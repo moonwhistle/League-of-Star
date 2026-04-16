@@ -3,7 +3,6 @@ name: 이슈 브랜치 및 Draft PR 자동 생성
 on:
   issues:
     types:
-      - opened
       - labeled
 
 permissions:
@@ -90,10 +89,6 @@ jobs:
               console.log('Template read error:', error);
             }
 
-            const issueBody = issue.body || '';
-            const tasksMatch = issueBody.match(/##\s*📚\s*작업\s*목록[\s\S]*?(?=\n##\s|$)/);
-            const tasksSection = tasksMatch ? tasksMatch[0].trim() : '- [ ] 작업 내용을 작성하세요';
-
             const prBody = [
               '## 🛠 자동 생성된 Draft PR',
               '',
@@ -101,9 +96,6 @@ jobs:
               '',
               '### 📌 브랜치',
               `- \`${branchName}\``,
-              '',
-              '### 📚 이슈 작업 목록',
-              tasksSection,
               '',
               '---',
               '',
