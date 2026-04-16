@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   create-branch-and-pr:
-    # 조건을 훨씬 단순화했습니다. feat 또는 refactor가 포함되면 실행됩니다.
     if: >-
       contains(github.event.issue.labels.*.name, 'feat') || 
       contains(github.event.issue.labels.*.name, 'FEAT') ||
@@ -32,18 +31,14 @@ jobs:
         run: |
           ISSUE_NUMBER="${{ github.event.issue.number }}"
           ISSUE_TITLE="${{ github.event.issue.title }}"
-          
-          # 라벨들을 콤마로 연결해 하나의 문자열로 변환
           ALL_LABELS=$(echo '${{ toJson(github.event.issue.labels.*.name) }}' | tr -d '[]" ')
 
-          # 우선순위에 따라 접두어 결정
           if [[ "$ALL_LABELS" =~ "refactor" ]] || [[ "$ALL_LABELS" =~ "REFACTOR" ]]; then
             PREFIX="refactor"
           else
             PREFIX="feat"
           fi
 
-          # 제목 슬러그화
           SLUG="$(echo "$ISSUE_TITLE" \
             | tr '[:upper:]' '[:lower:]' \
             | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g' \
@@ -78,19 +73,43 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
+            const path = require('path');
             const issue = context.payload.issue;
             const branchName = process.env.BRANCH_NAME;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            const existingPrs = await github.rest.pulls.list({
-              owner, repo, head: `${owner}:${branchName}`, state: 'open'
-            });
+            let prTemplate = '## 📌 요약\n\n## 📚 변경 사항\n\n## 📝 참고 사항\n\n## 📌 관련 이슈\n- Closes #' + issue.number;
+            try {
+              const templatePath = path.join(process.env.GITHUB_WORKSPACE, '.github', 'PULL_REQUEST_TEMPLATE.md');
+              if (fs.existsSync(templatePath)) {
+                prTemplate = fs.readFileSync(templatePath, 'utf8').replace('Closes #', `Closes #${issue.number}`);
+              }
+            } catch (error) {
+              console.log('Template read error:', error);
+            }
 
-            if (existingPrs.data.length > 0) return;
+            const issueBody = issue.body || '';
+            const tasksMatch = issueBody.match(/##\s*📚\s*작업\s*목록[\s\S]*?(?=\n##\s|$)/);
+            const tasksSection = tasksMatch ? tasksMatch[0].trim() : '- [ ] 작업 내용을 작성하세요';
 
-            const prBody = `## 📌 자동 생성된 PR\n\n- 연결된 이슈: #${issue.number}\n\n이 PR은 작업을 시작함과 동시에 자동으로 생성되었습니다.`;
-            
+            const prBody = [
+              '## 🛠 자동 생성된 Draft PR',
+              '',
+              '연결된 이슈를 기준으로 자동 생성된 PR입니다.',
+              '',
+              '### 📌 브랜치',
+              `- \`${branchName}\``,
+              '',
+              '### 📚 이슈 작업 목록',
+              tasksSection,
+              '',
+              '---',
+              '',
+              prTemplate.trim(),
+            ].join('\n');
+
             const { data: pr } = await github.rest.pulls.create({
               owner, repo,
               title: `#${issue.number} ${issue.title}`,
@@ -115,5 +134,5 @@ jobs:
 
             await github.rest.issues.createComment({
               owner, repo, issue_number: issue.number,
-              body: `🚀 작업 브랜치와 Draft PR이 생성되었습니다!\n\n- Branch: \`${branchName}\` \n- PR: #${pr.number}`
+              body: `🚀 작업 브랜치와 Draft PR이 성공적으로 생성되었습니다!\n\n- **Branch**: \`${branchName}\` \n- **PR**: #${pr.number}`
             });
