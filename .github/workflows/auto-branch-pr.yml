@@ -1,0 +1,135 @@
+name: 이슈 브랜치 및 Draft PR 자동 생성
+
+on:
+  issues:
+    types:
+      - opened
+      - labeled
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  create-branch-and-pr:
+    # 1. feat, refactor 라벨이 포함된 경우에만 실행 (대소문자 무관)
+    if: >-
+      contains(join(github.event.issue.labels.*.name, ','), 'feat') || 
+      contains(join(github.event.issue.labels.*.name, ','), 'FEAT') ||
+      contains(join(github.event.issue.labels.*.name, ','), 'refactor') ||
+      contains(join(github.event.issue.labels.*.name, ','), 'REFACTOR')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 기본 브랜치 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 브랜치 이름 생성
+        id: branch
+        shell: bash
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          LABELS='${{ toJson(github.event.issue.labels.*.name) }}'
+
+          # 라벨에 따른 프리픽스 결정
+          if echo "$LABELS" | grep -qi "refactor"; then
+            PREFIX="refactor"
+          else
+            PREFIX="feat"
+          fi
+
+          # 제목 슬러그화 (특수문자 제거, 소문자 변환)
+          SLUG="$(echo "$ISSUE_TITLE" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g' \
+            | cut -c1-30)"
+          
+          if [ -z "$SLUG" ]; then SLUG="work"; fi
+
+          # 2. 브랜치 명칭 설정: #이슈번호/라벨-슬러그
+          BRANCH_NAME="#${ISSUE_NUMBER}/${PREFIX}-${SLUG}"
+
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: 원격 브랜치 생성
+        id: create_branch
+        shell: bash
+        run: |
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # 브랜치 이미 존재하는지 확인
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
+            echo "Branch already exists. Skipping branch creation."
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH_NAME"
+          git commit --allow-empty -m "chore: 이슈 #${{ github.event.issue.number }} 작업 시작"
+          git push origin "$BRANCH_NAME"
+
+      - name: Draft PR 생성
+        uses: actions/github-script@v7
+        env:
+          BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const branchName = process.env.BRANCH_NAME;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // 이미 열린 PR이 있는지 확인
+            const existingPrs = await github.rest.pulls.list({
+              owner,
+              repo,
+              head: `${owner}:${branchName}`,
+              state: 'open'
+            });
+
+            if (existingPrs.data.length > 0) {
+              console.log('이미 존재하는 PR이 있어 생성을 건너뜁니다.');
+              return;
+            }
+
+            const prBody = `## 📌 자동 생성된 PR\n\n- 연결된 이슈: #${issue.number}\n\n이 PR은 ${issue.user.login}님의 이슈 작업을 시작함과 동시에 자동으로 생성되었습니다.\n작업이 완료되면 **Ready for review**로 변경해 주세요.`;
+            
+            const { data: pr } = await github.rest.pulls.create({
+              owner,
+              repo,
+              title: `[${branchName.split('/')[1].split('-')[0].toUpperCase()}] ${issue.title}`,
+              head: branchName,
+              base: context.payload.repository.default_branch,
+              body: prBody,
+              draft: true,
+            });
+
+            // 라벨 및 담당자 복사
+            if (issue.labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pr.number,
+                labels: issue.labels.map(l => l.name)
+              });
+            }
+            if (issue.assignees.length > 0) {
+              await github.rest.issues.addAssignees({
+                owner,
+                repo,
+                issue_number: pr.number,
+                assignees: issue.assignees.map(a => a.login)
+              });
+            }
+
+            // 이슈에 알림 댓글 작성
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issue.number,
+              body: `🚀 작업 브랜치와 Draft PR이 성공적으로 생성되었습니다!\n\n- **Branch**: \`${branchName}\` \n- **PR**: #${pr.number}`
+            });
