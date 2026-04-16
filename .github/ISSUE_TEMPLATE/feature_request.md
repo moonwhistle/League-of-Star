@@ -2,7 +2,7 @@
 name: Feature Request
 about: Suggest a new feature for this project
 title: "[FEAT] "
-labels: enhancement
+labels: feat
 assignees: ''
 ---
 
