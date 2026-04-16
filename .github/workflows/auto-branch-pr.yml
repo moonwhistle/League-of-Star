@@ -101,7 +101,7 @@ jobs:
             const { data: pr } = await github.rest.pulls.create({
               owner,
               repo,
-              title: `[${branchName.split('/')[1].split('-')[0].toUpperCase()}] ${issue.title}`,
+              title: `#${issue.number} ${issue.title}`,
               head: branchName,
               base: context.payload.repository.default_branch,
               body: prBody,
