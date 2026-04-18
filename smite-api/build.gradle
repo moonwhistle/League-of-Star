@@ -1,0 +1,14 @@
+// 실행 모듈: Spring Boot 플러그인 적용 → bootJar 생성
+apply plugin: 'org.springframework.boot'
+
+dependencies {
+	implementation project(':smite-core')
+	implementation project(':smite-infra-redis')
+
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+	runtimeOnly 'com.mysql:mysql-connector-j'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+}
