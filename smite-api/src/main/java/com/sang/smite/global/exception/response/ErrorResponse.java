@@ -24,12 +24,4 @@ public record ErrorResponse(
 			LocalDateTime.now()
 		);
 	}
-
-	public static ErrorResponse of(String customCode, String message) {
-		return new ErrorResponse(
-			customCode,
-			message,
-			LocalDateTime.now()
-		);
-	}
 }

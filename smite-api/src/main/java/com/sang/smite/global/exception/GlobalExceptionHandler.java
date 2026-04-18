@@ -3,7 +3,6 @@ package com.sang.smite.global.exception;
 import com.sang.smite.global.exception.response.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -45,8 +44,8 @@ public class GlobalExceptionHandler {
 	protected ResponseEntity<ErrorResponse> handleMessageNotReadable(HttpMessageNotReadableException e) {
 		log.warn("요청 바디 파싱 실패: {}", e.getMessage());
 		return ResponseEntity
-			.status(HttpStatus.BAD_REQUEST)
-			.body(ErrorResponse.of("COMMON_001", "요청 형식이 올바르지 않습니다"));
+			.status(CommonErrorCode.INVALID_REQUEST_BODY.httpStatus())
+			.body(ErrorResponse.of(CommonErrorCode.INVALID_REQUEST_BODY));
 	}
 
 	/**
@@ -56,8 +55,8 @@ public class GlobalExceptionHandler {
 	protected ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException e) {
 		log.warn("존재하지 않는 경로 접근: {}", e.getMessage());
 		return ResponseEntity
-			.status(HttpStatus.NOT_FOUND)
-			.body(ErrorResponse.of("COMMON_002", "요청한 리소스를 찾을 수 없습니다"));
+			.status(CommonErrorCode.RESOURCE_NOT_FOUND.httpStatus())
+			.body(ErrorResponse.of(CommonErrorCode.RESOURCE_NOT_FOUND));
 	}
 
 	/**
@@ -68,7 +67,7 @@ public class GlobalExceptionHandler {
 	protected ResponseEntity<ErrorResponse> handleUnexpectedException(Exception e) {
 		log.error("예상치 못한 서버 에러 발생", e);
 		return ResponseEntity
-			.status(HttpStatus.INTERNAL_SERVER_ERROR)
-			.body(ErrorResponse.of("COMMON_999", "서버 내부 오류가 발생했습니다"));
+			.status(CommonErrorCode.INTERNAL_SERVER_ERROR.httpStatus())
+			.body(ErrorResponse.of(CommonErrorCode.INTERNAL_SERVER_ERROR));
 	}
 }
