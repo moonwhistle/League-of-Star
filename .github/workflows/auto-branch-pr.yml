@@ -10,6 +10,10 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: issue-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   create-branch-and-pr:
     if: >-
@@ -29,7 +33,6 @@ jobs:
         shell: bash
         run: |
           ISSUE_NUMBER="${{ github.event.issue.number }}"
-          ISSUE_TITLE="${{ github.event.issue.title }}"
           ALL_LABELS=$(echo '${{ toJson(github.event.issue.labels.*.name) }}' | tr -d '[]" ')
 
           if [[ "$ALL_LABELS" =~ "refactor" ]] || [[ "$ALL_LABELS" =~ "REFACTOR" ]]; then
@@ -38,14 +41,7 @@ jobs:
             PREFIX="feat"
           fi
 
-          SLUG="$(echo "$ISSUE_TITLE" \
-            | tr '[:upper:]' '[:lower:]' \
-            | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g' \
-            | cut -c1-30)"
-          
-          if [ -z "$SLUG" ]; then SLUG="work"; fi
-
-          BRANCH_NAME="#${ISSUE_NUMBER}/${PREFIX}-${SLUG}"
+          BRANCH_NAME="${PREFIX}/#${ISSUE_NUMBER}"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
       - name: 원격 브랜치 생성
@@ -78,6 +74,15 @@ jobs:
             const branchName = process.env.BRANCH_NAME;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+
+            // 이미 해당 브랜치로 PR이 존재하면 스킵
+            const { data: existingPRs } = await github.rest.pulls.list({
+              owner, repo, head: `${owner}:${branchName}`, state: 'open'
+            });
+            if (existingPRs.length > 0) {
+              console.log(`PR already exists: #${existingPRs[0].number}. Skipping.`);
+              return;
+            }
 
             let prTemplate = '## 📌 요약\n\n## 📚 변경 사항\n\n## 📝 참고 사항\n\n## 📌 관련 이슈\n- Closes #' + issue.number;
             try {

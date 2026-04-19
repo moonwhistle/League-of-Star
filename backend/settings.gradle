@@ -1,0 +1,5 @@
+rootProject.name = 'smite'
+
+include 'smite-core'
+include 'smite-api'
+include 'smite-infra-redis'

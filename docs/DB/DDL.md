@@ -59,21 +59,24 @@ erDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Created : 회원가입
-    Created --> Verified : 이메일 인증
-    Verified --> Active : 게임 이용 가능
-    Active --> Active : 닉네임/비밀번호 변경
+    [*] --> Active : 회원가입
+    Active --> Active : 이메일 인증 / 닉네임·비밀번호 변경
     Active --> Withdrawn : 탈퇴 요청
-    Withdrawn --> [*] : 7일 유예 후 삭제
     Withdrawn --> Active : 유예 기간 내 취소
+    Withdrawn --> Anonymized : 7일 유예 후 익명화
+    Anonymized --> [*]
 ```
+
+> **Soft Delete 전략**: 유저 행은 물리적으로 삭제하지 않습니다. 탈퇴 시 `status=WITHDRAWN`으로 마킹하고, 7일 유예 후 개인정보(email, nickname, password)를 마스킹하여 `status=ANONYMIZED`로 전환합니다. 전적 기록(game_records, game_rooms)의 FK 참조가 유지되므로 전적 보존과 익명화가 동시에 달성됩니다.
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| 회원가입 | INSERT | email_verified = FALSE |
-| 이메일 인증 | UPDATE | email_verified = TRUE |
+| 회원가입 | INSERT | status=ACTIVE, email_verified=FALSE |
+| 이메일 인증 | UPDATE | email_verified=TRUE |
 | 닉네임/비밀번호 변경 | UPDATE | updated_at 갱신 |
-| 탈퇴 | DELETE | 7일 유예 후 CASCADE 삭제 |
+| 탈퇴 요청 | UPDATE | status=WITHDRAWN, withdrawn_at=NOW() |
+| 탈퇴 취소 (7일 이내) | UPDATE | status=ACTIVE, withdrawn_at=NULL |
+| 7일 유예 후 익명화 | UPDATE | status=ANONYMIZED, email·nickname·password 마스킹 |
 
 ### 2.2 social_accounts
 
@@ -103,6 +106,7 @@ stateDiagram-v2
 | 게임 패배 | UPDATE | lp 감소, total_losses 증가 |
 | 게임 무승부 | UPDATE | total_draws 증가 (LP 변동 없음) |
 | 승급 성공 | UPDATE | tier/division/tier_score 변경, lp=0, demotion_shield=3 |
+| 승리 (보호 중) | UPDATE | demotion_shield=0 (승리 시 강등 보호 즉시 해제) |
 | 강등 | UPDATE | tier/division/tier_score 변경, lp=75, demotion_shield=0 |
 
 ### 2.4 promotion_series
@@ -177,6 +181,8 @@ stateDiagram-v2
 | `password` | VARCHAR(255) | NULLABLE | BCrypt 해시. 소셜 전용 계정은 NULL |
 | `nickname` | VARCHAR(16) | UNIQUE, NOT NULL | 게임 닉네임 (2~16자) |
 | `email_verified` | BOOLEAN | NOT NULL, DEFAULT FALSE | 이메일 인증 완료 여부 |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'ACTIVE' | ACTIVE / WITHDRAWN / ANONYMIZED |
+| `withdrawn_at` | DATETIME | NULLABLE | 탈퇴 요청 시각 (7일 유예 기준점, 30일 재가입 제한 기준) |
 | `created_at` | DATETIME | NOT NULL | 가입일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
 
@@ -187,11 +193,14 @@ CREATE TABLE users (
     password       VARCHAR(255) NULL,
     nickname       VARCHAR(16)  NOT NULL,
     email_verified BOOLEAN      NOT NULL DEFAULT FALSE,
+    status         VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
+    withdrawn_at   DATETIME     NULL,
     created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_email (email),
-    UNIQUE KEY uk_nickname (nickname)
+    UNIQUE KEY uk_nickname (nickname),
+    INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -352,9 +361,9 @@ CREATE TABLE game_rooms (
     INDEX idx_player1_id (player1_id),
     INDEX idx_player2_id (player2_id),
     INDEX idx_status (status),
-    CONSTRAINT fk_game_rooms_player1 FOREIGN KEY (player1_id) REFERENCES users (id),
-    CONSTRAINT fk_game_rooms_player2 FOREIGN KEY (player2_id) REFERENCES users (id),
-    CONSTRAINT fk_game_rooms_winner  FOREIGN KEY (winner_id)  REFERENCES users (id)
+    CONSTRAINT fk_game_rooms_player1 FOREIGN KEY (player1_id) REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_game_rooms_player2 FOREIGN KEY (player2_id) REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_game_rooms_winner  FOREIGN KEY (winner_id)  REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -391,8 +400,8 @@ CREATE TABLE game_actions (
     updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_game_room_user (game_room_id, user_id),
-    CONSTRAINT fk_game_actions_room FOREIGN KEY (game_room_id) REFERENCES game_rooms (id),
-    CONSTRAINT fk_game_actions_user FOREIGN KEY (user_id)      REFERENCES users (id)
+    CONSTRAINT fk_game_actions_room FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_game_actions_user FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -441,9 +450,9 @@ CREATE TABLE game_records (
     UNIQUE KEY uk_game_room_user (game_room_id, user_id),
     INDEX idx_user_id_created (user_id, created_at DESC),
     INDEX idx_user_id_result (user_id, result),
-    CONSTRAINT fk_game_records_room     FOREIGN KEY (game_room_id) REFERENCES game_rooms (id),
-    CONSTRAINT fk_game_records_user     FOREIGN KEY (user_id)      REFERENCES users (id),
-    CONSTRAINT fk_game_records_opponent FOREIGN KEY (opponent_id)   REFERENCES users (id)
+    CONSTRAINT fk_game_records_room     FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_game_records_user     FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_game_records_opponent FOREIGN KEY (opponent_id)   REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -473,7 +482,7 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터:
 
 | # | 테이블 | 행 수 증가 패턴 | 가변/불변 | 설명 |
 |---|--------|----------------|----------|------|
-| 1 | `users` | 유저당 1행 | Mutable | 계정 정보 |
+| 1 | `users` | 유저당 1행 | Mutable (Soft Delete) | 계정 정보 — 탈퇴 시 익명화 보존 |
 | 2 | `social_accounts` | 유저당 0~2행 | 생성/삭제 | 소셜 연동 |
 | 3 | `user_rank_info` | 유저당 1행 | Mutable | 현재 랭크 (매 게임마다 갱신) |
 | 4 | `promotion_series` | 승급전마다 1행 | 진행 중 Mutable → 완료 후 Immutable | 승급전 이력 |
@@ -490,3 +499,4 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터:
 | 2026-04-17 | 초안 작성 — 7개 테이블 + Redis 저장 구조 |
 | 2026-04-17 | Mermaid ER 파싱 오류 수정, 객체 생명주기 섹션 추가 |
 | 2026-04-17 | 모든 테이블에 created_at/updated_at 통일, promotion_series.wins 제거, ER 다이어그램 PK/FK만 표시로 축소 |
+| 2026-04-18 | Soft Delete 전환: users에 status/withdrawn_at 추가, 탈퇴 익명화 생명주기 반영, FK ON DELETE RESTRICT 명시, demotion_shield 승리 시 해제 추가 |
