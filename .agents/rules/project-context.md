@@ -34,13 +34,16 @@ trigger: always_on
 
 ---
 
-## 멀티모듈 구조
+## 프로젝트 구조
 
 ```
 smite/
-├── smite-api/            # API 모듈 (Controller, DTO, Config, Service 구현체)
-├── smite-core/           # Core 모듈 (Entity, Repository, 게임 로직, Service 인터페이스)
-└── smite-infra-redis/    # Redis 인프라 모듈 (매칭 큐, 세션 관리)
+├── backend/                  # Gradle 루트
+│   ├── smite-api/            # API 모듈 (Controller, DTO, Config, Service 구현체)
+│   ├── smite-core/           # Core 모듈 (Entity, Repository, 게임 로직, Service 인터페이스)
+│   └── smite-infra-redis/    # Redis 인프라 모듈 (매칭 큐, 세션 관리)
+├── frontend/                 # React 19 + TypeScript + Vite
+└── docs/                     # 기획, 정책, DB 설계 문서
 ```
 
 ### 모듈 의존성 방향
