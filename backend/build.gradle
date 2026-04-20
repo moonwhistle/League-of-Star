@@ -18,6 +18,14 @@ subprojects {
 		}
 	}
 
+	// 모든 모듈에서 bootJar 생성을 기본적으로 끕니다. (라이브러리 모듈 기준)
+	bootJar {
+		enabled = false
+	}
+	jar {
+		enabled = true
+	}
+
 	repositories {
 		mavenCentral()
 	}

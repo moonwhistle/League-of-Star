@@ -1,6 +1,13 @@
 // 실행 모듈: Spring Boot 플러그인 적용 → bootJar 생성
 apply plugin: 'org.springframework.boot'
 
+bootJar {
+	enabled = true
+}
+jar {
+	enabled = false
+}
+
 dependencies {
 	implementation project(':smite-core')
 	implementation project(':smite-infra-redis')
