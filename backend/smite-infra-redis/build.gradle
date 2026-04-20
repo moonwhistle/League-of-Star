@@ -1,6 +1,15 @@
 // 라이브러리 모듈: 일반 jar만 생성 (bootJar 없음)
+apply plugin: 'java-test-fixtures'
 
 dependencies {
 	implementation project(':smite-core')
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'com.redis:testcontainers-redis'
+
+	testFixturesImplementation 'org.testcontainers:junit-jupiter'
+	testFixturesImplementation 'com.redis:testcontainers-redis'
+	testFixturesImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

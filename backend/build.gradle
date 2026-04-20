@@ -1,12 +1,13 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.5' apply false
+	id 'org.springframework.boot' version '3.4.2' apply false
 	id 'io.spring.dependency-management' version '1.1.7' apply false
 }
 
 subprojects {
 	apply plugin: 'java'
 	apply plugin: 'io.spring.dependency-management'
+	apply plugin: 'org.springframework.boot'
 
 	group = 'com.sang'
 	version = '0.0.1-SNAPSHOT'
@@ -24,7 +25,7 @@ subprojects {
 	// Spring Boot BOM으로 의존성 버전 통일 관리
 	dependencyManagement {
 		imports {
-			mavenBom "org.springframework.boot:spring-boot-dependencies:4.0.5"
+			mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.2"
 		}
 	}
 
@@ -37,6 +38,7 @@ subprojects {
 
 		// 테스트 핵심 라이브러리 추가
 		testImplementation 'org.springframework.boot:spring-boot-starter-test'
+		testRuntimeOnly 'com.h2database:h2'
 		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	}
 
