@@ -15,6 +15,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -46,13 +47,14 @@ public class GameRoom extends BaseEntity {
     private Long id;
 
     @Builder.Default
-    @OneToMany(mappedBy = "gameRoom", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "game_room_id")
     private List<GameParticipant> participants = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private GameStatus status = GameStatus.IN_PROGRESS;
+    private GameStatus status = GameStatus.READY;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
@@ -83,7 +85,6 @@ public class GameRoom extends BaseEntity {
             throw new CoreException(CoreErrorCode.GAME_ROOM_FULL);
         }
         GameParticipant participant = GameParticipant.builder()
-                .gameRoom(this)
                 .userId(userId)
                 .status(ParticipantStatus.READY)
                 .build();
@@ -91,9 +92,24 @@ public class GameRoom extends BaseEntity {
     }
 
     public void start(LocalDateTime startTime) {
+        validateStart();
         this.gameStartTime = startTime;
         this.status = GameStatus.IN_PROGRESS;
         this.participants.forEach(p -> p.updateStatus(ParticipantStatus.PLAYING));
+    }
+
+    private void validateStart() {
+        if (this.status != GameStatus.READY) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+        if (this.participants.size() != MAX_PARTICIPANTS) {
+            throw new CoreException(CoreErrorCode.INCOMPLETE_PARTICIPANTS);
+        }
+        boolean allReady = this.participants.stream()
+                .allMatch(p -> p.getStatus() == ParticipantStatus.READY);
+        if (!allReady) {
+            throw new CoreException(CoreErrorCode.INCOMPLETE_PARTICIPANTS);
+        }
     }
 
     public void finish(GameResult result, Long winnerId) {

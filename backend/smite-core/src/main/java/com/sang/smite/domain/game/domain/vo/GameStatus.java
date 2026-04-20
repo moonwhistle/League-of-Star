@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum GameStatus {
+    READY("대기 중"),
     IN_PROGRESS("진행 중"),
     FINISHED("종료됨"),
     ABORTED("중단됨");
