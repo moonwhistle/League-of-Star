@@ -1,11 +1,19 @@
 // 실행 모듈: Spring Boot 플러그인 적용 → bootJar 생성
 apply plugin: 'org.springframework.boot'
 
+bootJar {
+	enabled = true
+}
+jar {
+	enabled = false
+}
+
 dependencies {
 	implementation project(':smite-core')
 	implementation project(':smite-infra-redis')
+	testImplementation testFixtures(project(':smite-infra-redis'))
 
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
 	runtimeOnly 'com.mysql:mysql-connector-j'
@@ -13,6 +21,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'com.redis:testcontainers-redis'
 	testRuntimeOnly 'com.h2database:h2'
 }

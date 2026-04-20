@@ -11,9 +11,11 @@ erDiagram
     users ||--o{ promotion_series : enters
     users ||--o{ game_records : records
     users ||--o{ game_actions : performs
-    users ||--o{ game_rooms : plays
+    users ||--o{ game_participants : participates
+    game_rooms ||--o{ game_participants : has
     game_rooms ||--o{ game_actions : contains
     game_rooms ||--o{ game_records : generates
+    game_records ||--o| promotion_series : links
 
     users {
         BIGINT id PK
@@ -32,9 +34,12 @@ erDiagram
     }
     game_rooms {
         BIGINT id PK
-        BIGINT player1_id FK
-        BIGINT player2_id FK
         BIGINT winner_id FK
+    }
+    game_participants {
+        BIGINT id PK
+        BIGINT game_room_id FK
+        BIGINT user_id FK
     }
     game_actions {
         BIGINT id PK
@@ -46,6 +51,7 @@ erDiagram
         BIGINT game_room_id FK
         BIGINT user_id FK
         BIGINT opponent_id FK
+        BIGINT promotion_series_id FK
     }
 ```
 
@@ -141,9 +147,9 @@ stateDiagram-v2
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| 매칭 수락 | INSERT | status=IN_PROGRESS, scenario_data 생성 |
-| 게임 시작 | UPDATE | game_start_time 기록 (ms 정밀도) |
-| 게임 종료 | UPDATE | status=FINISHED, result/winner_id, finished_at |
+| 매칭 수락 | INSERT | status=IN_PROGRESS, scenario_data 생성, participants(READY) 추가 |
+| 게임 시작 | UPDATE | status=IN_PROGRESS, participants(PLAYING), game_start_time 기록 |
+| 게임 종료 | UPDATE | status=FINISHED, result/winner_id, participants(FINISHED), finished_at |
 | 디스커넥트 | UPDATE | status=ABORTED, 이탈자 패배/상대 승리 |
 
 ### 2.6 game_actions — Immutable
@@ -163,8 +169,9 @@ stateDiagram-v2
 | 게임 종료 | INSERT (2행) | 양쪽 플레이어 각 1행 동시 생성 |
 
 - **불변(Immutable)**: 전적 기록은 수정하지 않음
-- **항상 2행 생성**: player1/player2 각각의 관점에서 기록
-- **LP 스냅샷**: lp_before/after, tier_before/after로 변동 이력 추적
+- **항상 2행 생성**: 각 참여자(Participant)의 관점에서 기록
+- **LP/Rank 스냅샷**: lp_before/after와 함께 rank_before/after를 **JSON 스냅샷**으로 저장하여 변동 이력 추적
+- **승급전 연동**: 승급전 경기인 경우 `promotion_series_id`를 기록하여 결과 정합성 보장
 
 ---
 
@@ -329,14 +336,12 @@ CREATE TABLE promotion_series (
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
 | `id` | BIGINT | PK, AUTO_INCREMENT | 게임 고유 ID |
-| `player1_id` | BIGINT | FK → users, NOT NULL | 플레이어 1 |
-| `player2_id` | BIGINT | FK → users, NOT NULL | 플레이어 2 |
 | `status` | VARCHAR(20) | NOT NULL | IN_PROGRESS / FINISHED / ABORTED |
 | `result` | VARCHAR(20) | NULLABLE | PLAYER1_WIN / PLAYER2_WIN / DRAW |
-| `winner_id` | BIGINT | FK → users, NULLABLE | 승자 (무승부 시 NULL, 쿼리 편의용 비정규화) |
+| `winner_id` | BIGINT | FK → users, NULLABLE | 승자 (무승부 시 NULL) |
 | `dragon_max_hp` | INT | NOT NULL, DEFAULT 10000 | 드래곤 초기 HP |
 | `duration_seconds` | INT | NOT NULL | 게임 시간 (7~15) |
-| `scenario_data` | JSON | NOT NULL | HP 감소 시나리오 |
+| `scenario_data` | JSON | NOT NULL | HP 감소 시나리오 스냅샷 |
 | `game_start_time` | DATETIME(3) | NULLABLE | 게임 실제 시작 시각 (ms 정밀도) |
 | `finished_at` | DATETIME | NULLABLE | 게임 종료일시 |
 | `created_at` | DATETIME | NOT NULL | 방 생성일시 |
@@ -345,8 +350,6 @@ CREATE TABLE promotion_series (
 ```sql
 CREATE TABLE game_rooms (
     id                 BIGINT      NOT NULL AUTO_INCREMENT,
-    player1_id         BIGINT      NOT NULL,
-    player2_id         BIGINT      NOT NULL,
     status             VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS',
     result             VARCHAR(20) NULL,
     winner_id          BIGINT      NULL,
@@ -358,12 +361,36 @@ CREATE TABLE game_rooms (
     created_at         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    INDEX idx_player1_id (player1_id),
-    INDEX idx_player2_id (player2_id),
     INDEX idx_status (status),
-    CONSTRAINT fk_game_rooms_player1 FOREIGN KEY (player1_id) REFERENCES users (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_rooms_player2 FOREIGN KEY (player2_id) REFERENCES users (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_rooms_winner  FOREIGN KEY (winner_id)  REFERENCES users (id) ON DELETE RESTRICT
+    CONSTRAINT fk_game_rooms_winner FOREIGN KEY (winner_id) REFERENCES users (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+---
+
+### 3.6 game_participants — 게임 참여자
+
+| 컬럼 | 타입 | 제약 | 설명 |
+|------|------|------|------|
+| `id` | BIGINT | PK, AUTO_INCREMENT | 고유 ID |
+| `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 소속 게임방 |
+| `user_id` | BIGINT | FK → users, NOT NULL | 참여 유저 |
+| `status` | VARCHAR(20) | NOT NULL | READY / PLAYING / FINISHED / DISCONNECTED |
+| `created_at` | DATETIME | NOT NULL | 참여일시 |
+| `updated_at` | DATETIME | NOT NULL | 수정일시 |
+
+```sql
+CREATE TABLE game_participants (
+    id             BIGINT      NOT NULL AUTO_INCREMENT,
+    game_room_id   BIGINT      NOT NULL,
+    user_id        BIGINT      NOT NULL,
+    status         VARCHAR(20) NOT NULL DEFAULT 'READY',
+    created_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_room_user (game_room_id, user_id),
+    CONSTRAINT fk_participants_room FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE CASCADE,
+    CONSTRAINT fk_participants_user FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -371,7 +398,7 @@ CREATE TABLE game_rooms (
 
 ---
 
-### 3.6 game_actions — 강타 액션 기록
+### 3.7 game_actions — 강타 액션 기록
 
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
@@ -409,7 +436,7 @@ CREATE TABLE game_actions (
 
 ---
 
-### 3.7 game_records — 전적 기록
+### 3.8 game_records — 전적 기록
 
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
@@ -417,42 +444,39 @@ CREATE TABLE game_actions (
 | `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 게임 방 |
 | `user_id` | BIGINT | FK → users, NOT NULL | 해당 유저 |
 | `opponent_id` | BIGINT | FK → users, NOT NULL | 상대방 |
+| `promotion_series_id` | BIGINT | FK → promotion_series, NULLABLE | 연관된 승급전 |
 | `result` | VARCHAR(10) | NOT NULL | WIN / LOSS / DRAW |
 | `lp_change` | INT | NOT NULL | LP 변동량 |
 | `lp_before` | INT | NOT NULL | 게임 전 LP |
 | `lp_after` | INT | NOT NULL | 게임 후 LP |
-| `tier_before` | VARCHAR(20) | NOT NULL | 게임 전 티어 |
-| `division_before` | VARCHAR(5) | NULLABLE | 게임 전 디비전 |
-| `tier_after` | VARCHAR(20) | NOT NULL | 게임 후 티어 |
-| `division_after` | VARCHAR(5) | NULLABLE | 게임 후 디비전 |
+| `rank_before` | JSON | NOT NULL | 게임 전 랭크 스냅샷 (Tier + Division) |
+| `rank_after` | JSON | NOT NULL | 게임 후 랭크 스냅샷 (Tier + Division) |
 | `is_promotion_game` | BOOLEAN | NOT NULL, DEFAULT FALSE | 승급전 경기 여부 |
 | `created_at` | DATETIME | NOT NULL | 기록일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
 
 ```sql
 CREATE TABLE game_records (
-    id                 BIGINT      NOT NULL AUTO_INCREMENT,
-    game_room_id       BIGINT      NOT NULL,
-    user_id            BIGINT      NOT NULL,
-    opponent_id        BIGINT      NOT NULL,
-    result             VARCHAR(10) NOT NULL,
-    lp_change          INT         NOT NULL,
-    lp_before          INT         NOT NULL,
-    lp_after           INT         NOT NULL,
-    tier_before        VARCHAR(20) NOT NULL,
-    division_before    VARCHAR(5)  NULL,
-    tier_after         VARCHAR(20) NOT NULL,
-    division_after     VARCHAR(5)  NULL,
-    is_promotion_game  BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_at         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id                   BIGINT      NOT NULL AUTO_INCREMENT,
+    game_room_id         BIGINT      NOT NULL,
+    user_id              BIGINT      NOT NULL,
+    opponent_id          BIGINT      NOT NULL,
+    promotion_series_id  BIGINT      NULL,
+    result               VARCHAR(10) NOT NULL,
+    lp_change            INT         NOT NULL,
+    lp_before            INT         NOT NULL,
+    lp_after             INT         NOT NULL,
+    rank_before          JSON        NOT NULL,
+    rank_after           JSON        NOT NULL,
+    is_promotion_game    BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_game_room_user (game_room_id, user_id),
     INDEX idx_user_id_created (user_id, created_at DESC),
-    INDEX idx_user_id_result (user_id, result),
-    CONSTRAINT fk_game_records_room     FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_records_user     FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_records_opponent FOREIGN KEY (opponent_id)   REFERENCES users (id) ON DELETE RESTRICT
+    CONSTRAINT fk_game_records_room      FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_game_records_user      FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_game_records_series    FOREIGN KEY (promotion_series_id) REFERENCES promotion_series (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
