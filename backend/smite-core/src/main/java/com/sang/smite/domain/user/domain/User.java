@@ -1,7 +1,7 @@
 package com.sang.smite.domain.user.domain;
 
 import com.sang.smite.domain.user.domain.vo.UserStatus;
-import com.sang.smite.global.domain.BaseEntity;
+import com.sang.smite.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

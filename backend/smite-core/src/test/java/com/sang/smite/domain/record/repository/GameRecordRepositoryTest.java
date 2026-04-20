@@ -41,13 +41,16 @@ class GameRecordRepositoryTest {
         // given
         User user = userRepository.save(User.builder().email("user@test.com").nickname("user").build());
         User opponent = userRepository.save(User.builder().email("opp@test.com").nickname("opp").build());
-        GameRoom room = gameRoomRepository.save(GameRoom.builder()
-                .player1(user).player2(opponent).status(GameStatus.FINISHED)
+        GameRoom room = GameRoom.builder()
+                .status(GameStatus.FINISHED)
                 .durationSeconds(60).scenarioData(GameScenario.of(List.of(new HpStep(0, 10000))))
-                .build());
+                .build();
+        room.addParticipant(user.getId());
+        room.addParticipant(opponent.getId());
+        gameRoomRepository.save(room);
 
         GameRecord record = GameRecord.builder()
-                .gameRoom(room).user(user).opponent(opponent)
+                .gameRoomId(room.getId()).userId(user.getId()).opponentId(opponent.getId())
                 .result(GameRecordResult.WIN).lpChange(25).lpBefore(0).lpAfter(25)
                 .rankBefore(Rank.of(Tier.IRON, Division.I))
                 .rankAfter(Rank.of(Tier.BRONZE, Division.IV))

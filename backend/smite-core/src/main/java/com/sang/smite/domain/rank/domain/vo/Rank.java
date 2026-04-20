@@ -1,34 +1,40 @@
 package com.sang.smite.domain.rank.domain.vo;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 
-@Embeddable
+/**
+ * 티어와 단계(Division)를 결합한 가치 객체(Value Object)입니다.
+ */
 public record Rank(
-        @Enumerated(EnumType.STRING) @Column(name = "tier", nullable = false, length = 20) Tier tier,
-
-        @Enumerated(EnumType.STRING) @Column(name = "division", length = 5) Division division)
+        @Enumerated(EnumType.STRING)
+        @Column(name = "tier", nullable = false, length = 20) Tier tier,
+        @Enumerated(EnumType.STRING)
+        @Column(name = "division", length = 5) Division division
+)
         implements Comparable<Rank> {
+
+    private static final int DIVISION_COUNT = 4;
+    private static final int BASE_LP_CHANGE = 25;
+    private static final int GAP_MULTIPLIER = 3;
+    private static final int MIN_LP_CHANGE = 15;
+    private static final int MAX_LP_CHANGE = 35;
 
     public static Rank of(Tier tier, Division division) {
         return new Rank(tier, division);
     }
 
     /**
-     * [1단계: 티어 점수화] 랭크의 매칭 및 LP 계산 기준이 되는 티어 점수(Tier Score)를 계산합니다.
+     * [정책 3.2] 티어 점수(Tier Score)를 계산합니다.
      * <p>
-     * 이 점수는 상대방과의 실력 차이(gap)를 구하기 위한 지표로 사용됩니다.
+     * 공식: (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
      * </p>
-     * 공식: {@code (Tier_Level - 1) * 4 + (4 - Division_Value) + 1}
-     *
-     * @return 1 ~ 28 사이의 정수 점수 (Apex 티어 제외)
-     * @see <a href="./smite/docs/project/policy.md">정책 문서 3.1 & 3.2 참조</a>
+     * @return Iron IV(1) ~ Diamond I(28) 범위의 고유 점수
      */
     public int getTierScore() {
-        int baseScore = (this.tier.getLevel() - 1) * 4;
-        int divisionBonus = (division != null) ? (4 - division.getValue()) : 0;
+        int baseScore = (this.tier.getLevel() - 1) * DIVISION_COUNT;
+        int divisionBonus = (division != null) ? (DIVISION_COUNT - division.getValue()) : 0;
         return baseScore + divisionBonus + 1;
     }
 
@@ -38,31 +44,31 @@ public record Rank(
     }
 
     /**
-     * [2단계: LP 변동량 계산] 상대방 랭크와의 점수 차이(gap)를 기반으로 승리 시 획득할 LP를 계산합니다.
+     * [정책 3.1] 승리 시 획득할 LP를 계산합니다.
      * <p>
-     * 공식: {@code clamp(25 + gap * 3, 15, 35)}
+     * 공식: clamp(25 + gap * 3, 15, 35)
+     * gap: (상태 티어 점수 - 내 티어 점수)
      * </p>
-     *
-     * @param opponentRank 상대방의 Rank VO
-     * @return 15 ~ 35 사이의 승리 획득 LP
+     * @param opponentRank 상대방의 랭크 정보
+     * @return 최소 15, 최대 35 범위의 획득 LP
      */
     public int calculateWinLp(Rank opponentRank) {
         int gap = opponentRank.getTierScore() - this.getTierScore();
-        return Math.max(15, Math.min(35, 25 + (gap * 3)));
+        return Math.max(MIN_LP_CHANGE, Math.min(MAX_LP_CHANGE, BASE_LP_CHANGE + (gap * GAP_MULTIPLIER)));
     }
 
     /**
-     * [2단계: LP 변동량 계산] 상대방 랭크와의 점수 차이(gap)를 기반으로 패배 시 차감될 LP를 계산합니다.
+     * [정책 3.1] 패배 시 차감될 LP를 계산합니다.
      * <p>
-     * 공식: {@code clamp(25 - gap * 3, 15, 35)}
+     * 공식: clamp(25 - gap * 3, 15, 35)
+     * gap: (상태 티어 점수 - 내 티어 점수)
      * </p>
-     *
-     * @param opponentRank 상대방의 Rank VO
-     * @return 15 ~ 35 사이의 패배 차감 LP
+     * @param opponentRank 상대방의 랭크 정보
+     * @return 최소 15, 최대 35 범위의 차감 LP
      */
     public int calculateLossLp(Rank opponentRank) {
         int gap = opponentRank.getTierScore() - this.getTierScore();
-        return Math.max(15, Math.min(35, 25 - (gap * 3)));
+        return Math.max(MIN_LP_CHANGE, Math.min(MAX_LP_CHANGE, BASE_LP_CHANGE - (gap * GAP_MULTIPLIER)));
     }
 
     @Override

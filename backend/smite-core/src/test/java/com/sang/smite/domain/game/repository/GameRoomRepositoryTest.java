@@ -12,8 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
@@ -33,19 +31,20 @@ class GameRoomRepositoryTest {
         User p1 = userRepository.save(User.builder().email("p1@test.com").nickname("p1").build());
         User p2 = userRepository.save(User.builder().email("p2@test.com").nickname("p2").build());
 
-        GameScenario scenario = GameScenario.of(List.of(
+        GameScenario scenario = GameScenario.of(java.util.List.of(
             new HpStep(0, 10000),
             new HpStep(1000, 9500),
             new HpStep(2000, 9000)
         ));
 
         GameRoom room = GameRoom.builder()
-                .player1(p1)
-                .player2(p2)
                 .status(GameStatus.IN_PROGRESS)
                 .durationSeconds(60)
                 .scenarioData(scenario)
                 .build();
+        
+        room.addParticipant(p1.getId());
+        room.addParticipant(p2.getId());
 
         // when
         GameRoom savedRoom = gameRoomRepository.save(room);

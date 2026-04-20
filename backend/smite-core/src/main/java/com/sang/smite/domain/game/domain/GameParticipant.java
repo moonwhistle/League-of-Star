@@ -1,7 +1,6 @@
-package com.sang.smite.domain.account.domain;
+package com.sang.smite.domain.game.domain;
 
-import com.sang.smite.domain.account.domain.vo.SocialProvider;
-import com.sang.smite.domain.user.domain.User;
+import com.sang.smite.domain.game.domain.vo.ParticipantStatus;
 import com.sang.smite.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,41 +13,41 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/**
+ * 게임 방에 참여한 사용자 정보를 관리하는 엔티티입니다.
+ * 1v1 대전의 각 참여자를 독립적인 엔티티로 관리하여 확장성을 확보합니다.
+ */
 @Entity
-@Table(
-    name = "social_accounts",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_provider_provider_id", columnNames = {"provider", "providerId"})
-    }
-)
+@Table(name = "game_participants")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class SocialAccount extends BaseEntity {
+public class GameParticipant extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @JoinColumn(name = "game_room_id", nullable = false)
+    private GameRoom gameRoom;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private SocialProvider provider;
+    @Builder.Default
+    private ParticipantStatus status = ParticipantStatus.READY;
 
-    @Column(nullable = false)
-    private String providerId;
-
-    @Column
-    private String providerEmail;
+    public void updateStatus(ParticipantStatus status) {
+        this.status = status;
+    }
 }

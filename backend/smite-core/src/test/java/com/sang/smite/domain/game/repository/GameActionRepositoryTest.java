@@ -38,15 +38,17 @@ class GameActionRepositoryTest {
         User p1 = userRepository.save(User.builder().email("p1@test.com").nickname("p1").build());
         User p2 = userRepository.save(User.builder().email("p2@test.com").nickname("p2").build());
         
-        GameRoom room = gameRoomRepository.save(GameRoom.builder()
-                .player1(p1).player2(p2)
+        GameRoom room = GameRoom.builder()
                 .status(GameStatus.IN_PROGRESS)
                 .durationSeconds(60)
                 .scenarioData(GameScenario.of(List.of(new HpStep(0, 10000))))
-                .build());
+                .build();
+        room.addParticipant(p1.getId());
+        room.addParticipant(p2.getId());
+        gameRoomRepository.save(room);
 
         GameAction action1 = GameAction.builder()
-                .gameRoom(room).user(p1)
+                .gameRoomId(room.getId()).userId(p1.getId())
                 .serverReceiveTimeMs(1000L).rttMs(20).smiteTimeMs(980).dragonHpAtSmite(1000).isKill(true)
                 .build();
         gameActionRepository.save(action1);
@@ -54,7 +56,7 @@ class GameActionRepositoryTest {
 
         // when & then
         GameAction action2 = GameAction.builder()
-                .gameRoom(room).user(p1) // 동일 유저, 동일 게임방
+                .gameRoomId(room.getId()).userId(p1.getId()) // 동일 유저, 동일 게임방
                 .serverReceiveTimeMs(1100L).rttMs(20).smiteTimeMs(1080).dragonHpAtSmite(900).isKill(false)
                 .build();
 

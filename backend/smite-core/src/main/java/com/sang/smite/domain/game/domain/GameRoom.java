@@ -1,20 +1,21 @@
 package com.sang.smite.domain.game.domain;
 
+import com.sang.smite.common.exception.CoreErrorCode;
+import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
-import com.sang.smite.domain.user.domain.User;
-import com.sang.smite.global.domain.BaseEntity;
+import com.sang.smite.domain.game.domain.vo.ParticipantStatus;
+import com.sang.smite.common.domain.BaseEntity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -25,6 +26,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "game_rooms")
@@ -34,17 +37,17 @@ import java.time.LocalDateTime;
 @Builder
 public class GameRoom extends BaseEntity {
 
+    public static final int MAX_PARTICIPANTS = 2;
+    public static final int DEFAULT_DRAGON_MAX_HP = 10000;
+    private static final String ERR_MAX_PARTICIPANTS = "1v1 게임방에는 최대 %d명까지만 참여 가능합니다.";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player1_id", nullable = false)
-    private User player1;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player2_id", nullable = false)
-    private User player2;
+    @Builder.Default
+    @OneToMany(mappedBy = "gameRoom", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<GameParticipant> participants = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -55,13 +58,12 @@ public class GameRoom extends BaseEntity {
     @Column(length = 20)
     private GameResult result;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "winner_id")
-    private User winner;
+    @Column(name = "winner_id")
+    private Long winnerId;
 
     @Column(nullable = false)
     @Builder.Default
-    private int dragonMaxHp = 10000;
+    private int dragonMaxHp = DEFAULT_DRAGON_MAX_HP;
 
     @Column(nullable = false)
     private int durationSeconds;
@@ -76,15 +78,29 @@ public class GameRoom extends BaseEntity {
     @Column
     private LocalDateTime finishedAt;
 
+    public void addParticipant(Long userId) {
+        if (this.participants.size() >= MAX_PARTICIPANTS) {
+            throw new CoreException(CoreErrorCode.GAME_ROOM_FULL);
+        }
+        GameParticipant participant = GameParticipant.builder()
+                .gameRoom(this)
+                .userId(userId)
+                .status(ParticipantStatus.READY)
+                .build();
+        this.participants.add(participant);
+    }
+
     public void start(LocalDateTime startTime) {
         this.gameStartTime = startTime;
         this.status = GameStatus.IN_PROGRESS;
+        this.participants.forEach(p -> p.updateStatus(ParticipantStatus.PLAYING));
     }
 
-    public void finish(GameResult result, User winner) {
+    public void finish(GameResult result, Long winnerId) {
         this.result = result;
-        this.winner = winner;
+        this.winnerId = winnerId;
         this.status = GameStatus.FINISHED;
         this.finishedAt = LocalDateTime.now();
+        this.participants.forEach(p -> p.updateStatus(ParticipantStatus.FINISHED));
     }
 }

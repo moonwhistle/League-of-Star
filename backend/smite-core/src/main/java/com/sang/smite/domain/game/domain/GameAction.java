@@ -1,15 +1,11 @@
 package com.sang.smite.domain.game.domain;
 
-import com.sang.smite.domain.user.domain.User;
-import com.sang.smite.global.domain.BaseEntity;
+import com.sang.smite.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -35,13 +31,11 @@ public class GameAction extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "game_room_id", nullable = false)
-    private GameRoom gameRoom;
+    @Column(name = "game_room_id", nullable = false)
+    private Long gameRoomId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Column(nullable = false)
     private long serverReceiveTimeMs;

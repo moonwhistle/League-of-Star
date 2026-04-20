@@ -1,4 +1,4 @@
-package com.sang.smite.global.domain;
+package com.sang.smite.common.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

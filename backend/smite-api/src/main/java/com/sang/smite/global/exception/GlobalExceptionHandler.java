@@ -44,8 +44,8 @@ public class GlobalExceptionHandler {
 	protected ResponseEntity<ErrorResponse> handleMessageNotReadable(HttpMessageNotReadableException e) {
 		log.warn("요청 바디 파싱 실패: {}", e.getMessage());
 		return ResponseEntity
-			.status(CommonErrorCode.INVALID_REQUEST_BODY.httpStatus())
-			.body(ErrorResponse.of(CommonErrorCode.INVALID_REQUEST_BODY));
+			.status(GlobalErrorCode.INVALID_REQUEST_BODY.httpStatus())
+			.body(ErrorResponse.of(GlobalErrorCode.INVALID_REQUEST_BODY));
 	}
 
 	/**
@@ -55,8 +55,8 @@ public class GlobalExceptionHandler {
 	protected ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException e) {
 		log.warn("존재하지 않는 경로 접근: {}", e.getMessage());
 		return ResponseEntity
-			.status(CommonErrorCode.RESOURCE_NOT_FOUND.httpStatus())
-			.body(ErrorResponse.of(CommonErrorCode.RESOURCE_NOT_FOUND));
+			.status(GlobalErrorCode.RESOURCE_NOT_FOUND.httpStatus())
+			.body(ErrorResponse.of(GlobalErrorCode.RESOURCE_NOT_FOUND));
 	}
 
 	/**
@@ -67,7 +67,7 @@ public class GlobalExceptionHandler {
 	protected ResponseEntity<ErrorResponse> handleUnexpectedException(Exception e) {
 		log.error("예상치 못한 서버 에러 발생", e);
 		return ResponseEntity
-			.status(CommonErrorCode.INTERNAL_SERVER_ERROR.httpStatus())
-			.body(ErrorResponse.of(CommonErrorCode.INTERNAL_SERVER_ERROR));
+			.status(GlobalErrorCode.INTERNAL_SERVER_ERROR.httpStatus())
+			.body(ErrorResponse.of(GlobalErrorCode.INTERNAL_SERVER_ERROR));
 	}
 }

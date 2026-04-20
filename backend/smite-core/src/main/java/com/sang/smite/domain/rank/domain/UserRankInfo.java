@@ -4,7 +4,7 @@ import com.sang.smite.domain.rank.domain.vo.Division;
 import com.sang.smite.domain.rank.domain.vo.Rank;
 import com.sang.smite.domain.rank.domain.vo.Tier;
 import com.sang.smite.domain.user.domain.User;
-import com.sang.smite.global.domain.BaseEntity;
+import com.sang.smite.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
