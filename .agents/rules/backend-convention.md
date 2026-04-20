@@ -14,7 +14,7 @@ globs: ["*.java"]
 - **Java 17** (record, sealed class, pattern matching 활용)
 - **Spring Boot 4.0** + **JPA (Hibernate)** + **MySQL**
 - 명시되지 않은 기술 추가 금지 (필요 시 질문)
-- dry + srp + magicString 제거 + 불필요한 경로 제거 후 임포트 + 안쓰는 임포트 제거
+- dry + srp + magicString 제거 + 불필요한 경로 제거 후 임포트 + 안쓰는 임포트 제거 + build test 진행
 
 ---
 

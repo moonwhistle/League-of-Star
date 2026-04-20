@@ -154,6 +154,37 @@ gap = 상대_티어점수 - 내_티어점수
 | Emerald | 21 | 22 | 23 | 24 |
 | Diamond | 25 | 26 | 27 | 28 |
 
+#### LP 산정 프로세스 (2단계)
+
+랭크 게임 종료 후의 LP 변동은 다음의 2단계 과정을 거쳐 결정됩니다.
+
+**1단계: 티어 점수화 (Tier Scoring)**
+*   각 플레이어의 현재 랭크(Tier + Division)를 고유한 숫자로 변환합니다.
+*   공식: `Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1`
+*   결과값 범위: Iron IV(1점) ~ Diamond I(28점)
+
+**2단계: LP 변동량 계산 (LP Calculation)**
+*   양측의 티어 점수 차이(`gap`)를 구하고, 이를 기본값(25 LP)에 가감합니다.
+*   공식: `gap = 상대_티어점수 - 내_티어점수`
+*   최종 LP: `clamp(25 ± gap * 3, 15, 35)`
+
+#### 티어 점수(Tier Score) 계산 공식
+
+매칭 및 LP 계산의 기준이 되는 티어 점수는 다음 수식에 의해 자동으로 결정됩니다.
+
+```
+Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
+```
+
+*   **Tier_Level**: Iron(1), Bronze(2), Silver(3), Gold(4), Platinum(5), Emerald(6), Diamond(7)
+*   **Division_Value**: I(1), II(2), III(3), IV(4)
+*   **특이사항**: Master 이상의 Apex 티어는 별도의 LP 기반 점수를 사용합니다.
+
+**계산 예시:**
+*   **Iron IV**: (1 - 1) * 4 + (4 - 4) + 1 = **1점**
+*   **Silver I**: (3 - 1) * 4 + (4 - 1) + 1 = 8 + 3 + 1 = **12점**
+*   **Diamond I**: (7 - 1) * 4 + (4 - 1) + 1 = 24 + 3 + 1 = **28점**
+
 ### 3.3 LP 범위
 
 | 규칙 | 내용 |
