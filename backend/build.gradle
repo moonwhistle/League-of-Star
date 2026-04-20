@@ -34,6 +34,9 @@ subprojects {
 		annotationProcessor 'org.projectlombok:lombok'
 		testCompileOnly 'org.projectlombok:lombok'
 		testAnnotationProcessor 'org.projectlombok:lombok'
+
+		// 테스트 핵심 라이브러리 추가
+		testImplementation 'org.springframework.boot:spring-boot-starter-test'
 		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	}
 
