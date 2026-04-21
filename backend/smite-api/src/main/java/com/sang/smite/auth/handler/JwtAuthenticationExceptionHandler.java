@@ -1,6 +1,8 @@
-package com.sang.smite.global.security.jwt;
+package com.sang.smite.auth.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.common.exception.ApiErrorCode;
+import com.sang.smite.common.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -11,13 +13,15 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
+/**
+ * 인증되지 않은 사용자가 보호된 리소스에 접근할 때의 예외를 처리하는 핸들러입니다.
+ * ApiErrorCode를 사용하여 표준화된 에러 응답을 반환합니다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+public class JwtAuthenticationExceptionHandler implements AuthenticationEntryPoint {
 
     private final ObjectMapper objectMapper;
 
@@ -25,7 +29,6 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException authException) throws IOException {
         log.error("인증 오류 발생: {}", authException.getMessage());
-        
         sendErrorResponse(response);
     }
 
@@ -34,11 +37,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("status", HttpServletResponse.SC_UNAUTHORIZED);
-        body.put("code", "AUTH_001"); // 인증 관련 에러 확장 가능
-        body.put("message", "인증이 필요한 요청입니다.");
-
-        response.getWriter().write(objectMapper.writeValueAsString(body));
+        ErrorResponse errorResponse = ErrorResponse.of(ApiErrorCode.AUTH_UNAUTHORIZED);
+        response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
     }
 }

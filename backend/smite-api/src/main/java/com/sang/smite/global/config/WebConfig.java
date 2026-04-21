@@ -1,6 +1,6 @@
 package com.sang.smite.global.config;
 
-import com.sang.smite.global.security.AuthUserArgumentResolver;
+import com.sang.smite.global.resolver.AuthUserArgumentResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;

@@ -1,8 +1,10 @@
-package com.sang.smite.global.security;
+package com.sang.smite.auth.security.config;
 
-import com.sang.smite.global.security.jwt.JwtAuthenticationEntryPoint;
-import com.sang.smite.global.security.jwt.JwtAuthenticationFilter;
-import com.sang.smite.global.security.jwt.JwtTokenProvider;
+import com.sang.smite.common.path.SecurityPath;
+import com.sang.smite.auth.infrastructure.jwt.JwtTokenProvider;
+import com.sang.smite.auth.filter.JwtAuthenticationFilter;
+import com.sang.smite.auth.handler.JwtAuthenticationExceptionHandler;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,30 +21,33 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtTokenProvider tokenProvider;
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtAuthenticationExceptionHandler authenticationExceptionHandler;
+    private final ObjectMapper objectMapper;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            // Stateless 기반 보안 설정
             .csrf(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
-            
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
 
+            // 에러 핸들링
             .exceptionHandling(exception -> exception
-                .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                .authenticationEntryPoint(authenticationExceptionHandler)
             )
 
+            // 인가 경로 설정
             .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/api/auth/**").permitAll() // 인증 관련 API는 모두 허용
-                .requestMatchers("/actuator/**").permitAll() // 모니터링 API 허용
-                .anyRequest().authenticated() // 그 외 모든 요청은 인증 필요
+                .requestMatchers(SecurityPath.AUTH_WHITELIST).permitAll()
+                .anyRequest().authenticated()
             )
 
-            .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class);
+            // JWT 필터 배치
+            .addFilterBefore(new JwtAuthenticationFilter(tokenProvider, objectMapper), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

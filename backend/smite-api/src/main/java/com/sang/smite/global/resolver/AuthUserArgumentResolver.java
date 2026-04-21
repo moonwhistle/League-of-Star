@@ -1,6 +1,7 @@
-package com.sang.smite.global.security;
+package com.sang.smite.global.resolver;
 
-import com.sang.smite.global.security.jwt.JwtTokenProvider;
+import com.sang.smite.auth.infrastructure.jwt.JwtTokenProvider;
+import com.sang.smite.global.resolver.annotation.AuthUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;

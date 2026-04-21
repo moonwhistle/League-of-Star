@@ -1,4 +1,4 @@
-package com.sang.smite.global.security.jwt;
+package com.sang.smite.auth.infrastructure.jwt;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -8,16 +8,19 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * JwtTokenProvider의 기능을 검증하는 테스트.
+ */
 class JwtTokenProviderTest {
 
     private JwtTokenProvider jwtTokenProvider;
-    private final String secretKey = "c21pdGUta2V5LXNhbmctbGVhZ3VlLW9mLXNtaXRlLXNlY3JldC1rZXktZ2VuZXJhdGVkLWZvci1kZXZlbG9wbWVudA==";
-    private final long expiration = 3600000;
 
     @BeforeEach
     void setUp() {
         jwtTokenProvider = new JwtTokenProvider();
+        String secretKey = "c21pdGUta2V5LXNhbmctbGVhZ3VlLW9mLXNtaXRlLXNlY3JldC1rZXktZ2VuZXJhdGVkLWZvci1kZXZlbG9wbWVudA==";
         ReflectionTestUtils.setField(jwtTokenProvider, "salt", secretKey);
+        long expiration = 3600000;
         ReflectionTestUtils.setField(jwtTokenProvider, "accessTokenExpirationMs", expiration);
         jwtTokenProvider.init();
     }
@@ -70,15 +73,14 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    @DisplayName("잘못된 토큰이나 만료된 토큰인 경우 검증에 실패해야 한다")
+    @DisplayName("잘못된 토큰이나 만료된 토큰인 경우 ApiException이 발생해야 한다")
     void validateToken_Fail() {
         // given
         String invalidToken = "bearer.invalid.token";
 
-        // when
-        boolean isValid = jwtTokenProvider.validateToken(invalidToken);
-
-        // then
-        assertThat(isValid).isFalse();
+        // when & then
+        org.junit.jupiter.api.Assertions.assertThrows(com.sang.smite.common.exception.ApiException.class, () -> {
+            jwtTokenProvider.validateToken(invalidToken);
+        });
     }
 }

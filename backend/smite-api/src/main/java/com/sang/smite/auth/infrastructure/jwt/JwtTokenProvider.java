@@ -1,5 +1,7 @@
-package com.sang.smite.global.security.jwt;
+package com.sang.smite.auth.infrastructure.jwt;
 
+import com.sang.smite.common.exception.ApiErrorCode;
+import com.sang.smite.common.exception.ApiException;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
@@ -23,6 +25,7 @@ public class JwtTokenProvider {
 
     private static final String AUTHORITIES_KEY = "auth";
     private static final String USER_ID_KEY = "userId";
+    private static final String DEFAULT_ROLE = "ROLE_USER";
 
     @Value("${jwt.secret}")
     private String salt;
@@ -44,7 +47,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(email)
                 .claim(USER_ID_KEY, userId)
-                .claim(AUTHORITIES_KEY, "ROLE_USER")
+                .claim(AUTHORITIES_KEY, DEFAULT_ROLE)
                 .issuedAt(now)
                 .expiration(validity)
                 .signWith(secretKey)
@@ -64,7 +67,6 @@ public class JwtTokenProvider {
 
         User principal = new User(claims.getSubject(), "", authorities);
         
-        // 여기에 userId를 추가로 담은 CustomAuthentication 객체를 반환할 수 있도록 확장 가능
         return new UsernamePasswordAuthenticationToken(principal, token, authorities);
     }
 
@@ -83,13 +85,16 @@ public class JwtTokenProvider {
             return true;
         } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
             log.info("잘못된 JWT 서명입니다.");
+            throw new ApiException(ApiErrorCode.AUTH_INVALID_TOKEN);
         } catch (ExpiredJwtException e) {
             log.info("만료된 JWT 토큰입니다.");
+            throw new ApiException(ApiErrorCode.AUTH_EXPIRED_TOKEN);
         } catch (UnsupportedJwtException e) {
             log.info("지원되지 않는 JWT 토큰입니다.");
+            throw new ApiException(ApiErrorCode.AUTH_INVALID_TOKEN);
         } catch (IllegalArgumentException e) {
             log.info("JWT 토큰이 잘못되었습니다.");
+            throw new ApiException(ApiErrorCode.AUTH_INVALID_TOKEN);
         }
-        return false;
     }
 }
