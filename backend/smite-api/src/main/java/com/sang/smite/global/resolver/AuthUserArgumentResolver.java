@@ -1,6 +1,8 @@
 package com.sang.smite.global.resolver;
 
 import com.sang.smite.auth.infrastructure.jwt.JwtTokenProvider;
+import com.sang.smite.common.exception.ApiErrorCode;
+import com.sang.smite.common.exception.ApiException;
 import com.sang.smite.global.resolver.annotation.AuthUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.MethodParameter;
@@ -29,8 +31,13 @@ public class AuthUserArgumentResolver implements HandlerMethodArgumentResolver {
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                                   NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        AuthUser annotation = parameter.getParameterAnnotation(AuthUser.class);
+        boolean required = annotation != null && annotation.required();
 
         if (authentication == null || authentication.getCredentials() == null) {
+            if (required) {
+                throw new ApiException(ApiErrorCode.AUTH_UNAUTHORIZED);
+            }
             return null;
         }
 
