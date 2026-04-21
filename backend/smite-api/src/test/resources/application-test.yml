@@ -16,3 +16,7 @@ spring:
     redis:
       timeout: 2000
 # Redis Host/Port는 AbstractRedisTest의 DynamicPropertySource에서 동적으로 주입됩니다.
+
+jwt:
+  secret: "v-very-important-and-very-long-dummy-secret-key-for-test-environments-only"
+  access-token-expiration-ms: 3600000

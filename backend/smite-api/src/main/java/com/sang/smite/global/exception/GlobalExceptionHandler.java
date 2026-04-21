@@ -1,6 +1,6 @@
 package com.sang.smite.global.exception;
 
-import com.sang.smite.global.exception.response.ErrorResponse;
+import com.sang.smite.common.response.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
