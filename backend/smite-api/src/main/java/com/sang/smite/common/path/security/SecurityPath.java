@@ -13,7 +13,10 @@ public final class SecurityPath {
     public static final String[] AUTH_WHITELIST = {
             "/api/auth/**",
             "/api/v1/auth/**",
-            "/actuator/**"
+            "/actuator/**",
+            "/docs/**",
+            "/webjars/**",
+            "/favicon.ico"
     };
 
     // 그 외 공통 경로 상수가 필요할 경우 여기에 추가
