@@ -2,7 +2,7 @@ spring:
   application:
     name: smite
   profiles:
-    active: local
+    active: local, security
   jpa:
     open-in-view: false
     properties:
