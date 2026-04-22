@@ -67,10 +67,28 @@ sequenceDiagram
 
 ---
 
+## 🧪 테스트 전략 (Testing Strategy)
+
+본 프로젝트는 테스트의 신뢰성과 가독성을 높이기 위해 레이어별로 차별화된 4단계 테스트 전략을 사용한다.
+
+| 레이어 | 도구 | 전략 및 목적 |
+| :--- | :--- | :--- |
+| **Controller** | `RestAssuredMockMvc` + `RestDocs` | **인수 테스트 기반 문서화**. HTTP 규격 검증 및 API 명세서 자동 생성. |
+| **Service** | `Mockito` | **비즈니스 로직 단위 테스트**. 외부 의존성을 Mocking하여 순수 정책 및 예외 상황 검증. |
+| **Repository** | `@DataJpaTest` + `H2` | **JPA 슬라이스 테스트**. 실제 DB와 연동하여 쿼리 메서드 및 엔티티 매핑 정합성 검증. |
+| **Domain** | Pure JUnit 5 | **순수 객체 단위 테스트**. 외부 의존성 없이 엔티티 내부의 상태 변경 및 비즈니스 메서드 검증. |
+
+- **특이사항**: 
+    - `RestDocsSupport` 베이스 클래스에 `GlobalExceptionHandler`를 연동하여 에러 응답 규격까지 완벽하게 문서화함.
+    - `RestAssured` 스타일의 `given-when-then` 구조를 도입하여 테스트 시나리오 가독성 확보.
+
+---
+
 ## 📝 Work Summary
-- **의도**: 구글 소셜 로그인 및 일반 가입 기능을 구현함과 동시에, 확장 가능한 클린 아키텍처(CQRS-lite, Record 등)를 선제적으로 도입함.
+- **의도**: 구글 소셜 로그인 및 일반 가입 기능을 구현함과 동시에, 확장 가능한 클린 아키텍처와 자동화된 문서화 인프라를 구축함.
 - **결과**: 
-  - **인증 완료**: 소셜/일반 회원가입 및 JWT 발급 흐름 구축 성공.
-  - **CQRS-lite**: `UserReadService`, `UserCommandService` 등으로 분리하여 조회 성능 최적화(readOnly) 및 상태 변경 책임 분리 완료.
-  - **코드 품질**: Record 사용, Magic String 제거, 개별 인자 전달 방식을 통해 유지보수성 극대화.
-- **검증**: `SecurityConfig` 필터 연동 및 각 엔드포인트별 예외 핸들링(중복, 유효성 검사 등) 정상 동작 확인.
+    - **인증 완료**: 소셜/일반 회원가입 및 JWT 발급 흐름 구축 성공.
+    - **API 문서화 자동화**: `openapi3.yaml` 생성 및 Swagger UI(WebJar) 연동 완료. (`/docs/index.html`에서 확인 가능)
+    - **테스트 고도화**: 4단계 테스트 전략 도입으로 도메인부터 API까지 빈틈없는 검증 체계 구축.
+    - **코드 품질**: CQRS-lite, Record 도입, Magic String 제거를 통해 유지보수성 극대화.
+- **검증**: `./gradlew :smite-api:copyOasToSwagger`를 통해 테스트 통과 및 문서 생성 자동화 확인 완료.
