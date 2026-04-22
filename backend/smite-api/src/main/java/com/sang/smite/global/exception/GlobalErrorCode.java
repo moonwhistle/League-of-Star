@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 public enum GlobalErrorCode implements BaseErrorCode {
 
 	INVALID_REQUEST_BODY(400, "COMMON_001", "요청 형식이 올바르지 않습니다"),
+	INVALID_INPUT(400, "COMMON_003", "입력값이 유효하지 않습니다"),
 	RESOURCE_NOT_FOUND(404, "COMMON_002", "요청한 리소스를 찾을 수 없습니다"),
 	INTERNAL_SERVER_ERROR(500, "COMMON_999", "서버 내부 오류가 발생했습니다");
 

@@ -1,4 +1,4 @@
-# Issue-15 — Google Social Login & Auto-signup Implementation
+# Issue-15 — Authentication System Implementation (Social & General)
 
 ## 📌 Feature Description
 구글 OAuth2를 이용한 소셜 로그인 기능을 구현하고, 최초 로그인 시 이메일 기반으로 자동으로 회원가입이 진행되는 프로세스를 구축함. 기존 JWT 인증 체계와 통합하여 로그인 완료 시 Access Token을 발급함.
@@ -54,11 +54,18 @@ sequenceDiagram
 - [x] **정적 검토**: SRP, DRY 원칙 준수 여부 및 Magic String 제거 확인
 - [x] **아키텍처 확인**: Core 모듈을 통한 DB 접근 원칙 준수 확인
 
+### 5. 일반 회원가입 구현 (General Signup)
+- [x] **보안**: `BCryptPasswordEncoder` 빈 등록 및 가입 경로 인가 설정
+- [x] **도메인(Core)**: `UserRepository` 중복 체크 메서드 추가 및 `UserAuthService` 가입 로직 구현
+- [x] **API**: `SignupRequest` DTO 및 `AuthController` 구현
+- [x] **예외 처리**: 중복 가입 등 예외 상황에 대한 GlobalExceptionHandler 연동
+
 ---
 
 ## 📝 Work Summary
-- **의도**: 구글 소셜 로그인을 통해 유저 진입 장벽을 낮추고, 모든 DB 접근을 Core 모듈의 서비스로 캡슐화하여 아키텍처 일관성을 확보함.
+- **의도**: 구글 소셜 로그인 및 일반 이메일 회원가입을 통합 구현하여 서비스의 인증 기반을 마련함.
 - **결과**: 
-  - 구글 로그인 -> 자동 회원가입 -> JWT 발급으로 이어지는 심리스한 인증 흐름 구축 완료.
-  - 패키지 명칭(`response` -> `dto`) 정제 및 매직 스트링 제거로 코드 품질 향상.
-- **검증**: 도메인 서비스(`UserAuthService` 등) 호출을 통한 데이터 처리 로직의 정상 동작 확인 및 Security Filter Chain 연동 완료.
+  - 구글 로그인 -> 자동 회원가입 및 JWT 발급 성공.
+  - 일반 회원가입 -> 비밀번호 암호화 저장, 중복 검증, 유효성 검사 적용 완료.
+  - 모든 DB 접근은 Core 모듈의 서비스를 통하도록 아키텍처 정립.
+- **검증**: `SecurityConfig` 필터 체인 연동 및 각 엔드포인트에 대한 예외 처리 핸들링 정상 동작 확인.

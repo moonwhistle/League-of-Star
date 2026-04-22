@@ -4,10 +4,12 @@ import com.sang.smite.auth.service.dto.GoogleUserInfo;
 import com.sang.smite.auth.service.dto.OAuth2UserInfo;
 import com.sang.smite.auth.security.dto.PrincipalDetails;
 import com.sang.smite.domain.account.domain.SocialAccount;
-import com.sang.smite.domain.account.service.SocialAccountService;
 import com.sang.smite.domain.account.domain.vo.SocialProvider;
+import com.sang.smite.domain.account.service.SocialAccountCommandService;
+import com.sang.smite.domain.account.service.SocialAccountReadService;
 import com.sang.smite.domain.user.domain.User;
-import com.sang.smite.domain.user.service.UserAuthService;
+import com.sang.smite.domain.user.service.UserCommandService;
+import com.sang.smite.domain.user.service.UserReadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -25,8 +27,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private static final String PROVIDER_GOOGLE = "google";
     private static final String DEFAULT_NICKNAME_PREFIX = "User";
 
-    private final UserAuthService userAuthService;
-    private final SocialAccountService socialAccountService;
+    private final UserReadService userReadService;
+    private final UserCommandService userCommandService;
+    private final SocialAccountReadService socialAccountReadService;
+    private final SocialAccountCommandService socialAccountCommandService;
 
     @Override
     @Transactional
@@ -50,21 +54,21 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private User processOAuth2User(OAuth2UserInfo userInfo) {
         SocialProvider provider = SocialProvider.valueOf(userInfo.getProvider().toUpperCase());
         
-        return socialAccountService.findByProviderAndProviderId(provider, userInfo.getProviderId())
+        return socialAccountReadService.findByProviderAndProviderId(provider, userInfo.getProviderId())
                 .map(SocialAccount::getUser)
                 .orElseGet(() -> registerNewUser(userInfo, provider));
     }
 
     private User registerNewUser(OAuth2UserInfo userInfo, SocialProvider provider) {
-        // 1. 이메일로 기존 유저가 있는지 확인 (연동 처리)
-        User user = userAuthService.findByEmail(userInfo.getEmail())
+        // 1. 이메일으로 기존 유저가 있는지 확인 (연동 처리)
+        User user = userReadService.findByEmail(userInfo.getEmail())
                 .orElseGet(() -> {
                     // 신규 유저 생성
                     User newUser = User.builder()
                             .email(userInfo.getEmail())
                             .nickname(generateTempNickname(userInfo.getName()))
                             .build();
-                    return userAuthService.save(newUser);
+                    return userCommandService.save(newUser);
                 });
 
         // 2. 소셜 계정 정보 연동
@@ -74,7 +78,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 .providerId(userInfo.getProviderId())
                 .providerEmail(userInfo.getEmail())
                 .build();
-        socialAccountService.save(socialAccount);
+        socialAccountCommandService.save(socialAccount);
 
         return user;
     }

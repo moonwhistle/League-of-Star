@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -46,6 +47,19 @@ public class GlobalExceptionHandler {
 		return ResponseEntity
 			.status(GlobalErrorCode.INVALID_REQUEST_BODY.httpStatus())
 			.body(ErrorResponse.of(GlobalErrorCode.INVALID_REQUEST_BODY));
+	}
+
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	protected ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException e) {
+		String message = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
+		log.warn("유효성 검증 실패: {}", message);
+		return ResponseEntity
+			.status(GlobalErrorCode.INVALID_INPUT.httpStatus())
+			.body(ErrorResponse.of(
+				GlobalErrorCode.INVALID_INPUT.customCode(),
+				message,
+				GlobalErrorCode.INVALID_INPUT.httpStatus()
+			));
 	}
 
 	/**

@@ -11,7 +11,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class UserAuthService {
+public class UserReadService {
 
     private final UserRepository userRepository;
 
@@ -19,8 +19,11 @@ public class UserAuthService {
         return userRepository.findByEmail(email);
     }
 
-    @Transactional
-    public User save(User user) {
-        return userRepository.save(user);
+    public boolean existsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
+    public boolean existsByNickname(String nickname) {
+        return userRepository.existsByNickname(nickname);
     }
 }

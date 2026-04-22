@@ -1,4 +1,4 @@
-package com.sang.smite.common.path;
+package com.sang.smite.common.path.security;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -12,6 +12,7 @@ public final class SecurityPath {
     // 인증 화이트리스트 (인증 없이 접근 가능)
     public static final String[] AUTH_WHITELIST = {
             "/api/auth/**",
+            "/api/v1/auth/**",
             "/actuator/**"
     };
 

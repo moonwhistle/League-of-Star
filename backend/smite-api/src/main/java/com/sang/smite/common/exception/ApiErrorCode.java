@@ -15,7 +15,9 @@ public enum ApiErrorCode implements BaseErrorCode {
     AUTH_UNAUTHORIZED(401, "AUTH_001", "인증이 필요한 요청입니다."),
     AUTH_FORBIDDEN(403, "AUTH_002", "해당 리소스에 대한 접근 권한이 없습니다."),
     AUTH_INVALID_TOKEN(401, "AUTH_003", "유효하지 않은 토큰입니다."),
-    AUTH_EXPIRED_TOKEN(401, "AUTH_004", "만료된 토큰입니다.");
+    AUTH_EXPIRED_TOKEN(401, "AUTH_004", "만료된 토큰입니다."),
+    AUTH_DUPLICATE_EMAIL(400, "AUTH_005", "이미 사용 중인 이메일입니다."),
+    AUTH_DUPLICATE_NICKNAME(400, "AUTH_006", "이미 사용 중인 닉네임입니다.");
 
     private final int httpStatus;
     private final String customCode;

@@ -1,7 +1,7 @@
 package com.sang.smite.auth.security.config;
 
 import com.sang.smite.auth.service.CustomOAuth2UserService;
-import com.sang.smite.common.path.SecurityPath;
+import com.sang.smite.common.path.security.SecurityPath;
 import com.sang.smite.auth.infrastructure.jwt.JwtTokenProvider;
 import com.sang.smite.auth.filter.JwtAuthenticationFilter;
 import com.sang.smite.auth.handler.JwtAuthenticationExceptionHandler;
@@ -14,6 +14,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -27,6 +29,11 @@ public class SecurityConfig {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oauth2SuccessHandler;
     private final ObjectMapper objectMapper;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {

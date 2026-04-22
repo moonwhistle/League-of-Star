@@ -17,6 +17,8 @@ import java.io.IOException;
 @Component
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
+    private static final String TOKEN_PARAMETER_NAME = "accessToken";
+
     private final String successRedirectUrl;
     private final JwtTokenProvider tokenProvider;
 
@@ -27,8 +29,6 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         this.successRedirectUrl = successRedirectUrl;
         this.tokenProvider = tokenProvider;
     }
-
-    private static final String TOKEN_PARAMETER_NAME = "accessToken";
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
