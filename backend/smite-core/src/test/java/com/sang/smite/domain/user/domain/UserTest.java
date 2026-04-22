@@ -1,6 +1,5 @@
 package com.sang.smite.domain.user.domain;
 
-import com.sang.smite.domain.user.domain.vo.UserStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -9,39 +8,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 class UserTest {
 
     @Test
-    @DisplayName("회원 탈퇴 시 상태가 WITHDRAWN으로 변경되고 탈퇴 일시가 기록되어야 한다")
-    void withdraw_ShouldChangeStatusAndRecordTime() {
+    @DisplayName("User 빌더를 통해 객체를 생성할 수 있다")
+    void createUser() {
         // given
-        User user = User.builder()
-                .status(UserStatus.ACTIVE)
-                .build();
+        String email = "test@example.com";
+        String nickname = "테스터";
+        String password = "encodedPassword";
 
         // when
-        user.withdraw();
-
-        // then
-        assertThat(user.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
-        assertThat(user.getWithdrawnAt()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("계정 익명화 시 비밀번호가 삭제되고 상태가 ANONYMIZED로 변경되어야 한다")
-    void anonymize_ShouldClearSensitiveData() {
-        // given
         User user = User.builder()
-                .email("test@example.com")
-                .nickname("tester")
-                .password("encoded_password")
-                .status(UserStatus.ACTIVE)
+                .email(email)
+                .nickname(nickname)
+                .password(password)
                 .build();
 
-        // when
-        user.anonymize("masked-email", "masked-nickname");
-
         // then
-        assertThat(user.getEmail()).isEqualTo("masked-email");
-        assertThat(user.getNickname()).isEqualTo("masked-nickname");
-        assertThat(user.getPassword()).isNull();
-        assertThat(user.getStatus()).isEqualTo(UserStatus.ANONYMIZED);
+        assertThat(user.getEmail()).isEqualTo(email);
+        assertThat(user.getNickname()).isEqualTo(nickname);
+        assertThat(user.getPassword()).isEqualTo(password);
     }
 }

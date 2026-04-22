@@ -5,19 +5,17 @@ import com.sang.smite.auth.service.AuthService;
 import com.sang.smite.common.path.auth.AuthPath;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.global.restdocs.RestDocsSupport;
+import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
 import org.springframework.restdocs.payload.JsonFieldType;
 
-import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
-import static org.springframework.restdocs.payload.PayloadDocumentation.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 
 class AuthControllerRestDocsTest extends RestDocsSupport {
 
@@ -42,11 +40,13 @@ class AuthControllerRestDocsTest extends RestDocsSupport {
         when(authService.signUp(anyString(), anyString(), anyString())).thenReturn(user);
 
         // when & then
-        mockMvc.perform(post(AuthPath.SIGN_UP)
-                        .content(objectMapper.writeValueAsString(request))
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andDo(document("auth-signup",
+        spec.body(request)
+                .contentType(ContentType.JSON)
+                .when()
+                .post(AuthPath.SIGN_UP)
+                .then()
+                .statusCode(200)
+                .apply(document("auth-signup",
                         resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
                                 .tag("Auth")
                                 .summary("일반 회원가입")
