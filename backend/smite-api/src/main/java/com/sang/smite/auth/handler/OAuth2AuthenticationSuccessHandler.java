@@ -1,7 +1,7 @@
 package com.sang.smite.auth.handler;
 
 import com.sang.smite.auth.infrastructure.jwt.JwtTokenProvider;
-import com.sang.smite.auth.security.response.PrincipalDetails;
+import com.sang.smite.auth.security.dto.PrincipalDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;

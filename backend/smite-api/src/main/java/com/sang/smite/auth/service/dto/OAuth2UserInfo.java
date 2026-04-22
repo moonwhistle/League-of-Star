@@ -1,4 +1,4 @@
-package com.sang.smite.auth.service.response;
+package com.sang.smite.auth.service.dto;
 
 import java.util.Map;
 

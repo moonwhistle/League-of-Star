@@ -1,4 +1,4 @@
-package com.sang.smite.auth.security.response;
+package com.sang.smite.auth.security.dto;
 
 import com.sang.smite.domain.user.domain.User;
 import lombok.Getter;
@@ -37,7 +37,7 @@ public class PrincipalDetails implements UserDetails, OAuth2User {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.emptyList(); // 현재 권한 시스템 미구축으로 빈 리스트 반환
+        return Collections.emptyList();
     }
 
     @Override
