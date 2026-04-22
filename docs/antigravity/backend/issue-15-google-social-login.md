@@ -56,16 +56,21 @@ sequenceDiagram
 
 ### 5. 일반 회원가입 구현 (General Signup)
 - [x] **보안**: `BCryptPasswordEncoder` 빈 등록 및 가입 경로 인가 설정
-- [x] **도메인(Core)**: `UserRepository` 중복 체크 메서드 추가 및 `UserAuthService` 가입 로직 구현
+- [x] **도메인(Core)**: `UserRepository` 중복 체크 메서드 추가 및 `UserCommandService` 가입 로직 구현
 - [x] **API**: `SignupRequest` DTO 및 `AuthController` 구현
 - [x] **예외 처리**: 중복 가입 등 예외 상황에 대한 GlobalExceptionHandler 연동
+
+### 6. 아키텍처 고도화 (Refactoring)
+- [x] **CQRS-lite 적용**: 서비스를 `ReadService`와 `CommandService`로 분리하여 책임 명확화
+- [x] **Record 도입**: Request/Response DTO를 Java Record로 전환하여 불변성 및 간결성 확보
+- [x] **계층 간 규격 준수**: 컨트롤러-서비스 간 인자 개별 전달 및 엔티티 반환 원칙 적용
 
 ---
 
 ## 📝 Work Summary
-- **의도**: 구글 소셜 로그인 및 일반 이메일 회원가입을 통합 구현하여 서비스의 인증 기반을 마련함.
+- **의도**: 구글 소셜 로그인 및 일반 가입 기능을 구현함과 동시에, 확장 가능한 클린 아키텍처(CQRS-lite, Record 등)를 선제적으로 도입함.
 - **결과**: 
-  - 구글 로그인 -> 자동 회원가입 및 JWT 발급 성공.
-  - 일반 회원가입 -> 비밀번호 암호화 저장, 중복 검증, 유효성 검사 적용 완료.
-  - 모든 DB 접근은 Core 모듈의 서비스를 통하도록 아키텍처 정립.
-- **검증**: `SecurityConfig` 필터 체인 연동 및 각 엔드포인트에 대한 예외 처리 핸들링 정상 동작 확인.
+  - **인증 완료**: 소셜/일반 회원가입 및 JWT 발급 흐름 구축 성공.
+  - **CQRS-lite**: `UserReadService`, `UserCommandService` 등으로 분리하여 조회 성능 최적화(readOnly) 및 상태 변경 책임 분리 완료.
+  - **코드 품질**: Record 사용, Magic String 제거, 개별 인자 전달 방식을 통해 유지보수성 극대화.
+- **검증**: `SecurityConfig` 필터 연동 및 각 엔드포인트별 예외 핸들링(중복, 유효성 검사 등) 정상 동작 확인.
