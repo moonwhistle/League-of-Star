@@ -3,6 +3,7 @@ package com.sang.smite.auth.service;
 import com.sang.smite.auth.service.dto.GoogleUserInfo;
 import com.sang.smite.auth.service.dto.OAuth2UserInfo;
 import com.sang.smite.auth.security.dto.PrincipalDetails;
+import com.sang.smite.common.exception.ApiErrorCode;
 import com.sang.smite.domain.account.domain.SocialAccount;
 import com.sang.smite.domain.account.domain.vo.SocialProvider;
 import com.sang.smite.domain.account.service.SocialAccountCommandService;
@@ -42,9 +43,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         if (PROVIDER_GOOGLE.equals(registrationId)) {
             oAuth2UserInfo = new GoogleUserInfo(oAuth2User.getAttributes());
         }
-
         if (oAuth2UserInfo == null) {
-            throw new OAuth2AuthenticationException("지원하지 않는 소셜 로그인입니다.");
+            throw new OAuth2AuthenticationException(ApiErrorCode.AUTH_NOT_SUPPORTED_PROVIDER.message());
         }
 
         User user = processOAuth2User(oAuth2UserInfo);
@@ -59,11 +59,18 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 .orElseGet(() -> registerNewUser(userInfo, provider));
     }
 
+    /**
+     * 신규 소셜 사용자 등록 또는 기존 유저와의 연동 처리.
+     * <p>
+     * [계정 연동 정책]
+     * 동일한 이메일을 사용하는 기존 유저가 있을 경우, 별도의 인증 절차 없이 
+     * 해당 유저와 현재 소셜 계정을 연동(SocialAccount 생성)한다.
+     * 이는 사용자 편의성을 위한 정책이며, 보안 강화가 필요할 경우 
+     * 기존 계정의 비밀번호 확인 절차 등을 추가할 수 있다.
+     */
     private User registerNewUser(OAuth2UserInfo userInfo, SocialProvider provider) {
-        // 1. 이메일으로 기존 유저가 있는지 확인 (연동 처리)
         User user = userReadService.findByEmail(userInfo.getEmail())
                 .orElseGet(() -> {
-                    // 신규 유저 생성
                     User newUser = User.builder()
                             .email(userInfo.getEmail())
                             .nickname(generateTempNickname(userInfo.getName()))
@@ -71,7 +78,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                     return userCommandService.save(newUser);
                 });
 
-        // 2. 소셜 계정 정보 연동
         SocialAccount socialAccount = SocialAccount.builder()
                 .user(user)
                 .provider(provider)
@@ -83,11 +89,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return user;
     }
 
+    /**
+     * 닉네임 제약(2~16자)을 준수하는 유니크한 임시 닉네임 생성.
+     * 공백을 제거한 이름(최대 9자) + 언더바 + UUID 앞 6자 조합.
+     */
     private String generateTempNickname(String name) {
-        // 닉네임 중복 방지를 위한 임시 로직 (이름 + UUID 앞자리)
-        String base = name != null ? name : DEFAULT_NICKNAME_PREFIX;
+        String base = (name == null || name.isBlank()) ? DEFAULT_NICKNAME_PREFIX : name;
+        String sanitizedBase = base.replaceAll("\\s+", "");
+        String prefix = sanitizedBase.substring(0, Math.min(sanitizedBase.length(), 9));
         String suffix = UUID.randomUUID().toString().substring(0, 6);
-        String nickname = base + "_" + suffix;
-        return nickname.length() > 16 ? nickname.substring(0, 16) : nickname;
+        return prefix + "_" + suffix;
     }
 }

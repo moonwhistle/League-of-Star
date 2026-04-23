@@ -1,41 +1,60 @@
 package com.sang.smite.common.response;
 
 import com.sang.smite.global.exception.BaseErrorCode;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.Builder;
+import org.springframework.validation.BindingResult;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * 전역 공통 에러 응답 규격.
- * common.response 패키지에서 모든 API 응답 계약을 관리합니다.
+ * 전역 공통 에러 응답 객체.
  */
-@Getter
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class ErrorResponse {
-
-    private LocalDateTime timestamp;
-    private int status;
-    private String code;
-    private String message;
-
-    private ErrorResponse(BaseErrorCode errorCode) {
-        this(errorCode.customCode(), errorCode.message(), errorCode.httpStatus());
-    }
-
-    private ErrorResponse(String code, String message, int status) {
-        this.timestamp = LocalDateTime.now();
-        this.status = status;
-        this.code = code;
-        this.message = message;
-    }
+@Builder
+public record ErrorResponse(
+    LocalDateTime timestamp,
+    int status,
+    String code,
+    String message,
+    List<FieldError> errors
+) {
 
     public static ErrorResponse of(BaseErrorCode errorCode) {
-        return new ErrorResponse(errorCode);
+        return ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(errorCode.httpStatus())
+            .code(errorCode.customCode())
+            .message(errorCode.message())
+            .build();
     }
 
-    public static ErrorResponse of(String code, String message, int status) {
-        return new ErrorResponse(code, message, status);
+    public static ErrorResponse of(BaseErrorCode errorCode, BindingResult bindingResult) {
+        return ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(errorCode.httpStatus())
+            .code(errorCode.customCode())
+            .message(errorCode.message())
+            .errors(FieldError.of(bindingResult))
+            .build();
+    }
+
+    /**
+     * 필드별 상세 에러 정보를 담는 내부 클래스.
+     */
+    public record FieldError(
+        String field,
+        String value,
+        String reason
+    ) {
+        private static List<FieldError> of(BindingResult bindingResult) {
+            return bindingResult.getFieldErrors().stream()
+                .map(error -> new FieldError(
+                    error.getField(),
+                    error.getRejectedValue() == null ? "" : error.getRejectedValue().toString(),
+                    error.getDefaultMessage()
+                ))
+                .collect(Collectors.toList());
+        }
     }
 }

@@ -51,15 +51,10 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	protected ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException e) {
-		String message = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
-		log.warn("유효성 검증 실패: {}", message);
+		log.warn("유효성 검증 실패: {}", e.getBindingResult().getAllErrors().get(0).getDefaultMessage());
 		return ResponseEntity
 			.status(GlobalErrorCode.INVALID_INPUT.httpStatus())
-			.body(ErrorResponse.of(
-				GlobalErrorCode.INVALID_INPUT.customCode(),
-				message,
-				GlobalErrorCode.INVALID_INPUT.httpStatus()
-			));
+			.body(ErrorResponse.of(GlobalErrorCode.INVALID_INPUT, e.getBindingResult()));
 	}
 
 	/**

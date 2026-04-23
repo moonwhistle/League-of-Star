@@ -17,7 +17,8 @@ public enum ApiErrorCode implements BaseErrorCode {
     AUTH_INVALID_TOKEN(401, "AUTH_003", "유효하지 않은 토큰입니다."),
     AUTH_EXPIRED_TOKEN(401, "AUTH_004", "만료된 토큰입니다."),
     AUTH_DUPLICATE_EMAIL(400, "AUTH_005", "이미 사용 중인 이메일입니다."),
-    AUTH_DUPLICATE_NICKNAME(400, "AUTH_006", "이미 사용 중인 닉네임입니다.");
+    AUTH_DUPLICATE_NICKNAME(400, "AUTH_006", "이미 사용 중인 닉네임입니다."),
+    AUTH_NOT_SUPPORTED_PROVIDER(400, "AUTH_007", "지원하지 않는 소셜 로그인 공급자입니다.");
 
     private final int httpStatus;
     private final String customCode;
