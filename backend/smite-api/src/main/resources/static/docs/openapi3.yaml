@@ -1,0 +1,70 @@
+openapi: 3.0.1
+info:
+  title: League of Smite API
+  description: League of Smite API 명세서
+  version: 1.0.0
+servers:
+- url: http://localhost:8080
+tags: []
+paths:
+  /api/v1/auth/signUp:
+    post:
+      tags:
+      - Auth
+      summary: 일반 회원가입
+      description: 이메일과 비밀번호를 사용하여 회원가입을 진행합니다.
+      operationId: auth-signup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api-v1-auth-signUp1187183266'
+            examples:
+              auth-signup:
+                value: "{\n  \"email\" : \"test@example.com\",\n  \"password\" : \"\
+                  password123\",\n  \"nickname\" : \"테스터\"\n}"
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api-v1-auth-signUp-590972362'
+              examples:
+                auth-signup:
+                  value: "{\n  \"id\" : 1,\n  \"email\" : \"test@example.com\",\n\
+                    \  \"nickname\" : \"테스터\"\n}"
+components:
+  schemas:
+    api-v1-auth-signUp1187183266:
+      required:
+      - email
+      - nickname
+      - password
+      type: object
+      properties:
+        password:
+          type: string
+          description: 비밀번호 (8~20자)
+        nickname:
+          type: string
+          description: 닉네임 (2~16자)
+        email:
+          type: string
+          description: 사용자 이메일
+    api-v1-auth-signUp-590972362:
+      required:
+      - email
+      - id
+      - nickname
+      type: object
+      properties:
+        nickname:
+          type: string
+          description: 가입된 닉네임
+        id:
+          type: number
+          description: 생성된 사용자 ID
+        email:
+          type: string
+          description: 가입된 이메일

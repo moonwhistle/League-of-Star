@@ -1,6 +1,0 @@
-jwt:
-  secret: c21pdGUta2V5LXNhbmctbGVhZ3VlLW9mLXNtaXRlLXNlY3JldC1rZXktZ2VuZXJhdGVkLWZvci1kZXZlbG9wbWVudA==
-  # Access Token: 1시간
-  access-token-expiration-ms: 3600000
-  # Refresh Token (예약): 7일
-  refresh-token-expiration-ms: 604800000
