@@ -63,6 +63,8 @@ sequenceDiagram
 
 ## 4. 보안 고려사항
 - **RT Rotation**: 토큰 갱신 시 기존 RT를 무효화하고 새로운 RT를 발급하여 탈취 위험 최소화.
+- **Single Session Policy**: Redis의 PK를 `userId`로 설정하여 유저당 하나의 활성 세션만 허용합니다. 새로운 기기에서 로그인 시 기존 기기의 RT는 자동으로 만료(Overwrite)됩니다.
+- **Password Security**: `BCryptPasswordEncoder`를 사용하여 비밀번호를 암호화하며, 로그인 실패 시 아이디/비밀번호 존재 여부를 노출하지 않는 통합 에러 메시지를 반환하여 계정 열거 공격을 방지합니다.
 - **Stateless**: 서버 메모리를 사용하지 않고 Redis를 활용하여 수평 확장성 유지.
 - **Error Handling**: 로그인 실패 시 구체적인 실패 원인(아이디/비밀번호)을 노출하지 않음.
 
