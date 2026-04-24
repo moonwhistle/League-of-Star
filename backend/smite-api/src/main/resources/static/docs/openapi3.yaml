@@ -7,6 +7,78 @@ servers:
 - url: http://localhost:8080
 tags: []
 paths:
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Auth
+      summary: 일반 로그인
+      description: 이메일과 비밀번호로 로그인하여 토큰을 발급받습니다.
+      operationId: auth-login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api-v1-auth-login-2103469501'
+            examples:
+              auth-login:
+                value: "{\n  \"email\" : \"test@example.com\",\n  \"password\" : \"\
+                  password123\"\n}"
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api-v1-auth-login1260122497'
+              examples:
+                auth-login:
+                  value: "{\n  \"accessToken\" : \"access-token\",\n  \"refreshToken\"\
+                    \ : \"refresh-token\",\n  \"userId\" : 1,\n  \"nickname\" : \"\
+                    테스터\"\n}"
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: 로그아웃
+      description: 리프레시 토큰을 무효화하여 로그아웃 처리합니다.
+      operationId: auth-logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api-v1-auth-logout392386629'
+            examples:
+              auth-logout:
+                value: "{\n  \"refreshToken\" : \"refresh-token-to-delete\"\n}"
+      responses:
+        "200":
+          description: "200"
+  /api/v1/auth/refresh:
+    post:
+      tags:
+      - Auth
+      summary: 토큰 재발급
+      description: 리프레시 토큰을 사용하여 새로운 토큰 쌍을 발급받습니다.
+      operationId: auth-refresh
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api-v1-auth-refresh132229249'
+            examples:
+              auth-refresh:
+                value: "{\n  \"refreshToken\" : \"old-refresh-token\"\n}"
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api-v1-auth-refresh1249058254'
+              examples:
+                auth-refresh:
+                  value: "{\n  \"accessToken\" : \"new-access-token\",\n  \"refreshToken\"\
+                    \ : \"new-refresh-token\"\n}"
   /api/v1/auth/signUp:
     post:
       tags:
@@ -68,3 +140,63 @@ components:
         email:
           type: string
           description: 가입된 이메일
+    api-v1-auth-refresh132229249:
+      required:
+      - refreshToken
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: 기존 리프레시 토큰
+    api-v1-auth-logout392386629:
+      required:
+      - refreshToken
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: 무효화할 리프레시 토큰
+    api-v1-auth-login1260122497:
+      required:
+      - accessToken
+      - nickname
+      - refreshToken
+      - userId
+      type: object
+      properties:
+        nickname:
+          type: string
+          description: 사용자 닉네임
+        accessToken:
+          type: string
+          description: 액세스 토큰
+        userId:
+          type: number
+          description: 사용자 ID
+        refreshToken:
+          type: string
+          description: 리프레시 토큰
+    api-v1-auth-login-2103469501:
+      required:
+      - email
+      - password
+      type: object
+      properties:
+        password:
+          type: string
+          description: 비밀번호
+        email:
+          type: string
+          description: 사용자 이메일
+    api-v1-auth-refresh1249058254:
+      required:
+      - accessToken
+      - refreshToken
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: 새로운 액세스 토큰
+        refreshToken:
+          type: string
+          description: 새로운 리프레시 토큰 (Rotation 적용)

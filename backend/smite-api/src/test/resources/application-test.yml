@@ -27,6 +27,7 @@ spring:
 jwt:
   secret: "v-very-important-and-very-long-dummy-secret-key-for-test-environments-only"
   access-token-expiration-ms: 3600000
+  refresh-token-expiration-ms: 604800000
 
 oauth2:
   success-redirect-url: "http://localhost:3000/oauth2/redirect"

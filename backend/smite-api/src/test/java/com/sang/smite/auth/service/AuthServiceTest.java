@@ -1,17 +1,25 @@
 package com.sang.smite.auth.service;
 
+import com.sang.smite.auth.infrastructure.jwt.JwtTokenProvider;
+import com.sang.smite.auth.service.dto.LoginDto;
+import com.sang.smite.auth.service.dto.TokenDto;
 import com.sang.smite.common.exception.ApiErrorCode;
 import com.sang.smite.common.exception.ApiException;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.service.UserCommandService;
 import com.sang.smite.domain.user.service.UserReadService;
+import com.sang.smite.redis.auth.domain.RefreshToken;
+import com.sang.smite.redis.auth.repository.RefreshTokenRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,6 +41,12 @@ class AuthServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
 
     @Test
     @DisplayName("회원가입 - 성공")
@@ -90,8 +104,89 @@ class AuthServiceTest {
         // when & then
         assertThatThrownBy(() -> authService.signUp(email, "password", nickname))
                 .isInstanceOf(ApiException.class)
-                .hasMessage(ApiErrorCode.AUTH_DUPLICATE_NICKNAME.customCode() + ": " + ApiErrorCode.AUTH_DUPLICATE_NICKNAME.message());
+                .hasMessage(ApiErrorCode.AUTH_DUPLICATE_NICKNAME.customCode() + ": "
+                        + ApiErrorCode.AUTH_DUPLICATE_NICKNAME.message());
 
         verify(userCommandService, never()).signup(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("로그인 - 성공")
+    void login_Success() {
+        // given
+        String email = "test@example.com";
+        String password = "password123";
+        User user = User.builder().id(1L).email(email).password("encoded").build();
+
+        given(userReadService.findByEmail(email)).willReturn(Optional.of(user));
+        given(passwordEncoder.matches(password, user.getPassword())).willReturn(true);
+        given(jwtTokenProvider.createAccessToken(anyLong(), anyString())).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(anyLong(), anyString())).willReturn("refresh-token");
+        given(jwtTokenProvider.getRefreshTokenExpirationMs()).willReturn(604800000L);
+
+        // when
+        LoginDto result = authService.login(email, password);
+
+        // then
+        assertThat(result.tokens().accessToken()).isEqualTo("access-token");
+        assertThat(result.tokens().refreshToken()).isEqualTo("refresh-token");
+        assertThat(result.user().getEmail()).isEqualTo(email);
+        verify(refreshTokenRepository, times(1)).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("로그인 - 비밀번호 불일치 시 실패")
+    void login_WrongPassword() {
+        // given
+        String email = "test@example.com";
+        User user = User.builder().email(email).password("encoded").build();
+        given(userReadService.findByEmail(email)).willReturn(Optional.of(user));
+        given(passwordEncoder.matches(anyString(), anyString())).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> authService.login(email, "wrong-password"))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining(ApiErrorCode.AUTH_LOGIN_FAILED.customCode());
+    }
+
+    @Test
+    @DisplayName("토큰 재발급 - 성공")
+    void refresh_Success() {
+        // given
+        String oldRefreshToken = "old-rt";
+        User user = User.builder().id(1L).email("test@example.com").build();
+        Authentication authentication = mock(Authentication.class);
+
+        given(jwtTokenProvider.validateToken(oldRefreshToken)).willReturn(true);
+        given(refreshTokenRepository.findByToken(oldRefreshToken)).willReturn(Optional.of(mock(RefreshToken.class)));
+        given(jwtTokenProvider.getAuthentication(oldRefreshToken)).willReturn(authentication);
+        given(authentication.getName()).willReturn(user.getEmail());
+        given(userReadService.findByEmail(user.getEmail())).willReturn(Optional.of(user));
+        
+        given(jwtTokenProvider.createAccessToken(anyLong(), anyString())).willReturn("new-at");
+        given(jwtTokenProvider.createRefreshToken(anyLong(), anyString())).willReturn("new-rt");
+
+        // when
+        TokenDto result = authService.refresh(oldRefreshToken);
+
+        // then
+        assertThat(result.accessToken()).isEqualTo("new-at");
+        assertThat(result.refreshToken()).isEqualTo("new-rt");
+        verify(refreshTokenRepository, times(1)).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("로그아웃 - 성공")
+    void logout_Success() {
+        // given
+        String refreshToken = "rt-to-delete";
+        RefreshToken savedToken = mock(RefreshToken.class);
+        given(refreshTokenRepository.findByToken(refreshToken)).willReturn(Optional.of(savedToken));
+
+        // when
+        authService.logout(refreshToken);
+
+        // then
+        verify(refreshTokenRepository, times(1)).delete(savedToken);
     }
 }
