@@ -70,11 +70,12 @@ sequenceDiagram
 
 ## 🏗 진행 상황 (Progress)
 
-### 2026-04-24: 기반 작업 및 DTO 정의 완료
+### 2026-04-24: 기반 작업, DTO 정의 및 비즈니스 로직 구현 완료
 - `ApiErrorCode` 에러 코드 추가 (`AUTH_LOGIN_FAILED`, `AUTH_INVALID_REFRESH_TOKEN` 등)
 - `JwtTokenProvider` 확장: 리프레시 토큰 생성 메서드 및 만료 시간 설정 추가
 - `smite-infra-redis` 모듈 내 `RefreshToken` 엔티티 및 Repository 구현
 - 로그인 및 토큰 갱신을 위한 요청/응답 DTO(`LoginRequest`, `LoginResponse` 등) 정의 완료
+- `AuthService` 내 로그인, 토큰 갱신(Rotation), 로그아웃 핵심 비즈니스 로직 구현 완료
 
 ## 5. 향후 계획
 - 로그아웃 시 Access Token 블랙리스트 기능 추가 검토.
