@@ -1,4 +1,4 @@
-package com.sang.smite.infra.redis.auth.domain;
+package com.sang.smite.redis.auth.domain;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -32,10 +32,5 @@ public class RefreshToken {
                 .token(token)
                 .ttl(ttl)
                 .build();
-    }
-
-    public void updateToken(String token, Long ttl) {
-        this.token = token;
-        this.ttl = ttl;
     }
 }

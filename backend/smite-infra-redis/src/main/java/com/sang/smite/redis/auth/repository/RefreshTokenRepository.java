@@ -1,6 +1,6 @@
-package com.sang.smite.infra.redis.auth.repository;
+package com.sang.smite.redis.auth.repository;
 
-import com.sang.smite.infra.redis.auth.domain.RefreshToken;
+import com.sang.smite.redis.auth.domain.RefreshToken;
 import org.springframework.data.repository.CrudRepository;
 
 import java.util.Optional;
