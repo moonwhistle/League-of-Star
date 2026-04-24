@@ -77,7 +77,7 @@ public class AuthService {
         User user = userReadService.findByEmail(jwtTokenProvider.getAuthentication(refreshToken).getName())
                 .orElseThrow(() -> new ApiException(ApiErrorCode.AUTH_INVALID_REFRESH_TOKEN));
 
-        // 4. 새로운 토큰 쌍 발급 (Rotation)
+        // 4. 새로운 토큰 쌍 발급
         return issueTokens(user);
     }
 
