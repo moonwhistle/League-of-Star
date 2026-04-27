@@ -3,17 +3,13 @@ package com.sang.smite.domain.rank.domain;
 import com.sang.smite.domain.rank.domain.vo.Division;
 import com.sang.smite.domain.rank.domain.vo.Rank;
 import com.sang.smite.domain.rank.domain.vo.Tier;
-import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -33,9 +29,8 @@ public class UserRankInfo extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
-    private User user;
+    @Column(nullable = false, unique = true)
+    private Long userId;
 
     @Embedded
     @Builder.Default

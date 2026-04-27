@@ -25,7 +25,7 @@ public class UserCommandService {
         User savedUser = userRepository.save(user);
 
         UserRankInfo rankInfo = UserRankInfo.builder()
-                .user(savedUser)
+                .userId(savedUser.getId())
                 .build();
         userRankInfoRepository.save(rankInfo);
 

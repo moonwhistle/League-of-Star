@@ -1,11 +1,13 @@
 package com.sang.smite.domain.user.service;
 
+import com.sang.smite.domain.rank.domain.UserRankInfo;
 import com.sang.smite.domain.rank.repository.UserRankInfoRepository;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,9 +37,10 @@ class UserCommandServiceTest {
         String email = "test@example.com";
         String password = "encodedPassword";
         String nickname = "테스터";
+        Long savedUserId = 1L;
         
         User user = User.builder()
-                .id(1L)
+                .id(savedUserId)
                 .email(email)
                 .password(password)
                 .nickname(nickname)
@@ -51,7 +54,14 @@ class UserCommandServiceTest {
         // then
         assertThat(result.getEmail()).isEqualTo(email);
         assertThat(result.getNickname()).isEqualTo(nickname);
+        
         verify(userRepository, times(1)).save(any(User.class));
-        verify(userRankInfoRepository, times(1)).save(any());
+        
+        // UserRankInfo 저장 및 userId 검증
+        ArgumentCaptor<UserRankInfo> rankInfoCaptor = ArgumentCaptor.forClass(UserRankInfo.class);
+        verify(userRankInfoRepository, times(1)).save(rankInfoCaptor.capture());
+        
+        UserRankInfo capturedRankInfo = rankInfoCaptor.getValue();
+        assertThat(capturedRankInfo.getUserId()).isEqualTo(savedUserId);
     }
 }
