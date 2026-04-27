@@ -1,5 +1,6 @@
 package com.sang.smite.domain.user.service;
 
+import com.sang.smite.domain.rank.repository.UserRankInfoRepository;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -24,8 +25,11 @@ class UserCommandServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private UserRankInfoRepository userRankInfoRepository;
+
     @Test
-    @DisplayName("signup - 성공적으로 유저를 저장한다")
+    @DisplayName("signup - 성공적으로 유저와 초기 랭크 정보를 저장한다")
     void signup_Success() {
         // given
         String email = "test@example.com";
@@ -48,5 +52,6 @@ class UserCommandServiceTest {
         assertThat(result.getEmail()).isEqualTo(email);
         assertThat(result.getNickname()).isEqualTo(nickname);
         verify(userRepository, times(1)).save(any(User.class));
+        verify(userRankInfoRepository, times(1)).save(any());
     }
 }
