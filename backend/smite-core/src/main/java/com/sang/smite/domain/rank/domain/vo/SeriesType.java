@@ -5,10 +5,9 @@ import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
-public enum SeriesStatus {
-    IN_PROGRESS("진행 중"),
-    SUCCESS("성공"),
-    FAILED("실패");
+public enum SeriesType {
+    PLACEMENT("배치 고사"),
+    PROMOTION("승급전");
 
     private final String description;
 }

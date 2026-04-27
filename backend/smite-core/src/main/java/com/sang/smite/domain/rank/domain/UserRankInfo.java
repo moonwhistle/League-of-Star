@@ -42,6 +42,10 @@ public class UserRankInfo extends BaseEntity {
 
     @Column(nullable = false)
     @Builder.Default
+    private int tierScore = 1;
+
+    @Column(nullable = false)
+    @Builder.Default
     private int totalWins = 0;
 
     @Column(nullable = false)
@@ -51,22 +55,6 @@ public class UserRankInfo extends BaseEntity {
     @Column(nullable = false)
     @Builder.Default
     private int totalDraws = 0;
-
-    @Column(nullable = false)
-    @Builder.Default
-    private boolean isInPlacement = true;
-
-    @Column(nullable = false)
-    @Builder.Default
-    private int placementWins = 0;
-
-    @Column(nullable = false)
-    @Builder.Default
-    private int placementLosses = 0;
-
-    @Column(nullable = false)
-    @Builder.Default
-    private int demotionShield = 0;
 
     public void updateLp(int amount) {
         this.lp += amount;

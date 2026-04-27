@@ -8,14 +8,14 @@
 erDiagram
     users ||--|| user_rank_info : has
     users ||--o{ social_accounts : links
-    users ||--o{ promotion_series : enters
+    users ||--o{ rank_series : enters
     users ||--o{ game_records : records
     users ||--o{ game_actions : performs
     users ||--o{ game_participants : participates
     game_rooms ||--o{ game_participants : has
     game_rooms ||--o{ game_actions : contains
     game_rooms ||--o{ game_records : generates
-    game_records ||--o| promotion_series : links
+    game_records ||--o| rank_series : links
 
     users {
         BIGINT id PK
@@ -28,7 +28,7 @@ erDiagram
         BIGINT id PK
         BIGINT user_id FK
     }
-    promotion_series {
+    rank_series {
         BIGINT id PK
         BIGINT user_id FK
     }
@@ -51,7 +51,7 @@ erDiagram
         BIGINT game_room_id FK
         BIGINT user_id FK
         BIGINT opponent_id FK
-        BIGINT promotion_series_id FK
+        BIGINT rank_series_id FK
     }
 ```
 
@@ -105,34 +105,30 @@ stateDiagram-v2
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| 회원가입 | INSERT | is_in_placement=TRUE, IRON IV, LP 0 |
-| 배치 게임 결과 | UPDATE | placement_wins 또는 placement_losses 증가 |
-| 배치 완료 | UPDATE | is_in_placement=FALSE, 승수 기반 티어 배정 |
+| 회원가입 | INSERT | IRON IV, LP 0 (동시에 RankSeries 생성) |
 | 게임 승리 | UPDATE | lp 증가, total_wins 증가 |
 | 게임 패배 | UPDATE | lp 감소, total_losses 증가 |
 | 게임 무승부 | UPDATE | total_draws 증가 (LP 변동 없음) |
-| 승급 성공 | UPDATE | tier/division/tier_score 변경, lp=0, demotion_shield=3 |
-| 승리 (보호 중) | UPDATE | demotion_shield=0 (승리 시 강등 보호 즉시 해제) |
-| 강등 | UPDATE | tier/division/tier_score 변경, lp=75, demotion_shield=0 |
+| 시리즈(배치/승급) 성공 | UPDATE | tier/division/tier_score 변경, lp=0 |
+| 강등 | UPDATE | tier/division/tier_score 변경, lp=75 |
 
-### 2.4 promotion_series
+### 2.4 rank_series (Placement & Promotion)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> InProgress : LP 99 or 100 도달
-    InProgress --> InProgress : 게임 결과 기록
-    InProgress --> Promoted : 2승 달성
-    InProgress --> Failed : 2승 불가능 확정
-    Promoted --> [*]
+    [*] --> InProgress : 프로세스(배치/승급) 시작
+    InProgress --> InProgress : 게임 결과 기록 (W/L/D)
+    InProgress --> Success : 완료 조건 충족 (배치 10판 or 승급 2승)
+    InProgress --> Failed : 실패 조건 확정 (승급 2패)
+    Success --> [*]
     Failed --> [*]
 ```
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| LP 99/100 도달 | INSERT | status=IN_PROGRESS, 모든 game result=PENDING |
-| 승급전 경기 결과 | UPDATE | game1/2/3_result 갱신 |
-| 2승 달성 | UPDATE | status=PROMOTED, completed_at 기록 |
-| 2승 불가능 확정 | UPDATE | status=FAILED, completed_at 기록 |
+| 프로세스 시작 | INSERT | type(PLACEMENT/PROMOTION), status=IN_PROGRESS |
+| 경기 결과 반영 | UPDATE | wins / losses / draws 카운트 증가 |
+| 조건 충족 시 | UPDATE | status=SUCCESS/FAILED, completed_at 기록 |
 
 ### 2.5 game_rooms
 
@@ -256,10 +252,6 @@ CREATE TABLE social_accounts (
 | `total_wins` | INT | NOT NULL, DEFAULT 0 | 총 승리 수 |
 | `total_losses` | INT | NOT NULL, DEFAULT 0 | 총 패배 수 |
 | `total_draws` | INT | NOT NULL, DEFAULT 0 | 총 무승부 수 |
-| `is_in_placement` | BOOLEAN | NOT NULL, DEFAULT TRUE | 배치 진행 중 여부 |
-| `placement_wins` | INT | NOT NULL, DEFAULT 0 | 배치 승리 수 |
-| `placement_losses` | INT | NOT NULL, DEFAULT 0 | 배치 패배 수 |
-| `demotion_shield` | INT | NOT NULL, DEFAULT 0 | 강등 보호 남은 횟수 (0~3) |
 | `created_at` | DATETIME | NOT NULL | 생성일시 |
 | `updated_at` | DATETIME | NOT NULL | 최종 갱신일시 |
 
@@ -274,10 +266,6 @@ CREATE TABLE user_rank_info (
     total_wins        INT         NOT NULL DEFAULT 0,
     total_losses      INT         NOT NULL DEFAULT 0,
     total_draws       INT         NOT NULL DEFAULT 0,
-    is_in_placement   BOOLEAN     NOT NULL DEFAULT TRUE,
-    placement_wins    INT         NOT NULL DEFAULT 0,
-    placement_losses  INT         NOT NULL DEFAULT 0,
-    demotion_shield   INT         NOT NULL DEFAULT 0,
     created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -294,38 +282,42 @@ CREATE TABLE user_rank_info (
 
 ---
 
-### 3.4 promotion_series — 승급전 진행 상태
+### 3.4 rank_series — 배치/승급전 진행 상태
 
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
 | `id` | BIGINT | PK, AUTO_INCREMENT | 고유 ID |
-| `user_id` | BIGINT | FK → users, NOT NULL | 승급전 진행 유저 |
-| `target_tier` | VARCHAR(20) | NOT NULL | 승급 목표 티어 |
-| `target_division` | VARCHAR(5) | NULLABLE | 승급 목표 디비전 (Master 승급 시 NULL) |
-| `game1_result` | VARCHAR(10) | NOT NULL, DEFAULT 'PENDING' | 1판 결과 (WIN/LOSS/DRAW/PENDING) |
-| `game2_result` | VARCHAR(10) | NOT NULL, DEFAULT 'PENDING' | 2판 결과 |
-| `game3_result` | VARCHAR(10) | NOT NULL, DEFAULT 'PENDING' | 3판 결과 |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'IN_PROGRESS' | IN_PROGRESS / PROMOTED / FAILED |
-| `completed_at` | DATETIME | NULLABLE | 승급전 완료일시 |
-| `created_at` | DATETIME | NOT NULL | 승급전 시작일시 |
+| `user_id` | BIGINT | FK → users, NOT NULL | 대상 유저 |
+| `type` | VARCHAR(20) | NOT NULL | PLACEMENT / PROMOTION |
+| `target_tier` | VARCHAR(20) | NULLABLE | 승급 목표 티어 (배치 시 NULL) |
+| `target_division` | VARCHAR(5) | NULLABLE | 승급 목표 디비전 |
+| `wins` | INT | NOT NULL, DEFAULT 0 | 시리즈 내 승리 수 |
+| `losses` | INT | NOT NULL, DEFAULT 0 | 시리즈 내 패배 수 |
+| `draws` | INT | NOT NULL, DEFAULT 0 | 시리즈 내 무승부 수 |
+| `total_games_required` | INT | NOT NULL | 필요 게임 수 (10 또는 3) |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'IN_PROGRESS' | IN_PROGRESS / SUCCESS / FAILED |
+| `completed_at` | DATETIME | NULLABLE | 시리즈 완료일시 |
+| `created_at` | DATETIME | NOT NULL | 시리즈 시작일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
 
 ```sql
-CREATE TABLE promotion_series (
-    id               BIGINT      NOT NULL AUTO_INCREMENT,
-    user_id          BIGINT      NOT NULL,
-    target_tier      VARCHAR(20) NOT NULL,
-    target_division  VARCHAR(5)  NULL,
-    game1_result     VARCHAR(10) NOT NULL DEFAULT 'PENDING',
-    game2_result     VARCHAR(10) NOT NULL DEFAULT 'PENDING',
-    game3_result     VARCHAR(10) NOT NULL DEFAULT 'PENDING',
-    status           VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS',
-    completed_at     DATETIME    NULL,
-    created_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+CREATE TABLE rank_series (
+    id                    BIGINT      NOT NULL AUTO_INCREMENT,
+    user_id               BIGINT      NOT NULL,
+    type                  VARCHAR(20) NOT NULL,
+    target_tier           VARCHAR(20) NULL,
+    target_division       VARCHAR(5)  NULL,
+    wins                  INT         NOT NULL DEFAULT 0,
+    losses                INT         NOT NULL DEFAULT 0,
+    draws                 INT         NOT NULL DEFAULT 0,
+    total_games_required  INT         NOT NULL,
+    status                VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS',
+    completed_at          DATETIME    NULL,
+    created_at            DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     INDEX idx_user_id_status (user_id, status),
-    CONSTRAINT fk_promotion_series_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    CONSTRAINT fk_rank_series_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -444,39 +436,39 @@ CREATE TABLE game_actions (
 | `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 게임 방 |
 | `user_id` | BIGINT | FK → users, NOT NULL | 해당 유저 |
 | `opponent_id` | BIGINT | FK → users, NOT NULL | 상대방 |
-| `promotion_series_id` | BIGINT | FK → promotion_series, NULLABLE | 연관된 승급전 |
+| `rank_series_id` | BIGINT | FK → rank_series, NULLABLE | 연관된 배치/승급전 |
 | `result` | VARCHAR(10) | NOT NULL | WIN / LOSS / DRAW |
 | `lp_change` | INT | NOT NULL | LP 변동량 |
 | `lp_before` | INT | NOT NULL | 게임 전 LP |
 | `lp_after` | INT | NOT NULL | 게임 후 LP |
 | `rank_before` | JSON | NOT NULL | 게임 전 랭크 스냅샷 (Tier + Division) |
 | `rank_after` | JSON | NOT NULL | 게임 후 랭크 스냅샷 (Tier + Division) |
-| `is_promotion_game` | BOOLEAN | NOT NULL, DEFAULT FALSE | 승급전 경기 여부 |
+| `is_series_game` | BOOLEAN | NOT NULL, DEFAULT FALSE | 배치/승급전 경기 여부 |
 | `created_at` | DATETIME | NOT NULL | 기록일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
 
 ```sql
 CREATE TABLE game_records (
-    id                   BIGINT      NOT NULL AUTO_INCREMENT,
-    game_room_id         BIGINT      NOT NULL,
-    user_id              BIGINT      NOT NULL,
-    opponent_id          BIGINT      NOT NULL,
-    promotion_series_id  BIGINT      NULL,
-    result               VARCHAR(10) NOT NULL,
-    lp_change            INT         NOT NULL,
-    lp_before            INT         NOT NULL,
-    lp_after             INT         NOT NULL,
-    rank_before          JSON        NOT NULL,
-    rank_after           JSON        NOT NULL,
-    is_promotion_game    BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_at           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id                BIGINT      NOT NULL AUTO_INCREMENT,
+    game_room_id      BIGINT      NOT NULL,
+    user_id           BIGINT      NOT NULL,
+    opponent_id       BIGINT      NOT NULL,
+    rank_series_id    BIGINT      NULL,
+    result            VARCHAR(10) NOT NULL,
+    lp_change         INT         NOT NULL,
+    lp_before         INT         NOT NULL,
+    lp_after          INT         NOT NULL,
+    rank_before       JSON        NOT NULL,
+    rank_after        JSON        NOT NULL,
+    is_series_game    BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_game_room_user (game_room_id, user_id),
     INDEX idx_user_id_created (user_id, created_at DESC),
     CONSTRAINT fk_game_records_room      FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
     CONSTRAINT fk_game_records_user      FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_records_series    FOREIGN KEY (promotion_series_id) REFERENCES promotion_series (id) ON DELETE SET NULL
+    CONSTRAINT fk_game_records_series    FOREIGN KEY (rank_series_id) REFERENCES rank_series (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
