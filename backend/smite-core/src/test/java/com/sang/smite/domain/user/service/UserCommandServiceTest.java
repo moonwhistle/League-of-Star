@@ -22,6 +22,7 @@ class UserCommandServiceTest {
     private static final Long TEST_USER_ID = 1L;
     private static final String TEST_EMAIL = "test@example.com";
     private static final String TEST_NICKNAME = "테스터";
+    private static final String ENCODED_PASSWORD = "encodedPassword123";
 
     @InjectMocks
     private UserCommandService userCommandService;
@@ -36,22 +37,21 @@ class UserCommandServiceTest {
     @DisplayName("signup - 성공적으로 유저를 저장하고 랭크 초기화를 호출한다")
     void signup_Success() {
         // given
-        String password = "encodedPassword";
-        
         User user = User.builder()
                 .id(TEST_USER_ID)
                 .email(TEST_EMAIL)
-                .password(password)
+                .password(ENCODED_PASSWORD)
                 .nickname(TEST_NICKNAME)
                 .build();
         
         given(userRepository.save(any(User.class))).willReturn(user);
 
         // when
-        User result = userCommandService.signup(TEST_EMAIL, password, TEST_NICKNAME);
+        User result = userCommandService.signup(TEST_EMAIL, ENCODED_PASSWORD, TEST_NICKNAME);
 
         // then
         assertThat(result.getEmail()).isEqualTo(TEST_EMAIL);
+        assertThat(result.getPassword()).isEqualTo(ENCODED_PASSWORD);
         assertThat(result.getNickname()).isEqualTo(TEST_NICKNAME);
         
         verify(userRepository, times(1)).save(any(User.class));
