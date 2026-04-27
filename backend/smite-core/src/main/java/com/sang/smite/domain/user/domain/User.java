@@ -39,10 +39,6 @@ public class User extends BaseEntity {
     @Column(nullable = false, unique = true, length = 16)
     private String nickname;
 
-    @Column(nullable = false)
-    @Builder.Default
-    private boolean emailVerified = false;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

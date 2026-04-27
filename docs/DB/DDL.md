@@ -77,8 +77,7 @@ stateDiagram-v2
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| 회원가입 | INSERT | status=ACTIVE, email_verified=FALSE |
-| 이메일 인증 | UPDATE | email_verified=TRUE |
+| 회원가입 | INSERT | status=ACTIVE |
 | 닉네임/비밀번호 변경 | UPDATE | updated_at 갱신 |
 | 탈퇴 요청 | UPDATE | status=WITHDRAWN, withdrawn_at=NOW() |
 | 탈퇴 취소 (7일 이내) | UPDATE | status=ACTIVE, withdrawn_at=NULL |
@@ -183,7 +182,6 @@ stateDiagram-v2
 | `email` | VARCHAR(255) | UNIQUE, NOT NULL | 로그인 이메일 |
 | `password` | VARCHAR(255) | NULLABLE | BCrypt 해시. 소셜 전용 계정은 NULL |
 | `nickname` | VARCHAR(16) | UNIQUE, NOT NULL | 게임 닉네임 (2~16자) |
-| `email_verified` | BOOLEAN | NOT NULL, DEFAULT FALSE | 이메일 인증 완료 여부 |
 | `status` | VARCHAR(20) | NOT NULL, DEFAULT 'ACTIVE' | ACTIVE / WITHDRAWN / ANONYMIZED |
 | `withdrawn_at` | DATETIME | NULLABLE | 탈퇴 요청 시각 (7일 유예 기준점, 30일 재가입 제한 기준) |
 | `created_at` | DATETIME | NOT NULL | 가입일시 |
@@ -195,7 +193,6 @@ CREATE TABLE users (
     email          VARCHAR(255) NOT NULL,
     password       VARCHAR(255) NULL,
     nickname       VARCHAR(16)  NOT NULL,
-    email_verified BOOLEAN      NOT NULL DEFAULT FALSE,
     status         VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     withdrawn_at   DATETIME     NULL,
     created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
