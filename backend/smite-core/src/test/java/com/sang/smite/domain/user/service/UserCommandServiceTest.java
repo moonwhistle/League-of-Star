@@ -1,13 +1,11 @@
 package com.sang.smite.domain.user.service;
 
-import com.sang.smite.domain.rank.domain.UserRankInfo;
-import com.sang.smite.domain.rank.repository.UserRankInfoRepository;
+import com.sang.smite.domain.rank.service.RankCommandService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +19,10 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class UserCommandServiceTest {
 
+    private static final Long TEST_USER_ID = 1L;
+    private static final String TEST_EMAIL = "test@example.com";
+    private static final String TEST_NICKNAME = "테스터";
+
     @InjectMocks
     private UserCommandService userCommandService;
 
@@ -28,40 +30,31 @@ class UserCommandServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private UserRankInfoRepository userRankInfoRepository;
+    private RankCommandService rankCommandService;
 
     @Test
-    @DisplayName("signup - 성공적으로 유저와 초기 랭크 정보를 저장한다")
+    @DisplayName("signup - 성공적으로 유저를 저장하고 랭크 초기화를 호출한다")
     void signup_Success() {
         // given
-        String email = "test@example.com";
         String password = "encodedPassword";
-        String nickname = "테스터";
-        Long savedUserId = 1L;
         
         User user = User.builder()
-                .id(savedUserId)
-                .email(email)
+                .id(TEST_USER_ID)
+                .email(TEST_EMAIL)
                 .password(password)
-                .nickname(nickname)
+                .nickname(TEST_NICKNAME)
                 .build();
         
         given(userRepository.save(any(User.class))).willReturn(user);
 
         // when
-        User result = userCommandService.signup(email, password, nickname);
+        User result = userCommandService.signup(TEST_EMAIL, password, TEST_NICKNAME);
 
         // then
-        assertThat(result.getEmail()).isEqualTo(email);
-        assertThat(result.getNickname()).isEqualTo(nickname);
+        assertThat(result.getEmail()).isEqualTo(TEST_EMAIL);
+        assertThat(result.getNickname()).isEqualTo(TEST_NICKNAME);
         
         verify(userRepository, times(1)).save(any(User.class));
-        
-        // UserRankInfo 저장 및 userId 검증
-        ArgumentCaptor<UserRankInfo> rankInfoCaptor = ArgumentCaptor.forClass(UserRankInfo.class);
-        verify(userRankInfoRepository, times(1)).save(rankInfoCaptor.capture());
-        
-        UserRankInfo capturedRankInfo = rankInfoCaptor.getValue();
-        assertThat(capturedRankInfo.getUserId()).isEqualTo(savedUserId);
+        verify(rankCommandService, times(1)).initializeRank(TEST_USER_ID);
     }
 }
