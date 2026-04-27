@@ -4,6 +4,7 @@ import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.common.path.auth.AuthPath;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.sang.smite.common.service.EmailService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import com.sang.smite.domain.user.service.PasswordResetStore;
@@ -25,9 +26,13 @@ public class PasswordResetService {
     private static final String RESET_LINK_TAG = "[PASSWORD RESET LINK]";
     private static final String RESET_URL_TEMPLATE = BASE_URL + AuthPath.PASSWORD_RESET_BASE + AuthPath.RESET_SUBMIT + "?token=%s";
 
+    private static final String RESET_SUBJECT = "[League of Smite] 비밀번호 재설정 안내";
+    private static final String RESET_CONTENT_TEMPLATE = "안녕하세요. 비밀번호 재설정을 위해 아래 링크를 클릭해 주세요.\n\n%s\n\n링크는 10분 동안 유효합니다.";
+
     private final UserRepository userRepository;
     private final PasswordResetStore passwordResetStore;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     /**
      * 비밀번호 재설정 링크(토큰)를 요청합니다.
@@ -41,7 +46,10 @@ public class PasswordResetService {
         String token = generateToken();
         passwordResetStore.save(token, email, RESET_TOKEN_TTL_MINUTES);
         
-        log.info("{} {}", RESET_LINK_TAG, String.format(RESET_URL_TEMPLATE, token));
+        String resetLink = String.format(RESET_URL_TEMPLATE, token);
+        emailService.sendTextEmail(email, RESET_SUBJECT, String.format(RESET_CONTENT_TEMPLATE, resetLink));
+        
+        log.info("{} {}", RESET_LINK_TAG, resetLink);
         
         return token;
     }

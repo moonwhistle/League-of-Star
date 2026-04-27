@@ -68,3 +68,33 @@ sequenceDiagram
 ### 4.4 Documentation
 - [x] **RestDocs 업데이트**: 테스트 코드를 기반으로 API 명세서 스니펫 생성.
 - [x] **이슈 문서 최신화**: 구현 완료 사항 및 테스트 전략 반영.
+
+---------
+
+## 📌 Summary
+본 이슈는 유저가 이메일을 통해 비밀번호를 안전하게 재설정할 수 있는 기능을 구현하는 것을 목표로 합니다. 도메인 계층의 순수성을 유지하면서 Redis를 활용한 토큰 관리와 실제 이메일 발송 인프라를 연동하였습니다.
+
+## 📚 Changes
+- **Backend (API)**
+  - `PasswordResetService` 구현: UUID 기반 토큰 생성, Redis 저장(TTL 10분), 이메일 발송 오케스트레이션 수행.
+  - `AuthPasswordController` 구현: 재설정 링크 요청 및 제출 API 제공. (`AuthPath` 상수 활용)
+  - `JavaMailEmailService` 구현: Spring Mail 기반의 실제 이메일 발송 엔진 구축.
+- **Backend (Core)**
+  - `UserCommandService.updatePassword()` 구현: 암호화된 비밀번호를 전달받아 유저 정보 업데이트.
+  - `EmailService` 및 `PasswordResetStore` 인터페이스 정의: 인프라 기술과의 결합도 제거.
+- **Infrastructure (Redis)**
+  - `PasswordResetRedisStore` 구현: `@RedisHash` 엔티티를 활용한 토큰 영속성 관리.
+- **Configuration**
+  - `security.yml` 도입: JWT, OAuth2, Mail 설정 등 민감 정보를 분리하여 보안성 강화.
+  - `application.yml`: `spring.config.import`를 통해 외부 설정 파일 명시적 로드.
+
+## 📝 Note
+- **Security**: 이메일 존재 여부에 관계없이 동일한 성공 메시지를 반환하여 이메일 열거 공격(Email Enumeration)을 방지함.
+- **Architecture**: `smite-core`는 어떠한 보안 라이브러리나 외부 기술에도 의존하지 않으며, `smite-api` 계층에서 모든 기술적 구현(Encryption, Mail)을 담당함.
+- **Testing**:
+  - `RestAssuredMockMvc`를 활용한 Controller 테스트 및 RestDocs 명세 생성 완료.
+  - Testcontainers 기반의 실제 Redis 연동 데이터 무결성 검증 완료.
+  - 비즈니스 로직 단위 테스트(Mock 활용) 100% 통과.
+
+## 📌 Related Issue
+- Closes #20

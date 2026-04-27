@@ -3,6 +3,7 @@ package com.sang.smite.auth.service;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.sang.smite.common.service.EmailService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import com.sang.smite.domain.user.service.PasswordResetStore;
@@ -45,8 +46,11 @@ class PasswordResetServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private EmailService emailService;
+
     @Test
-    @DisplayName("requestReset - 성공: 유저가 존재하면 토큰을 생성하고 저장한다")
+    @DisplayName("requestReset - 성공: 유저가 존재하면 토큰을 생성하고 저장하며 이메일을 발송한다")
     void requestReset_Success() {
         // given
         given(userRepository.existsByEmail(TEST_EMAIL)).willReturn(true);
@@ -57,6 +61,7 @@ class PasswordResetServiceTest {
         // then
         assertThat(token).isNotNull();
         verify(passwordResetStore, times(1)).save(anyString(), eq(TEST_EMAIL), anyLong());
+        verify(emailService, times(1)).sendTextEmail(eq(TEST_EMAIL), anyString(), anyString());
     }
 
     @Test
