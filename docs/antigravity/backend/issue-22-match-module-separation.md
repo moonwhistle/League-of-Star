@@ -22,8 +22,8 @@
 - [ ] **MatchStore 구현체 작성**: Redisson을 활용한 원자적 대기열 조작 로직 구현.
 
 ### 4. 분산 락 및 엔진 기초 (Issue-22 범위 내)
-- [ ] **Redisson Lock 적용**: 매칭 조작 시 동시성 문제를 방지하기 위한 분산 락 유틸리티 구현.
-- [ ] **기초 테스트 코드**: Redis Testcontainers를 활용한 대기열 진입/추출 정합성 테스트.
+- [x] **Redisson Lock 적용**: 매칭 조작 시 동시성 문제를 방지하기 위한 분산 락 유틸리티(AOP) 구현 완료.
+- [x] **기초 테스트 코드**: Redis Testcontainers를 활용한 대기열 진입/추출 정합성 테스트 완료.
 
 ## 📝 기술적 의사결정 (Technical Decisions)
 

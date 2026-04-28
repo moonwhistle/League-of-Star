@@ -1,0 +1,82 @@
+package com.sang.smite.matching.repository;
+
+import com.sang.smite.domain.match.domain.vo.MatchTicket;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.sang.smite.redis.AbstractRedisTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class RedisMatchStoreTest extends AbstractRedisTest {
+
+    @Autowired
+    private RedisMatchStore matchStore;
+
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @AfterEach
+    void tearDown() {
+        redissonClient.getKeys().flushall();
+    }
+
+    @Test
+    @DisplayName("대기열에 티켓을 추가하고 전체 조회할 수 있다")
+    void addAndFindAll() {
+        // given
+        MatchTicket ticket1 = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket ticket2 = new MatchTicket(2L, 11, System.currentTimeMillis() + 100);
+
+        // when
+        matchStore.add(ticket1);
+        matchStore.add(ticket2);
+
+        // then
+        List<MatchTicket> all = matchStore.findAll();
+        assertThat(all).hasSize(2);
+        assertThat(all).extracting(MatchTicket::userId).containsExactlyInAnyOrder(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("루아 스크립트를 사용하여 두 명의 유저를 원자적으로 제거할 수 있다")
+    void atomicPairRemove() {
+        // given
+        MatchTicket userA = new MatchTicket(101L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(102L, 12, System.currentTimeMillis());
+        matchStore.add(userA);
+        matchStore.add(userB);
+
+        // when
+        boolean result = matchStore.atomicPairRemove(101L, 10, 102L, 12);
+
+        // then
+        assertThat(result).isTrue();
+        assertThat(matchStore.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("한 명이라도 존재하지 않으면 루아 스크립트 삭제가 실패하고 아무도 삭제되지 않는다")
+    void atomicPairRemoveFail() {
+        // given
+        MatchTicket userA = new MatchTicket(101L, 10, System.currentTimeMillis());
+        matchStore.add(userA);
+
+        // when
+        boolean result = matchStore.atomicPairRemove(101L, 10, 999L, 12);
+
+        // then
+        assertThat(result).isFalse();
+        assertThat(matchStore.findAll()).hasSize(1); // 기존 유저는 남아있어야 함
+    }
+}
