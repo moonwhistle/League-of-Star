@@ -1,9 +1,10 @@
-package com.sang.smite.matching.repository;
+package com.sang.smite.matching.infrastructure;
 
 import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.domain.match.domain.vo.MatchTicket;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.common.exception.MatchingException;
+import com.sang.smite.matching.repository.MatchStore;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBatch;

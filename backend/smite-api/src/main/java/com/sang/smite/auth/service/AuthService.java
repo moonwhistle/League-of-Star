@@ -9,7 +9,7 @@ import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.service.UserCommandService;
 import com.sang.smite.domain.user.service.UserReadService;
 import com.sang.smite.auth.domain.RefreshToken;
-import com.sang.smite.auth.repository.RefreshTokenRepository;
+import com.sang.smite.auth.infrastructure.token.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

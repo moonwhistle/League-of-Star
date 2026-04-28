@@ -1,4 +1,4 @@
-package com.sang.smite.auth.repository;
+package com.sang.smite.auth.infrastructure.token;
 
 import com.sang.smite.global.annotation.RedisRepository;
 import com.sang.smite.auth.domain.RefreshToken;

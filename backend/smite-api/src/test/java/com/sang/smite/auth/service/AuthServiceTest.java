@@ -9,7 +9,7 @@ import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.service.UserCommandService;
 import com.sang.smite.domain.user.service.UserReadService;
 import com.sang.smite.auth.domain.RefreshToken;
-import com.sang.smite.auth.repository.RefreshTokenRepository;
+import com.sang.smite.auth.infrastructure.token.RefreshTokenRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

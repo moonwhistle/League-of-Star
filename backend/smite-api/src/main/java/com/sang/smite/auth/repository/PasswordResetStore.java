@@ -1,6 +1,7 @@
 package com.sang.smite.auth.repository;
 
 import com.sang.smite.auth.domain.PasswordResetToken;
+import com.sang.smite.auth.infrastructure.token.PasswordResetTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 

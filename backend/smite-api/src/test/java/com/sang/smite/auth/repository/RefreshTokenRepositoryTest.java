@@ -3,6 +3,7 @@ package com.sang.smite.auth.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sang.smite.auth.domain.RefreshToken;
+import com.sang.smite.auth.infrastructure.token.RefreshTokenRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
