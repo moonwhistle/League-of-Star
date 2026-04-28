@@ -6,7 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.sang.smite.common.service.EmailService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
-import com.sang.smite.domain.user.service.PasswordResetStore;
+import com.sang.smite.auth.repository.PasswordResetStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
