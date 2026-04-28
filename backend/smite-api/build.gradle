@@ -21,6 +21,7 @@ configurations {
 dependencies {
 	implementation project(':smite-core')
 	implementation project(':smite-infra-redis')
+	implementation project(':smite-matching')
 	testImplementation testFixtures(project(':smite-infra-redis'))
 
 	// Lombok

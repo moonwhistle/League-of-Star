@@ -1,0 +1,10 @@
+dependencies {
+    implementation project(':smite-core')
+    implementation project(':smite-infra-redis')
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.redisson:redisson-spring-boot-starter:3.43.0'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'com.redis:testcontainers-redis'
+}
