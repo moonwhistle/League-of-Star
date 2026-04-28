@@ -7,15 +7,15 @@
 ## 📚 작업 순서 (Tasks)
 
 ### 1. 모듈 생성 및 환경 설정
-- [ ] **smite-matching 멀티 모듈 생성**: 루트 `settings.gradle`에 등록 및 디렉터리 구조 생성.
-- [ ] **build.gradle 설정**: 
-    - `smite-core` 및 `smite-infra-redis` 의존성 추가.
-    - `redisson-spring-boot-starter` 의존성 추가.
-- [ ] **Redisson 설정**: 멀티 서버 환경에서 공유할 수 있는 Redisson Client 설정 클래스 구현.
+- [x] **smite-matching 멀티 모듈 생성**: 루트 `settings.gradle`에 등록 및 디렉터리 구조 생성 완료.
+- [x] **build.gradle 설정**: 
+    - `smite-core` 및 `smite-infra-redis` 의존성 추가 완료.
+    - `redisson-spring-boot-starter` 의존성 추가 완료.
+- [x] **Redisson 설정**: Spring Boot 설정을 참조하여 RedissonClient를 Bean으로 등록 완료.
 
 ### 2. 도메인 추상화 (smite-core)
-- [ ] **매칭 도메인 모델 정의**: `MatchTicket`(대기 정보), `MatchWindow`(탐색 범위) 등 정의.
-- [ ] **MatchStore 인터페이스 정의**: 인프라 기술(Redis)에 의존하지 않는 대기열 조작 인터페이스 정의.
+- [x] **매칭 도메인 모델 정의**: `MatchTicket`(대기 정보), `MatchStatus`(프로세스 상태) 정의 완료.
+- [x] **MatchStore 인터페이스 정의**: 인프라 기술(Redis)에 의존하지 않는 대기열 조작 인터페이스 정의 완료.
 
 ### 3. Redis 기반 대기열 구현 (smite-matching)
 - [ ] **ZSET 기반 대기열 로직**: 유저의 티어 점수를 Score로 하는 Redis Sorted Set 진입/취소 기능 구현.
