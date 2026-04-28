@@ -7,6 +7,7 @@ import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.repository.MatchStore;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBatch;
 import org.redisson.api.RFuture;
 import org.redisson.api.RScoredSortedSet;
@@ -29,6 +30,7 @@ import java.util.concurrent.ExecutionException;
  * Redis 기반의 매칭 대기열 저장소 구현체입니다.
  * 티어별 분할 ZSET 구조를 사용하여 성능과 확장성을 보장합니다.
  */
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class RedisMatchStore implements MatchStore {
@@ -81,8 +83,14 @@ public class RedisMatchStore implements MatchStore {
                             entry.getScore().longValue()
                     ));
                 }
-            } catch (InterruptedException | ExecutionException e) {
+            } catch (InterruptedException e) {
+                // 스레드 인터럽트 상태를 복원한 뒤 예외를 전파
                 Thread.currentThread().interrupt();
+                throw new MatchingException(MatchingErrorCode.MATCH_REDIS_FETCH_ERROR);
+            } catch (ExecutionException e) {
+                // Redis 작업 자체의 실패 원인(네트워크 오류, 타임아웃 등) 로그
+                // interrupt() 호출은 무관하므로 제거
+                log.error("Redis batch fetch failed for tierScore={}, cause={}", tierScore, e.getCause().toString());
                 throw new MatchingException(MatchingErrorCode.MATCH_REDIS_FETCH_ERROR);
             }
         }
@@ -109,6 +117,10 @@ public class RedisMatchStore implements MatchStore {
     }
 
     private String loadLuaScript() {
+        // [Fail-Fast 설계 의도]
+        // Lua 스크립트 없이는 원자적 페어 제거가 불가능하여 데이터 정합성을 보장할 수 없습니다.
+        // 따라서 스크립트 파일이 없으면 애플리케이션 시작 자체를 막는 것이 올바른 동작입니다.
+        // 폴백(Fallback) 로직은 의도적으로 제공하지 않습니다.
         try {
             ClassPathResource resource = new ClassPathResource(MatchingConstants.LUA_SCRIPT_PATH);
             return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);

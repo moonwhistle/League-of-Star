@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.Method;
 
 /**
- * 분산 락의 핵심 흐름을 제어하는 Aspect 클래스입니다.
+ * 분산 락의 핵심 흐름을 제어하는 Aspect 클래스
  */
 @Aspect
 @Component
@@ -33,22 +33,33 @@ public class DistributedLockAop {
         Method method = signature.getMethod();
         DistributedLock distributedLock = method.getAnnotation(DistributedLock.class);
 
-        String key = LockConstants.REDISSON_LOCK_PREFIX + 
-                CustomSpringELParser.getDynamicValue(signature.getParameterNames(), joinPoint.getArgs(), distributedLock.key());
-        
+        String key = LockConstants.REDISSON_LOCK_PREFIX +
+                CustomSpringELParser.getDynamicValue(signature.getParameterNames(), joinPoint.getArgs(),
+                        distributedLock.key());
+
         RLock rLock = redissonClient.getLock(key);
 
         try {
-            boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
+            boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(),
+                    distributedLock.timeUnit());
             if (!available) {
                 log.warn("Lock acquisition failed for key: {}", key);
                 return false;
             }
 
+            /* [REQUIRES_NEW 트랜잭션 설계 의도]
+             * AopForTransaction.proceed()는 REQUIRES_NEW 트랜잭션 안에서 비즈니스 로직을 실행
+             * 트랜잭션이 완전히 커밋된 후 finally 블록에서 락이 해제되므로,
+             * 락 해제와 트랜잭션 롤백 사이의 타이밍 문제가 발생하지 않음
+             */
             return aopForTransaction.proceed(joinPoint);
         } catch (InterruptedException e) {
-            log.error("Lock acquisition interrupted", e);
-            throw new InterruptedException();
+            log.error("Lock acquisition interrupted for key: {}", key, e);
+            // 원본 예외를 cause로 연결하여 스택 트레이스를 보존
+            InterruptedException wrapped = new InterruptedException(e.getMessage());
+            wrapped.initCause(e);
+            Thread.currentThread().interrupt();
+            throw wrapped;
         } finally {
             try {
                 if (rLock.isHeldByCurrentThread()) {
