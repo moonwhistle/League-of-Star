@@ -29,19 +29,15 @@ public class AuthService {
 
     @Transactional
     public User signUp(String email, String password, String nickname) {
-        // 1. 이메일 중복 확인
         if (userReadService.existsByEmail(email)) {
             throw new ApiException(ApiErrorCode.AUTH_DUPLICATE_EMAIL);
         }
 
-        // 2. 닉네임 중복 확인
         if (userReadService.existsByNickname(nickname)) {
             throw new ApiException(ApiErrorCode.AUTH_DUPLICATE_NICKNAME);
         }
 
-        // 3. 회원가입 처리 (비밀번호 암호화 포함)
         String encodedPassword = passwordEncoder.encode(password);
-
         return userCommandService.signup(email, encodedPassword, nickname);
     }
 

@@ -40,7 +40,6 @@ public class GameRoom extends BaseEntity {
 
     public static final int MAX_PARTICIPANTS = 2;
     public static final int DEFAULT_DRAGON_MAX_HP = 10000;
-    private static final String ERR_MAX_PARTICIPANTS = "1v1 게임방에는 최대 %d명까지만 참여 가능합니다.";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

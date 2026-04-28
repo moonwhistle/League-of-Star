@@ -22,6 +22,17 @@ spring:
   data:
     redis:
       timeout: 2000
+  mail:
+    host: localhost
+    port: 587
+    username: dummy
+    password: dummy
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
 # Redis Host/Port는 AbstractRedisTest의 DynamicPropertySource에서 동적으로 주입됩니다.
 
 jwt:

@@ -2,6 +2,8 @@ package com.sang.smite.domain.user.domain;
 
 import com.sang.smite.domain.user.domain.vo.UserStatus;
 import com.sang.smite.common.domain.BaseEntity;
+import com.sang.smite.common.exception.CoreErrorCode;
+import com.sang.smite.common.exception.CoreException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -39,10 +41,6 @@ public class User extends BaseEntity {
     @Column(nullable = false, unique = true, length = 16)
     private String nickname;
 
-    @Column(nullable = false)
-    @Builder.Default
-    private boolean emailVerified = false;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
@@ -61,5 +59,12 @@ public class User extends BaseEntity {
         this.nickname = maskedNickname;
         this.password = null;
         this.status = UserStatus.ANONYMIZED;
+    }
+
+    public void updatePassword(String encodedPassword) {
+        if (this.status != UserStatus.ACTIVE) {
+            throw new CoreException(CoreErrorCode.USER_INACTIVE);
+        }
+        this.password = encodedPassword;
     }
 }

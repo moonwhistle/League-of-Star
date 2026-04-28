@@ -10,4 +10,9 @@ public final class AuthPath {
     public static final String LOGIN = "/api/v1/auth/login";
     public static final String REFRESH = "/api/v1/auth/refresh";
     public static final String LOGOUT = "/api/v1/auth/logout";
+
+    // Password Reset
+    public static final String PASSWORD_RESET_BASE = "/api/v1/auth/password";
+    public static final String RESET_REQUEST = "/reset-request";
+    public static final String RESET_SUBMIT = "/reset-submit";
 }

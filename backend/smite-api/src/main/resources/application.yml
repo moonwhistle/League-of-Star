@@ -2,7 +2,9 @@ spring:
   application:
     name: smite
   profiles:
-    active: local, security
+    active: local
+  config:
+    import: optional:security.yml
   jpa:
     open-in-view: false
     properties:

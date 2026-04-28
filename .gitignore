@@ -26,6 +26,7 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 application-security.yml
+security.yml
 
 ### NetBeans ###
 /nbproject/private/

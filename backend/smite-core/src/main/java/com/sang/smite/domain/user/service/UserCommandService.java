@@ -1,5 +1,6 @@
 package com.sang.smite.domain.user.service;
 
+import com.sang.smite.domain.rank.service.RankCommandService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserCommandService {
 
     private final UserRepository userRepository;
+    private final RankCommandService rankCommandService;
 
     public User signup(String email, String encodedPassword, String nickname) {
         User user = User.builder()
@@ -19,7 +21,11 @@ public class UserCommandService {
                 .password(encodedPassword)
                 .nickname(nickname)
                 .build();
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        rankCommandService.initializeRank(savedUser.getId());
+
+        return savedUser;
     }
 
     public User save(User user) {

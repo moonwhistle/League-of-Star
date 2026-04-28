@@ -1,5 +1,6 @@
 package com.sang.smite.domain.user.service;
 
+import com.sang.smite.domain.rank.service.RankCommandService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -18,35 +19,42 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class UserCommandServiceTest {
 
+    private static final Long TEST_USER_ID = 1L;
+    private static final String TEST_EMAIL = "test@example.com";
+    private static final String TEST_NICKNAME = "테스터";
+    private static final String ENCODED_PASSWORD = "encodedPassword123";
+
     @InjectMocks
     private UserCommandService userCommandService;
 
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private RankCommandService rankCommandService;
+
     @Test
-    @DisplayName("signup - 성공적으로 유저를 저장한다")
+    @DisplayName("signup - 성공적으로 유저를 저장하고 랭크 초기화를 호출한다")
     void signup_Success() {
         // given
-        String email = "test@example.com";
-        String password = "encodedPassword";
-        String nickname = "테스터";
-        
         User user = User.builder()
-                .id(1L)
-                .email(email)
-                .password(password)
-                .nickname(nickname)
+                .id(TEST_USER_ID)
+                .email(TEST_EMAIL)
+                .password(ENCODED_PASSWORD)
+                .nickname(TEST_NICKNAME)
                 .build();
         
         given(userRepository.save(any(User.class))).willReturn(user);
 
         // when
-        User result = userCommandService.signup(email, password, nickname);
+        User result = userCommandService.signup(TEST_EMAIL, ENCODED_PASSWORD, TEST_NICKNAME);
 
         // then
-        assertThat(result.getEmail()).isEqualTo(email);
-        assertThat(result.getNickname()).isEqualTo(nickname);
+        assertThat(result.getEmail()).isEqualTo(TEST_EMAIL);
+        assertThat(result.getPassword()).isEqualTo(ENCODED_PASSWORD);
+        assertThat(result.getNickname()).isEqualTo(TEST_NICKNAME);
+        
         verify(userRepository, times(1)).save(any(User.class));
+        verify(rankCommandService, times(1)).initializeRank(TEST_USER_ID);
     }
 }
