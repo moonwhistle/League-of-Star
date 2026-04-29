@@ -19,9 +19,6 @@ spring:
           google:
             client-id: "dummy-client-id"
             client-secret: "dummy-client-secret"
-  data:
-    redis:
-      timeout: 2000
   mail:
     host: localhost
     port: 587

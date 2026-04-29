@@ -39,3 +39,4 @@ security.yml
 .vscode/
 .env
 
+backend/smite-infra-redis/src/main/resources/application-redis.yml
