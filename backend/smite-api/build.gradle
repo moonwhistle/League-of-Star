@@ -39,6 +39,7 @@ dependencies {
 
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-aop'      // smite-matching AOP Aspect 활성화
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
 	// Security & JWT
