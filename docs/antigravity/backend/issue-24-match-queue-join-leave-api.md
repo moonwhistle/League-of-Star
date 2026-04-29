@@ -24,7 +24,7 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
 
 ### 2. MatchService 구현 (smite-matching)
 
-- [ ] **`MatchService` 클래스** (`matching/service/`)
+- [x] **`MatchService` 클래스** (`matching/service/`)
     - `joinQueue(Long userId, int tierScore)`: 대기열 진입
         1. 현재 상태 조회 → `MATCHING` / `IN_GAME`이면 예외 발생
         2. `MatchStore.add(ticket)` 호출
@@ -36,7 +36,7 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
 
 ### 3. 에러 코드 추가 (smite-matching)
 
-- [ ] **`MatchingErrorCode` 추가**
+- [x] **`MatchingErrorCode` 추가**
     - `ALREADY_IN_QUEUE`: 이미 매칭 대기열에 있는 유저
     - `NOT_IN_QUEUE`: 대기열에 없는 유저가 취소 시도
 
@@ -57,7 +57,7 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
 
 ### 5. 테스트
 
-- [ ] **`MatchServiceTest`** (단위 테스트, Mock 사용)
+- [x] **`MatchServiceTest`** (단위 테스트, Mock 사용)
     - 정상 진입: `MATCHING` 상태 설정 + 대기열 추가 확인
     - 중복 진입: 이미 `MATCHING` 상태면 예외 확인
     - 정상 취소: 상태 초기화 + 대기열 제거 확인
