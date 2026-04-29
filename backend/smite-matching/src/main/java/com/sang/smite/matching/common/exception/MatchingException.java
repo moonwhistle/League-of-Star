@@ -9,4 +9,8 @@ public class MatchingException extends BaseException {
     public MatchingException(MatchingErrorCode errorCode) {
         super(errorCode);
     }
+
+    public MatchingException(MatchingErrorCode errorCode, Throwable cause) {
+        super(errorCode, cause);
+    }
 }

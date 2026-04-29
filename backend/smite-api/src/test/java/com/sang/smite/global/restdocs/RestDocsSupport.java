@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.prettyPrint;
@@ -22,6 +23,7 @@ public abstract class RestDocsSupport {
         this.spec = RestAssuredMockMvc.given()
                 .mockMvc(MockMvcBuilders.standaloneSetup(initController())
                         .setControllerAdvice(new GlobalExceptionHandler())
+                        .setCustomArgumentResolvers(customArgumentResolvers())
                         .apply(documentationConfiguration(provider)
                                 .operationPreprocessors()
                                 .withRequestDefaults(prettyPrint())
@@ -30,4 +32,8 @@ public abstract class RestDocsSupport {
     }
 
     protected abstract Object initController();
+
+    protected HandlerMethodArgumentResolver[] customArgumentResolvers() {
+        return new HandlerMethodArgumentResolver[0];
+    }
 }

@@ -106,6 +106,42 @@ paths:
                 auth-signup:
                   value: "{\n  \"id\" : 1,\n  \"email\" : \"test@example.com\",\n\
                     \  \"nickname\" : \"테스터\"\n}"
+  /api/v1/match/join:
+    post:
+      tags:
+      - Match
+      summary: 매칭 대기열 진입
+      description: 사용자가 매칭 대기열에 진입합니다.
+      operationId: match-join
+      parameters:
+      - name: Authorization
+        in: header
+        description: 액세스 토큰 (Bearer)
+        required: true
+        schema:
+          type: string
+        example: Bearer access-token
+      responses:
+        "200":
+          description: "200"
+  /api/v1/match/leave:
+    delete:
+      tags:
+      - Match
+      summary: 매칭 대기열 취소
+      description: 사용자가 매칭 대기열에서 나갑니다.
+      operationId: match-leave
+      parameters:
+      - name: Authorization
+        in: header
+        description: 액세스 토큰 (Bearer)
+        required: true
+        schema:
+          type: string
+        example: Bearer access-token
+      responses:
+        "200":
+          description: "200"
   /api/v1/auth/password/reset-request:
     post:
       tags:

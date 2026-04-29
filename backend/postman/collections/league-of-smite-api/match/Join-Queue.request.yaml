@@ -1,0 +1,8 @@
+$kind: http-request
+name: Join Queue
+method: POST
+url: '{{baseUrl}}/api/v1/match/join'
+order: 1000
+headers:
+  - key: Authorization
+    value: 'Bearer {{accessToken}}'

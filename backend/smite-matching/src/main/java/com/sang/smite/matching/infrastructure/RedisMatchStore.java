@@ -51,10 +51,10 @@ public class RedisMatchStore implements MatchStore {
     }
 
     @Override
-    public void remove(Long userId, int tierScore) {
+    public boolean remove(Long userId, int tierScore) {
         String key = getQueueKey(tierScore);
         RScoredSortedSet<Long> queue = redissonClient.getScoredSortedSet(key);
-        queue.remove(userId);
+        return queue.remove(userId);
     }
 
     @Override
