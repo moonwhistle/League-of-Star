@@ -21,10 +21,10 @@ public class RedisMatchUserStatusStore implements MatchUserStatusStore {
     private final RedissonClient redissonClient;
 
     @Override
-    public void setStatus(Long userId, MatchStatus status, long ttlSeconds) {
+    public boolean setStatusIfAbsent(Long userId, MatchStatus status, long ttlSeconds) {
         String key = getStatusKey(userId);
         RBucket<MatchStatus> bucket = redissonClient.getBucket(key);
-        bucket.set(status, Duration.ofSeconds(ttlSeconds));
+        return bucket.setIfAbsent(status, Duration.ofSeconds(ttlSeconds));
     }
 
     @Override

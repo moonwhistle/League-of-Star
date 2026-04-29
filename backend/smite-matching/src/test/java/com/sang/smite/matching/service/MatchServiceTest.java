@@ -39,14 +39,13 @@ class MatchServiceTest {
         // given
         Long userId = 1L;
         int tierScore = 10;
-        given(userStatusStore.getStatus(userId)).willReturn(Optional.empty());
+        given(userStatusStore.setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class))).willReturn(true);
 
         // when
         matchService.joinQueue(userId, tierScore);
 
         // then
         verify(matchStore).add(any(MatchTicket.class));
-        verify(userStatusStore).setStatus(eq(userId), eq(MatchStatus.MATCHING), any(Long.class));
     }
 
     @Test
@@ -55,7 +54,7 @@ class MatchServiceTest {
         // given
         Long userId = 1L;
         int tierScore = 10;
-        given(userStatusStore.getStatus(userId)).willReturn(Optional.of(MatchStatus.MATCHING));
+        given(userStatusStore.setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class))).willReturn(false);
 
         // when & then
         assertThatThrownBy(() -> matchService.joinQueue(userId, tierScore))
@@ -70,6 +69,7 @@ class MatchServiceTest {
         Long userId = 1L;
         int tierScore = 10;
         given(userStatusStore.getStatus(userId)).willReturn(Optional.of(MatchStatus.MATCHING));
+        given(matchStore.remove(userId, tierScore)).willReturn(true);
 
         // when
         matchService.leaveQueue(userId, tierScore);
@@ -86,6 +86,21 @@ class MatchServiceTest {
         Long userId = 1L;
         int tierScore = 10;
         given(userStatusStore.getStatus(userId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> matchService.leaveQueue(userId, tierScore))
+                .isInstanceOf(MatchingException.class)
+                .hasFieldOrPropertyWithValue("errorCode", MatchingErrorCode.NOT_IN_QUEUE);
+    }
+
+    @Test
+    @DisplayName("취소 시도 중 매칭 엔진이 이미 큐에서 유저를 꺼내갔다면 예외가 발생한다.")
+    void leaveQueue_already_picked_by_engine() {
+        // given
+        Long userId = 1L;
+        int tierScore = 10;
+        given(userStatusStore.getStatus(userId)).willReturn(Optional.of(MatchStatus.MATCHING));
+        given(matchStore.remove(userId, tierScore)).willReturn(false);
 
         // when & then
         assertThatThrownBy(() -> matchService.leaveQueue(userId, tierScore))

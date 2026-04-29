@@ -9,13 +9,16 @@ import java.util.Optional;
 public interface MatchUserStatusStore {
 
     /**
-     * 유저의 매칭 상태를 설정합니다.
+     * 유저의 매칭 상태를 원자적으로 설정합니다. (SETNX)
+     * 이미 상태가 존재하면 설정하지 않고 false를 반환합니다.
      *
      * @param userId 유저 ID
      * @param status 설정할 상태
      * @param ttlSeconds 상태 유지 시간 (초)
+     * @return 성공 여부 (true: 성공, false: 이미 상태 존재)
      */
-    void setStatus(Long userId, MatchStatus status, long ttlSeconds);
+    boolean setStatusIfAbsent(Long userId, MatchStatus status, long ttlSeconds);
+
 
     /**
      * 유저의 현재 매칭 상태를 조회합니다.

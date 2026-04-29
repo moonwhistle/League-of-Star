@@ -16,8 +16,9 @@ public interface MatchStore {
 
     /**
      * 유저를 해당 티어 대기열에서 수동으로 제거합니다. (매칭 취소 등)
+     * @return 큐에 유저가 존재하여 성공적으로 제거했으면 true, 아니면 false
      */
-    void remove(Long userId, int tierScore);
+    boolean remove(Long userId, int tierScore);
 
     /**
      * 현재 모든 티어 대기열에 있는 모든 유저 목록을 로드합니다.

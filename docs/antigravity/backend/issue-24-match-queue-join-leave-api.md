@@ -42,7 +42,7 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
 
 ### 4. API 엔드포인트 (smite-api)
 
-- [ ] **`MatchController`** (`api/match/controller/`)
+- [x] **`MatchController`** (`api/match/controller/`)
     - `POST /api/v1/match/join`: 매칭 대기열 진입
         - 인증 필요 (JWT)
         - 요청: 없음 (유저 티어 정보는 서버에서 조회)
@@ -51,7 +51,7 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
         - 인증 필요 (JWT)
         - 응답: `200 OK` / `400 BAD_REQUEST` (대기 중 아닐 때)
 
-- [ ] **`MatchFacade` 또는 `MatchController` 내에서 티어 조회 처리**
+- [x] **`MatchFacade` 또는 `MatchController` 내에서 티어 조회 처리**
     - 현재 인증 유저의 `UserRankInfo`에서 `tierScore` 계산
     - `Rank.getTierScore()` 공식 사용 (`smite-core` 참조)
 
@@ -71,16 +71,69 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
 
 ## 📝 Note
 
+### 트랜잭션 전파 범위 및 동시성 제어 분석
+
+```mermaid
+sequenceDiagram
+    participant C as MatchController
+    participant QS as MatchQueueService (api)
+    participant RS as RankReadService [TX: readOnly]
+    participant DB as DB (UserRankInfo)
+    participant MS as MatchService
+    participant Redis as Redis
+
+    C->>QS: joinQueue(userId)
+    Note over QS: @Transactional 없음
+
+    QS->>RS: getUserRankInfo(userId)
+    Note over RS: TX 1 START (readOnly)
+    RS->>DB: findByUserId(userId)
+    DB-->>RS: UserRankInfo
+    Note over RS: TX 1 COMMIT
+    RS-->>QS: UserRankInfo (tierScore)
+
+    QS->>MS: joinQueue(userId, tierScore)
+    Note over MS: 분산 락 제거<br/>SETNX로 원자성 보장
+    MS->>Redis: setIfAbsent(userId, MATCHING)
+    Redis-->>MS: true/false
+    
+    alt 성공 (true)
+        MS->>Redis: add(ticket) — ZADD
+        MS-->>QS: 완료
+    else 실패 (false - 이미 큐/게임 중)
+        MS-->>QS: throw ALREADY_IN_QUEUE
+    end
+    QS-->>C: 응답 반환
+```
+
+### 트랜잭션 경계 요약
+
+| 레이어 | 클래스 | TX 전파 | 비고 |
+|--------|--------|---------|------|
+| api | `MatchQueueService` | 없음 | TX 없이 진입 |
+| core | `RankReadService` | `REQUIRED` | DB 조회 전용 (readOnly) |
+| matching | `MatchService` | 없음 | Redis 연산만 수행 |
+
+### 분산 락(Distributed Lock) 대신 SETNX(setIfAbsent) 사용
+기존에는 상태 체크(check) 후 ZADD 추가(act) 사이에 발생할 수 있는 동시성 문제를 막기 위해 Redisson 기반 `@DistributedLock`을 사용했습니다.
+하지만 `RedisMatchUserStatusStore.setStatusIfAbsent()` (내부적으로 `SETNX` 활용) 기능을 도입하여 **분산 락 없이 원자성을 보장**하도록 개선했습니다.
+
+**이점:**
+1. 락 획득/해제를 위한 추가적인 Redis 네트워크 I/O 감소
+2. 불필요하게 `REQUIRES_NEW` JPA 트랜잭션 커넥션을 여는 `AopForTransaction` 오버헤드 완벽 제거 (DB를 사용하지 않는 로직에 최적화)
+
 ### 유저 티어 조회 흐름
 
 ```
-MatchController (인증 유저 ID 추출)
+MatchController (@AuthUser → userId 추출)
     ↓
-UserRankInfo 조회 (smite-core/UserRankInfoRepository)
-    ↓
-Rank.getTierScore() 계산 → tierScore (1~28)
-    ↓
+MatchQueueService.joinQueue(userId)
+    ↓ [TX 1: readOnly]
+RankReadService.getUserRankInfo(userId) → tierScore
+    ↓ [No TX, No Lock]
 MatchService.joinQueue(userId, tierScore)
+    ↓
+SETNX 성공 시 Redis 대기열 추가
 ```
 
 ### MatchUserStatusStore를 별도 인터페이스로 분리하는 이유

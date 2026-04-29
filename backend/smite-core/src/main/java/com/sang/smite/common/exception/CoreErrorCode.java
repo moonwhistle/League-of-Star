@@ -21,7 +21,10 @@ public enum CoreErrorCode implements BaseErrorCode {
 
     // User (USER_000)
     USER_NOT_FOUND(404, "USER_001", "해당 유저를 찾을 수 없습니다."),
-    USER_INACTIVE(400, "USER_002", "비활성화된 유저입니다.");
+    USER_INACTIVE(400, "USER_002", "비활성화된 유저입니다."),
+
+    // Rank (RANK_000)
+    RANK_NOT_FOUND(404, "RANK_001", "유저의 랭크 정보를 찾을 수 없습니다.");
 
     private final int httpStatus;
     private final String customCode;

@@ -1,6 +1,6 @@
 package com.sang.smite;
 
-import com.sang.smite.infra.redis.AbstractRedisTest;
+import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;

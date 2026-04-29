@@ -1,8 +1,7 @@
-package com.sang.smite.matching.repository;
+package com.sang.smite.matching.infrastructure;
 
 import com.sang.smite.domain.match.domain.vo.MatchTicket;
 
-import com.sang.smite.matching.infrastructure.RedisMatchStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

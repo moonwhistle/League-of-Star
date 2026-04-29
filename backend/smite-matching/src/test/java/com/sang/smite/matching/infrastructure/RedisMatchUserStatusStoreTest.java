@@ -19,19 +19,37 @@ class RedisMatchUserStatusStoreTest extends AbstractRedisTest {
     private RedisMatchUserStatusStore statusStore;
 
     @Test
-    @DisplayName("유저의 매칭 상태를 저장하고 조회할 수 있다.")
-    void setAndGetStatus() {
+    @DisplayName("유저의 매칭 상태를 원자적으로 저장하고 조회할 수 있다.")
+    void setIfAbsentAndGetStatus() {
         // given
         Long userId = 1L;
         MatchStatus status = MatchStatus.MATCHING;
 
         // when
-        statusStore.setStatus(userId, status, 60);
+        boolean isSet = statusStore.setStatusIfAbsent(userId, status, 60);
         Optional<MatchStatus> result = statusStore.getStatus(userId);
 
         // then
+        assertThat(isSet).isTrue();
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualTo(status);
+    }
+
+    @Test
+    @DisplayName("이미 매칭 상태가 존재하는 경우 저장이 무시되고 false를 반환한다.")
+    void setIfAbsent_alreadyExists() {
+        // given
+        Long userId = 100L;
+        statusStore.setStatusIfAbsent(userId, MatchStatus.MATCHING, 60);
+
+        // when
+        boolean isSetAgain = statusStore.setStatusIfAbsent(userId, MatchStatus.IN_GAME, 60);
+        Optional<MatchStatus> result = statusStore.getStatus(userId);
+
+        // then
+        assertThat(isSetAgain).isFalse();
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualTo(MatchStatus.MATCHING); // 기존 상태 유지
     }
 
     @Test
@@ -52,7 +70,7 @@ class RedisMatchUserStatusStoreTest extends AbstractRedisTest {
     void removeStatus() {
         // given
         Long userId = 2L;
-        statusStore.setStatus(userId, MatchStatus.MATCHING, 60);
+        statusStore.setStatusIfAbsent(userId, MatchStatus.MATCHING, 60);
 
         // when
         statusStore.removeStatus(userId);
@@ -67,7 +85,7 @@ class RedisMatchUserStatusStoreTest extends AbstractRedisTest {
     void ttl_expiration() throws InterruptedException {
         // given
         Long userId = 3L;
-        statusStore.setStatus(userId, MatchStatus.MATCHING, 1); // 1초 TTL
+        statusStore.setStatusIfAbsent(userId, MatchStatus.MATCHING, 1); // 1초 TTL
 
         // when
         Thread.sleep(1500); // 1.5초 대기
