@@ -9,7 +9,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MatchingConstants {
     public static final String QUEUE_KEY_PREFIX = "matching:queue:";
+    public static final String STATUS_KEY_PREFIX = "match:status:";
     public static final String LUA_SCRIPT_PATH = "scripts/atomic_pair_remove.lua";
     public static final int TIER_SCORE_MIN = 1;
     public static final int TIER_SCORE_MAX = 28;
+    public static final long STATUS_TTL_SECONDS = 1800; // 30분
 }
