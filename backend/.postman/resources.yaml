@@ -1,0 +1,8 @@
+# Use this workspace to collaborate
+workspace:
+  id: 20016074-7d49-48e9-803c-1fa08e2dab09
+
+localResources:
+  specs:
+    - ../smite-api/bin/main/static/docs/openapi3.yaml
+    - ../smite-api/src/main/resources/static/docs/openapi3.yaml

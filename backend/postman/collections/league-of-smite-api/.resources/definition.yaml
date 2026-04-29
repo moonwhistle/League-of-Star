@@ -1,0 +1,6 @@
+$kind: collection
+name: League of Smite API
+description: League of Smite API collection covering Auth and Match endpoints.
+variables:
+  - key: baseUrl
+    value: 'http://localhost:8080'

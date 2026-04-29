@@ -1,0 +1,8 @@
+$kind: http-request
+name: Leave Queue
+method: DELETE
+url: '{{baseUrl}}/api/v1/match/leave'
+order: 2000
+headers:
+  - key: Authorization
+    value: 'Bearer {{accessToken}}'
