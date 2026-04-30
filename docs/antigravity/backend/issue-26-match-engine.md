@@ -117,12 +117,12 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
   - 세션 TTL이 12초로 적용되는지 검증
   - `delete()` 호출 시 세션이 제거되는지 검증
 
-- [ ] **`MatchFoundServiceTest` 단위 테스트 작성**
+- [x] **`MatchFoundServiceTest` 단위 테스트 작성**
   - 매칭 성사 시 두 유저 상태가 `FOUND`로 변경되는지 검증
   - `MatchSessionStore.save()`가 TTL 12초로 호출되는지 검증
   - `MatchFoundEvent`가 `matchId`, `userA`, `userB`, `acceptTimeoutSeconds=10`을 포함해 발행되는지 검증
 
-- [ ] **`MatchEngineMetricsTest` 단위 테스트 작성**
+- [x] **`MatchEngineMetricsTest` 단위 테스트 작성**
   - `SimpleMeterRegistry` 기반으로 엔진 지표가 의도한 meter name으로 기록되는지 검증
   - 검증 대상:
     - `match.engine.scan.duration`
