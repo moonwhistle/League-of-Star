@@ -98,6 +98,13 @@ public class RedisMatchStore implements MatchStore {
     }
 
     @Override
+    public int countByTierScore(int tierScore) {
+        String key = getQueueKey(tierScore);
+        RScoredSortedSet<Long> queue = redissonClient.getScoredSortedSet(key);
+        return queue.size();
+    }
+
+    @Override
     public boolean atomicPairRemove(Long userAId, int tierAScore, Long userBId, int tierBScore) {
         List<Object> keys = List.of(getQueueKey(tierAScore), getQueueKey(tierBScore));
         

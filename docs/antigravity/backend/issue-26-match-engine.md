@@ -66,10 +66,25 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
   - Redis 상태/세션 생성 원자화 및 이벤트 재시도는 후속 이슈에서 검토
 
 ### 6. 매칭 엔진 모니터링 지표 추가 (Metrics)
-- [ ] **엔진 스캔 레이턴시 수집 (Timer)**
+- [x] **엔진 스캔 레이턴시 수집 (Timer)**
   - `match_engine_scan_duration_seconds`: 엔진이 전체 큐를 스캔하고 인메모리 매칭을 완료하는 데 걸린 시간
-- [ ] **매칭 성사 처리량 (Counter)**
-  - `match_engine_paired_total`: 성공적으로 성사된 페어 수 (TPS 측정용)
+- [x] **스캔 입력 크기 수집 (DistributionSummary)**
+  - `match_engine_scan_tickets`: 엔진 1회 스캔에서 로드한 티켓 수
+- [x] **매칭 성사 처리량 수집 (Counter)**
+  - `match_engine_pairs_total`: 성공적으로 성사된 페어 수 (TPS 측정용)
+- [x] **스캔당 페어 수 수집 (DistributionSummary)**
+  - `match_engine_pairs_per_scan`: 엔진 1회 스캔에서 성사된 페어 수
+- [x] **Lua 원자 제거 경합 지표 수집 (Counter)**
+  - `match_engine_atomic_pair_attempts_total`: `atomicPairRemove` 시도 수
+  - `match_engine_atomic_pair_failures_total`: `atomicPairRemove` 실패 수
+- [x] **매칭된 유저 대기 시간 수집 (Timer)**
+  - `match_engine_matched_user_wait_duration_seconds`: 매칭 성공 유저가 큐에서 대기한 시간
+- [x] **락 경합 지표 수집 (Counter)**
+  - `match_engine_lock_skipped_total`: 다른 인스턴스가 락을 보유해 스킵된 스캔 수
+- [x] **대기열 크기 Gauge 최적화**
+  - `match_queue_size`: 전체 큐 스캔 대신 티어별 ZSET 크기 조회로 측정
+- [x] **Grafana 대시보드 갱신**
+  - 매칭 엔진 개선 비교용 지표 중심으로 `docs/grafana/smite-match-queue-dashboard.json` 구성
 
 ### 7. 테스트 코드 작성
 - [ ] 대기 시간에 따른 티어 범위 확장이 정상적으로 동작하는지(Sliding Window) 단위 테스트

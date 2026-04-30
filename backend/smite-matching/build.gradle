@@ -4,10 +4,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.redisson:redisson-spring-boot-starter:3.24.3'
 
-    // 모니터링: 코드 침투 없이 지표 수집 (AOP + Micrometer)
+    // 모니터링: Micrometer API는 런타임 구현체를 smite-api가 제공함
     // compileOnly 사용 이유: 런타임 구현체는 smite-api가 제공함
     compileOnly 'io.micrometer:micrometer-core'
-    compileOnly 'org.aspectj:aspectjrt'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.testcontainers:junit-jupiter'

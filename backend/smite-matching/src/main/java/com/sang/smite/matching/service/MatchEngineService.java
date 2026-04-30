@@ -1,7 +1,9 @@
 package com.sang.smite.matching.service;
 
 import com.sang.smite.domain.match.domain.MatchTicket;
+import com.sang.smite.matching.metrics.MatchEngineMetrics;
 import com.sang.smite.matching.repository.MatchStore;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class MatchEngineService {
 
     private final MatchStore matchStore;
     private final MatchFoundService matchFoundService;
+    private final MatchEngineMetrics matchEngineMetrics;
 
     /**
      * 전체 매칭 대기열을 스캔하여 조건에 맞는 유저 쌍을 매칭합니다.
@@ -42,17 +45,26 @@ public class MatchEngineService {
      * 매칭 성사 후 후처리 실패는 로그로 남기고 다음 페어링 후보 처리를 계속합니다.</p>
      */
     public void processMatching() {
+        Timer.Sample sample = matchEngineMetrics.startScanTimer();
+        int pairedCount = 0;
         log.debug("[MatchEngine] 스캔 루프 시작");
 
-        List<MatchTicket> tickets = loadSortedTickets();
-        if (tickets.size() < MIN_MATCHABLE_USER_COUNT) {
-            log.debug("[MatchEngine] 매칭 가능 인원 부족, 현재 인원: {}명", tickets.size());
-            return;
+        try {
+            List<MatchTicket> tickets = loadSortedTickets();
+            matchEngineMetrics.recordScannedTickets(tickets.size());
+
+            if (tickets.size() < MIN_MATCHABLE_USER_COUNT) {
+                log.debug("[MatchEngine] 매칭 가능 인원 부족, 현재 인원: {}명", tickets.size());
+                return;
+            }
+
+            pairedCount = pairTickets(tickets);
+
+            log.debug("[MatchEngine] 스캔 루프 완료");
+        } finally {
+            matchEngineMetrics.recordPairsPerScan(pairedCount);
+            matchEngineMetrics.recordScanDuration(sample);
         }
-
-        pairTickets(tickets);
-
-        log.debug("[MatchEngine] 스캔 루프 완료");
     }
 
     private List<MatchTicket> loadSortedTickets() {
@@ -63,9 +75,10 @@ public class MatchEngineService {
         return tickets;
     }
 
-    private void pairTickets(List<MatchTicket> tickets) {
+    private int pairTickets(List<MatchTicket> tickets) {
         long now = System.currentTimeMillis();
         Set<Long> pairedUserIds = new HashSet<>();
+        int pairedCount = 0;
 
         for (int i = 0; i < tickets.size(); i++) {
             MatchTicket userA = tickets.get(i);
@@ -73,11 +86,15 @@ public class MatchEngineService {
                 continue;
             }
 
-            tryPair(userA, tickets, i + 1, now, pairedUserIds);
+            if (tryPair(userA, tickets, i + 1, now, pairedUserIds)) {
+                pairedCount++;
+            }
         }
+
+        return pairedCount;
     }
 
-    private void tryPair(
+    private boolean tryPair(
             MatchTicket userA,
             List<MatchTicket> tickets,
             int candidateStartIndex,
@@ -90,6 +107,7 @@ public class MatchEngineService {
                 continue;
             }
 
+            matchEngineMetrics.incrementAtomicPairAttempts();
             boolean success = matchStore.atomicPairRemove(
                     userA.userId(), userA.tierScore(),
                     userB.userId(), userB.tierScore()
@@ -97,10 +115,14 @@ public class MatchEngineService {
 
             if (success) {
                 markPaired(userA, userB, pairedUserIds);
-                handleMatchedPair(userA, userB);
-                return;
+                handleMatchedPair(userA, userB, now);
+                return true;
             }
+
+            matchEngineMetrics.incrementAtomicPairFailures();
         }
+
+        return false;
     }
 
     private boolean isMatchable(MatchTicket userA, MatchTicket userB, long now) {
@@ -116,9 +138,13 @@ public class MatchEngineService {
         pairedUserIds.add(userB.userId());
     }
 
-    private void handleMatchedPair(MatchTicket userA, MatchTicket userB) {
+    private void handleMatchedPair(MatchTicket userA, MatchTicket userB, long now) {
         log.info("[MatchEngine] 매칭 성사: User {} (Tier {}) <-> User {} (Tier {})",
                 userA.userId(), userA.tierScore(), userB.userId(), userB.tierScore());
+
+        matchEngineMetrics.incrementPairs();
+        recordMatchedUserWait(userA, now);
+        recordMatchedUserWait(userB, now);
 
         try {
             matchFoundService.process(userA, userB);
@@ -126,6 +152,11 @@ public class MatchEngineService {
             log.error("[MatchEngine] 매칭 성사 후처리 실패: userA={}, userB={}",
                     userA.userId(), userB.userId(), e);
         }
+    }
+
+    private void recordMatchedUserWait(MatchTicket user, long now) {
+        long waitMillis = Math.max(0L, now - user.entryTime());
+        matchEngineMetrics.recordMatchedUserWait(waitMillis);
     }
 
     private int calculateAllowedTierDiff(long waitTimeSec) {

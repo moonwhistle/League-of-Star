@@ -1,6 +1,7 @@
 package com.sang.smite.matching.scheduler;
 
 import com.sang.smite.matching.service.MatchEngineService;
+import com.sang.smite.matching.metrics.MatchEngineMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -28,6 +29,7 @@ public class MatchEngine {
 
     private final RedissonClient redissonClient;
     private final MatchEngineService matchEngineService;
+    private final MatchEngineMetrics matchEngineMetrics;
 
     /**
      * 매칭 엔진 스캔 루프를 주기적으로 실행합니다.
@@ -42,6 +44,7 @@ public class MatchEngine {
         try {
             boolean locked = lock.tryLock(LOCK_WAIT_TIME_SECONDS, LOCK_LEASE_TIME_SECONDS, TimeUnit.SECONDS);
             if (!locked) {
+                matchEngineMetrics.incrementLockSkipped();
                 log.debug("[MatchEngine] 다른 인스턴스가 스캔 중이므로 이번 사이클을 건너뜁니다.");
                 return;
             }

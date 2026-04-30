@@ -9,347 +9,281 @@
       "pluginName": "Prometheus"
     }
   ],
-  "title": "League of Smite - Match Queue",
-  "uid": "smite-match-queue",
+  "title": "리그 오브 스마이트 - 매칭 엔진",
+  "uid": "smite-match-engine",
   "timezone": "browser",
   "refresh": "10s",
   "schemaVersion": 38,
-  "tags": ["smite", "matching"],
+  "tags": ["smite", "matching", "engine"],
   "time": { "from": "now-30m", "to": "now" },
   "panels": [
-
     {
       "id": 1,
-      "title": "📊 Row: 처리량",
+      "title": "요약",
       "type": "row",
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
     },
-
     {
       "id": 2,
-      "title": "분당 대기열 진입 성공 수",
-      "description": "match_queue_join_total{result='success'} 기준 1분 평균",
-      "type": "timeseries",
+      "title": "초당 매칭 성사 수",
+      "description": "Redis 원자 제거에 성공하여 성사된 페어 수입니다.",
+      "type": "stat",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
       "targets": [
         {
-          "expr": "sum(rate(match_queue_join_total{result=\"success\"}[1m])) by (tier)",
-          "legendFormat": "tier={{tier}}",
+          "expr": "sum(rate(match_engine_pairs_total[1m]))",
+          "legendFormat": "초당 페어 수",
           "refId": "A"
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "color": { "mode": "palette-classic" }
-        }
-      }
+        "defaults": { "unit": "ops", "min": 0 }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
     },
-
     {
       "id": 3,
-      "title": "분당 대기열 취소 성공 수",
-      "description": "match_queue_leave_total{result='success'} 기준 1분 평균",
-      "type": "timeseries",
+      "title": "전체 대기 인원",
+      "description": "모든 티어 큐에 남아 있는 현재 대기 유저 수입니다.",
+      "type": "stat",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
       "targets": [
         {
-          "expr": "sum(rate(match_queue_leave_total{result=\"success\"}[1m])) by (tier)",
-          "legendFormat": "tier={{tier}}",
+          "expr": "sum(match_queue_size)",
+          "legendFormat": "대기 인원",
           "refId": "A"
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "color": { "mode": "palette-classic" }
-        }
-      }
+        "defaults": { "unit": "short", "min": 0 }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
     },
-
     {
       "id": 4,
-      "title": "📊 Row: 처리 시간 (Latency)",
-      "type": "row",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
-    },
-
-    {
-      "id": 5,
-      "title": "joinQueue 평균 처리 시간 (ms)",
-      "description": "성공 케이스 기준 평균 레이턴시",
-      "type": "timeseries",
+      "title": "원자 제거 실패율",
+      "description": "Lua 원자 제거 실패 수 / 시도 수입니다. 값이 높으면 취소 요청과 엔진 선점 경합 또는 오래된 스캔 스냅샷 가능성이 큽니다.",
+      "type": "stat",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
       "targets": [
         {
-          "expr": "1000 * rate(match_queue_join_duration_seconds_sum{result=\"success\"}[1m]) / rate(match_queue_join_duration_seconds_count{result=\"success\"}[1m])",
-          "legendFormat": "avg (success)",
+          "expr": "sum(rate(match_engine_atomic_pair_failures_total[5m])) / clamp_min(sum(rate(match_engine_atomic_pair_attempts_total[5m])), 0.001) * 100",
+          "legendFormat": "실패율",
           "refId": "A"
-        },
-        {
-          "expr": "1000 * histogram_quantile(0.95, rate(match_queue_join_duration_seconds_bucket{result=\"success\"}[5m]))",
-          "legendFormat": "p95 (success)",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "ms" }
-      }
-    },
-
-    {
-      "id": 6,
-      "title": "leaveQueue 평균 처리 시간 (ms)",
-      "description": "성공 케이스 기준 평균 레이턴시",
-      "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
-      "targets": [
-        {
-          "expr": "1000 * rate(match_queue_leave_duration_seconds_sum{result=\"success\"}[1m]) / rate(match_queue_leave_duration_seconds_count{result=\"success\"}[1m])",
-          "legendFormat": "avg (success)",
-          "refId": "A"
-        },
-        {
-          "expr": "1000 * histogram_quantile(0.95, rate(match_queue_leave_duration_seconds_bucket{result=\"success\"}[5m]))",
-          "legendFormat": "p95 (success)",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "ms" }
-      }
-    },
-
-    {
-      "id": 7,
-      "title": "📊 Row: 동시성 & 대기열 현황",
-      "type": "row",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
-    },
-
-    {
-      "id": 8,
-      "title": "현재 In-flight 요청 수",
-      "description": "현재 처리 중인 joinQueue / leaveQueue 동시 요청 수 (AtomicInteger 기반)",
-      "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
-      "targets": [
-        {
-          "expr": "match_queue_join_inflight",
-          "legendFormat": "joinQueue in-flight",
-          "refId": "A"
-        },
-        {
-          "expr": "match_queue_leave_inflight",
-          "legendFormat": "leaveQueue in-flight",
-          "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "percent",
           "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "red", "value": 100 }
-            ]
-          }
-        }
-      }
-    },
-
-    {
-      "id": 9,
-      "title": "티어별 대기열 현재 인원",
-      "description": "match_queue_size — 티어별 현재 대기 인원 수",
-      "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
-      "targets": [
-        {
-          "expr": "match_queue_size",
-          "legendFormat": "tier={{tier}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0
-        }
-      }
-    },
-
-    {
-      "id": 10,
-      "title": "📊 Row: 오류 & 경합",
-      "type": "row",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 }
-    },
-
-    {
-      "id": 11,
-      "title": "진입 실패 비율 (duplicate vs error)",
-      "description": "SETNX 경합(duplicate) 및 Redis 오류(error) 비율",
-      "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
-      "targets": [
-        {
-          "expr": "sum(rate(match_queue_join_total{result=\"duplicate\"}[5m]))",
-          "legendFormat": "중복 진입 (SETNX 경합)",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(match_queue_join_total{result=\"error\"}[5m]))",
-          "legendFormat": "Redis 오류",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "reqps" }
-      }
-    },
-
-    {
-      "id": 12,
-      "title": "취소 실패 비율 (not_in_queue vs error)",
-      "description": "not_in_queue: 비대기 상태 취소 시도 또는 엔진 선점. error: Redis 오류",
-      "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
-      "targets": [
-        {
-          "expr": "sum(rate(match_queue_leave_total{result=\"not_in_queue\"}[5m]))",
-          "legendFormat": "대기 상태 아님 / 엔진 선점",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(match_queue_leave_total{result=\"error\"}[5m]))",
-          "legendFormat": "Redis 오류",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "reqps" }
-      }
-    },
-
-    {
-      "id": 13,
-      "title": "📊 Row: 요약 Stat",
-      "type": "row",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 }
-    },
-
-    {
-      "id": 14,
-      "title": "전체 진입 성공률",
-      "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 37 },
-      "targets": [
-        {
-          "expr": "sum(rate(match_queue_join_total{result=\"success\"}[5m])) / sum(rate(match_queue_join_total[5m])) * 100",
-          "legendFormat": "성공률 (%)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 90 },
-              { "color": "green", "value": 99 }
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 15 }
             ]
           }
         }
       },
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
     },
-
     {
-      "id": 15,
-      "title": "전체 취소 성공률",
+      "id": 5,
+      "title": "분당 락 스킵 수",
+      "description": "다른 인스턴스가 매칭 엔진 락을 보유하여 이번 스캔을 건너뛴 횟수입니다.",
       "type": "stat",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 37 },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
       "targets": [
         {
-          "expr": "sum(rate(match_queue_leave_total{result=\"success\"}[5m])) / sum(rate(match_queue_leave_total[5m])) * 100",
-          "legendFormat": "성공률 (%)",
+          "expr": "sum(increase(match_engine_lock_skipped_total[1m]))",
+          "legendFormat": "분당 스킵 수",
           "refId": "A"
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 90 },
-              { "color": "green", "value": 99 }
-            ]
-          }
-        }
-      },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
-    },
-
-    {
-      "id": 16,
-      "title": "피크 joinQueue In-flight",
-      "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 37 },
-      "targets": [
-        {
-          "expr": "max_over_time(match_queue_join_inflight[30m])",
-          "legendFormat": "max (30m)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "short" }
+        "defaults": { "unit": "short", "min": 0 }
       },
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
     },
-
     {
-      "id": 17,
-      "title": "전체 대기 인원",
-      "type": "stat",
+      "id": 6,
+      "title": "지연 시간",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }
+    },
+    {
+      "id": 7,
+      "title": "스캔 소요 시간",
+      "description": "락을 획득한 매칭 엔진 스캔 1회가 걸린 시간입니다. 알고리즘 버전 간 비교에는 p95/p99를 우선 확인합니다.",
+      "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 37 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "targets": [
         {
-          "expr": "sum(match_queue_size)",
-          "legendFormat": "전체 대기 인원",
+          "expr": "1000 * rate(match_engine_scan_duration_seconds_sum[1m]) / clamp_min(rate(match_engine_scan_duration_seconds_count[1m]), 0.001)",
+          "legendFormat": "평균",
+          "refId": "A"
+        },
+        {
+          "expr": "1000 * histogram_quantile(0.95, sum(rate(match_engine_scan_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "1000 * histogram_quantile(0.99, sum(rate(match_engine_scan_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "min": 0 }
+      }
+    },
+    {
+      "id": 8,
+      "title": "매칭 성공 유저 대기 시간",
+      "description": "매칭에 성공한 유저가 큐에서 기다린 시간입니다. p95가 낮을수록 엔진이 대기열을 빠르게 해소합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(match_engine_matched_user_wait_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(match_engine_matched_user_wait_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0 }
+      }
+    },
+    {
+      "id": 9,
+      "title": "처리량",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
+    },
+    {
+      "id": 10,
+      "title": "초당 페어 수와 원자 제거 시도 수",
+      "description": "성공한 페어 생산량과 Lua 원자 제거 시도/실패량을 함께 비교합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum(rate(match_engine_pairs_total[1m]))",
+          "legendFormat": "초당 페어 수",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(match_engine_atomic_pair_attempts_total[1m]))",
+          "legendFormat": "초당 원자 제거 시도 수",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(match_engine_atomic_pair_failures_total[1m]))",
+          "legendFormat": "초당 원자 제거 실패 수",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "min": 0 }
+      }
+    },
+    {
+      "id": 11,
+      "title": "스캔당 성사 페어 수",
+      "description": "스캔 1회가 몇 개의 페어를 만들었는지 보여줍니다. 배치 매칭 효율 비교에 사용합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "targets": [
+        {
+          "expr": "rate(match_engine_pairs_per_scan_sum[5m]) / clamp_min(rate(match_engine_pairs_per_scan_count[5m]), 0.001)",
+          "legendFormat": "평균",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(match_engine_pairs_per_scan_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "max_over_time(match_engine_pairs_per_scan_max[5m])",
+          "legendFormat": "최대",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0 }
+      }
+    },
+    {
+      "id": 12,
+      "title": "큐와 스캔 입력",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }
+    },
+    {
+      "id": 13,
+      "title": "티어별 현재 대기 인원",
+      "description": "티어 점수별 현재 대기 유저 수입니다. 전체 큐 스캔이 아니라 ZSET 크기 조회로 측정합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "match_queue_size",
+          "legendFormat": "티어={{tier}}",
           "refId": "A"
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "short" }
-      },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
+        "defaults": { "unit": "short", "min": 0 }
+      }
+    },
+    {
+      "id": 14,
+      "title": "스캔당 로드 티켓 수",
+      "description": "엔진 스캔 1회가 로드한 티켓 수입니다. 스캔 소요 시간과 함께 보면 입력 규모 대비 알고리즘 비용을 판단할 수 있습니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(match_engine_scan_tickets_sum[5m]) / clamp_min(rate(match_engine_scan_tickets_count[5m]), 0.001)",
+          "legendFormat": "평균",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(match_engine_scan_tickets_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "max_over_time(match_engine_scan_tickets_max[5m])",
+          "legendFormat": "최대",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0 }
+      }
     }
-
   ]
 }

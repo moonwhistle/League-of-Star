@@ -26,6 +26,11 @@ public interface MatchStore {
     List<MatchTicket> findAll();
 
     /**
+     * 특정 티어 대기열의 현재 유저 수를 조회합니다.
+     */
+    int countByTierScore(int tierScore);
+
+    /**
      * 두 유저를 각자의 티어 대기열에서 원자적으로 확인하고 제거합니다.
      * @return 두 유저가 모두 존재하여 제거에 성공하면 true, 아니면 false
      */
