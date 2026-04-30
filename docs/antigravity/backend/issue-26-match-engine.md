@@ -87,9 +87,49 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
   - 매칭 엔진 개선 비교용 지표 중심으로 `docs/grafana/smite-match-queue-dashboard.json` 구성
 
 ### 7. 테스트 코드 작성
-- [ ] 대기 시간에 따른 티어 범위 확장이 정상적으로 동작하는지(Sliding Window) 단위 테스트
-- [ ] 멀티 스레드/서버 환경에서 글로벌 분산 락이 의도대로 동작하는지 테스트
-- [ ] `atomicPairRemove` 스크립트를 통한 이기종 티어 간 교차 제거(Cross-Tier) 연동 테스트
-- [ ] 매칭 성사 시 `match:session:{matchId}`가 생성되고 12초 TTL이 적용되는지 테스트
-- [ ] 수락 유효 시간은 `createdAt + 10초` 기준으로 판정되는지 테스트
-- [ ] 매칭 성사 시 두 유저 상태가 `FOUND`로 변경되고 `MatchFoundEvent`가 발행되는지 테스트
+- [x] **`MatchEngineServiceTest` 단위 테스트 작성**
+  - Mock: `MatchStore`, `MatchFoundService`, `MatchEngineMetrics`
+  - 대기 인원 0~1명일 때 `atomicPairRemove`와 후처리가 호출되지 않는지 검증
+  - `entryTime` 오름차순 FIFO 정렬 후 가장 오래 기다린 유저부터 후보를 찾는지 검증
+  - Sliding Window 검증:
+    - 0~10초 대기: ±1 티어만 매칭
+    - 11~20초 대기: ±2 티어까지 매칭
+    - 21~30초 대기: ±4 티어까지 매칭
+    - 31초 이상 대기: ±8 티어까지 매칭
+  - `atomicPairRemove`가 `false`를 반환하면 후처리(`MatchFoundService.process`)가 호출되지 않고 다음 후보/유저로 진행되는지 검증
+  - 한 스캔에서 동일 유저가 두 번 매칭되지 않는지 검증
+  - 매칭 성공 시 `MatchEngineMetrics`의 스캔 시간, 스캔 티켓 수, 스캔당 페어 수, 원자 제거 시도/실패, 매칭 대기 시간이 기록되는지 검증
+
+- [ ] **`MatchEngineTest` 단위 테스트 작성**
+  - Mock: `RedissonClient`, `RLock`, `MatchEngineService`, `MatchEngineMetrics`
+  - 락 획득 성공 시 `MatchEngineService.processMatching()`이 1회 호출되고 finally에서 unlock 되는지 검증
+  - 락 획득 실패 시 엔진 서비스는 호출되지 않고 `incrementLockSkipped()`가 호출되는지 검증
+  - `tryLock` 중 `InterruptedException` 발생 시 interrupt 상태를 복원하고 unlock을 시도하지 않는지 검증
+
+- [ ] **`RedisMatchStoreTest` 통합 테스트 보강**
+  - `countByTierScore(tierScore)`가 해당 티어 ZSET 크기만 정확히 반환하는지 검증
+  - `atomicPairRemove`가 서로 다른 티어 큐의 두 유저를 원자적으로 제거하는지 검증
+  - 한 유저가 이미 취소되어 큐에 없으면 `atomicPairRemove`가 `false`를 반환하고 남은 유저를 제거하지 않는지 검증
+
+- [ ] **`RedisMatchSessionStoreTest` 통합 테스트 작성**
+  - `save()` 시 `match:session:{matchId}`가 Redis Hash 필드(`matchId`, `userA`, `userB`, `status`, `createdAt`)로 저장되는지 검증
+  - `findById()`가 Redis Hash를 `MatchSession`으로 복원하는지 검증
+  - 세션 TTL이 12초로 적용되는지 검증
+  - `delete()` 호출 시 세션이 제거되는지 검증
+
+- [ ] **`MatchFoundServiceTest` 단위 테스트 작성**
+  - 매칭 성사 시 두 유저 상태가 `FOUND`로 변경되는지 검증
+  - `MatchSessionStore.save()`가 TTL 12초로 호출되는지 검증
+  - `MatchFoundEvent`가 `matchId`, `userA`, `userB`, `acceptTimeoutSeconds=10`을 포함해 발행되는지 검증
+
+- [ ] **`MatchEngineMetricsTest` 단위 테스트 작성**
+  - `SimpleMeterRegistry` 기반으로 엔진 지표가 의도한 meter name으로 기록되는지 검증
+  - 검증 대상:
+    - `match.engine.scan.duration`
+    - `match.engine.scan.tickets`
+    - `match.engine.pairs`
+    - `match.engine.pairs.per.scan`
+    - `match.engine.atomic_pair.attempts`
+    - `match.engine.atomic_pair.failures`
+    - `match.engine.matched_user.wait.duration`
+    - `match.engine.lock.skipped`
