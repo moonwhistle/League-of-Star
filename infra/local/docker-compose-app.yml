@@ -1,0 +1,38 @@
+services:
+  smite-api-1:
+    build:
+      context: ../../backend
+      dockerfile: smite-api/Dockerfile
+    container_name: smite-api-1
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/smite?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: smite
+      SPRING_DATASOURCE_PASSWORD: smite1234
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    depends_on:
+      - mysql
+      - redis
+
+  smite-api-2:
+    build:
+      context: ../../backend
+      dockerfile: smite-api/Dockerfile
+    container_name: smite-api-2
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/smite?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: smite
+      SPRING_DATASOURCE_PASSWORD: smite1234
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    depends_on:
+      - mysql
+      - redis

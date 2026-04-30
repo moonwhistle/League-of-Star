@@ -133,3 +133,78 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
     - `match.engine.atomic_pair.failures`
     - `match.engine.matched_user.wait.duration`
     - `match.engine.lock.skipped`
+
+### 8. 매칭 엔진 부하 테스트
+- [ ] **부하 테스트 목적 정의**
+  - 매칭 엔진 개선 전/후를 비교할 수 있도록 동일 조건에서 1,000명, 5,000명, 10,000명 대기열 진입 시나리오를 반복 측정
+  - API 인스턴스 2개가 같은 Redis 대기열을 공유할 때 중복 매칭, 락 경합, 스캔 지연, 매칭 대기 시간이 허용 범위 안에 있는지 확인
+  - `joinQueue` API 처리 성능과 매칭 엔진 처리 성능을 분리해서 관측
+
+- [ ] **로컬 부하 테스트 실행 환경 구성**
+  - `infra/local/docker-compose-infra.yml`로 MySQL, Redis 실행
+  - `infra/local/docker-compose-monitoring.yml`로 Prometheus, Grafana 실행
+  - `smite-api` 인스턴스 2개 실행
+    - Instance A: `server.port=8080`
+    - Instance B: `server.port=8081`
+    - 두 인스턴스는 동일한 MySQL/Redis를 바라보게 구성
+  - Prometheus scrape target을 두 인스턴스로 확장
+    - `smite-api-1:8080`
+    - `smite-api-2:8080`
+  - 부하 도구는 `k6`를 우선 사용하고, 스크립트는 `docs/load-test` 또는 별도 load-test 디렉터리에 보관
+
+- [ ] **테스트 데이터 준비**
+  - 1,000명, 5,000명, 10,000명 규모별 테스트 유저 생성 방식 정의
+  - 각 테스트 유저가 인증된 `joinQueue` 요청을 보낼 수 있도록 JWT 발급 또는 테스트 전용 인증 우회 전략 결정
+  - 티어 분포는 편향 없이 매칭 엔진을 검증할 수 있도록 1~28 구간에 균등 분산
+  - 각 시나리오 시작 전 Redis 매칭 데이터 초기화
+    - `match:status:*`
+    - `matching:queue:*`
+    - `match:session:*`
+
+- [ ] **부하 테스트 시나리오 작성**
+  - Scenario A: 1,000명 `POST /api/v1/match/join`
+    - 목표: 기본 부하에서 매칭 엔진이 정상적으로 큐를 소진하는지 확인
+  - Scenario B: 5,000명 `POST /api/v1/match/join`
+    - 목표: 스캔 입력 크기 증가에 따른 p95 스캔 시간, p95 매칭 대기 시간 변화 확인
+  - Scenario C: 10,000명 `POST /api/v1/match/join`
+    - 목표: V1 인메모리 전체 스캔 방식의 한계 지점과 Redis/Lua 경합 수준 확인
+  - 각 시나리오는 같은 조건으로 최소 3회 반복 실행하고 평균, p95, 최댓값을 기록
+
+- [ ] **관측 지표 정의**
+  - API 지표
+    - `POST /api/v1/match/join` 처리량
+    - `POST /api/v1/match/join` p95 응답 시간
+    - HTTP 2xx/4xx/5xx 비율
+  - 매칭 엔진 지표
+    - `match_engine_scan_duration_seconds` p95
+    - `match_engine_scan_tickets` p95
+    - `match_engine_pairs_total` 증가율
+    - `match_engine_pairs_per_scan` p95
+    - `match_engine_atomic_pair_attempts_total`
+    - `match_engine_atomic_pair_failures_total`
+    - `match_engine_matched_user_wait_duration_seconds` p95
+    - `match_engine_lock_skipped_total`
+    - `match_queue_size` 감소 추이
+  - 인프라 지표
+    - Redis CPU/메모리 사용량
+    - Redis command 처리량
+    - API JVM heap, GC pause, thread 상태
+
+- [ ] **성공 기준 정의**
+  - 모든 시나리오에서 중복 매칭이 없어야 함
+  - `match_queue_size`가 테스트 종료 후 기대치까지 감소해야 함
+    - 짝수 인원 기준 최종 잔여 큐 0명
+    - 후처리 실패가 발생한 경우 실패 로그와 잔여 큐를 함께 분석
+  - `match_engine_atomic_pair_failures_total`은 취소/경합이 없는 join-only 시나리오에서 0에 가까워야 함
+  - `match_engine_lock_skipped_total`은 멀티 인스턴스 환경에서 발생할 수 있으나, 스캔 지연이나 큐 적체로 이어지는지 함께 판단
+  - 10,000명 시나리오에서 p95 매칭 대기 시간이 수락 모달 시간(10초)을 침범하는지 확인하고, 침범 시 V2 최적화 후보로 기록
+
+- [ ] **결과 기록 및 개선 판단**
+  - 1,000명, 5,000명, 10,000명 각각의 실행 결과를 표로 정리
+  - Grafana 대시보드 캡처 또는 주요 Prometheus 쿼리 결과를 함께 보관
+  - 병목이 API 요청 처리인지, Redis 조회/삭제인지, 엔진 인메모리 페어링인지 구분
+  - 개선 후보를 후속 이슈로 분리
+    - 티어별 병렬 스캔
+    - 큐 조회 범위 축소
+    - 엔진 전용 독립 worker 분리
+    - 매칭 후처리 이벤트 재시도/보상 처리
