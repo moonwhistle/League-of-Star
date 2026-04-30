@@ -77,6 +77,32 @@ class RedisMatchStoreTest extends AbstractRedisTest {
 
         // then
         assertThat(result).isFalse();
-        assertThat(matchStore.findAll()).hasSize(1); // 기존 유저는 남아있어야 함
+        assertThat(matchStore.findAll())
+                .hasSize(1)
+                .extracting(MatchTicket::userId)
+                .containsExactly(101L);
+    }
+
+    @Test
+    @DisplayName("countByTierScore는 해당 티어의 대기 인원만 정확히 반환한다")
+    void countByTierScore() {
+        // given
+        MatchTicket ticket1 = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket ticket2 = new MatchTicket(2L, 10, System.currentTimeMillis() + 100);
+        MatchTicket ticket3 = new MatchTicket(3L, 12, System.currentTimeMillis() + 200);
+
+        matchStore.add(ticket1);
+        matchStore.add(ticket2);
+        matchStore.add(ticket3);
+
+        // when
+        int countTier10 = matchStore.countByTierScore(10);
+        int countTier12 = matchStore.countByTierScore(12);
+        int countTier15 = matchStore.countByTierScore(15);
+
+        // then
+        assertThat(countTier10).isEqualTo(2);
+        assertThat(countTier12).isEqualTo(1);
+        assertThat(countTier15).isEqualTo(0);
     }
 }

@@ -106,12 +106,12 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
   - 락 획득 실패 시 엔진 서비스는 호출되지 않고 `incrementLockSkipped()`가 호출되는지 검증
   - `tryLock` 중 `InterruptedException` 발생 시 interrupt 상태를 복원하고 unlock을 시도하지 않는지 검증
 
-- [ ] **`RedisMatchStoreTest` 통합 테스트 보강**
+- [x] **`RedisMatchStoreTest` 통합 테스트 보강**
   - `countByTierScore(tierScore)`가 해당 티어 ZSET 크기만 정확히 반환하는지 검증
   - `atomicPairRemove`가 서로 다른 티어 큐의 두 유저를 원자적으로 제거하는지 검증
   - 한 유저가 이미 취소되어 큐에 없으면 `atomicPairRemove`가 `false`를 반환하고 남은 유저를 제거하지 않는지 검증
 
-- [ ] **`RedisMatchSessionStoreTest` 통합 테스트 작성**
+- [x] **`RedisMatchSessionStoreTest` 통합 테스트 작성**
   - `save()` 시 `match:session:{matchId}`가 Redis Hash 필드(`matchId`, `userA`, `userB`, `status`, `createdAt`)로 저장되는지 검증
   - `findById()`가 Redis Hash를 `MatchSession`으로 복원하는지 검증
   - 세션 TTL이 12초로 적용되는지 검증
