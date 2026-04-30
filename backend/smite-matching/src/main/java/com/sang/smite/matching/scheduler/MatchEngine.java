@@ -2,8 +2,12 @@ package com.sang.smite.matching.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * 매칭 엔진 워커(Worker)
@@ -16,23 +20,43 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MatchEngine {
 
+    private static final String MATCH_ENGINE_LOCK_KEY = "lock:match:engine";
     private static final String MATCH_ENGINE_FIXED_DELAY_MS = "1000";
+    private static final long LOCK_WAIT_TIME_SECONDS = 0L;
+    private static final long LOCK_LEASE_TIME_SECONDS = 2L;
+
+    private final RedissonClient redissonClient;
 
     /**
      * 매칭 엔진 스캔 루프 (1초마다 반복)
      */
     @Scheduled(fixedDelayString = MATCH_ENGINE_FIXED_DELAY_MS)
     public void processMatching() {
-        log.debug("[MatchEngine] 스캔 루프 시작");
+        RLock lock = redissonClient.getLock(MATCH_ENGINE_LOCK_KEY);
 
-        // TODO 1: 전역 분산 락(lock:match:engine) 획득
-        
-        // TODO 2: 전체 대기열 조회 및 FIFO(entryTime 오름차순) 정렬
-        
-        // TODO 3: 슬라이딩 윈도우 페어링 및 atomicPairRemove 연동
-        
-        // TODO 4: 매칭 성사 시 상태 변경 (FOUND) 및 수락 세션 생성
-        
-        log.debug("[MatchEngine] 스캔 루프 완료");
+        try {
+            boolean locked = lock.tryLock(LOCK_WAIT_TIME_SECONDS, LOCK_LEASE_TIME_SECONDS, TimeUnit.SECONDS);
+            if (!locked) {
+                log.debug("[MatchEngine] 다른 인스턴스가 스캔 중이므로 이번 사이클을 건너뜁니다.");
+                return;
+            }
+
+            log.debug("[MatchEngine] 스캔 루프 시작");
+
+            // TODO 2: 전체 대기열 조회 및 FIFO(entryTime 오름차순) 정렬
+
+            // TODO 3: 슬라이딩 윈도우 페어링 및 atomicPairRemove 연동
+
+            // TODO 4: 매칭 성사 시 상태 변경 (FOUND) 및 수락 세션 생성
+
+            log.debug("[MatchEngine] 스캔 루프 완료");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("[MatchEngine] 락 획득 대기 중 인터럽트가 발생했습니다.", e);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
 }

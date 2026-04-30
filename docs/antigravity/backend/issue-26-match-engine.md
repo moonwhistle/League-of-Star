@@ -12,16 +12,19 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
 ## 📚 Tasks
 
 ### 1. 매칭 엔진 스케줄러 기반 구축 (smite-matching)
-- [ ] **스케줄러 설정 (`@EnableScheduling`)**
+- [x] **스케줄러 설정 (`@EnableScheduling`)**
   - 단일 스레드 병목을 막기 위해 전용 `ThreadPoolTaskScheduler` 설정
-- [ ] **`MatchEngine` 클래스 생성**
+- [x] **`MatchEngine` 클래스 생성**
   - `@Scheduled` 어노테이션을 사용하여 주기적(예: 1초 간격)으로 실행되는 `processMatching()` 워커 스레드 구성
 
 ### 2. 글로벌 분산 락 적용 (중복 스캔 방지)
-- [ ] **전역 스캔 락(Lock) 적용**
+- [x] **전역 스캔 락(Lock) 적용**
   - 멀티 인스턴스 환경에서 여러 엔진이 동시에 전체 큐를 스캔하는 것을 막기 위해 `Redisson` 전역 분산 락 사용
+  - 매칭 엔진은 Redis-only 작업이므로 `@DistributedLock` AOP 대신 `RedissonClient.getLock()` + `RLock.tryLock()`을 직접 사용
   - Lock Key: `lock:match:engine`
-  - WaitTime 0, LeaseTime을 스케줄링 간격보다 적절히 설정하여 엔진 장애 시 락이 고립되지 않도록 구성
+  - WaitTime 0초: 다른 인스턴스가 스캔 중이면 이번 사이클은 즉시 스킵
+  - LeaseTime 2초: 엔진 장애 시 락이 고립되지 않도록 스케줄링 간격보다 길게 설정
+  - 락 획득 중 인터럽트 발생 시 interrupt 상태를 복원하고 해당 사이클을 종료
 
 ### 3. 전체 데이터 로드 및 FIFO 인메모리 정렬
 - [ ] **전체 대기열 일괄 조회 (`MatchStore.findAll`)**
