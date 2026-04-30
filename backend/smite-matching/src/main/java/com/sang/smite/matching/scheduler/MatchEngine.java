@@ -1,5 +1,7 @@
 package com.sang.smite.matching.scheduler;
 
+import com.sang.smite.domain.match.domain.vo.MatchTicket;
+import com.sang.smite.matching.repository.MatchStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -7,6 +9,8 @@ import org.redisson.api.RedissonClient;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,6 +30,7 @@ public class MatchEngine {
     private static final long LOCK_LEASE_TIME_SECONDS = 2L;
 
     private final RedissonClient redissonClient;
+    private final MatchStore matchStore;
 
     /**
      * 매칭 엔진 스캔 루프 (1초마다 반복)
@@ -43,7 +48,17 @@ public class MatchEngine {
 
             log.debug("[MatchEngine] 스캔 루프 시작");
 
-            // TODO 2: 전체 대기열 조회 및 FIFO(entryTime 오름차순) 정렬
+            // 1. 전체 대기열 조회
+            List<MatchTicket> tickets = matchStore.findAll();
+            
+            if (tickets.size() < 2) {
+                return; // 매칭을 위한 최소 인원 부족
+            }
+
+            // 2. FIFO(entryTime 오름차순) 정렬: 가장 오래 대기한 유저에게 우선권 부여
+            tickets.sort(Comparator.comparingLong(MatchTicket::entryTime));
+            
+            log.debug("[MatchEngine] 대기열 스캔 완료, 현재 인원: {}명", tickets.size());
 
             // TODO 3: 슬라이딩 윈도우 페어링 및 atomicPairRemove 연동
 

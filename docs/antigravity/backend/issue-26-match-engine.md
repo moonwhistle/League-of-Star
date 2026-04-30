@@ -27,9 +27,9 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
   - 락 획득 중 인터럽트 발생 시 interrupt 상태를 복원하고 해당 사이클을 종료
 
 ### 3. 전체 데이터 로드 및 FIFO 인메모리 정렬
-- [ ] **전체 대기열 일괄 조회 (`MatchStore.findAll`)**
+- [x] **전체 대기열 일괄 조회 (`MatchStore.findAll`)**
   - Redis 파이프라이닝을 활용해 1~28티어의 모든 `matching:queue:*` 데이터를 한 번에 가져와 `List<MatchTicket>`으로 병합
-- [ ] **대기 시간 기준 정렬 (FIFO)**
+- [x] **대기 시간 기준 정렬 (FIFO)**
   - 통합된 리스트를 `entryTime` (대기열 진입 시간) 오름차순으로 정렬하여 가장 오래 기다린 사람에게 우선권 부여
 
 ### 4. 매칭 범위 확장(Sliding Window) 페어링 로직
