@@ -44,19 +44,26 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
   - 결과값이 1(성공)인 경우 매칭 성사 처리, 0인 경우 패스(취소된 유저)
 
 ### 5. 매칭 성사 후 상태 변경 처리
-- [ ] **유저 상태 변경 (`UserStatusStore`)**
+- [x] **관심사 분리**
+  - `MatchEngine`: 스케줄링 및 전역 락 획득/해제만 담당
+  - `MatchEngineService`: 전체 큐 조회, FIFO 정렬, 슬라이딩 윈도우 페어링, `atomicPairRemove` 연동 담당
+  - `MatchFoundProcessor`: 매칭 성사 후 상태 변경, 세션 생성, 이벤트 발행 담당
+- [x] **유저 상태 변경 (`UserStatusStore`)**
   - `atomicPairRemove` 성공 후 두 유저의 상태를 `MATCHING`에서 `FOUND`로 변경
   - 상태 변경은 `MatchStatus` enum 기준을 따른다 (`GAME_READY` 상태는 사용하지 않음)
-- [ ] **매칭 수락 세션 생성 (`match:session:{matchId}`)**
+- [x] **매칭 수락 세션 생성 (`match:session:{matchId}`)**
   - 매칭 성사 시 고유한 `matchId`를 생성하고 Redis Hash에 수락 세션을 저장
   - 필드: `matchId`, `userA`, `userB`, `status`, `createdAt`
   - 클라이언트에 노출되는 매칭 수락 제한 시간은 10초로 유지
   - Redis 세션 TTL은 네트워크/스케줄링 경계 버퍼를 포함하여 12초로 설정
   - 서버는 세션 존재 여부만 믿지 않고 `createdAt + 10초` 기준으로 수락 유효성을 판정
   - 세션 상태는 양쪽 유저의 수락/거절/타임아웃 처리를 위한 단일 기준으로 사용
-- [ ] **매칭 결과 발행 (Event/Message)**
+- [x] **매칭 결과 발행 (Event/Message)**
   - `MatchFoundEvent`를 발행하여 이후 로직(WebSocket 알림 등)과 느슨하게 결합될 수 있도록 연동 마련
   - 이벤트 payload에는 `matchId`, `userA`, `userB`, `acceptTimeoutSeconds`를 포함
+- [x] **후처리 실패 로그**
+  - `atomicPairRemove` 성공 후 후처리 중 예외가 발생하면 매칭 대상 유저 ID와 함께 에러 로그를 남김
+  - Redis 상태/세션 생성 원자화 및 이벤트 재시도는 후속 이슈에서 검토
 
 ### 6. 매칭 엔진 모니터링 지표 추가 (Metrics)
 - [ ] **엔진 스캔 레이턴시 수집 (Timer)**

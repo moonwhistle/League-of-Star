@@ -1,4 +1,4 @@
-package com.sang.smite.domain.match.domain.vo;
+package com.sang.smite.domain.match.domain;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

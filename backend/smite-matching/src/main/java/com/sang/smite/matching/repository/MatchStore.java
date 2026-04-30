@@ -1,6 +1,6 @@
 package com.sang.smite.matching.repository;
 
-import com.sang.smite.domain.match.domain.vo.MatchTicket;
+import com.sang.smite.domain.match.domain.MatchTicket;
 import java.util.List;
 
 /**

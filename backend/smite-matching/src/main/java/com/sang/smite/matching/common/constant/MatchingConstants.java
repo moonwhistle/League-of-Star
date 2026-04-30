@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 public final class MatchingConstants {
     public static final String QUEUE_KEY_PREFIX = "matching:queue:";
     public static final String STATUS_KEY_PREFIX = "match:status:";
+    public static final String SESSION_KEY_PREFIX = "match:session:";
     public static final String LUA_SCRIPT_PATH = "scripts/atomic_pair_remove.lua";
     public static final int TIER_SCORE_MIN = 1;
     public static final int TIER_SCORE_MAX = 28;

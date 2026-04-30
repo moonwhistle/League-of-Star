@@ -1,7 +1,7 @@
 package com.sang.smite.matching.service;
 
-import com.sang.smite.domain.match.domain.vo.MatchStatus;
-import com.sang.smite.domain.match.domain.vo.MatchTicket;
+import com.sang.smite.domain.match.domain.MatchStatus;
+import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.repository.MatchStore;

@@ -1,6 +1,6 @@
 package com.sang.smite.matching.infrastructure;
 
-import com.sang.smite.domain.match.domain.vo.MatchStatus;
+import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.matching.TestMatchingApplication;
 import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.DisplayName;

@@ -1,6 +1,6 @@
 package com.sang.smite.matching.repository;
 
-import com.sang.smite.domain.match.domain.vo.MatchStatus;
+import com.sang.smite.domain.match.domain.MatchStatus;
 import java.util.Optional;
 
 /**
@@ -27,6 +27,15 @@ public interface MatchUserStatusStore {
      * @return 유저의 현재 상태 (없을 경우 Optional.empty())
      */
     Optional<MatchStatus> getStatus(Long userId);
+
+    /**
+     * 유저의 매칭 상태를 강제로 변경/갱신합니다.
+     *
+     * @param userId 유저 ID
+     * @param status 변경할 상태
+     * @param ttlSeconds 상태 유지 시간 (초)
+     */
+    void updateStatus(Long userId, MatchStatus status, long ttlSeconds);
 
     /**
      * 유저의 매칭 상태를 제거합니다.
