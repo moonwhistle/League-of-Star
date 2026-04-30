@@ -1,0 +1,102 @@
+package com.sang.smite.matching.infrastructure;
+
+import com.sang.smite.domain.match.domain.MatchSession;
+import com.sang.smite.domain.match.domain.MatchStatus;
+import com.sang.smite.matching.common.constant.MatchingConstants;
+import com.sang.smite.redis.AbstractRedisTest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.redisson.api.RMap;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class RedisMatchSessionStoreTest extends AbstractRedisTest {
+
+    @Autowired
+    private RedisMatchSessionStore matchSessionStore;
+
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @AfterEach
+    void tearDown() {
+        redissonClient.getKeys().flushall();
+    }
+
+    @Test
+    @DisplayName("save() 호출 시 Redis Hash에 각 필드가 정상적으로 저장되고 TTL이 설정된다")
+    void saveAndTtl() {
+        // given
+        String matchId = "test-match-1";
+        long now = System.currentTimeMillis();
+        MatchSession session = new MatchSession(matchId, 1L, 2L, MatchStatus.FOUND, now);
+        long ttlSeconds = 12L;
+
+        // when
+        matchSessionStore.save(session, ttlSeconds);
+
+        // then
+        String key = MatchingConstants.SESSION_KEY_PREFIX + matchId;
+        RMap<String, String> sessionHash = redissonClient.getMap(key);
+
+        assertThat(sessionHash.isEmpty()).isFalse();
+        assertThat(sessionHash.get("matchId")).isEqualTo(matchId);
+        assertThat(sessionHash.get("userA")).isEqualTo("1");
+        assertThat(sessionHash.get("userB")).isEqualTo("2");
+        assertThat(sessionHash.get("status")).isEqualTo("FOUND");
+        assertThat(sessionHash.get("createdAt")).isEqualTo(String.valueOf(now));
+
+        // TTL 검증 (테스트 실행 지연을 고려해 10초 이상, 설정값 이하)
+        long remainTimeToLive = sessionHash.remainTimeToLive();
+        assertThat(remainTimeToLive).isBetween(10_000L, ttlSeconds * 1000L);
+    }
+
+    @Test
+    @DisplayName("findById() 호출 시 Redis Hash를 MatchSession으로 정확히 복원한다")
+    void findById() {
+        // given
+        String matchId = "test-match-2";
+        long now = System.currentTimeMillis();
+        MatchSession session = new MatchSession(matchId, 3L, 4L, MatchStatus.FOUND, now);
+        matchSessionStore.save(session, 12L);
+
+        // when
+        Optional<MatchSession> foundSession = matchSessionStore.findById(matchId);
+
+        // then
+        assertThat(foundSession).isPresent();
+        assertThat(foundSession.get().matchId()).isEqualTo(matchId);
+        assertThat(foundSession.get().userA()).isEqualTo(3L);
+        assertThat(foundSession.get().userB()).isEqualTo(4L);
+        assertThat(foundSession.get().status()).isEqualTo(MatchStatus.FOUND);
+        assertThat(foundSession.get().createdAt()).isEqualTo(now);
+    }
+
+    @Test
+    @DisplayName("delete() 호출 시 Redis Hash 세션이 제거된다")
+    void delete() {
+        // given
+        String matchId = "test-match-3";
+        MatchSession session = new MatchSession(matchId, 5L, 6L, MatchStatus.FOUND, System.currentTimeMillis());
+        matchSessionStore.save(session, 12L);
+
+        // when
+        matchSessionStore.delete(matchId);
+
+        // then
+        Optional<MatchSession> foundSession = matchSessionStore.findById(matchId);
+        assertThat(foundSession).isEmpty();
+        
+        String key = MatchingConstants.SESSION_KEY_PREFIX + matchId;
+        assertThat(redissonClient.getMap(key).isExists()).isFalse();
+    }
+}
