@@ -100,7 +100,7 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
   - 한 스캔에서 동일 유저가 두 번 매칭되지 않는지 검증
   - 매칭 성공 시 `MatchEngineMetrics`의 스캔 시간, 스캔 티켓 수, 스캔당 페어 수, 원자 제거 시도/실패, 매칭 대기 시간이 기록되는지 검증
 
-- [ ] **`MatchEngineTest` 단위 테스트 작성**
+- [x] **`MatchEngineTest` 단위 테스트 작성**
   - Mock: `RedissonClient`, `RLock`, `MatchEngineService`, `MatchEngineMetrics`
   - 락 획득 성공 시 `MatchEngineService.processMatching()`이 1회 호출되고 finally에서 unlock 되는지 검증
   - 락 획득 실패 시 엔진 서비스는 호출되지 않고 `incrementLockSkipped()`가 호출되는지 검증
