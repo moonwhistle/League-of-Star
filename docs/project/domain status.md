@@ -22,20 +22,18 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: 매칭 큐 진입 (Find Match)
-    PENDING --> MATCHED: 상대 탐색 완료
-    
-    state MATCHED {
-        [*] --> WAITING_ACCEPT: 수락 대기
-        WAITING_ACCEPT --> ACCEPTED: 수락 (Accept)
-        WAITING_ACCEPT --> REJECTED: 거절 (Decline)
-        WAITING_ACCEPT --> TIMEOUT: 응답 시간 초과
-    }
-    
+    [*] --> MATCHING: 매칭 큐 진입 (Find Match)
+    MATCHING --> [*]: 매칭 취소 (Cancel)
+    MATCHING --> FOUND: 상대 탐색 완료 / 수락 대기
+
+    FOUND --> ACCEPTED: 수락 (Accept)
+    FOUND --> DECLINED: 거절 (Decline)
+    FOUND --> TIMEOUT: 응답 시간 초과
+
     ACCEPTED --> IN_GAME: 양측 모두 수락
-    REJECTED --> PENDING: 한 명이라도 거절 시 (자동 재매칭)
-    TIMEOUT --> [*]: 응답 시간 초과 시 (대기열 이탈)
-    
+    DECLINED --> [*]: 거절 완료 후 대기열 이탈
+    TIMEOUT --> [*]: 응답 시간 초과 후 대기열 이탈
+
     IN_GAME --> [*]: 게임 세션 생성 완료
 ```
 

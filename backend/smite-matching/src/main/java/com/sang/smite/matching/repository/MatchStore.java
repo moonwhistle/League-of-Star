@@ -1,6 +1,6 @@
 package com.sang.smite.matching.repository;
 
-import com.sang.smite.domain.match.domain.vo.MatchTicket;
+import com.sang.smite.domain.match.domain.MatchTicket;
 import java.util.List;
 
 /**
@@ -24,6 +24,11 @@ public interface MatchStore {
      * 현재 모든 티어 대기열에 있는 모든 유저 목록을 로드합니다.
      */
     List<MatchTicket> findAll();
+
+    /**
+     * 특정 티어 대기열의 현재 유저 수를 조회합니다.
+     */
+    int countByTierScore(int tierScore);
 
     /**
      * 두 유저를 각자의 티어 대기열에서 원자적으로 확인하고 제거합니다.

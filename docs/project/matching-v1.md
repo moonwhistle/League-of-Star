@@ -9,25 +9,49 @@
 ### 1.1 Redis 데이터 구조 시각화
 
 ```mermaid
-graph TD
-    subgraph "Redis Sorted Sets (Authority)"
-        Q1["matching:queue:1 (Iron IV)"]
-        Q2["matching:queue:2 (Iron III)"]
-        QN["..."]
-        Q28["matching:queue:28 (Diamond I)"]
+flowchart TD
+    User["Authenticated User"]
+    Controller["smite-api<br/>MatchController"]
+    QueueService["smite-api<br/>MatchQueueService"]
+    RankReadService["smite-core<br/>RankReadService"]
+    MatchService["smite-matching<br/>MatchService"]
+
+    User -->|"POST / match join<br/>DELETE / match leave"| Controller
+    Controller --> QueueService
+    QueueService -->|"getTierScore()"| RankReadService
+    QueueService -->|"joinQueue(userId, tierScore)<br/>leaveQueue(userId, tierScore)"| MatchService
+
+    subgraph Redis["Redis"]
+        Status["Bucket<br/>match:status:{userId}<br/>value: MatchStatus<br/>ttl: 30 minutes"]
+        Session["Hash<br/>match:session:{matchId}<br/>fields: matchId, userA, userB, status<br/>ttl: accept timeout"]
+
+        subgraph Queues["Tier-partitioned Sorted Sets"]
+            Q1["matching:queue:1<br/>Iron IV"]
+            Q2["matching:queue:2<br/>Iron III"]
+            QN["..."]
+            Q28["matching:queue:28<br/>Diamond I"]
+        end
     end
 
-    Q1 --> |Score: Timestamp| U1["User:101, User:102"]
-    Q2 --> |Score: Timestamp| U2["User:201, User:202"]
-    Q28 --> |Score: Timestamp| U28["User:2801, User:2802"]
+    MatchService -->|"SETNX MATCHING"| Status
+    MatchService -->|"ZADD score: entryTime<br/>member: userId"| Queues
+    MatchService -->|"ZREM on cancel"| Queues
+    MatchService -->|"DEL on cancel"| Status
 
-    subgraph "MatchEngine Memory (Stage 1)"
-        List["InMemory Ticket List (Sorted by entryTime)"]
+    subgraph Stage1["Stage 1 batch matching"]
+        FindAll["RedisMatchStore.findAll()"]
+        TicketList["List&lt;MatchTicket&gt;<br/>sorted by entryTime"]
+        Pair["Matched pair<br/>userA, userB"]
+        Lua["atomic_pair_remove.lua"]
     end
 
-    U1 & U2 & U28 --> |"1. Fetch All (ZRANGE)"| List
-    List --> |"2. Pairing Logic"| Pair["Matched Pair (A, B)"]
-    Pair --> |"3. Atomic Delete (Lua)"| Q1 & Q2
+    Queues -->|"batch entryRangeAsync 1..28"| FindAll
+    FindAll --> TicketList
+    TicketList --> Pair
+    Pair -->|"Lua ZSCORE + ZREM both users"| Lua
+    Lua --> Queues
+    Pair -->|"create accept session"| Session
+    Pair -->|"set FOUND"| Status
 ```
 
 ### 1.2 Redis Key 명세 (Core Module 기반)
@@ -57,12 +81,12 @@ sequenceDiagram
 
     Note over Redis, Engine: [2. 탐색] 티어별 Head 유저 우선 추출 및 병합
     loop Every 1 Second
-        Engine->>Redis: (Lock) matching:lock 획득
+        Engine->>Redis: (Lock) lock:match:engine 획득
         Engine->>Redis: ZRANGE matching:queue:* 0 -1 (전체 데이터 로드)
         Engine->>Engine: entryTime 오름차순 정렬 (가장 오래 기다린 유저 우선)
         Engine->>Engine: 슬라이딩 윈도우 기반 짝짓기
         Engine->>Redis: Lua Script로 원자적 제거 (ZREM)
-        Engine->>Redis: (Unlock) matching:lock 해제
+        Engine->>Redis: (Unlock) lock:match:engine 해제
     end
 
     Note over User, Engine: [3. 알림] WebSocket을 통해 매칭 성사 알림

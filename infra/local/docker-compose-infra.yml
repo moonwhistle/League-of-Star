@@ -2,6 +2,8 @@ services:
   mysql:
     image: mysql:8.0
     container_name: smite-mysql
+    networks:
+      - smite-local
     ports:
       - "3306:3306"
     environment:
@@ -17,8 +19,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: smite-redis
+    networks:
+      - smite-local
     ports:
       - "6379:6379"
 
 volumes:
   mysql-data:
+
+networks:
+  smite-local:
+    name: smite-local

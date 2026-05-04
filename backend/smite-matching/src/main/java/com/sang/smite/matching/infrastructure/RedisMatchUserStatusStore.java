@@ -1,6 +1,6 @@
 package com.sang.smite.matching.infrastructure;
 
-import com.sang.smite.domain.match.domain.vo.MatchStatus;
+import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +32,13 @@ public class RedisMatchUserStatusStore implements MatchUserStatusStore {
         String key = getStatusKey(userId);
         RBucket<MatchStatus> bucket = redissonClient.getBucket(key);
         return Optional.ofNullable(bucket.get());
+    }
+
+    @Override
+    public void updateStatus(Long userId, MatchStatus status, long ttlSeconds) {
+        String key = getStatusKey(userId);
+        RBucket<MatchStatus> bucket = redissonClient.getBucket(key);
+        bucket.set(status, Duration.ofSeconds(ttlSeconds));
     }
 
     @Override

@@ -1,7 +1,7 @@
 package com.sang.smite.matching.infrastructure;
 
 import com.sang.smite.matching.common.exception.MatchingErrorCode;
-import com.sang.smite.domain.match.domain.vo.MatchTicket;
+import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.repository.MatchStore;
@@ -95,6 +95,13 @@ public class RedisMatchStore implements MatchStore {
             }
         }
         return allTickets;
+    }
+
+    @Override
+    public int countByTierScore(int tierScore) {
+        String key = getQueueKey(tierScore);
+        RScoredSortedSet<Long> queue = redissonClient.getScoredSortedSet(key);
+        return queue.size();
     }
 
     @Override
