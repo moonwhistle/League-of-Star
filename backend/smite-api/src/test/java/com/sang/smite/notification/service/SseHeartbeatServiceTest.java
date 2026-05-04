@@ -17,7 +17,8 @@ import static org.mockito.Mockito.verify;
 class SseHeartbeatServiceTest {
 
     private final SseConnectionRegistry registry = new SseConnectionRegistry();
-    private final SseHeartbeatService heartbeatService = new SseHeartbeatService(registry, mock(TaskScheduler.class));
+    private final SseNotificationSender sender = new SseNotificationSender(registry);
+    private final SseHeartbeatService heartbeatService = new SseHeartbeatService(registry, sender, mock(TaskScheduler.class));
 
     @Test
     @DisplayName("등록된 SSE 연결에 heartbeat 이벤트를 전송한다.")

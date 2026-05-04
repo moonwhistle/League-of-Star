@@ -332,22 +332,37 @@ sequenceDiagram
 - `SseConnectionRegistry.findAll()`을 추가해 현재 활성 연결 스냅샷을 순회할 수 있게 했습니다.
 
 ### 5. MatchFoundEvent 연동
-- [ ] **매칭 성사 이벤트 리스너 구현**
+- [x] **매칭 성사 이벤트 리스너 구현**
   - `MatchFoundEvent`를 구독하는 listener 추가
   - 이벤트 발생 시 `userA`, `userB` 대상 연결 조회
   - 연결이 있으면 각각에게 `match_found` 이벤트 전송
 
-- [ ] **매칭 성사 payload 정의**
+- [x] **매칭 성사 payload 정의**
   - `matchId`
   - `userId`
   - `opponentUserId`
   - `acceptTimeoutSeconds`
   - 필요 시 `eventCreatedAt`
 
-- [ ] **미연결 유저 처리**
+- [x] **미연결 유저 처리**
   - 대상 유저의 SSE 연결이 없으면 이벤트 전송은 스킵
   - 매칭 상태는 Redis 세션에 이미 저장되어 있으므로, 전송 실패만 로그로 남김
   - 재전송/보상 정책은 후속 이슈에서 검토
+
+#### 구현 결과
+
+- `match_found` 이벤트 이름을 추가했습니다.
+- `MatchFoundNotification` payload를 추가했습니다.
+  - `matchId`
+  - `userId`
+  - `opponentUserId`
+  - `acceptTimeoutSeconds`
+  - `eventCreatedAt`
+- `MatchFoundEventListener`를 추가해 `MatchFoundEvent`를 구독합니다.
+- 이벤트 발생 시 `userA`, `userB` 각각의 SSE 연결을 조회하고, 연결이 있으면 `match_found` 이벤트를 전송합니다.
+- 대상 유저의 SSE 연결이 없으면 알림 전송만 스킵하고 매칭 상태는 Redis 세션 기준으로 유지합니다.
+- `SseNotificationSender`를 추가해 heartbeat와 match_found가 같은 전송 실패 처리 정책을 사용하도록 분리했습니다.
+- 전송 실패 시 실패 연결은 registry에서 제거하고 `completeWithError()`로 종료합니다.
 
 ### 6. 전송 실패 및 로깅 처리
 - [ ] **전송 실패 예외 처리**

@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -23,15 +22,18 @@ public class SseHeartbeatService {
     private static final Duration HEARTBEAT_INTERVAL = Duration.ofSeconds(15);
 
     private final SseConnectionRegistry sseConnectionRegistry;
+    private final SseNotificationSender sseNotificationSender;
     private final TaskScheduler notificationTaskScheduler;
     private final Clock clock = Clock.systemUTC();
     private ScheduledFuture<?> heartbeatTask;
 
     public SseHeartbeatService(
             SseConnectionRegistry sseConnectionRegistry,
+            SseNotificationSender sseNotificationSender,
             @Qualifier("notificationTaskScheduler") TaskScheduler notificationTaskScheduler
     ) {
         this.sseConnectionRegistry = sseConnectionRegistry;
+        this.sseNotificationSender = sseNotificationSender;
         this.notificationTaskScheduler = notificationTaskScheduler;
     }
 
@@ -52,13 +54,7 @@ public class SseHeartbeatService {
         SseHeartbeatEvent event = new SseHeartbeatEvent(Instant.now(clock));
 
         for (SseConnection connection : sseConnectionRegistry.findAll()) {
-            try {
-                connection.send(MatchNotificationEventName.HEARTBEAT, event);
-            } catch (IOException e) {
-                log.warn("[SSE] heartbeat 전송 실패. userId={}", connection.userId(), e);
-                sseConnectionRegistry.remove(connection.userId(), connection);
-                connection.completeWithError(e);
-            }
+            sseNotificationSender.send(connection, MatchNotificationEventName.HEARTBEAT, event);
         }
     }
 }
