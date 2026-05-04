@@ -1,4 +1,4 @@
-# Issue-28: 매칭 알림 기능 구현 (Netty 기반 SSE)
+# Issue-28: 매칭 알림 기능 구현 (SSE V1)
 
 ## 📌 Feature Description
 
@@ -18,7 +18,7 @@ SSE는 HTTP 기반이라 인증, 로깅, 장애 분석이 단순하고, 브라�
 
 이번 이슈에서는 API 모듈에 SSE 연결 API를 추가하고, 유저별 SSE 연결을 관리하는 컴포넌트를 구성합니다. 이후 매칭 모듈에서 발행하는 `MatchFoundEvent`를 API 모듈에서 구독하여 대상 유저 2명에게 매칭 성사 알림을 전송합니다.
 
-Netty 기반 SSE를 사용하기 위해 WebFlux/Netty 적용 범위를 먼저 검토합니다. 현재 API 모듈은 `spring-boot-starter-web` 기반이므로, 기존 MVC API와 충돌 없이 SSE 스트림을 구성할 수 있는 방식으로 설계합니다.
+V1은 기존 API 서버가 `spring-boot-starter-web` 기반이라는 점을 고려해 MVC `SseEmitter` 방식으로 먼저 구현합니다. 이후 동시 SSE 연결 부하 테스트를 통해 Thread, Heap, CPU, 연결 유지율을 측정하고, 10,000명 동시 연결에서 리소스 한계가 확인되면 WebFlux/Netty 기반 SSE로 전환합니다.
 
 ## ⚖️ SSE vs WebSocket 선택 이유
 
@@ -88,10 +88,70 @@ SSE와 WebSocket은 둘 다 연결을 일정 시간 유지하므로, 연결 유�
 
 이번 이슈는 **매칭 대기 중 match_found 알림을 안정적으로 받는 것**이 목표이므로 SSE를 선택합니다. 실제 게임 플레이 동기화가 필요해지는 단계에서는 WebSocket 또는 별도 게임 서버 구조를 다시 검토합니다.
 
+## 🧭 SSE 구현 단계 전략
+
+이번 이슈에서는 처음부터 WebFlux/Netty를 도입하지 않고, 기존 MVC 구조와 잘 맞는 `SseEmitter`로 V1을 구현합니다.
+
+이유는 다음과 같습니다.
+
+- 현재 API 모듈은 MVC 기반이므로 기존 인증, 컨트롤러, 테스트 구조와 바로 통합할 수 있습니다.
+- 이번 이슈의 핵심은 Netty 도입이 아니라, 매칭 성사 이벤트가 클라이언트까지 안정적으로 전달되는지 검증하는 것입니다.
+- 먼저 기능을 완성한 뒤 동시 연결 부하 테스트로 실제 병목을 확인해야 전환 근거가 명확해집니다.
+
+단, 목표 사용자 규모를 10,000명으로 잡고 있으므로 SSE 연결 부하 테스트는 반드시 진행합니다.
+
+```text
+1단계: MVC SseEmitter 기반 SSE V1 구현
+2단계: 1,000 / 5,000 / 10,000 동시 SSE 연결 부하 테스트
+3단계: Thread, Heap, CPU, 연결 유지율, 이벤트 전송 지연 측정
+4단계: MVC SSE 한계가 확인되면 WebFlux/Netty 기반 SSE로 전환
+```
+
+### MVC SSE와 Netty SSE 판단 기준
+
+| 기준 | MVC SseEmitter | WebFlux/Netty SSE | V1 판단 |
+| --- | --- | --- | --- |
+| 기존 API 구조와의 호환성 | 높음 | 낮음 | MVC 우선 |
+| 구현 속도 | 빠름 | 느림 | MVC 우선 |
+| 기존 Security/JWT 연동 | 단순 | 별도 검토 필요 | MVC 우선 |
+| 동시 장기 연결 확장성 | 상대적으로 불리 | 유리 | 부하 테스트 후 판단 |
+| 포트폴리오 개선 스토리 | 기능 구현 중심 | 성능 개선 중심 | 측정 후 전환 시 설득력 높음 |
+
+따라서 이번 이슈의 정책은 다음과 같습니다.
+
+```text
+V1: MVC SseEmitter로 SSE 알림 기능을 먼저 완성한다.
+V2: 동시 연결 부하 테스트에서 리소스 한계가 확인되면 WebFlux/Netty로 전환한다.
+```
+
+### SSE V1 구현 방식 결정 결과
+
+현재 코드 기준으로 V1은 MVC `SseEmitter` 기반으로 구현합니다.
+
+확인 결과 `smite-api`는 `spring-boot-starter-web` 기반 MVC 애플리케이션입니다. WebFlux 의존성은 없고, Security도 Servlet 기반 `SecurityFilterChain`, `OncePerRequestFilter` 구조로 구성되어 있습니다. 따라서 WebFlux/Netty를 이번 이슈에 바로 도입하면 기존 MVC API, Security, RestDocs/MockMvc 테스트 구조와 섞이면서 변경 범위가 커집니다.
+
+반면 MVC `SseEmitter`는 현재 구조와 바로 맞습니다. 기존 JWT 필터가 `Authorization: Bearer` 토큰을 검증하고, `@AuthUser` argument resolver가 `SecurityContextHolder`에서 인증 정보를 읽어 유저 ID를 추출하므로 SSE 연결 API에서도 같은 인증 흐름을 재사용할 수 있습니다.
+
+다만 SSE는 장기 연결이므로 timeout 설정은 구현 단계에서 별도로 확인합니다. 현재 `application.yml`에는 `spring.mvc.async.request-timeout`, `server.tomcat.*` SSE 전용 설정이 없습니다. 따라서 구현 시 다음 설정을 검토합니다.
+
+- `spring.mvc.async.request-timeout`
+- `server.tomcat.threads.max`
+- `server.tomcat.max-connections`
+- SSE heartbeat 주기
+- `SseEmitter` timeout 값
+
+결론은 다음과 같습니다.
+
+```text
+Issue-28 V1은 MVC SseEmitter로 구현한다.
+이유는 기존 API/Security 구조와 가장 잘 맞고, 매칭 성사 알림 정책을 빠르게 검증할 수 있기 때문이다.
+동시 SSE 연결 부하 테스트에서 리소스 한계가 확인되면 WebFlux/Netty 전환을 후속 개선으로 진행한다.
+```
+
 ## 📚 Changes
 
 - API 모듈에 SSE 연결 엔드포인트를 추가합니다.
-  - 예: `GET /api/v1/match/notifications/stream`
+  - 예: `GET /api/v1/notifications/match/stream`
   - 인증된 유저만 연결할 수 있게 구성합니다.
   - 연결된 유저 ID를 기준으로 SSE 세션을 관리합니다.
 
@@ -110,10 +170,10 @@ SSE와 WebSocket은 둘 다 연결을 일정 시간 유지하므로, 연결 유�
   - 끊어진 연결에 이벤트 전송 시 예외를 처리하고 연결 저장소에서 제거합니다.
   - 이벤트 전송 실패가 매칭 상태 자체를 망가뜨리지 않도록 Redis 매칭 세션을 기준 상태로 유지합니다.
 
-- Netty 기반 SSE 구성을 검토하고 적용합니다.
-  - WebFlux/Netty 의존성 추가 여부를 검토합니다.
-  - 기존 MVC API와 함께 사용할 때 애플리케이션 타입, 포트, 필터/보안 설정 충돌 여부를 확인합니다.
-  - 필요하면 SSE 전용 라우터/핸들러와 기존 MVC 컨트롤러의 경계를 분리합니다.
+- SSE V1은 MVC `SseEmitter` 기반으로 구현합니다.
+  - 기존 API/Security 구조와 빠르게 통합합니다.
+  - 동시 SSE 연결 부하 테스트로 Thread, Heap, CPU, 연결 유지율을 측정합니다.
+  - 측정 결과 한계가 확인되면 WebFlux/Netty 기반 SSE 전환을 후속 이슈로 분리합니다.
 
 ## 📝 Note
 
@@ -137,12 +197,12 @@ sequenceDiagram
     participant Listener as MatchFoundEventListener
     participant Redis as Redis
 
-    ClientA->>API: GET /api/v1/match/notifications/stream
+    ClientA->>API: GET /api/v1/notifications/match/stream
     API->>API: JWT 인증 후 userA 식별
     API->>Registry: userA SSE 연결 등록
     API-->>ClientA: event: connected
 
-    ClientB->>API: GET /api/v1/match/notifications/stream
+    ClientB->>API: GET /api/v1/notifications/match/stream
     API->>API: JWT 인증 후 userB 식별
     API->>Registry: userB SSE 연결 등록
     API-->>ClientB: event: connected
@@ -193,32 +253,40 @@ sequenceDiagram
 
 ## 📚 Tasks
 
-### 1. SSE 적용 방식 결정
-- [ ] **현재 API 서버 구조 확인**
+### 1. SSE V1 구현 방식 결정
+- [x] **현재 API 서버 구조 확인**
   - `smite-api`가 현재 `spring-boot-starter-web` 기반으로 동작하는지 확인
-  - Netty 기반 SSE를 위해 WebFlux 적용이 필요한지 검토
-  - 기존 MVC 컨트롤러, Spring Security, RestDocs/OpenAPI 구성과 충돌 가능성 확인
+  - 기존 MVC 컨트롤러, Spring Security, RestDocs/OpenAPI 구성과 함께 `SseEmitter`를 사용할 수 있는지 확인
+  - SSE 연결 timeout, async request timeout, Tomcat connection 설정 확인
 
-- [ ] **SSE 구현 방식 결정**
-  - 선택지 A: Spring MVC `SseEmitter` 기반 구현
-  - 선택지 B: Spring WebFlux + Netty 기반 `Flux<ServerSentEvent<?>>` 구현
-  - 포트폴리오 목표가 "Netty 기반 SSE"이므로, 가능하면 WebFlux/Netty 기반으로 설계
-  - 기존 API와 충돌이 크면 SSE 전용 설정/모듈 분리 방안 검토
+- [x] **SSE 구현 방식 결정**
+  - V1은 Spring MVC `SseEmitter` 기반으로 구현
+  - 이유: 기존 API 구조와의 호환성, 빠른 검증, 낮은 구현 위험
+  - WebFlux/Netty 기반 SSE는 동시 연결 부하 테스트 이후 후속 개선으로 검토
 
 ### 2. SSE 연결 API 구현
-- [ ] **SSE 연결 엔드포인트 추가**
-  - `GET /api/v1/match/notifications/stream`
+- [x] **SSE 연결 엔드포인트 추가**
+  - `GET /api/v1/notifications/match/stream`
   - 인증된 유저 ID를 `@AuthUser` 또는 SecurityContext에서 추출
   - 응답 Content-Type은 `text/event-stream` 형태로 제공
 
-- [ ] **초기 연결 이벤트 전송**
+- [x] **초기 연결 이벤트 전송**
   - 연결 직후 `connected` 이벤트 전송
   - 클라이언트가 정상 연결 여부를 바로 알 수 있게 구성
   - 필요 시 현재 서버 시간 또는 connection id 포함
 
-- [ ] **인증 실패 처리**
+- [x] **인증 실패 처리**
   - 인증되지 않은 요청은 SSE 연결을 열지 않음
   - 기존 인증 실패 응답 정책과 동일하게 처리
+
+#### 구현 결과
+
+- `MatchNotificationController`를 추가해 SSE 연결 API를 제공합니다.
+- `MatchNotificationService`에서 `SseEmitter`를 생성하고, 연결 직후 `connected` 이벤트를 전송합니다.
+- `connected` payload에는 `userId`, `connectedAt`을 포함합니다.
+- 인증은 기존 JWT 필터와 `@AuthUser` resolver를 그대로 사용합니다.
+- 인증되지 않은 요청은 기존 Security 정책에 따라 SSE 연결을 열지 않습니다.
+- 유저별 연결 저장, 재연결 교체, heartbeat, 실패 연결 정리는 다음 task에서 구현합니다.
 
 ### 3. 유저별 SSE 연결 관리
 - [ ] **SSE 연결 저장소 구현**
@@ -305,7 +373,63 @@ sequenceDiagram
   - heartbeat 이벤트가 주기적으로 전송되는지 검증
   - heartbeat 실패 시 연결이 제거되는지 검증
 
-### 9. 후속 이슈 분리
+### 9. SSE 부하 테스트
+- [ ] **부하 테스트 목적 정의**
+  - MVC `SseEmitter` 기반 SSE가 목표 사용자 규모에서 안정적으로 연결을 유지할 수 있는지 확인
+  - 동시 연결 수 증가에 따른 Thread, Heap, CPU, GC, 연결 유지율 변화를 측정
+  - 측정 결과를 바탕으로 WebFlux/Netty 기반 SSE 전환 필요성을 판단
+
+- [ ] **동시 SSE 연결 유지 테스트**
+  - 1,000 동시 연결: 기본 안정성 검증
+  - 5,000 동시 연결: 목표 안정 구간 검증
+  - 10,000 동시 연결: 한계 확인 구간 검증
+  - 각 연결은 매칭 대기 화면에 머무르는 상황을 가정해 일정 시간 유지
+
+- [ ] **heartbeat 안정성 테스트**
+  - 연결된 클라이언트에게 주기적으로 `heartbeat` 이벤트 전송
+  - heartbeat 전송 성공률 측정
+  - heartbeat 실패 시 연결이 저장소에서 제거되는지 확인
+  - heartbeat 주기가 서버 리소스에 미치는 영향 측정
+
+- [ ] **match_found 이벤트 전송 테스트**
+  - 연결된 유저 중 일부에게 `match_found` 이벤트를 전송
+  - 이벤트 전송 성공률 측정
+  - 이벤트 전송 p95/p99 지연 시간 측정
+  - 연결이 끊긴 유저에게 전송 시 실패 연결이 정리되는지 확인
+
+- [ ] **관측 지표 정의**
+  - SSE 연결 성공률
+  - SSE 연결 유지율
+  - SSE 연결 종료/실패 수
+  - heartbeat 전송 성공률
+  - `match_found` 이벤트 전송 성공률
+  - `match_found` 이벤트 전송 p95/p99 지연 시간
+  - JVM Heap 사용량
+  - JVM Thread 수
+  - GC pause
+  - Process CPU
+  - Tomcat active threads / active connections
+
+- [ ] **성공 기준 정의**
+  - 1,000 동시 연결은 반드시 안정적으로 유지
+  - 5,000 동시 연결은 목표 안정 구간으로 설정
+  - 10,000 동시 연결은 MVC SSE의 한계 확인 구간으로 설정
+  - 연결 유지율이 낮거나 Thread/Heap/CPU가 급격히 증가하면 WebFlux/Netty 전환 후보로 기록
+  - `match_found` 이벤트 전송 실패는 매칭 상태를 변경하지 않고 알림 실패로만 격리
+
+- [ ] **부하 테스트 스크립트 작성**
+  - SSE 연결 유지용 k6 스크립트 작성
+  - heartbeat 수신 확인 가능 여부 검토
+  - `match_found` 이벤트 전송 테스트를 위한 테스트 전용 이벤트 트리거 방식 검토
+  - 테스트 결과는 `docs/load-test/result` 하위에 보관
+
+- [ ] **결과 분석 문서 작성**
+  - 연결 수별 결과를 표로 정리
+  - Grafana 캡처 이미지 첨부
+  - MVC SSE 유지 가능 여부 판단
+  - WebFlux/Netty 전환 필요성 여부 정리
+
+### 10. 후속 이슈 분리
 - [ ] **수락/거절 API 후속 이슈로 분리**
   - `POST /api/v1/match/{matchId}/accept`
   - `POST /api/v1/match/{matchId}/reject`
