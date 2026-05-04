@@ -7,4 +7,5 @@ import lombok.NoArgsConstructor;
 public final class MatchNotificationEventName {
 
     public static final String CONNECTED = "connected";
+    public static final String HEARTBEAT = "heartbeat";
 }

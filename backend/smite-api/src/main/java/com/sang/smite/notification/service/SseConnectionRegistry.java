@@ -4,6 +4,8 @@ import com.sang.smite.notification.domain.SseConnection;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -42,6 +44,10 @@ public class SseConnectionRegistry {
 
     public Optional<SseConnection> findByUserId(Long userId) {
         return Optional.ofNullable(connections.get(userId));
+    }
+
+    public Collection<SseConnection> findAll() {
+        return List.copyOf(connections.values());
     }
 
     public void remove(Long userId, SseConnection connection) {

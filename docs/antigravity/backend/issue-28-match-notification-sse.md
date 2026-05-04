@@ -313,14 +313,23 @@ sequenceDiagram
 - `MatchNotificationService`는 SSE 연결 생성 후 registry에 등록하고, 초기 `connected` 이벤트 전송 실패 시 연결을 제거합니다.
 
 ### 4. Heartbeat 구현
-- [ ] **주기적 heartbeat 이벤트 전송**
+- [x] **주기적 heartbeat 이벤트 전송**
   - 일정 주기로 `heartbeat` 이벤트 전송
   - 프록시, 브라우저, 네트워크 장비가 유휴 연결을 끊지 않도록 유지
   - heartbeat 주기는 설정값으로 분리
 
-- [ ] **heartbeat 실패 연결 정리**
+- [x] **heartbeat 실패 연결 정리**
   - heartbeat 전송 중 예외 발생 시 해당 연결 제거
   - 실패 연결이 계속 저장소에 남아 메모리 누수가 생기지 않도록 처리
+
+#### 구현 결과
+
+- `notificationTaskScheduler`를 추가해 알림 전용 스케줄러를 분리했습니다.
+- 매칭 엔진의 전역 `@Scheduled` 설정과 섞이지 않도록 heartbeat는 `@Scheduled`를 사용하지 않고, 알림 전용 `TaskScheduler`에서 직접 실행합니다.
+- `SseHeartbeatService`를 추가해 15초마다 전체 SSE 연결에 `heartbeat` 이벤트를 전송합니다.
+- `heartbeat` payload에는 `sentAt`을 포함합니다.
+- heartbeat 전송 실패 시 해당 연결을 registry에서 제거하고 `completeWithError()`로 종료합니다.
+- `SseConnectionRegistry.findAll()`을 추가해 현재 활성 연결 스냅샷을 순회할 수 있게 했습니다.
 
 ### 5. MatchFoundEvent 연동
 - [ ] **매칭 성사 이벤트 리스너 구현**
