@@ -1,6 +1,7 @@
 package com.sang.smite.notification.service;
 
 import com.sang.smite.notification.domain.SseConnection;
+import com.sang.smite.notification.metrics.SseNotificationMetrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.TaskScheduler;
@@ -16,8 +17,8 @@ import static org.mockito.Mockito.verify;
 
 class SseHeartbeatServiceTest {
 
-    private final SseConnectionRegistry registry = new SseConnectionRegistry();
-    private final SseNotificationSender sender = new SseNotificationSender(registry);
+    private final SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
+    private final SseNotificationSender sender = new SseNotificationSender(registry, SseNotificationMetrics.noop());
     private final SseHeartbeatService heartbeatService = new SseHeartbeatService(registry, sender, mock(TaskScheduler.class));
 
     @Test

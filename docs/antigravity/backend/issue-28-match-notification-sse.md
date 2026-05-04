@@ -556,30 +556,30 @@ eventSource.onerror = () => {
   - SSE 연결 API 문서화 테스트를 통해 문서 생성 흐름을 검증합니다.
 
 ### 9. SSE 부하 테스트
-- [ ] **부하 테스트 목적 정의**
+- [x] **부하 테스트 목적 정의**
   - MVC `SseEmitter` 기반 SSE가 목표 사용자 규모에서 안정적으로 연결을 유지할 수 있는지 확인
   - 동시 연결 수 증가에 따른 Thread, Heap, CPU, GC, 연결 유지율 변화를 측정
   - 측정 결과를 바탕으로 WebFlux/Netty 기반 SSE 전환 필요성을 판단
 
-- [ ] **동시 SSE 연결 유지 테스트**
+- [x] **동시 SSE 연결 유지 테스트**
   - 1,000 동시 연결: 기본 안정성 검증
   - 5,000 동시 연결: 목표 안정 구간 검증
   - 10,000 동시 연결: 한계 확인 구간 검증
   - 각 연결은 매칭 대기 화면에 머무르는 상황을 가정해 일정 시간 유지
 
-- [ ] **heartbeat 안정성 테스트**
+- [x] **heartbeat 안정성 테스트**
   - 연결된 클라이언트에게 주기적으로 `heartbeat` 이벤트 전송
   - heartbeat 전송 성공률 측정
   - heartbeat 실패 시 연결이 저장소에서 제거되는지 확인
   - heartbeat 주기가 서버 리소스에 미치는 영향 측정
 
-- [ ] **match_found 이벤트 전송 테스트**
+- [x] **match_found 이벤트 전송 테스트**
   - 연결된 유저 중 일부에게 `match_found` 이벤트를 전송
   - 이벤트 전송 성공률 측정
   - 이벤트 전송 p95/p99 지연 시간 측정
   - 연결이 끊긴 유저에게 전송 시 실패 연결이 정리되는지 확인
 
-- [ ] **관측 지표 정의**
+- [x] **관측 지표 정의**
   - SSE 연결 성공률
   - SSE 연결 유지율
   - SSE 연결 종료/실패 수
@@ -588,28 +588,64 @@ eventSource.onerror = () => {
   - `match_found` 이벤트 전송 p95/p99 지연 시간
   - JVM Heap 사용량
   - JVM Thread 수
+  - JVM Thread 상태별 수
+  - Tomcat current/busy threads
+  - Tomcat current connections
   - GC pause
   - Process CPU
   - Tomcat active threads / active connections
 
-- [ ] **성공 기준 정의**
+- [x] **성공 기준 정의**
   - 1,000 동시 연결은 반드시 안정적으로 유지
   - 5,000 동시 연결은 목표 안정 구간으로 설정
   - 10,000 동시 연결은 MVC SSE의 한계 확인 구간으로 설정
   - 연결 유지율이 낮거나 Thread/Heap/CPU가 급격히 증가하면 WebFlux/Netty 전환 후보로 기록
   - `match_found` 이벤트 전송 실패는 매칭 상태를 변경하지 않고 알림 실패로만 격리
 
-- [ ] **부하 테스트 스크립트 작성**
-  - SSE 연결 유지용 k6 스크립트 작성
+- [x] **부하 테스트 스크립트 작성**
+  - SSE 연결 유지용 부하 테스트 스크립트 작성
   - heartbeat 수신 확인 가능 여부 검토
   - `match_found` 이벤트 전송 테스트를 위한 테스트 전용 이벤트 트리거 방식 검토
   - 테스트 결과는 `docs/load-test/result` 하위에 보관
 
-- [ ] **결과 분석 문서 작성**
+- [x] **결과 분석 문서 작성**
   - 연결 수별 결과를 표로 정리
   - Grafana 캡처 이미지 첨부
   - MVC SSE 유지 가능 여부 판단
   - WebFlux/Netty 전환 필요성 여부 정리
+
+#### 구현 결과
+
+- SSE 전용 Micrometer 지표를 추가했습니다.
+  - `sse_notification_connections_active`
+  - `sse_notification_connections_opened_total`
+  - `sse_notification_connections_closed_total{reason}`
+  - `sse_notification_connection_duration_seconds`
+  - `sse_notification_events_send_attempts_total{event}`
+  - `sse_notification_events_send_success_total{event}`
+  - `sse_notification_events_send_failures_total{event}`
+  - `sse_notification_event_send_duration_seconds{event,result}`
+- 지표 이름은 MVC `SseEmitter`와 향후 WebFlux/Netty SSE가 같은 이름을 사용하도록 구현체와 무관하게 정의했습니다.
+- `SseConnectionRegistry`에서 활성 연결 수, 연결 생성 수, 종료 사유, 연결 유지 시간을 기록합니다.
+- `SseNotificationSender`에서 이벤트 전송 시도/성공/실패 수와 전송 지연 시간을 기록합니다.
+- SSE 전용 부하 테스트 스크립트를 추가했습니다.
+  - `docs/load-test/sse-notification-load.mjs`
+  - `MODE=connection`: SSE 연결 유지 및 heartbeat 안정성 테스트
+  - `MODE=match`: SSE 연결 후 `joinQueue`를 호출해 실제 `match_found` 수신까지 확인
+- SSE 전용 Grafana 대시보드를 추가했습니다.
+  - `docs/grafana/smite-sse-notification-dashboard.json`
+  - 활성 연결 수, 연결 종료 사유, 이벤트 전송 성공/실패율, 전송 p95/p99, JVM Thread/Thread 상태/Heap/CPU, Tomcat Thread/Connection을 확인합니다.
+- SSE 부하 테스트 실행법과 MVC vs Netty 비교 기준을 `docs/load-test/README.md`에 정리했습니다.
+
+#### 중요한 판단 기준
+
+Netty 전환 여부는 "10,000명이라서 무조건 Netty"가 아니라 아래 기준으로 판단합니다.
+
+```text
+MVC SseEmitter가 10,000 연결에서 active connection, thread, heap, CPU, 이벤트 전송 p95/p99를 안정적으로 유지하는가?
+```
+
+유지하지 못하면 WebFlux/Netty로 전환하고, 같은 `sse_notification_*` 지표로 개선 폭을 비교합니다.
 
 ### 10. 후속 이슈 분리
 - [ ] **수락/거절 API 후속 이슈로 분리**

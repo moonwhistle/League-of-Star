@@ -1,0 +1,331 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "title": "리그 오브 스마이트 - SSE 매칭 알림",
+  "uid": "smite-sse-notification",
+  "timezone": "browser",
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": [
+    "smite",
+    "sse",
+    "notification"
+  ],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "label": "API 인스턴스",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "query": "label_values(up{job=\"smite-api\"}, instance)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "요약",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "title": "활성 SSE 연결 수",
+      "description": "현재 서버가 보유 중인 SSE 연결 수입니다. MVC와 Netty 비교에서 가장 먼저 보는 수용량 지표입니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum(sse_notification_connections_active{instance=~\"$instance\"})",
+          "legendFormat": "전체",
+          "refId": "A"
+        },
+        {
+          "expr": "sse_notification_connections_active{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 } }
+    },
+    {
+      "id": 3,
+      "title": "초당 연결 생성/종료 수",
+      "description": "SSE 연결이 얼마나 빠르게 열리고 닫히는지 확인합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum(rate(sse_notification_connections_opened_total{instance=~\"$instance\"}[1m]))",
+          "legendFormat": "생성",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(sse_notification_connections_closed_total{instance=~\"$instance\"}[1m]))",
+          "legendFormat": "종료",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
+    },
+    {
+      "id": 4,
+      "title": "연결 종료 사유",
+      "description": "completion, timeout, error, replaced, send_failure 기준으로 종료 원인을 확인합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum by (reason) (increase(sse_notification_connections_closed_total{instance=~\"$instance\"}[1m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 } }
+    },
+    {
+      "id": 5,
+      "title": "이벤트 전송",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }
+    },
+    {
+      "id": 6,
+      "title": "초당 SSE 이벤트 전송 성공 수",
+      "description": "connected, heartbeat, match_found 이벤트별 전송 성공률을 확인합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 7 },
+      "targets": [
+        {
+          "expr": "sum by (event) (rate(sse_notification_events_send_success_total{instance=~\"$instance\"}[1m]))",
+          "legendFormat": "{{event}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
+    },
+    {
+      "id": 7,
+      "title": "SSE 이벤트 전송 실패율",
+      "description": "전송 실패 수 / 전송 시도 수입니다. 연결은 유지되지만 이벤트 전송 실패가 증가하면 알림 경로 병목입니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 7 },
+      "targets": [
+        {
+          "expr": "sum by (event) (rate(sse_notification_events_send_failures_total{instance=~\"$instance\"}[5m])) / clamp_min(sum by (event) (rate(sse_notification_events_send_attempts_total{instance=~\"$instance\"}[5m])), 0.001) * 100",
+          "legendFormat": "{{event}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0 } }
+    },
+    {
+      "id": 8,
+      "title": "SSE 이벤트 전송 지연 시간",
+      "description": "서버가 SseEmitter.send를 호출하고 완료될 때까지의 시간입니다. Netty 전환 전후 p95/p99 비교 기준입니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 7 },
+      "targets": [
+        {
+          "expr": "1000 * histogram_quantile(0.95, sum by (le, event) (rate(sse_notification_event_send_duration_seconds_bucket{instance=~\"$instance\", result=\"success\"}[5m])))",
+          "legendFormat": "{{event}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "1000 * histogram_quantile(0.99, sum by (le, event) (rate(sse_notification_event_send_duration_seconds_bucket{instance=~\"$instance\", result=\"success\"}[5m])))",
+          "legendFormat": "{{event}} p99",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 } }
+    },
+    {
+      "id": 9,
+      "title": "리소스",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
+    },
+    {
+      "id": 10,
+      "title": "JVM Thread 수",
+      "description": "MVC SseEmitter는 장기 연결에서 Thread 사용량이 중요합니다. Netty 전환 판단의 핵심 지표입니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 15 },
+      "targets": [
+        {
+          "expr": "jvm_threads_live_threads{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} live",
+          "refId": "A"
+        },
+        {
+          "expr": "jvm_threads_peak_threads{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} peak",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 } }
+    },
+    {
+      "id": 11,
+      "title": "JVM Heap 사용량",
+      "description": "SSE 연결 수 증가에 따른 heap 증가량을 확인합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum by (instance) (jvm_memory_used_bytes{area=\"heap\", instance=~\"$instance\"})",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "min": 0 } }
+    },
+    {
+      "id": 12,
+      "title": "CPU 사용률",
+      "description": "SSE 연결 유지와 heartbeat 전송이 CPU를 얼마나 쓰는지 확인합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 15 },
+      "targets": [
+        {
+          "expr": "process_cpu_usage{instance=~\"$instance\"} * 100",
+          "legendFormat": "{{instance}} process",
+          "refId": "A"
+        },
+        {
+          "expr": "system_cpu_usage{instance=~\"$instance\"} * 100",
+          "legendFormat": "{{instance}} system",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    },
+    {
+      "id": 13,
+      "title": "JVM Thread 상태별 수",
+      "description": "SSE 연결 유지 중 runnable, waiting, timed-waiting 스레드가 어떻게 변하는지 확인합니다. MVC와 Netty 비교에서 Thread 사용 패턴을 보는 핵심 패널입니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "expr": "sum by (instance, state) (jvm_threads_states_threads{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} {{state}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 } }
+    },
+    {
+      "id": 14,
+      "title": "연결 유지 시간",
+      "description": "SSE 연결이 실제로 얼마나 유지됐는지 확인합니다. 짧은 종료가 많으면 클라이언트, 프록시, 서버 timeout을 확인합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 29 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(sse_notification_connection_duration_seconds_bucket{instance=~\"$instance\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(sse_notification_connection_duration_seconds_bucket{instance=~\"$instance\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "min": 0 } }
+    },
+    {
+      "id": 15,
+      "title": "인스턴스별 match_found 전송 수",
+      "description": "매칭 성사 알림이 특정 인스턴스에 쏠리는지 확인합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 29 },
+      "targets": [
+        {
+          "expr": "sum by (instance) (rate(sse_notification_events_send_success_total{event=\"match_found\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
+    },
+    {
+      "id": 16,
+      "title": "Tomcat Thread 수",
+      "description": "MVC SseEmitter 환경에서 Tomcat worker thread의 현재 수와 busy 수를 확인합니다. Netty 전환 후에는 비교 공통 지표가 아니라 MVC 병목 진단용으로 봅니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 36 },
+      "targets": [
+        {
+          "expr": "tomcat_threads_current_threads{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} current",
+          "refId": "A"
+        },
+        {
+          "expr": "tomcat_threads_busy_threads{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} busy",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 } }
+    },
+    {
+      "id": 17,
+      "title": "Tomcat 현재 연결 수",
+      "description": "MVC/Tomcat이 보유한 현재 연결 수입니다. SSE 활성 연결 수와 함께 보며, Netty 전환 시에는 별도 Netty connection 지표로 대체합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 36 },
+      "targets": [
+        {
+          "expr": "tomcat_connections_current_connections{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 } }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 package com.sang.smite.notification.service;
 
 import com.sang.smite.notification.domain.SseConnection;
+import com.sang.smite.notification.metrics.SseNotificationMetrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -13,7 +14,7 @@ import static org.mockito.Mockito.verify;
 
 class SseConnectionRegistryTest {
 
-    private final SseConnectionRegistry registry = new SseConnectionRegistry();
+    private final SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
 
     @Test
     @DisplayName("유저별 SSE 연결을 등록하고 조회한다.")

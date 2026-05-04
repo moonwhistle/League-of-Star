@@ -3,6 +3,7 @@ package com.sang.smite.notification.service;
 import com.sang.smite.notification.constants.MatchNotificationEventName;
 import com.sang.smite.notification.domain.SseConnection;
 import com.sang.smite.notification.dto.SseConnectedEvent;
+import com.sang.smite.notification.metrics.SseNotificationMetrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -17,7 +18,7 @@ import static org.mockito.Mockito.when;
 
 class MatchNotificationServiceTest {
 
-    private final SseConnectionRegistry registry = new SseConnectionRegistry();
+    private final SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
     private final SseNotificationSender sender = mock(SseNotificationSender.class);
     private final MatchNotificationService service = new MatchNotificationService(registry, sender);
 

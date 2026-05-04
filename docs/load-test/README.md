@@ -320,3 +320,152 @@ docker exec smite-redis sh -c 'for key in $(redis-cli --scan --pattern "match:se
 ## 9. 결과 해석
 
 테스트 결과 해석, Grafana 지표 비교 방식, 버전별 결과 기록은 [분석-가이드.md](./분석-가이드.md)를 따릅니다.
+
+---
+
+## 10. SSE 매칭 알림 부하 테스트
+
+SSE 테스트는 `joinQueue`처럼 짧은 HTTP 요청 성능을 보는 테스트가 아닙니다. 핵심은 **매칭 대기 화면에 들어온 사용자가 SSE 연결을 안정적으로 유지하고, 서버가 `heartbeat`와 `match_found` 이벤트를 지연 없이 보낼 수 있는지** 확인하는 것입니다.
+
+MVC `SseEmitter` V1과 향후 WebFlux/Netty SSE를 같은 기준으로 비교하기 위해 서버 메트릭 이름은 구현체와 무관하게 고정합니다.
+
+### 10.1 SSE 테스트 목표
+
+| 구분 | 동시 SSE 연결 수 | 목적 |
+| --- | ---: | --- |
+| 기본 안정성 | 1,000 | MVC SSE가 문제 없이 연결을 유지하는지 확인 |
+| 목표 안정 구간 | 5,000 | 피크 동접 규모에서 Thread/Heap/CPU가 버티는지 확인 |
+| 한계 확인 구간 | 10,000 | Netty 전환 필요성을 판단하기 위한 압박 테스트 |
+
+### 10.2 서버에서 수집하는 SSE 지표
+
+| Prometheus 지표 | 의미 | 비교 목적 |
+| --- | --- | --- |
+| `sse_notification_connections_active` | 현재 활성 SSE 연결 수 | 목표 연결 수까지 올라가는지 확인 |
+| `sse_notification_connections_opened_total` | SSE 연결 생성 수 | 연결 성공 처리량 확인 |
+| `sse_notification_connections_closed_total{reason}` | SSE 연결 종료 수와 사유 | timeout/error/send_failure 증가 여부 확인 |
+| `sse_notification_connection_duration_seconds` | SSE 연결 유지 시간 | 연결이 테스트 시간만큼 유지되는지 확인 |
+| `sse_notification_events_send_attempts_total{event}` | 이벤트 전송 시도 수 | heartbeat/match_found 전송량 확인 |
+| `sse_notification_events_send_success_total{event}` | 이벤트 전송 성공 수 | 이벤트 전달 성공률 확인 |
+| `sse_notification_events_send_failures_total{event}` | 이벤트 전송 실패 수 | 끊어진 연결, 서버 write 실패 확인 |
+| `sse_notification_event_send_duration_seconds{event,result}` | 이벤트 전송 소요 시간 | MVC vs Netty p95/p99 비교 |
+| `jvm_threads_live_threads` | JVM live thread 수 | MVC SSE의 thread 사용량 확인 |
+| `jvm_threads_states_threads{state}` | JVM thread 상태별 수 | runnable/waiting/timed-waiting 증가 패턴 확인 |
+| `tomcat_threads_current_threads` | Tomcat worker thread 현재 수 | MVC SseEmitter 병목 진단 |
+| `tomcat_threads_busy_threads` | Tomcat busy thread 수 | MVC 요청 처리 thread 포화 여부 확인 |
+| `tomcat_connections_current_connections` | Tomcat 현재 연결 수 | MVC/Tomcat 연결 수 확인 |
+| `jvm_memory_used_bytes{area="heap"}` | JVM heap 사용량 | 연결 수 증가에 따른 메모리 증가량 확인 |
+| `process_cpu_usage` | API 프로세스 CPU 사용률 | heartbeat/event 전송 비용 확인 |
+
+### 10.3 Grafana 대시보드
+
+SSE 전용 대시보드는 아래 파일을 import해서 사용합니다.
+
+```text
+docs/grafana/smite-sse-notification-dashboard.json
+```
+
+대시보드에서 가장 먼저 볼 패널은 다음 순서입니다.
+
+1. `활성 SSE 연결 수`
+2. `JVM Thread 수`
+3. `JVM Thread 상태별 수`
+4. `Tomcat Thread 수`
+5. `Tomcat 현재 연결 수`
+6. `JVM Heap 사용량`
+7. `SSE 이벤트 전송 실패율`
+8. `SSE 이벤트 전송 지연 시간`
+9. `연결 종료 사유`
+
+인스턴스 선택 변수에서 `All`, `8080`, `8081`처럼 전체/개별 서버를 나눠 볼 수 있습니다. 전체 성능은 `All` 기준으로 보고, 특정 서버만 튀는 현상은 instance label 기준으로 따로 분석합니다.
+
+### 10.4 연결 유지 테스트
+
+매칭 대기 화면에 사용자가 머무르면서 SSE 연결만 유지하는 시나리오입니다. `heartbeat` 안정성과 서버 리소스 사용량을 봅니다.
+
+1,000 연결:
+
+```bash
+MODE=connection CONNECTIONS=1000 HOLD_DURATION=5m RAMP_UP=60s TEST_USER_NAMESPACE=sse-1000 node docs/load-test/sse-notification-load.mjs
+```
+
+5,000 연결:
+
+```bash
+MODE=connection CONNECTIONS=5000 HOLD_DURATION=5m RAMP_UP=120s SETUP_CONCURRENCY=150 TEST_USER_NAMESPACE=sse-5000 node docs/load-test/sse-notification-load.mjs
+```
+
+10,000 연결:
+
+```bash
+MODE=connection CONNECTIONS=10000 HOLD_DURATION=5m RAMP_UP=180s SETUP_CONCURRENCY=200 TEST_USER_NAMESPACE=sse-10000 node docs/load-test/sse-notification-load.mjs
+```
+
+확인 기준:
+
+| 지표 | 성공 기준 |
+| --- | --- |
+| 활성 SSE 연결 수 | 목표 연결 수의 99% 이상 도달 |
+| 연결 유지 시간 p95 | `HOLD_DURATION`에 근접 |
+| 전송 실패율 | 1% 미만 |
+| heartbeat 전송 | 연결 수에 비례해 안정적으로 증가 |
+| JVM Thread | 연결 수 증가에 따라 비정상 급증하면 Netty 전환 후보 |
+| Heap/CPU | 테스트 종료 후 안정적으로 내려와야 함 |
+
+### 10.5 match_found 이벤트 전송 테스트
+
+SSE 연결을 먼저 열고, 같은 유저들로 `joinQueue`를 호출해 실제 매칭 성사 이벤트가 클라이언트까지 도착하는지 확인하는 시나리오입니다.
+
+1,000명:
+
+```bash
+MODE=match CONNECTIONS=1000 HOLD_DURATION=5m RAMP_UP=60s CONNECT_WAIT=70s JOIN_TPS=5 TEST_USER_NAMESPACE=sse-match-1000 node docs/load-test/sse-notification-load.mjs
+```
+
+5,000명:
+
+```bash
+MODE=match CONNECTIONS=5000 HOLD_DURATION=5m RAMP_UP=120s CONNECT_WAIT=140s JOIN_TPS=25 SETUP_CONCURRENCY=150 TEST_USER_NAMESPACE=sse-match-5000 node docs/load-test/sse-notification-load.mjs
+```
+
+10,000명:
+
+```bash
+MODE=match CONNECTIONS=10000 HOLD_DURATION=5m RAMP_UP=180s CONNECT_WAIT=210s JOIN_TPS=50 SETUP_CONCURRENCY=200 TEST_USER_NAMESPACE=sse-match-10000 node docs/load-test/sse-notification-load.mjs
+```
+
+`CONNECT_WAIT`는 SSE 연결을 충분히 연 뒤 `joinQueue`를 시작하기 위한 대기 시간입니다. 보통 `RAMP_UP`보다 조금 길게 잡습니다.
+
+확인 기준:
+
+| 지표 | 성공 기준 |
+| --- | --- |
+| `match_found` 전송 성공 수 | 매칭 성사 유저 수에 근접 |
+| `match_found` 전송 실패율 | 1% 미만 |
+| `match_found` 전송 지연 p95 | steady 상황에서 낮고 안정적이어야 함 |
+| 연결 종료 사유 | `send_failure`, `error`, `timeout`이 급증하지 않아야 함 |
+| joinQueue/매칭 엔진 지표 | 기존 매칭 대시보드 기준도 함께 만족해야 함 |
+
+### 10.6 MVC SSE vs Netty SSE 비교 기준
+
+V1 MVC `SseEmitter`와 V2 Netty/WebFlux SSE를 비교할 때는 같은 시나리오와 같은 지표를 사용합니다.
+
+| 비교 항목 | 봐야 할 지표 | Netty 전환 판단 |
+| --- | --- | --- |
+| 연결 수용량 | 활성 SSE 연결 수 | MVC가 목표 연결 수를 안정적으로 유지하지 못하면 전환 검토 |
+| Thread 사용량 | JVM Thread 수, JVM Thread 상태별 수 | 연결 수에 비례해 live/waiting/timed-waiting thread가 크게 증가하면 전환 후보 |
+| MVC Thread 병목 | Tomcat current/busy threads | busy thread가 높게 유지되면 MVC/Tomcat 병목 가능성 |
+| 메모리 비용 | Heap 사용량 | 연결당 메모리 증가량이 높으면 전환 후보 |
+| 이벤트 전송 지연 | `sse_notification_event_send_duration_seconds` p95/p99 | p95/p99가 부하에 따라 크게 튀면 전환 후보 |
+| 실패율 | 이벤트 전송 실패율, 연결 종료 사유 | `send_failure`, `error`, `timeout`이 증가하면 전환 후보 |
+| 회복성 | 테스트 종료 후 active connection/heap/thread 감소 | 종료 후 리소스가 내려오지 않으면 누수 의심 |
+
+정리하면, Netty 전환 여부는 단순히 "10,000명을 목표로 하니까 Netty"가 아니라 아래 질문에 대한 측정 결과로 판단합니다.
+
+```text
+MVC SseEmitter가 10,000 연결에서 thread, heap, CPU, 이벤트 전송 p95/p99를 안정적으로 유지하는가?
+```
+
+유지하지 못하면 WebFlux/Netty로 전환하고, 같은 `sse_notification_*` 지표로 개선 폭을 비교합니다.
+
+주의할 점은 `tomcat_*` 지표는 MVC/Tomcat 진단용이라는 것입니다. Netty/WebFlux로 전환하면 Tomcat 지표는 비교 대상에서 빠질 수 있습니다. 따라서 버전 간 핵심 비교는 `sse_notification_*`, `jvm_threads_*`, `jvm_memory_*`, `process_cpu_usage`를 기준으로 하고, Tomcat 지표는 MVC V1 병목 원인 분석에 사용합니다.

@@ -4,6 +4,7 @@ import com.sang.smite.domain.match.event.MatchFoundEvent;
 import com.sang.smite.notification.constants.MatchNotificationEventName;
 import com.sang.smite.notification.domain.SseConnection;
 import com.sang.smite.notification.dto.MatchFoundNotification;
+import com.sang.smite.notification.metrics.SseNotificationMetrics;
 import com.sang.smite.notification.service.SseConnectionRegistry;
 import com.sang.smite.notification.service.SseNotificationSender;
 import org.junit.jupiter.api.DisplayName;
@@ -23,8 +24,8 @@ import static org.mockito.Mockito.when;
 
 class MatchFoundEventListenerTest {
 
-    private final SseConnectionRegistry registry = new SseConnectionRegistry();
-    private final SseNotificationSender sender = new SseNotificationSender(registry);
+    private final SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
+    private final SseNotificationSender sender = new SseNotificationSender(registry, SseNotificationMetrics.noop());
     private final MatchFoundEventListener listener = new MatchFoundEventListener(registry, sender);
 
     @Test
@@ -89,7 +90,7 @@ class MatchFoundEventListenerTest {
     @DisplayName("match_found payload는 대상 유저 기준으로 상대 유저 정보를 포함한다.")
     void sendTargetUserPayload() {
         // given
-        SseConnectionRegistry registry = new SseConnectionRegistry();
+        SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
         SseNotificationSender sender = mock(SseNotificationSender.class);
         MatchFoundEventListener listener = new MatchFoundEventListener(registry, sender);
         SseConnection userAConnection = new SseConnection(1L, mock(SseEmitter.class));

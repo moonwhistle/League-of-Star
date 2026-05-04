@@ -3,6 +3,7 @@ package com.sang.smite.notification.service;
 import com.sang.smite.notification.constants.MatchNotificationEventName;
 import com.sang.smite.notification.domain.SseConnection;
 import com.sang.smite.notification.dto.SseHeartbeatEvent;
+import com.sang.smite.notification.metrics.SseNotificationMetrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -18,8 +19,8 @@ import static org.mockito.Mockito.verify;
 
 class SseNotificationSenderTest {
 
-    private final SseConnectionRegistry registry = new SseConnectionRegistry();
-    private final SseNotificationSender sender = new SseNotificationSender(registry);
+    private final SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
+    private final SseNotificationSender sender = new SseNotificationSender(registry, SseNotificationMetrics.noop());
 
     @Test
     @DisplayName("SSE 이벤트 전송에 성공하면 true를 반환하고 연결을 유지한다.")
