@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +38,7 @@ public class MatchEngineService {
     private final MatchStore matchStore;
     private final MatchFoundService matchFoundService;
     private final MatchEngineMetrics matchEngineMetrics;
+    private final Clock clock;
 
     /**
      * 전체 매칭 대기열을 스캔하여 조건에 맞는 유저 쌍을 매칭합니다.
@@ -76,7 +78,7 @@ public class MatchEngineService {
     }
 
     private int pairTickets(List<MatchTicket> tickets) {
-        long now = System.currentTimeMillis();
+        long now = clock.millis();
         Set<Long> pairedUserIds = new HashSet<>();
         int pairedCount = 0;
 
@@ -115,7 +117,7 @@ public class MatchEngineService {
 
             if (success) {
                 markPaired(userA, userB, pairedUserIds);
-                handleMatchedPair(userA, userB, now);
+                handleMatchedPair(userA, userB);
                 return true;
             }
 
@@ -138,13 +140,14 @@ public class MatchEngineService {
         pairedUserIds.add(userB.userId());
     }
 
-    private void handleMatchedPair(MatchTicket userA, MatchTicket userB, long now) {
+    private void handleMatchedPair(MatchTicket userA, MatchTicket userB) {
         log.info("[MatchEngine] 매칭 성사: User {} (Tier {}) <-> User {} (Tier {})",
                 userA.userId(), userA.tierScore(), userB.userId(), userB.tierScore());
 
+        long matchedAt = clock.millis();
         matchEngineMetrics.incrementPairs();
-        recordMatchedUserWait(userA, now);
-        recordMatchedUserWait(userB, now);
+        recordMatchedUserWait(userA, matchedAt);
+        recordMatchedUserWait(userB, matchedAt);
 
         try {
             matchFoundService.process(userA, userB);

@@ -81,12 +81,12 @@ sequenceDiagram
 
     Note over Redis, Engine: [2. 탐색] 티어별 Head 유저 우선 추출 및 병합
     loop Every 1 Second
-        Engine->>Redis: (Lock) matching:lock 획득
+        Engine->>Redis: (Lock) lock:match:engine 획득
         Engine->>Redis: ZRANGE matching:queue:* 0 -1 (전체 데이터 로드)
         Engine->>Engine: entryTime 오름차순 정렬 (가장 오래 기다린 유저 우선)
         Engine->>Engine: 슬라이딩 윈도우 기반 짝짓기
         Engine->>Redis: Lua Script로 원자적 제거 (ZREM)
-        Engine->>Redis: (Unlock) matching:lock 해제
+        Engine->>Redis: (Unlock) lock:match:engine 해제
     end
 
     Note over User, Engine: [3. 알림] WebSocket을 통해 매칭 성사 알림

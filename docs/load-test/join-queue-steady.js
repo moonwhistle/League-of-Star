@@ -10,13 +10,17 @@ import {
 } from './lib/join-queue-common.js';
 
 const ratePerMinute = __ENV.RATE_PER_MINUTE ? Number(__ENV.RATE_PER_MINUTE) : null;
-const requestRate = ratePerMinute || totalUsers;
-const requestTimeUnit = ratePerMinute ? '1m' : duration;
-const plannedIterations = ratePerMinute
+const targetTps = __ENV.TARGET_TPS ? Number(__ENV.TARGET_TPS) : null;
+const requestRate = targetTps || ratePerMinute || totalUsers;
+const requestTimeUnit = targetTps ? '1s' : ratePerMinute ? '1m' : duration;
+const plannedIterations = targetTps
+  ? Math.ceil(targetTps * durationToSeconds(duration))
+  : ratePerMinute
   ? Math.ceil((ratePerMinute / 60) * durationToSeconds(duration))
   : totalUsers;
 
 export const options = {
+  setupTimeout: __ENV.SETUP_TIMEOUT || '10m',
   scenarios: {
     join_queue_steady: {
       executor: 'constant-arrival-rate',

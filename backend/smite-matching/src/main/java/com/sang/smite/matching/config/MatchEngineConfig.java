@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
+import java.time.Clock;
+
 /**
  * 매칭 엔진용 스케줄러 설정
  */
@@ -34,5 +36,10 @@ public class MatchEngineConfig implements SchedulingConfigurer {
         scheduler.setThreadNamePrefix(MATCH_ENGINE_THREAD_NAME_PREFIX);
         scheduler.initialize();
         return scheduler;
+    }
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
     }
 }

@@ -8,6 +8,7 @@ import {
 } from './lib/join-queue-common.js';
 
 export const options = {
+  setupTimeout: __ENV.SETUP_TIMEOUT || '10m',
   scenarios: {
     join_queue_burst: {
       executor: 'shared-iterations',

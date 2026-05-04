@@ -25,7 +25,6 @@ public class MatchEngine {
     private static final String MATCH_ENGINE_LOCK_KEY = "lock:match:engine";
     private static final String MATCH_ENGINE_FIXED_DELAY_MS = "1000";
     private static final long LOCK_WAIT_TIME_SECONDS = 0L;
-    private static final long LOCK_LEASE_TIME_SECONDS = 5L;
 
     private final RedissonClient redissonClient;
     private final MatchEngineService matchEngineService;
@@ -42,7 +41,7 @@ public class MatchEngine {
         RLock lock = redissonClient.getLock(MATCH_ENGINE_LOCK_KEY);
 
         try {
-            boolean locked = lock.tryLock(LOCK_WAIT_TIME_SECONDS, LOCK_LEASE_TIME_SECONDS, TimeUnit.SECONDS);
+            boolean locked = lock.tryLock(LOCK_WAIT_TIME_SECONDS, TimeUnit.SECONDS);
             if (!locked) {
                 matchEngineMetrics.incrementLockSkipped();
                 log.debug("[MatchEngine] 다른 인스턴스가 스캔 중이므로 이번 사이클을 건너뜁니다.");

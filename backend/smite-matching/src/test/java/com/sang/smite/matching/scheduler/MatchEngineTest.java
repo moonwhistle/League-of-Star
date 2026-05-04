@@ -40,7 +40,7 @@ class MatchEngineTest {
     void processMatching_LockAcquired() throws InterruptedException {
         // given
         given(redissonClient.getLock("lock:match:engine")).willReturn(rLock);
-        given(rLock.tryLock(0L, 5L, TimeUnit.SECONDS)).willReturn(true);
+        given(rLock.tryLock(0L, TimeUnit.SECONDS)).willReturn(true);
         given(rLock.isHeldByCurrentThread()).willReturn(true);
 
         // when
@@ -57,7 +57,7 @@ class MatchEngineTest {
     void processMatching_LockSkipped() throws InterruptedException {
         // given
         given(redissonClient.getLock("lock:match:engine")).willReturn(rLock);
-        given(rLock.tryLock(0L, 5L, TimeUnit.SECONDS)).willReturn(false);
+        given(rLock.tryLock(0L, TimeUnit.SECONDS)).willReturn(false);
         given(rLock.isHeldByCurrentThread()).willReturn(false);
 
         // when
@@ -74,7 +74,7 @@ class MatchEngineTest {
     void processMatching_Interrupted() throws InterruptedException {
         // given
         given(redissonClient.getLock("lock:match:engine")).willReturn(rLock);
-        given(rLock.tryLock(0L, 5L, TimeUnit.SECONDS)).willThrow(new InterruptedException("Test interrupted"));
+        given(rLock.tryLock(0L, TimeUnit.SECONDS)).willThrow(new InterruptedException("Test interrupted"));
         given(rLock.isHeldByCurrentThread()).willReturn(false);
 
         try {

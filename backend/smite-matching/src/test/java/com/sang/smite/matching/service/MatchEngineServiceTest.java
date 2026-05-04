@@ -4,6 +4,7 @@ import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.matching.metrics.MatchEngineMetrics;
 import com.sang.smite.matching.repository.MatchStore;
 import io.micrometer.core.instrument.Timer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,6 +36,14 @@ class MatchEngineServiceTest {
 
     @Mock
     private MatchEngineMetrics matchEngineMetrics;
+
+    @Mock
+    private Clock clock;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(clock.millis()).thenReturn(System.currentTimeMillis());
+    }
 
     @Test
     @DisplayName("대기 인원 0~1명일 때 atomicPairRemove와 후처리가 호출되지 않음")
@@ -201,5 +211,32 @@ class MatchEngineServiceTest {
         
         verify(matchEngineMetrics, times(2)).incrementPairs();
         verify(matchEngineMetrics).recordPairsPerScan(2);
+    }
+
+    @Test
+    @DisplayName("매칭 대기 시간은 스캔 시작 시각이 아니라 페어별 매칭 성사 시각 기준으로 기록")
+    void recordMatchedUserWaitUsesPairMatchedAt() {
+        long entryTime = 100_000L;
+        long scanStartedAt = entryTime + 1_000L;
+        long firstPairMatchedAt = entryTime + 1_100L;
+        long secondPairMatchedAt = entryTime + 4_300L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(scanStartedAt, firstPairMatchedAt, secondPairMatchedAt);
+
+        MatchTicket userA = new MatchTicket(1L, 10, entryTime);
+        MatchTicket userB = new MatchTicket(2L, 10, entryTime);
+        MatchTicket userC = new MatchTicket(3L, 10, entryTime);
+        MatchTicket userD = new MatchTicket(4L, 10, entryTime);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB, userC, userD)));
+        given(matchStore.atomicPairRemove(1L, 10, 2L, 10)).willReturn(true);
+        given(matchStore.atomicPairRemove(3L, 10, 4L, 10)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchEngineMetrics, times(2)).recordMatchedUserWait(1_100L);
+        verify(matchEngineMetrics, times(2)).recordMatchedUserWait(4_300L);
+        verify(matchEngineMetrics, never()).recordMatchedUserWait(1_000L);
     }
 }
