@@ -512,23 +512,48 @@ eventSource.onerror = () => {
 - 재연결과 화면 이탈 시 연결 종료 기준을 정리했습니다.
 
 ### 8. 테스트 코드 작성
-- [ ] **SSE 연결 저장소 단위 테스트**
+- [x] **SSE 연결 저장소 단위 테스트**
   - 연결 등록 테스트
   - 재연결 시 기존 연결 교체 테스트
   - 연결 종료 시 제거 테스트
 
-- [ ] **매칭 성사 이벤트 전송 테스트**
+- [x] **매칭 성사 이벤트 전송 테스트**
   - `MatchFoundEvent` 발생 시 두 유저에게 이벤트가 전송되는지 검증
   - 한 명만 연결된 경우 연결된 유저에게만 전송되는지 검증
   - 두 명 모두 연결되지 않은 경우 예외 없이 종료되는지 검증
 
-- [ ] **전송 실패 처리 테스트**
+- [x] **전송 실패 처리 테스트**
   - 이벤트 전송 중 예외 발생 시 연결이 제거되는지 검증
   - 전송 실패가 매칭 이벤트 처리 전체를 중단시키지 않는지 검증
 
-- [ ] **heartbeat 테스트**
+- [x] **heartbeat 테스트**
   - heartbeat 이벤트가 주기적으로 전송되는지 검증
   - heartbeat 실패 시 연결이 제거되는지 검증
+
+#### 구현 결과
+
+- `MatchNotificationServiceTest`를 추가했습니다.
+  - SSE 연결 생성 시 registry에 연결이 저장되는지 검증합니다.
+  - 연결 직후 `connected` 이벤트 전송을 요청하는지 검증합니다.
+- `SseConnectionRegistryTest`를 보강했습니다.
+  - 유저별 연결 등록/조회
+  - 재연결 시 기존 연결 종료 후 새 연결 교체
+  - 현재 연결만 제거하고 오래된 연결 제거 요청은 무시
+  - `onCompletion`, `onTimeout`, `onError` 콜백 실행 시 registry 제거
+- `MatchFoundEventListenerTest`를 보강했습니다.
+  - 두 유저 모두 연결된 경우 두 유저에게 `match_found` 전송
+  - 한 유저만 연결된 경우 연결된 유저에게만 전송
+  - 두 유저 모두 미연결이어도 예외 없이 종료
+  - 전송 실패 시 실패 연결 제거
+  - 대상 유저 기준 `matchId`, `userId`, `opponentUserId`, `acceptTimeoutSeconds` payload 생성 검증
+- `SseNotificationSenderTest`를 추가했습니다.
+  - 전송 성공 시 true 반환 및 연결 유지
+  - 전송 실패 시 false 반환, registry 제거, `completeWithError()` 호출
+- `SseHeartbeatServiceTest`를 작성했습니다.
+  - 등록된 연결에 `heartbeat` 이벤트 전송
+  - heartbeat 실패 시 실패 연결 제거 및 에러 완료 처리
+- `MatchNotificationControllerRestDocsTest`를 추가했습니다.
+  - SSE 연결 API 문서화 테스트를 통해 문서 생성 흐름을 검증합니다.
 
 ### 9. SSE 부하 테스트
 - [ ] **부하 테스트 목적 정의**

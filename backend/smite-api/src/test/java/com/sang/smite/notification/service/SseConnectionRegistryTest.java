@@ -7,6 +7,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -96,5 +97,69 @@ class SseConnectionRegistryTest {
         verify(emitter).onCompletion(any(Runnable.class));
         verify(emitter).onTimeout(any(Runnable.class));
         verify(emitter).onError(any());
+    }
+
+    @Test
+    @DisplayName("SSE 연결 완료 콜백이 실행되면 현재 연결을 제거한다.")
+    void removeConnectionOnCompletion() {
+        // given
+        SseEmitter emitter = mock(SseEmitter.class);
+        doAnswer(invocation -> {
+            Runnable callback = invocation.getArgument(0);
+            callback.run();
+            return null;
+        }).when(emitter).onCompletion(any(Runnable.class));
+
+        SseConnection connection = new SseConnection(1L, emitter);
+
+        // when
+        registry.register(connection);
+
+        // then
+        assertThat(registry.findByUserId(1L)).isEmpty();
+        assertThat(registry.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("SSE 타임아웃 콜백이 실행되면 현재 연결을 제거하고 완료 처리한다.")
+    void removeConnectionOnTimeout() {
+        // given
+        SseEmitter emitter = mock(SseEmitter.class);
+        doAnswer(invocation -> {
+            Runnable callback = invocation.getArgument(0);
+            callback.run();
+            return null;
+        }).when(emitter).onTimeout(any(Runnable.class));
+
+        SseConnection connection = new SseConnection(1L, emitter);
+
+        // when
+        registry.register(connection);
+
+        // then
+        assertThat(registry.findByUserId(1L)).isEmpty();
+        assertThat(registry.count()).isZero();
+        verify(emitter).complete();
+    }
+
+    @Test
+    @DisplayName("SSE 에러 콜백이 실행되면 현재 연결을 제거한다.")
+    void removeConnectionOnError() {
+        // given
+        SseEmitter emitter = mock(SseEmitter.class);
+        doAnswer(invocation -> {
+            java.util.function.Consumer<Throwable> callback = invocation.getArgument(0);
+            callback.accept(new RuntimeException("connection error"));
+            return null;
+        }).when(emitter).onError(any());
+
+        SseConnection connection = new SseConnection(1L, emitter);
+
+        // when
+        registry.register(connection);
+
+        // then
+        assertThat(registry.findByUserId(1L)).isEmpty();
+        assertThat(registry.count()).isZero();
     }
 }
