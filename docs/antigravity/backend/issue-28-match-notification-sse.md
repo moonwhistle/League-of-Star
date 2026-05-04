@@ -392,16 +392,124 @@ sequenceDiagram
   - SSE 이벤트 전송 실패
 
 ### 7. API 문서 및 사용 예시 작성
-- [ ] **SSE 연결 API 문서화**
+- [x] **SSE 연결 API 문서화**
   - 요청 URL
   - 인증 방식
   - 이벤트 이름
   - 이벤트 payload 예시
 
-- [ ] **클라이언트 사용 예시 작성**
+- [x] **클라이언트 사용 예시 작성**
   - `EventSource` 연결 예시
   - `match_found` 이벤트 수신 예시
   - 연결 종료/재연결 시 주의사항
+
+#### API 문서
+
+```http
+GET /api/v1/notifications/match/stream
+Accept: text/event-stream
+Authorization: Bearer {accessToken}
+```
+
+매칭 대기 화면에서 호출하는 SSE 연결 API입니다. 인증된 유저 ID를 기준으로 서버가 SSE 연결을 저장합니다.
+
+응답은 일반 JSON 응답이 아니라 `text/event-stream` 스트림입니다. 연결이 유지되는 동안 서버가 이벤트를 계속 내려보낼 수 있습니다.
+
+#### 이벤트 목록
+
+| 이벤트 이름 | 발생 시점 | payload |
+| --- | --- | --- |
+| `connected` | SSE 연결 직후 | `userId`, `connectedAt` |
+| `heartbeat` | 연결 유지 확인용 주기 이벤트 | `sentAt` |
+| `match_found` | 매칭 엔진에서 매칭 성사 이벤트 발생 시 | `matchId`, `userId`, `opponentUserId`, `acceptTimeoutSeconds`, `eventCreatedAt` |
+
+#### connected 예시
+
+```text
+event: connected
+data: {
+  "userId": 1,
+  "connectedAt": "2026-05-04T00:00:00Z"
+}
+```
+
+#### heartbeat 예시
+
+```text
+event: heartbeat
+data: {
+  "sentAt": "2026-05-04T00:00:15Z"
+}
+```
+
+#### match_found 예시
+
+```text
+event: match_found
+data: {
+  "matchId": "match-20260504-0001",
+  "userId": 1,
+  "opponentUserId": 2,
+  "acceptTimeoutSeconds": 10,
+  "eventCreatedAt": "2026-05-04T00:00:20Z"
+}
+```
+
+#### 클라이언트 사용 예시
+
+브라우저 기본 `EventSource`는 커스텀 `Authorization` 헤더를 직접 넣을 수 없습니다. 실제 프론트 구현에서는 아래 두 방식 중 하나를 선택해야 합니다.
+
+| 방식 | 설명 | V1 판단 |
+| --- | --- | --- |
+| 쿠키 기반 인증 | `EventSource`가 쿠키를 자동 포함 | 브라우저 SSE와 가장 단순하게 맞음 |
+| fetch 기반 SSE polyfill | `Authorization` 헤더를 직접 설정 가능 | 현재 Bearer 토큰 정책을 유지하기 쉬움 |
+
+현재 API 문서 기준 인증 방식은 `Authorization: Bearer {accessToken}`입니다. 따라서 프론트가 Bearer 토큰을 유지한다면 native `EventSource`만으로는 부족하고, 헤더 설정이 가능한 SSE 클라이언트 라이브러리 또는 fetch 기반 stream 처리가 필요합니다.
+
+```javascript
+const eventSource = new EventSource('/api/v1/notifications/match/stream', {
+  withCredentials: true,
+});
+
+eventSource.addEventListener('connected', (event) => {
+  const payload = JSON.parse(event.data);
+  console.log('SSE connected', payload);
+});
+
+eventSource.addEventListener('heartbeat', (event) => {
+  const payload = JSON.parse(event.data);
+  console.log('SSE heartbeat', payload.sentAt);
+});
+
+eventSource.addEventListener('match_found', (event) => {
+  const payload = JSON.parse(event.data);
+
+  openMatchAcceptModal({
+    matchId: payload.matchId,
+    opponentUserId: payload.opponentUserId,
+    acceptTimeoutSeconds: payload.acceptTimeoutSeconds,
+  });
+});
+
+eventSource.onerror = () => {
+  // EventSource는 네트워크 오류 시 자동 재연결을 시도합니다.
+  // 화면을 벗어나거나 매칭이 종료되면 명시적으로 close() 해야 합니다.
+};
+```
+
+#### 연결 종료 기준
+
+- 사용자가 매칭 대기 화면을 벗어나면 클라이언트에서 `eventSource.close()`를 호출합니다.
+- 매칭이 성사되어 수락/거절 모달로 넘어간 뒤 더 이상 대기 이벤트가 필요 없으면 연결을 종료합니다.
+- 브라우저 새로고침이나 네트워크 재연결로 같은 유저가 다시 연결하면 서버는 기존 연결을 닫고 새 연결로 교체합니다.
+- 서버는 연결 완료, 타임아웃, 에러, 전송 실패 시 registry에서 해당 연결을 제거합니다.
+
+#### 구현 결과
+
+- `notification-match-stream` RestDocs 문서를 추가했습니다.
+- SSE 연결 URL, 인증 헤더, 이벤트 이름, payload 예시를 문서화했습니다.
+- 클라이언트 구현 시 native `EventSource`와 Bearer 토큰 인증의 제약을 명시했습니다.
+- 재연결과 화면 이탈 시 연결 종료 기준을 정리했습니다.
 
 ### 8. 테스트 코드 작성
 - [ ] **SSE 연결 저장소 단위 테스트**
