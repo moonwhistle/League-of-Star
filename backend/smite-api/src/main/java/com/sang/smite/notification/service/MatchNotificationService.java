@@ -3,25 +3,27 @@ package com.sang.smite.notification.service;
 import com.sang.smite.notification.constants.MatchNotificationEventName;
 import com.sang.smite.notification.domain.SseConnection;
 import com.sang.smite.notification.dto.SseConnectedEvent;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 
-@Slf4j
 @Service
 public class MatchNotificationService {
 
     private static final long SSE_TIMEOUT_MILLIS = 30 * 60 * 1000L;
 
     private final SseConnectionRegistry sseConnectionRegistry;
+    private final SseNotificationSender sseNotificationSender;
     private final Clock clock = Clock.systemUTC();
 
-    public MatchNotificationService(SseConnectionRegistry sseConnectionRegistry) {
+    public MatchNotificationService(
+            SseConnectionRegistry sseConnectionRegistry,
+            SseNotificationSender sseNotificationSender
+    ) {
         this.sseConnectionRegistry = sseConnectionRegistry;
+        this.sseNotificationSender = sseNotificationSender;
     }
 
     /**
@@ -41,15 +43,10 @@ public class MatchNotificationService {
     }
 
     private void sendConnectedEvent(SseConnection connection) {
-        try {
-            connection.send(
-                    MatchNotificationEventName.CONNECTED,
-                    new SseConnectedEvent(connection.userId(), Instant.now(clock))
-            );
-        } catch (IOException e) {
-            log.warn("[MatchNotification] SSE connected 이벤트 전송 실패: userId={}", connection.userId(), e);
-            sseConnectionRegistry.remove(connection.userId(), connection);
-            connection.completeWithError(e);
-        }
+        sseNotificationSender.send(
+                connection,
+                MatchNotificationEventName.CONNECTED,
+                new SseConnectedEvent(connection.userId(), Instant.now(clock))
+        );
     }
 }
