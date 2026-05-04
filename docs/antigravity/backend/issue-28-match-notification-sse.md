@@ -286,22 +286,31 @@ sequenceDiagram
 - `connected` payload에는 `userId`, `connectedAt`을 포함합니다.
 - 인증은 기존 JWT 필터와 `@AuthUser` resolver를 그대로 사용합니다.
 - 인증되지 않은 요청은 기존 Security 정책에 따라 SSE 연결을 열지 않습니다.
-- 유저별 연결 저장, 재연결 교체, heartbeat, 실패 연결 정리는 다음 task에서 구현합니다.
+- 유저별 연결 저장과 재연결 교체는 Task 3에서 확장합니다.
 
 ### 3. 유저별 SSE 연결 관리
-- [ ] **SSE 연결 저장소 구현**
+- [x] **SSE 연결 저장소 구현**
   - 유저 ID를 key로 활성 연결 저장
   - 저장 구조 예: `ConcurrentHashMap<Long, SseConnection>`
   - 연결 객체는 이벤트 전송, 완료 처리, 종료 처리를 캡슐화
 
-- [ ] **재연결 처리**
+- [x] **재연결 처리**
   - 같은 유저가 새로 연결하면 기존 연결을 종료하고 새 연결로 교체
   - 브라우저 새로고침, 네트워크 재연결 상황에서 중복 연결이 쌓이지 않도록 처리
 
-- [ ] **연결 제거 처리**
+- [x] **연결 제거 처리**
   - 클라이언트 연결 종료 시 저장소에서 제거
   - 타임아웃 발생 시 저장소에서 제거
   - 이벤트 전송 실패 시 저장소에서 제거
+
+#### 구현 결과
+
+- `SseConnection`을 추가해 유저 1명의 SSE 연결을 표현합니다.
+- `SseConnectionRegistry`를 추가해 유저 ID별 활성 연결을 `ConcurrentHashMap`으로 관리합니다.
+- 같은 유저가 재연결하면 기존 연결은 `complete()` 처리하고 새 연결로 교체합니다.
+- `onCompletion`, `onTimeout`, `onError` 콜백을 등록해 연결 종료 시 저장소에서 제거합니다.
+- 오래된 연결의 종료 콜백이 새 연결을 지우지 않도록 `remove(userId, connection)` 방식으로 현재 연결만 제거합니다.
+- `MatchNotificationService`는 SSE 연결 생성 후 registry에 등록하고, 초기 `connected` 이벤트 전송 실패 시 연결을 제거합니다.
 
 ### 4. Heartbeat 구현
 - [ ] **주기적 heartbeat 이벤트 전송**

@@ -1,6 +1,7 @@
 package com.sang.smite.notification.service;
 
 import com.sang.smite.notification.constants.MatchNotificationEventName;
+import com.sang.smite.notification.domain.SseConnection;
 import com.sang.smite.notification.dto.SseConnectedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,36 +17,39 @@ public class MatchNotificationService {
 
     private static final long SSE_TIMEOUT_MILLIS = 30 * 60 * 1000L;
 
-    private final Clock clock;
+    private final SseConnectionRegistry sseConnectionRegistry;
+    private final Clock clock = Clock.systemUTC();
 
-    public MatchNotificationService() {
-        this(Clock.systemUTC());
-    }
-
-    MatchNotificationService(Clock clock) {
-        this.clock = clock;
+    public MatchNotificationService(SseConnectionRegistry sseConnectionRegistry) {
+        this.sseConnectionRegistry = sseConnectionRegistry;
     }
 
     /**
      * 매칭 알림용 SSE 연결을 생성합니다.
      *
-     * <p>V1에서는 연결 API와 초기 연결 이벤트 전송까지만 담당합니다.
-     * 유저별 연결 저장, 재연결 교체, heartbeat, 실패 연결 정리는 후속 task에서 확장합니다.</p>
+     * <p>같은 유저가 다시 연결하면 기존 연결은 종료하고 새 연결로 교체합니다.
+     * heartbeat와 매칭 성사 이벤트 전송은 후속 task에서 확장합니다.</p>
      */
     public SseEmitter connect(Long userId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
-        sendConnectedEvent(userId, emitter);
+        SseConnection connection = new SseConnection(userId, emitter);
+
+        sseConnectionRegistry.register(connection);
+        sendConnectedEvent(connection);
+
         return emitter;
     }
 
-    private void sendConnectedEvent(Long userId, SseEmitter emitter) {
+    private void sendConnectedEvent(SseConnection connection) {
         try {
-            emitter.send(SseEmitter.event()
-                    .name(MatchNotificationEventName.CONNECTED)
-                    .data(new SseConnectedEvent(userId, Instant.now(clock))));
+            connection.send(
+                    MatchNotificationEventName.CONNECTED,
+                    new SseConnectedEvent(connection.userId(), Instant.now(clock))
+            );
         } catch (IOException e) {
-            log.warn("[MatchNotification] SSE connected 이벤트 전송 실패: userId={}", userId, e);
-            emitter.completeWithError(e);
+            log.warn("[MatchNotification] SSE connected 이벤트 전송 실패: userId={}", connection.userId(), e);
+            sseConnectionRegistry.remove(connection.userId(), connection);
+            connection.completeWithError(e);
         }
     }
 }
