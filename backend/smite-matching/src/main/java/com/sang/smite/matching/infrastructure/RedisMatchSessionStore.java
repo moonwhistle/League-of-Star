@@ -28,6 +28,8 @@ public class RedisMatchSessionStore implements MatchSessionStore {
     private static final String FIELD_USER_B = "userB";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_CREATED_AT = "createdAt";
+    private static final String FIELD_USER_A_ACCEPTED = "userAAccepted";
+    private static final String FIELD_USER_B_ACCEPTED = "userBAccepted";
 
     private final RedissonClient redissonClient;
 
@@ -40,7 +42,9 @@ public class RedisMatchSessionStore implements MatchSessionStore {
                 FIELD_USER_A, String.valueOf(session.userA()),
                 FIELD_USER_B, String.valueOf(session.userB()),
                 FIELD_STATUS, session.status().name(),
-                FIELD_CREATED_AT, String.valueOf(session.createdAt())
+                FIELD_CREATED_AT, String.valueOf(session.createdAt()),
+                FIELD_USER_A_ACCEPTED, String.valueOf(session.userAAccepted()),
+                FIELD_USER_B_ACCEPTED, String.valueOf(session.userBAccepted())
         ));
         sessionHash.expire(Duration.ofSeconds(ttlSeconds));
     }
@@ -59,7 +63,9 @@ public class RedisMatchSessionStore implements MatchSessionStore {
                 Long.valueOf(fields.get(FIELD_USER_A)),
                 Long.valueOf(fields.get(FIELD_USER_B)),
                 MatchStatus.valueOf(fields.get(FIELD_STATUS)),
-                Long.parseLong(fields.get(FIELD_CREATED_AT))
+                Long.parseLong(fields.get(FIELD_CREATED_AT)),
+                Boolean.parseBoolean(fields.get(FIELD_USER_A_ACCEPTED)),
+                Boolean.parseBoolean(fields.get(FIELD_USER_B_ACCEPTED))
         ));
     }
 

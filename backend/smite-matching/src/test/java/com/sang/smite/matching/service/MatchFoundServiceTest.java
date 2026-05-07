@@ -59,6 +59,8 @@ class MatchFoundServiceTest {
         assertThat(savedSession.userB()).isEqualTo(2L);
         assertThat(savedSession.status()).isEqualTo(MatchStatus.FOUND);
         assertThat(savedSession.matchId()).isNotBlank();
+        assertThat(savedSession.userAAccepted()).isFalse();
+        assertThat(savedSession.userBAccepted()).isFalse();
 
         // 3. 이벤트 발행 검증
         ArgumentCaptor<MatchFoundEvent> eventCaptor = ArgumentCaptor.forClass(MatchFoundEvent.class);

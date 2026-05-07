@@ -92,19 +92,38 @@ timeout 정책:
 
 ### 2. 도메인 모델 확장
 
-- [ ] `MatchSession`에 수락 상태 필드 추가
+- [x] `MatchSession`에 수락 상태 필드 추가
   - `boolean userAAccepted`
   - `boolean userBAccepted`
-- [ ] 생성 메서드 수정
+- [x] 생성 메서드 수정
   - `MatchSession.create()`는 기본값 `false, false`로 생성
-- [ ] 편의 메서드 검토
+- [x] 편의 메서드 검토
   - `isParticipant(Long userId)`
   - `isAcceptedByBoth()`
   - `isUserA(Long userId)`
   - `isUserB(Long userId)`
-- [ ] 기존 테스트 영향 확인
+- [x] 기존 테스트 영향 확인
   - `RedisMatchSessionStoreTest`
   - `MatchFoundServiceTest`
+
+#### 구현 결과
+
+- `MatchSession`에 유저별 수락 여부를 추가했습니다.
+  - `userAAccepted`
+  - `userBAccepted`
+- `MatchSession.create()`는 매칭 성사 직후 수락 대기 상태를 만들기 때문에 두 수락 필드를 모두 `false`로 초기화합니다.
+- 참여자/수락 완료 판단 메서드를 추가했습니다.
+  - `isParticipant(Long userId)`
+  - `isUserA(Long userId)`
+  - `isUserB(Long userId)`
+  - `isAcceptedByBoth()`
+- `RedisMatchSessionStore` 저장/복원 필드를 확장했습니다.
+  - `userAAccepted`
+  - `userBAccepted`
+- 테스트를 보강했습니다.
+  - `MatchSessionTest`: 생성 기본값, 참여자 검증, 양쪽 수락 여부 검증
+  - `RedisMatchSessionStoreTest`: 수락 필드 Redis Hash 저장/복원 검증
+  - `MatchFoundServiceTest`: 매칭 성사 직후 수락 필드 기본값 검증
 
 ### 3. API 경로 정의
 

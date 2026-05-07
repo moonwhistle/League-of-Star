@@ -38,7 +38,7 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         // given
         String matchId = "test-match-1";
         long now = System.currentTimeMillis();
-        MatchSession session = new MatchSession(matchId, 1L, 2L, MatchStatus.FOUND, now);
+        MatchSession session = new MatchSession(matchId, 1L, 2L, MatchStatus.FOUND, now, false, false);
         long ttlSeconds = 12L;
 
         // when
@@ -54,6 +54,8 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         assertThat(sessionHash.get("userB")).isEqualTo("2");
         assertThat(sessionHash.get("status")).isEqualTo("FOUND");
         assertThat(sessionHash.get("createdAt")).isEqualTo(String.valueOf(now));
+        assertThat(sessionHash.get("userAAccepted")).isEqualTo("false");
+        assertThat(sessionHash.get("userBAccepted")).isEqualTo("false");
 
         // TTL 검증 (테스트 실행 지연을 고려해 10초 이상, 설정값 이하)
         long remainTimeToLive = sessionHash.remainTimeToLive();
@@ -66,7 +68,7 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         // given
         String matchId = "test-match-2";
         long now = System.currentTimeMillis();
-        MatchSession session = new MatchSession(matchId, 3L, 4L, MatchStatus.FOUND, now);
+        MatchSession session = new MatchSession(matchId, 3L, 4L, MatchStatus.FOUND, now, true, false);
         matchSessionStore.save(session, 12L);
 
         // when
@@ -79,6 +81,8 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         assertThat(foundSession.get().userB()).isEqualTo(4L);
         assertThat(foundSession.get().status()).isEqualTo(MatchStatus.FOUND);
         assertThat(foundSession.get().createdAt()).isEqualTo(now);
+        assertThat(foundSession.get().userAAccepted()).isTrue();
+        assertThat(foundSession.get().userBAccepted()).isFalse();
     }
 
     @Test
@@ -86,7 +90,7 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
     void delete() {
         // given
         String matchId = "test-match-3";
-        MatchSession session = new MatchSession(matchId, 5L, 6L, MatchStatus.FOUND, System.currentTimeMillis());
+        MatchSession session = new MatchSession(matchId, 5L, 6L, MatchStatus.FOUND, System.currentTimeMillis(), false, false);
         matchSessionStore.save(session, 12L);
 
         // when
