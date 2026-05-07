@@ -176,15 +176,28 @@ timeout 정책:
 
 ### 5. API 모듈 Service 분리
 
-- [ ] `MatchQueueService`에 수락/거절을 넣을지 별도 서비스로 분리할지 결정
+- [x] `MatchQueueService`에 수락/거절을 넣을지 별도 서비스로 분리할지 결정
   - 현재 `MatchQueueService`는 join/leave 대기열 책임
   - 수락/거절은 매칭 세션 응답 책임
-- [ ] 별도 `MatchResponseService` 추가 검토
+- [x] 별도 `MatchResponseService` 추가 검토
   - 위치: `smite-api/src/main/java/com/sang/smite/match/service`
   - 역할: API layer에서 인증 유저 요청을 matching module로 위임
-- [ ] API layer는 JPA rank 조회를 하지 않음
+- [x] API layer는 JPA rank 조회를 하지 않음
   - 수락/거절은 `matchId`, `userId`만 필요
-- [ ] matching module의 수락/거절 서비스 호출
+- [x] matching module의 수락/거절 서비스 호출
+
+#### 구현 결과
+
+- 수락/거절 요청은 `MatchQueueService`에 넣지 않고 별도 `MatchResponseService`로 분리했습니다.
+  - `MatchQueueService`: join/leave 대기열 책임
+  - `MatchResponseService`: 매칭 성사 후 accept/reject 응답 위임 책임
+- API 모듈 `MatchResponseService`는 JPA rank 조회를 하지 않습니다.
+  - 수락/거절에는 `matchId`, `userId`만 필요합니다.
+- matching 모듈에 `MatchResponseCommandService`를 추가했습니다.
+  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service`
+  - API 모듈은 이 서비스를 호출해 수락/거절 처리를 위임합니다.
+  - 실제 세션 상태 변경, `matchId` 기준 Redis lock, timeout 정책은 다음 task에서 구현합니다.
+- `MatchResponseServiceTest`를 추가해 API 서비스가 matching 모듈 서비스로 accept/reject를 위임하는지 검증했습니다.
 
 ### 6. Matching 모듈 서비스 설계
 

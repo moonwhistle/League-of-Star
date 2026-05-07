@@ -1,5 +1,7 @@
 package com.sang.smite.match.service;
 
+import com.sang.smite.matching.service.MatchResponseCommandService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -9,13 +11,16 @@ import org.springframework.stereotype.Service;
  * 실제 세션 상태 변경, 분산락, timeout 처리는 후속 task에서 matching 모듈 서비스로 구현합니다.</p>
  */
 @Service
+@RequiredArgsConstructor
 public class MatchResponseService {
 
+    private final MatchResponseCommandService matchResponseCommandService;
+
     public void accept(String matchId, Long userId) {
-        throw new UnsupportedOperationException("매칭 수락 처리는 후속 task에서 구현합니다.");
+        matchResponseCommandService.accept(matchId, userId);
     }
 
     public void reject(String matchId, Long userId) {
-        throw new UnsupportedOperationException("매칭 거절 처리는 후속 task에서 구현합니다.");
+        matchResponseCommandService.reject(matchId, userId);
     }
 }
