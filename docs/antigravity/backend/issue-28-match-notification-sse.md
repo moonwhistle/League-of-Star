@@ -929,3 +929,115 @@ MatchFoundService
   - `match_reject`
   - `match_completed`
   - `match_timeout`
+
+---
+
+## PR 정리
+
+## 📌 Summary
+
+- 매칭 엔진에서 매칭이 성사되었을 때, 대상 유저 2명에게 실시간으로 `match_found` 알림을 전달하는 SSE 기반 매칭 알림 기능을 구현했습니다.
+- API 인스턴스가 2대 이상 떠 있는 상황에서도 알림이 누락되지 않도록 Redis Pub/Sub 기반 이벤트 전파 구조를 적용했습니다.
+- 클라이언트는 매칭 화면 진입 시 SSE 연결을 먼저 열고, 서버는 연결 유지용 `heartbeat`와 매칭 성사용 `match_found` 이벤트를 전송합니다.
+- 수락/거절 API와 수락 상태 동기화 이벤트는 후속 이슈로 분리했습니다.
+
+동작 흐름:
+
+```mermaid
+flowchart TD
+    A[사용자 매칭 화면 진입] --> B[SSE 연결 생성]
+    B --> C[API 인스턴스 메모리에<br/>유저별 SSE 연결 저장]
+    C --> D[connected 이벤트 전송]
+    D --> E[heartbeat 주기 전송]
+
+    A --> F[joinQueue 요청]
+    F --> G[Redis 매칭 대기열 저장]
+    G --> H[매칭 엔진 배치 스캔]
+    H --> I[두 유저 원자 제거]
+    I --> J[매칭 세션 저장]
+    J --> K[MatchFoundEvent 발행]
+    K --> L[Redis Pub/Sub publish]
+    L --> M[모든 API 인스턴스 subscribe]
+    M --> N[각 인스턴스가<br/>자기 SSE 연결만 조회]
+    N --> O[연결된 유저에게<br/>match_found 전송]
+```
+
+## 📚 Changes
+
+### SSE 선택 이유
+
+- 매칭 성사 알림은 서버에서 클라이언트로 보내는 단방향 이벤트이므로 SSE가 요구사항에 적합하다고 판단했습니다.
+- 폴링은 매칭이 성사되지 않은 대부분의 시간에도 요청을 반복하므로 불필요한 트래픽이 큽니다.
+- WebSocket은 양방향 통신에는 유리하지만, 이번 기능은 `match_found` 알림을 받고 이후 수락/거절을 HTTP API로 1회 호출하는 구조입니다.
+- 정책상 수락/거절 세션은 짧은 시간 동안만 유효하므로, 이 응답 하나를 받기 위해 WebSocket 메시지 프로토콜과 세션 관리를 도입하는 것은 현재 단계에서 과하다고 판단했습니다.
+- 따라서 V1은 기존 API 구조와 잘 맞는 MVC `SseEmitter` 기반 SSE로 구현했습니다.
+
+| 방식 | 장점 | 단점 | 판단 |
+| --- | --- | --- | --- |
+| Polling | 구현 단순 | 불필요한 반복 요청, 실시간성 낮음 | 제외 |
+| WebSocket | 양방향 실시간 통신에 강함 | 세션 관리, 재연결, 메시지 프로토콜 관리 복잡 | 후순위 |
+| SSE | 서버 -> 클라이언트 알림에 단순하고 적합 | 클라이언트 -> 서버 명령은 별도 HTTP 필요 | V1 선택 |
+
+### 설계
+
+1. **SSE 선연결 구조**
+   - 매칭이 성사된 뒤 SSE를 연결하면 수락/거절 제한 시간 안에 알림을 받지 못할 수 있습니다.
+   - 따라서 클라이언트는 매칭 대기 화면에 진입할 때 SSE 연결을 먼저 생성합니다.
+
+2. **유저별 연결 관리**
+   - API 인스턴스 메모리에 `userId -> SseConnection` 형태로 연결을 저장합니다.
+   - 같은 유저가 재연결하면 기존 연결을 종료하고 새 연결로 교체합니다.
+   - 연결 종료, 타임아웃, 전송 실패 시 registry에서 제거합니다.
+
+3. **heartbeat 유지**
+   - 서버가 주기적으로 `heartbeat` 이벤트를 보내 연결이 살아 있는지 확인합니다.
+   - heartbeat 전송 실패 시 끊어진 연결로 판단하고 정리합니다.
+
+4. **멀티 인스턴스 알림 전파**
+   - SSE 연결은 각 API 인스턴스 메모리에만 존재합니다.
+   - Spring ApplicationEvent만 사용하면 이벤트가 발생한 인스턴스에 연결된 유저에게만 알림이 갈 수 있습니다.
+   - 이를 해결하기 위해 `MatchFoundEvent`를 Redis Pub/Sub으로 publish하고, 모든 API 인스턴스가 subscribe하도록 구성했습니다.
+   - 각 인스턴스는 자기 `SseConnectionRegistry`에 존재하는 연결에만 `match_found`를 전송합니다.
+
+### 구현
+
+- `GET /api/v1/notifications/match/stream` SSE 연결 API 추가
+- `SseConnectionRegistry`로 유저별 SSE 연결 등록/조회/제거 구현
+- `SseNotificationSender`로 SSE 이벤트 전송과 실패 연결 정리 책임 분리
+- `SseHeartbeatService`로 heartbeat 주기 전송 구현
+- `MatchFoundNotification` payload 정의
+- `MatchFoundPubSubMessage`로 Pub/Sub 전송 메시지 모델 정의
+- `MatchFoundPubSubPublisher`로 `notification:match_found` publish 구현
+- `MatchFoundPubSubSubscriber`로 모든 API 인스턴스 subscribe 구현
+- `MatchFoundNotificationDispatcher`로 현재 인스턴스에 연결된 유저에게만 `match_found` 전송
+- 기존 로컬 직접 전송 리스너 제거로 중복 전송 방지
+- SSE, Pub/Sub, dispatch 관련 Micrometer 지표 추가
+- Grafana SSE 대시보드에 연결, 이벤트 전송, Pub/Sub 전파, JVM/Tomcat 리소스 패널 추가
+- SSE 연결 유지/이벤트 전송 부하 테스트 스크립트 추가
+
+### 부하 테스트
+
+1. **연결 유지 테스트**
+   - 10,000개 SSE 연결을 유지하면서 `connected`, `heartbeat`, 연결 실패율, JVM/CPU/Thread 사용량을 확인했습니다.
+   - 결과: `10000/10000` 연결 성공, `sse failed: 0`
+
+2. **이벤트 전송 테스트**
+   - 10,000개 SSE 연결을 먼저 생성한 뒤 `joinQueue`를 호출해 실제 `match_found`가 클라이언트까지 도착하는지 확인했습니다.
+   - 결과: `join success: 10000/10000`, `match_found received: 10000/10000`
+
+3. **분석**
+   - Pub/Sub 적용 후 멀티 인스턴스 알림 누락 문제는 해결되었습니다.
+   - Tomcat/MVC 스레드 병목은 현재 확인되지 않았습니다.
+   - 서버의 SSE send 지연은 낮게 유지되었습니다.
+   - 다만 목표 `50 events/s` 대비 실제 `match_found` 전송량은 약 `40~42 events/s` 수준으로, 최종 전달은 성공했지만 목표 처리 속도에는 여유가 부족했습니다.
+
+## 📝 Note
+
+- 현재 구현은 MVC `SseEmitter` 기반 SSE V1입니다.
+- 이번 테스트 기준으로는 10,000명 연결 유지와 `match_found` 100% 전달이 가능하므로 즉시 Netty로 전환할 근거는 부족합니다.
+- Netty/WebFlux 전환은 Tomcat busy thread 증가, JVM runnable thread 급증, send latency 악화, 더 큰 연결 규모 요구가 확인될 때 후속 개선으로 검토합니다.
+- 수락/거절 API, 양쪽 수락 완료, 거절/타임아웃 이벤트는 후속 이슈에서 구현합니다.
+
+## 📌 Related Issue
+
+- Closes #28
