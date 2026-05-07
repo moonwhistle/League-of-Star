@@ -1,52 +1,45 @@
-package com.sang.smite.notification.listener;
+package com.sang.smite.notification.service;
 
-import com.sang.smite.domain.match.event.MatchFoundEvent;
 import com.sang.smite.notification.constants.MatchNotificationEventName;
 import com.sang.smite.notification.dto.MatchFoundNotification;
-import com.sang.smite.notification.service.SseConnectionRegistry;
-import com.sang.smite.notification.service.SseNotificationSender;
+import com.sang.smite.notification.pubsub.dto.MatchFoundPubSubMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.time.Clock;
-import java.time.Instant;
-
+/**
+ * match_found Pub/Sub 메시지를 현재 인스턴스의 SSE 연결에 전송합니다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class MatchFoundEventListener {
+public class MatchFoundNotificationDispatcher {
 
     private final SseConnectionRegistry sseConnectionRegistry;
     private final SseNotificationSender sseNotificationSender;
-    private final Clock clock = Clock.systemUTC();
 
-    @EventListener
-    public void handle(MatchFoundEvent event) {
-        Instant eventCreatedAt = Instant.now(clock);
-
+    public void dispatch(MatchFoundPubSubMessage message) {
         sendMatchFound(
-                event.userA(),
-                event.userB(),
+                message.userA(),
+                message.userB(),
                 new MatchFoundNotification(
-                        event.matchId(),
-                        event.userA(),
-                        event.userB(),
-                        event.acceptTimeoutSeconds(),
-                        eventCreatedAt
+                        message.matchId(),
+                        message.userA(),
+                        message.userB(),
+                        message.acceptTimeoutSeconds(),
+                        message.eventCreatedAt()
                 )
         );
 
         sendMatchFound(
-                event.userB(),
-                event.userA(),
+                message.userB(),
+                message.userA(),
                 new MatchFoundNotification(
-                        event.matchId(),
-                        event.userB(),
-                        event.userA(),
-                        event.acceptTimeoutSeconds(),
-                        eventCreatedAt
+                        message.matchId(),
+                        message.userB(),
+                        message.userA(),
+                        message.acceptTimeoutSeconds(),
+                        message.eventCreatedAt()
                 )
         );
     }
@@ -66,7 +59,7 @@ public class MatchFoundEventListener {
                                         targetUserId, opponentUserId, notification.matchId());
                             }
                         },
-                        () -> log.info("[MatchNotification] SSE 연결이 없어 match_found 전송을 스킵합니다. userId={}, matchId={}",
+                        () -> log.info("[MatchNotification] 현재 인스턴스에 SSE 연결이 없어 match_found 전송을 스킵합니다. userId={}, matchId={}",
                                 targetUserId, notification.matchId())
                 );
     }

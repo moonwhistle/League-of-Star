@@ -194,7 +194,9 @@ sequenceDiagram
     participant Registry as SseConnectionRegistry
     participant Engine as MatchEngine
     participant Found as MatchFoundService
-    participant Listener as MatchFoundEventListener
+    participant Publisher as MatchFoundPubSubPublishListener
+    participant Subscriber as MatchFoundPubSubSubscriber
+    participant Dispatcher as MatchFoundNotificationDispatcher
     participant Redis as Redis
 
     ClientA->>API: GET /api/v1/notifications/match/stream
@@ -220,19 +222,20 @@ sequenceDiagram
     Found->>Redis: userA/userB 상태 FOUND 저장
     Found->>Redis: match:session:{matchId} 저장, TTL 12초
     Found->>API: MatchFoundEvent 발행
-
-    Note over API,Listener: 현재 V1은 같은 JVM 내부 이벤트만 전달
-    API->>Listener: MatchFoundEvent 수신
-    Listener->>Registry: userA SSE 연결 조회
-    Listener->>Registry: userB SSE 연결 조회
-    Listener-->>ClientA: event: match_found
-    Listener-->>ClientB: event: match_found
+    API->>Publisher: MatchFoundEvent 수신
+    Publisher->>Redis: notification:match_found publish
+    Redis-->>Subscriber: 모든 API 인스턴스가 메시지 수신
+    Subscriber->>Dispatcher: match_found 전송 위임
+    Dispatcher->>Registry: userA SSE 연결 조회
+    Dispatcher->>Registry: userB SSE 연결 조회
+    Dispatcher-->>ClientA: event: match_found
+    Dispatcher-->>ClientB: event: match_found
 
     alt 특정 유저 SSE 연결 없음
-        Listener->>Listener: 전송 스킵 및 로그 기록
+        Dispatcher->>Dispatcher: 전송 스킵 및 로그 기록
     else 이벤트 전송 실패
-        Listener->>Registry: 실패한 연결 제거
-        Listener->>Listener: 실패 로그 기록
+        Dispatcher->>Registry: 실패한 연결 제거
+        Dispatcher->>Dispatcher: 실패 로그 기록
     end
 ```
 
@@ -243,9 +246,11 @@ sequenceDiagram
 3. 매칭 엔진이 두 유저를 원자적으로 큐에서 제거합니다.
 4. `MatchFoundService`가 유저 상태와 매칭 세션을 Redis에 저장합니다.
 5. `MatchFoundEvent`가 발행됩니다.
-6. API 모듈의 이벤트 리스너가 이벤트를 받아 두 유저의 SSE 연결을 조회합니다.
-7. 연결이 살아 있으면 `match_found` 이벤트를 전송합니다.
-8. 연결이 없거나 전송에 실패하면 알림 실패만 로그로 남기고, 매칭 상태는 Redis 기준으로 유지합니다.
+6. API 모듈의 Pub/Sub publisher가 `notification:match_found` channel로 메시지를 발행합니다.
+7. 모든 API 인스턴스의 subscriber가 메시지를 수신합니다.
+8. 각 인스턴스는 자기 `SseConnectionRegistry`에서 두 유저의 SSE 연결을 조회합니다.
+9. 연결이 살아 있으면 `match_found` 이벤트를 전송합니다.
+10. 연결이 없거나 전송에 실패하면 알림 실패만 로그로 남기고, 매칭 상태는 Redis 기준으로 유지합니다.
 
 ### 멀티 인스턴스 한계
 
@@ -395,8 +400,9 @@ MatchFoundEvent 발생
   - `opponentUserId`
   - `acceptTimeoutSeconds`
   - `eventCreatedAt`
-- `MatchFoundEventListener`를 추가해 `MatchFoundEvent`를 구독합니다.
-- 이벤트 발생 시 `userA`, `userB` 각각의 SSE 연결을 조회하고, 연결이 있으면 `match_found` 이벤트를 전송합니다.
+- `MatchFoundPubSubPublishListener`를 추가해 `MatchFoundEvent`를 구독합니다.
+- 이벤트 발생 시 Redis Pub/Sub channel에 `match_found` 메시지를 publish합니다.
+- 각 API 인스턴스의 subscriber가 메시지를 수신한 뒤 `userA`, `userB` 각각의 SSE 연결을 조회하고, 연결이 있으면 `match_found` 이벤트를 전송합니다.
 - 대상 유저의 SSE 연결이 없으면 알림 전송만 스킵하고 매칭 상태는 Redis 세션 기준으로 유지합니다.
 - `SseNotificationSender`를 추가해 heartbeat와 match_found가 같은 전송 실패 처리 정책을 사용하도록 분리했습니다.
 - 전송 실패 시 실패 연결은 registry에서 제거하고 `completeWithError()`로 종료합니다.
@@ -577,7 +583,7 @@ eventSource.onerror = () => {
   - 재연결 시 기존 연결 종료 후 새 연결 교체
   - 현재 연결만 제거하고 오래된 연결 제거 요청은 무시
   - `onCompletion`, `onTimeout`, `onError` 콜백 실행 시 registry 제거
-- `MatchFoundEventListenerTest`를 보강했습니다.
+- `MatchFoundNotificationDispatcherTest`를 작성했습니다.
   - 두 유저 모두 연결된 경우 두 유저에게 `match_found` 전송
   - 한 유저만 연결된 경우 연결된 유저에게만 전송
   - 두 유저 모두 미연결이어도 예외 없이 종료
@@ -692,12 +698,12 @@ MVC SseEmitter가 10,000 연결에서 active connection, thread, heap, CPU, 이�
 
 #### 현재 로컬 이벤트 구조 한계 정리 결과
 
-현재 `match_found` 알림 흐름은 아래 구조입니다.
+기존 V1 로컬 전송 구조의 `match_found` 알림 흐름은 아래 구조였습니다.
 
 ```text
 MatchFoundService
 -> ApplicationEventPublisher.publishEvent(MatchFoundEvent)
--> 같은 JVM의 MatchFoundEventListener
+-> 같은 JVM의 로컬 직접 전송 리스너
 -> 같은 JVM의 SseConnectionRegistry 조회
 -> 연결이 있으면 SseEmitter.send(match_found)
 ```
@@ -712,9 +718,9 @@ MatchFoundService
 - `MatchFoundService`
   - 매칭 세션 저장 후 `ApplicationEventPublisher.publishEvent(new MatchFoundEvent(...))`를 호출합니다.
   - Spring `ApplicationEvent`는 현재 애플리케이션 컨텍스트 내부 이벤트입니다.
-  - 즉, 이벤트가 발생한 인스턴스의 JVM 안에서만 `MatchFoundEventListener`가 실행됩니다.
+  - 즉, 이벤트가 발생한 인스턴스의 JVM 안에서만 로컬 리스너가 실행됩니다.
 
-- `MatchFoundEventListener`
+- 기존 로컬 직접 전송 리스너
   - 이벤트를 받으면 자기 인스턴스의 `SseConnectionRegistry`만 조회합니다.
   - 대상 유저가 다른 인스턴스에 SSE 연결되어 있으면 현재 인스턴스 registry에는 없으므로 전송을 스킵합니다.
 
@@ -766,7 +772,7 @@ Netty/WebFlux로 전환해도 `SSE 연결 저장소 = 인스턴스 메모리`, `
 
 - [x] **match_found publish 구현**
   - `MatchFoundEvent` 발생 시 Redis Pub/Sub channel로 메시지 publish
-  - 기존 로컬 `MatchFoundEventListener`가 바로 SSE 전송하지 않도록 책임 재정리
+  - 기존 로컬 직접 전송 경로가 바로 SSE 전송하지 않도록 책임 재정리
   - publish 실패 시 매칭 상태는 Redis 세션 기준으로 유지하고 에러 로그만 남김
   - publish 성공/실패 메트릭 추가
 
@@ -786,20 +792,48 @@ Netty/WebFlux로 전환해도 `SSE 연결 저장소 = 인스턴스 메모리`, `
   - `sse_notification_pubsub_publish_failures_total{event="match_found"}`
 
 주의:
-- 이번 단계는 publish 구현까지만 완료했습니다.
-- 아직 subscribe가 구현되지 않았으므로, 현재 운영 흐름에서는 기존 로컬 `MatchFoundEventListener`도 같이 남아 있습니다.
-- 다음 `API 인스턴스별 subscribe 구현` 단계에서 SSE 전송 경로를 Pub/Sub 기반 단일 경로로 정리해야 이중 전송을 피할 수 있습니다.
+- publish 실패는 매칭 상태 자체를 되돌리지 않습니다.
+- 매칭 상태와 매칭 세션은 Redis에 이미 저장되어 있으므로, publish 실패는 알림 전파 실패로만 보고 로그와 메트릭으로 추적합니다.
+- subscribe 구현 이후 실제 SSE 전송은 Pub/Sub subscribe 경로로 단일화했고, 로컬 직접 전송 리스너는 제거했습니다.
 
-- [ ] **API 인스턴스별 subscribe 구현**
+- [x] **API 인스턴스별 subscribe 구현**
   - 모든 API 인스턴스가 `notification:match_found` channel subscribe
   - 메시지 수신 시 자기 인스턴스의 `SseConnectionRegistry`에서 `userA`, `userB` 연결 조회
   - 연결이 있는 유저에게만 `match_found` SSE 전송
   - 연결이 없는 유저는 정상 스킵으로 처리
 
-- [ ] **중복 전송 방지 정책 정리**
+#### API 인스턴스별 subscribe 구현 결과
+
+- `MatchNotificationPubSubConfig`를 추가했습니다.
+  - `RedisMessageListenerContainer`를 생성합니다.
+  - `notification:match_found` channel에 `MatchFoundPubSubSubscriber`를 등록합니다.
+  - 따라서 모든 API 인스턴스가 동일 channel을 구독합니다.
+- `MatchFoundPubSubSubscriber`를 추가했습니다.
+  - Redis Pub/Sub 메시지를 수신합니다.
+  - JSON payload를 `MatchFoundPubSubMessage`로 decode합니다.
+  - `MatchFoundNotificationDispatcher`에 전송 처리를 위임합니다.
+  - 메시지 처리 실패는 로그로 격리하고 listener thread 밖으로 예외를 전파하지 않습니다.
+- `MatchFoundNotificationDispatcher`를 추가했습니다.
+  - 현재 인스턴스의 `SseConnectionRegistry`에서 `userA`, `userB` 연결을 조회합니다.
+  - 연결이 있는 유저에게만 `match_found` SSE를 전송합니다.
+  - 연결이 없는 유저는 정상 스킵합니다.
+- 기존 로컬 직접 전송 리스너인 `MatchFoundEventListener`를 제거했습니다.
+  - 이제 전송 흐름은 `MatchFoundEvent -> Redis Pub/Sub publish -> 모든 인스턴스 subscribe -> 로컬 registry 조회 후 전송` 단일 경로입니다.
+  - 로컬 이벤트 직접 전송과 Pub/Sub 전송이 동시에 실행되어 중복 알림이 발생하는 문제를 방지합니다.
+
+- [x] **중복 전송 방지 정책 정리**
   - Pub/Sub 메시지는 모든 인스턴스가 받지만, 각 인스턴스는 자기 메모리에 존재하는 연결에만 전송
   - 같은 유저가 재연결하면 registry가 기존 연결을 교체하므로 동일 인스턴스 중복 연결은 방지됨
   - 로컬 이벤트 전송과 Pub/Sub 전송이 동시에 동작해 이중 전송되지 않도록 전송 경로를 하나로 고정
+
+#### 중복 전송 방지 정책 정리 결과
+
+- `MatchFoundEvent`는 더 이상 직접 SSE 전송을 수행하지 않습니다.
+- `MatchFoundPubSubPublishListener`는 `MatchFoundEvent`를 Redis Pub/Sub 메시지로 변환해 publish만 담당합니다.
+- 실제 SSE 전송은 각 API 인스턴스의 `MatchFoundPubSubSubscriber -> MatchFoundNotificationDispatcher` 경로에서만 수행합니다.
+- 모든 API 인스턴스가 같은 Pub/Sub 메시지를 받지만, 각 인스턴스는 자기 JVM 메모리의 `SseConnectionRegistry`에 존재하는 연결에만 전송합니다.
+- 따라서 `smite-api-1`에 붙은 유저는 `smite-api-1`에서만, `smite-api-2`에 붙은 유저는 `smite-api-2`에서만 알림을 받습니다.
+- 로컬 직접 전송 리스너를 제거했기 때문에 같은 인스턴스에서 Pub/Sub 전송과 로컬 전송이 동시에 실행되어 중복 알림이 발생하지 않습니다.
 
 - [ ] **관측 지표 보강**
   - Pub/Sub publish 성공/실패 수
