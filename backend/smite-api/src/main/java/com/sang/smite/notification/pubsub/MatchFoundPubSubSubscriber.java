@@ -1,5 +1,8 @@
 package com.sang.smite.notification.pubsub;
 
+import com.sang.smite.notification.constants.MatchNotificationEventName;
+import com.sang.smite.notification.metrics.SseNotificationMetricNames;
+import com.sang.smite.notification.metrics.SseNotificationMetrics;
 import com.sang.smite.notification.pubsub.dto.MatchFoundPubSubMessage;
 import com.sang.smite.notification.pubsub.util.MatchFoundPubSubMessageCodec;
 import com.sang.smite.notification.service.MatchFoundNotificationDispatcher;
@@ -22,16 +25,34 @@ public class MatchFoundPubSubSubscriber implements MessageListener {
 
     private final MatchFoundPubSubMessageCodec messageCodec;
     private final MatchFoundNotificationDispatcher dispatcher;
+    private final SseNotificationMetrics metrics;
 
     @Override
     public void onMessage(@NonNull Message message, byte[] pattern) {
         String payload = new String(message.getBody(), StandardCharsets.UTF_8);
+        metrics.incrementPubSubMessageReceived(MatchNotificationEventName.MATCH_FOUND);
+
+        MatchFoundPubSubMessage pubSubMessage;
 
         try {
-            MatchFoundPubSubMessage pubSubMessage = messageCodec.decode(payload);
+            pubSubMessage = messageCodec.decode(payload);
+        } catch (Exception e) {
+            metrics.incrementPubSubMessageFailure(
+                    MatchNotificationEventName.MATCH_FOUND,
+                    SseNotificationMetricNames.REASON_DECODE
+            );
+            log.error("[MatchNotification] match_found Pub/Sub 메시지 decode 실패. payload={}", payload, e);
+            return;
+        }
+
+        try {
             dispatcher.dispatch(pubSubMessage);
         } catch (Exception e) {
-            log.error("[MatchNotification] match_found Pub/Sub 메시지 처리 실패. payload={}", payload, e);
+            metrics.incrementPubSubMessageFailure(
+                    MatchNotificationEventName.MATCH_FOUND,
+                    SseNotificationMetricNames.REASON_DISPATCH
+            );
+            log.error("[MatchNotification] match_found Pub/Sub 메시지 dispatch 실패. payload={}", payload, e);
         }
     }
 }

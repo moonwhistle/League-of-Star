@@ -3,8 +3,10 @@ package com.sang.smite.notification.service;
 import com.sang.smite.notification.constants.MatchNotificationEventName;
 import com.sang.smite.notification.domain.SseConnection;
 import com.sang.smite.notification.dto.MatchFoundNotification;
+import com.sang.smite.notification.metrics.SseNotificationMetricNames;
 import com.sang.smite.notification.metrics.SseNotificationMetrics;
 import com.sang.smite.notification.pubsub.dto.MatchFoundPubSubMessage;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,9 +23,11 @@ import static org.mockito.Mockito.when;
 
 class MatchFoundNotificationDispatcherTest {
 
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+    private final SseNotificationMetrics metrics = new SseNotificationMetrics(meterRegistry);
     private final SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
     private final SseNotificationSender sender = mock(SseNotificationSender.class);
-    private final MatchFoundNotificationDispatcher dispatcher = new MatchFoundNotificationDispatcher(registry, sender);
+    private final MatchFoundNotificationDispatcher dispatcher = new MatchFoundNotificationDispatcher(registry, sender, metrics);
 
     @Test
     @DisplayName("연결된 두 유저에게 match_found 이벤트를 전송한다.")
@@ -41,6 +45,7 @@ class MatchFoundNotificationDispatcherTest {
         // then
         verify(sender).send(eq(userAConnection), eq(MatchNotificationEventName.MATCH_FOUND), any(MatchFoundNotification.class));
         verify(sender).send(eq(userBConnection), eq(MatchNotificationEventName.MATCH_FOUND), any(MatchFoundNotification.class));
+        assertThatCounter(SseNotificationMetricNames.MATCH_FOUND_DISPATCH_LOCAL_HITS, 2.0);
     }
 
     @Test
@@ -64,6 +69,8 @@ class MatchFoundNotificationDispatcherTest {
         assertThat(notification.opponentUserId()).isEqualTo(2L);
         assertThat(notification.acceptTimeoutSeconds()).isEqualTo(10);
         assertThat(notification.eventCreatedAt()).isEqualTo(Instant.parse("2026-05-07T00:00:00Z"));
+        assertThatCounter(SseNotificationMetricNames.MATCH_FOUND_DISPATCH_LOCAL_HITS, 1.0);
+        assertThatCounter(SseNotificationMetricNames.MATCH_FOUND_DISPATCH_LOCAL_MISSES, 1.0);
     }
 
     @Test
@@ -72,6 +79,7 @@ class MatchFoundNotificationDispatcherTest {
         dispatcher.dispatch(message());
 
         assertThat(registry.count()).isZero();
+        assertThatCounter(SseNotificationMetricNames.MATCH_FOUND_DISPATCH_LOCAL_MISSES, 2.0);
     }
 
     private MatchFoundPubSubMessage message() {
@@ -82,5 +90,9 @@ class MatchFoundNotificationDispatcherTest {
                 10,
                 Instant.parse("2026-05-07T00:00:00Z")
         );
+    }
+
+    private void assertThatCounter(String metricName, double expected) {
+        assertThat(meterRegistry.get(metricName).counter().count()).isEqualTo(expected);
     }
 }

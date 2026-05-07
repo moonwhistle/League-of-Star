@@ -2,6 +2,7 @@ package com.sang.smite.notification.service;
 
 import com.sang.smite.notification.constants.MatchNotificationEventName;
 import com.sang.smite.notification.dto.MatchFoundNotification;
+import com.sang.smite.notification.metrics.SseNotificationMetrics;
 import com.sang.smite.notification.pubsub.dto.MatchFoundPubSubMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,30 +18,33 @@ public class MatchFoundNotificationDispatcher {
 
     private final SseConnectionRegistry sseConnectionRegistry;
     private final SseNotificationSender sseNotificationSender;
+    private final SseNotificationMetrics sseNotificationMetrics;
 
     public void dispatch(MatchFoundPubSubMessage message) {
         sendMatchFound(
                 message.userA(),
                 message.userB(),
-                new MatchFoundNotification(
-                        message.matchId(),
-                        message.userA(),
-                        message.userB(),
-                        message.acceptTimeoutSeconds(),
-                        message.eventCreatedAt()
-                )
+                createNotification(message, message.userA(), message.userB())
         );
 
         sendMatchFound(
                 message.userB(),
                 message.userA(),
-                new MatchFoundNotification(
-                        message.matchId(),
-                        message.userB(),
-                        message.userA(),
-                        message.acceptTimeoutSeconds(),
-                        message.eventCreatedAt()
-                )
+                createNotification(message, message.userB(), message.userA())
+        );
+    }
+
+    private MatchFoundNotification createNotification(
+            MatchFoundPubSubMessage message,
+            Long userId,
+            Long opponentUserId
+    ) {
+        return new MatchFoundNotification(
+                message.matchId(),
+                userId,
+                opponentUserId,
+                message.acceptTimeoutSeconds(),
+                message.eventCreatedAt()
         );
     }
 
@@ -48,6 +52,7 @@ public class MatchFoundNotificationDispatcher {
         sseConnectionRegistry.findByUserId(targetUserId)
                 .ifPresentOrElse(
                         connection -> {
+                            sseNotificationMetrics.incrementMatchFoundDispatchLocalHit();
                             boolean sent = sseNotificationSender.send(
                                     connection,
                                     MatchNotificationEventName.MATCH_FOUND,
@@ -59,8 +64,11 @@ public class MatchFoundNotificationDispatcher {
                                         targetUserId, opponentUserId, notification.matchId());
                             }
                         },
-                        () -> log.info("[MatchNotification] 현재 인스턴스에 SSE 연결이 없어 match_found 전송을 스킵합니다. userId={}, matchId={}",
-                                targetUserId, notification.matchId())
+                        () -> {
+                            sseNotificationMetrics.incrementMatchFoundDispatchLocalMiss();
+                            log.info("[MatchNotification] 현재 인스턴스에 SSE 연결이 없어 match_found 전송을 스킵합니다. userId={}, matchId={}",
+                                    targetUserId, notification.matchId());
+                        }
                 );
     }
 }

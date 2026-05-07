@@ -173,11 +173,92 @@
       "fieldConfig": { "defaults": { "unit": "ms", "min": 0 } }
     },
     {
+      "id": 24,
+      "title": "Redis Pub/Sub 전파",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
+    },
+    {
+      "id": 20,
+      "title": "Pub/Sub publish 성공/실패",
+      "description": "MatchFoundEvent가 Redis Pub/Sub channel로 정상 발행되는지 확인합니다. 실패가 증가하면 매칭은 됐지만 알림 전파 시작에 실패한 상태입니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum(rate(sse_notification_pubsub_publish_success_total{event=\"match_found\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "publish success",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(sse_notification_pubsub_publish_failures_total{event=\"match_found\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "publish failure",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
+    },
+    {
+      "id": 21,
+      "title": "인스턴스별 Pub/Sub 수신 수",
+      "description": "모든 API 인스턴스가 notification:match_found 메시지를 받고 있는지 확인합니다. 특정 인스턴스만 0이면 subscribe 또는 Redis 연결 문제입니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum by (instance) (rate(sse_notification_pubsub_messages_received_total{event=\"match_found\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
+    },
+    {
+      "id": 22,
+      "title": "Pub/Sub 처리 실패",
+      "description": "decode 실패와 dispatch 실패를 분리해서 봅니다. 정상 부하 테스트에서는 0이어야 합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(sse_notification_pubsub_messages_failures_total{event=\"match_found\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
+    },
+    {
+      "id": 23,
+      "title": "로컬 연결 조회 hit/miss",
+      "description": "Pub/Sub 메시지를 받은 뒤 현재 인스턴스에 대상 유저 SSE 연결이 있는지 확인합니다. 멀티 인스턴스에서는 miss도 정상이며, 전체 hit는 실제 전송 대상 수와 맞아야 합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "expr": "sum(rate(sse_notification_match_found_dispatch_local_hits_total{instance=~\"$instance\"}[1m]))",
+          "legendFormat": "local hit",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(sse_notification_match_found_dispatch_local_misses_total{instance=~\"$instance\"}[1m]))",
+          "legendFormat": "local miss",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
+    },
+    {
       "id": 9,
       "title": "리소스",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 29 }
     },
     {
       "id": 10,
@@ -185,7 +266,7 @@
       "description": "MVC SseEmitter는 장기 연결에서 Thread 사용량이 중요합니다. Netty 전환 판단의 핵심 지표입니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 15 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 30 },
       "targets": [
         {
           "expr": "jvm_threads_live_threads{instance=~\"$instance\"}",
@@ -206,7 +287,7 @@
       "description": "SSE 연결 수 증가에 따른 heap 증가량을 확인합니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 15 },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 30 },
       "targets": [
         {
           "expr": "sum by (instance) (jvm_memory_used_bytes{area=\"heap\", instance=~\"$instance\"})",
@@ -222,7 +303,7 @@
       "description": "SSE 연결 유지와 heartbeat 전송이 CPU를 얼마나 쓰는지 확인합니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 15 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 30 },
       "targets": [
         {
           "expr": "process_cpu_usage{instance=~\"$instance\"} * 100",
@@ -243,7 +324,7 @@
       "description": "SSE 연결 유지 중 runnable, waiting, timed-waiting 스레드가 어떻게 변하는지 확인합니다. MVC와 Netty 비교에서 Thread 사용 패턴을 보는 핵심 패널입니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 37 },
       "targets": [
         {
           "expr": "sum by (instance, state) (jvm_threads_states_threads{instance=~\"$instance\"})",
@@ -259,7 +340,7 @@
       "description": "SSE 연결이 실제로 얼마나 유지됐는지 확인합니다. 짧은 종료가 많으면 클라이언트, 프록시, 서버 timeout을 확인합니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 29 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 44 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum by (le) (rate(sse_notification_connection_duration_seconds_bucket{instance=~\"$instance\"}[5m])))",
@@ -280,7 +361,7 @@
       "description": "매칭 성사 알림이 특정 인스턴스에 쏠리는지 확인합니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 29 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 44 },
       "targets": [
         {
           "expr": "sum by (instance) (rate(sse_notification_events_send_success_total{event=\"match_found\", instance=~\"$instance\"}[1m]))",
@@ -296,7 +377,7 @@
       "description": "JOIN_TPS=50 기준 기대 match_found 전송량은 약 50 events/s입니다. 1페어가 2명에게 전송되므로 pair/s가 아니라 user event/s로 봅니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 36 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 51 },
       "targets": [
         {
           "expr": "sum(rate(sse_notification_events_send_success_total{event=\"match_found\", instance=~\"$instance\"}[1m]))",
@@ -317,7 +398,7 @@
       "description": "busy / current 비율입니다. 이 값이 장시간 80~90% 이상이면 MVC/Tomcat thread 병목을 의심합니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 36 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 51 },
       "targets": [
         {
           "expr": "tomcat_threads_busy{instance=~\"$instance\"} / clamp_min(tomcat_threads_current{instance=~\"$instance\"}, 1) * 100",
@@ -333,7 +414,7 @@
       "description": "MVC SseEmitter 환경에서 Tomcat worker thread의 현재 수와 busy 수를 확인합니다. Netty 전환 후에는 비교 공통 지표가 아니라 MVC 병목 진단용으로 봅니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 43 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 58 },
       "targets": [
         {
           "expr": "tomcat_threads_current{instance=~\"$instance\"}",
@@ -354,7 +435,7 @@
       "description": "MVC/Tomcat이 보유한 현재 연결 수입니다. SSE 활성 연결 수와 함께 보며, Netty 전환 시에는 별도 Netty connection 지표로 대체합니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 43 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 58 },
       "targets": [
         {
           "expr": "tomcat_connections_current{instance=~\"$instance\"}",

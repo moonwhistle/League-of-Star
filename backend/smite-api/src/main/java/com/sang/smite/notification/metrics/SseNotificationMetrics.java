@@ -75,7 +75,7 @@ public class SseNotificationMetrics {
                 SseNotificationMetricNames.TAG_EVENT,
                 eventName
         ).increment();
-        recordSendDuration(eventName, "success", sample);
+        recordSendDuration(eventName, SseNotificationMetricNames.RESULT_SUCCESS, sample);
     }
 
     public void recordSendFailure(String eventName, Timer.Sample sample) {
@@ -84,7 +84,7 @@ public class SseNotificationMetrics {
                 SseNotificationMetricNames.TAG_EVENT,
                 eventName
         ).increment();
-        recordSendDuration(eventName, "failure", sample);
+        recordSendDuration(eventName, SseNotificationMetricNames.RESULT_FAILURE, sample);
     }
 
     public void incrementPubSubPublishSuccess(String eventName) {
@@ -103,10 +103,36 @@ public class SseNotificationMetrics {
         ).increment();
     }
 
+    public void incrementPubSubMessageReceived(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.PUBSUB_MESSAGES_RECEIVED,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
+    public void incrementPubSubMessageFailure(String eventName, String reason) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.PUBSUB_MESSAGES_FAILURES,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName,
+                SseNotificationMetricNames.TAG_REASON,
+                reason
+        ).increment();
+    }
+
+    public void incrementMatchFoundDispatchLocalHit() {
+        meterRegistry.counter(SseNotificationMetricNames.MATCH_FOUND_DISPATCH_LOCAL_HITS).increment();
+    }
+
+    public void incrementMatchFoundDispatchLocalMiss() {
+        meterRegistry.counter(SseNotificationMetricNames.MATCH_FOUND_DISPATCH_LOCAL_MISSES).increment();
+    }
+
     private void recordSendDuration(String eventName, String result, Timer.Sample sample) {
         sample.stop(Timer.builder(SseNotificationMetricNames.EVENT_SEND_DURATION)
                 .tag(SseNotificationMetricNames.TAG_EVENT, eventName)
-                .tag("result", result)
+                .tag(SseNotificationMetricNames.TAG_RESULT, result)
                 .publishPercentileHistogram()
                 .register(meterRegistry));
     }

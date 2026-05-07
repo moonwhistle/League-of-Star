@@ -7,14 +7,23 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class MatchFoundPubSubPublishListenerTest {
 
+    private static final Instant EVENT_CREATED_AT = Instant.parse("2026-05-07T00:00:00Z");
+
     private final MatchFoundPubSubPublisher publisher = mock(MatchFoundPubSubPublisher.class);
-    private final MatchFoundPubSubPublishListener listener = new MatchFoundPubSubPublishListener(publisher);
+    private final MatchFoundPubSubPublishListener listener = new MatchFoundPubSubPublishListener(
+            publisher,
+            Clock.fixed(EVENT_CREATED_AT, ZoneOffset.UTC)
+    );
 
     @Test
     @DisplayName("MatchFoundEvent를 Pub/Sub 메시지로 변환해 publish한다.")
@@ -34,6 +43,6 @@ class MatchFoundPubSubPublishListenerTest {
         assertThat(message.userA()).isEqualTo(1L);
         assertThat(message.userB()).isEqualTo(2L);
         assertThat(message.acceptTimeoutSeconds()).isEqualTo(10);
-        assertThat(message.eventCreatedAt()).isNotNull();
+        assertThat(message.eventCreatedAt()).isEqualTo(EVENT_CREATED_AT);
     }
 }

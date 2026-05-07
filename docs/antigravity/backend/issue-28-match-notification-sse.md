@@ -835,18 +835,60 @@ Netty/WebFlux로 전환해도 `SSE 연결 저장소 = 인스턴스 메모리`, `
 - 따라서 `smite-api-1`에 붙은 유저는 `smite-api-1`에서만, `smite-api-2`에 붙은 유저는 `smite-api-2`에서만 알림을 받습니다.
 - 로컬 직접 전송 리스너를 제거했기 때문에 같은 인스턴스에서 Pub/Sub 전송과 로컬 전송이 동시에 실행되어 중복 알림이 발생하지 않습니다.
 
-- [ ] **관측 지표 보강**
+- [x] **관측 지표 보강**
   - Pub/Sub publish 성공/실패 수
   - Pub/Sub subscribe 수신 수
   - 연결 없음으로 인한 `match_found` 스킵 수
   - 인스턴스별 `match_found` 전송 성공 수
   - 인스턴스별 활성 SSE 연결 수와 `match_found` 전송 수를 함께 볼 수 있도록 Grafana 패널 보강
 
-- [ ] **테스트 코드 작성**
+#### 관측 지표 보강 결과
+
+- Pub/Sub publish 지표를 유지했습니다.
+  - `sse_notification_pubsub_publish_success_total{event="match_found"}`
+  - `sse_notification_pubsub_publish_failures_total{event="match_found"}`
+- Pub/Sub subscribe 지표를 추가했습니다.
+  - `sse_notification_pubsub_messages_received_total{event="match_found"}`
+  - `sse_notification_pubsub_messages_failures_total{event="match_found", reason="decode|dispatch"}`
+- 현재 인스턴스의 로컬 SSE 연결 조회 결과를 분리했습니다.
+  - `sse_notification_match_found_dispatch_local_hits_total`
+  - `sse_notification_match_found_dispatch_local_misses_total`
+- `local_miss`는 멀티 인스턴스 구조에서 정상적으로 발생할 수 있습니다.
+  - 모든 API 인스턴스가 같은 Pub/Sub 메시지를 받기 때문입니다.
+  - 어떤 유저의 SSE 연결은 한 인스턴스에만 있으므로, 다른 인스턴스에서는 miss가 됩니다.
+  - 따라서 실패 판단은 miss 단독이 아니라 `publish 성공`, `인스턴스별 subscribe 수신`, `local hit`, `match_found send success`를 함께 봐야 합니다.
+- Grafana SSE 대시보드에 `Redis Pub/Sub 전파` 섹션을 추가했습니다.
+  - Pub/Sub publish 성공/실패
+  - 인스턴스별 Pub/Sub 수신 수
+  - Pub/Sub 처리 실패
+  - 로컬 연결 조회 hit/miss
+
+- [x] **테스트 코드 작성**
   - publish payload 생성 테스트
   - subscribe 메시지 수신 시 연결된 유저에게만 전송되는지 테스트
   - 연결 없는 유저는 예외 없이 스킵되는지 테스트
   - 로컬 이벤트와 Pub/Sub 경로가 중복 전송하지 않는지 테스트
+
+#### 테스트 코드 작성 결과
+
+- `MatchFoundPubSubMessageTest`
+  - `MatchFoundEvent`에서 Pub/Sub 메시지를 생성하는 payload 변환을 검증합니다.
+- `MatchFoundPubSubPublisherTest`
+  - Redis Pub/Sub channel publish 호출을 검증합니다.
+  - publish 실패가 외부로 전파되지 않고 실패 메트릭으로 격리되는지 검증합니다.
+- `MatchFoundPubSubSubscriberTest`
+  - Pub/Sub 메시지 수신 후 decode와 dispatcher 위임을 검증합니다.
+  - decode 실패와 dispatch 실패가 listener 밖으로 전파되지 않고 실패 메트릭으로 기록되는지 검증합니다.
+- `MatchFoundNotificationDispatcherTest`
+  - 두 유저 모두 현재 인스턴스에 연결된 경우 두 유저에게 전송되는지 검증합니다.
+  - 한 유저만 연결된 경우 연결된 유저에게만 전송되는지 검증합니다.
+  - 두 유저 모두 미연결이어도 예외 없이 종료되는지 검증합니다.
+  - 로컬 연결 조회 hit/miss 메트릭이 증가하는지 검증합니다.
+- `MatchNotificationPubSubConfigTest`
+  - `notification:match_found` channel을 구독하는 Redis listener container 생성을 검증합니다.
+- `SseNotificationMetricsTest`
+  - Pub/Sub publish, subscribe, dispatch hit/miss 메트릭 기록을 검증합니다.
+- 로컬 직접 전송 리스너를 제거했기 때문에 `MatchFoundEvent`가 직접 SSE 전송과 Pub/Sub 전송을 동시에 수행하지 않습니다.
 
 - [ ] **부하 테스트 재실행**
   - 2대 API 인스턴스 기준 `MODE=match`, `CONNECTIONS=10000`, `JOIN_TPS=50` 재실행

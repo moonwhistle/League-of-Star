@@ -1,8 +1,8 @@
 package com.sang.smite.notification.listener;
 
 import com.sang.smite.domain.match.event.MatchFoundEvent;
-import com.sang.smite.notification.pubsub.dto.MatchFoundPubSubMessage;
 import com.sang.smite.notification.pubsub.MatchFoundPubSubPublisher;
+import com.sang.smite.notification.pubsub.dto.MatchFoundPubSubMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,7 @@ import java.time.Instant;
 public class MatchFoundPubSubPublishListener {
 
     private final MatchFoundPubSubPublisher publisher;
-    private final Clock clock = Clock.systemUTC();
+    private final Clock clock;
 
     @EventListener
     public void handle(MatchFoundEvent event) {

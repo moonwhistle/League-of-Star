@@ -42,9 +42,26 @@ public final class SseNotificationMetricNames {
     /** Pub/Sub publish 실패 횟수 (Counter) -> sse_notification_pubsub_publish_failures_total */
     public static final String PUBSUB_PUBLISH_FAILURES = "sse.notification.pubsub.publish.failures";
 
+    /** Pub/Sub 메시지 수신 횟수 (Counter) -> sse_notification_pubsub_messages_received_total */
+    public static final String PUBSUB_MESSAGES_RECEIVED = "sse.notification.pubsub.messages.received";
+
+    /** Pub/Sub 메시지 처리 실패 횟수 (Counter) -> sse_notification_pubsub_messages_failures_total */
+    public static final String PUBSUB_MESSAGES_FAILURES = "sse.notification.pubsub.messages.failures";
+
+    /** match_found 메시지 대상 유저가 현재 인스턴스에 연결되어 있던 횟수 (Counter) -> sse_notification_match_found_dispatch_local_hits_total */
+    public static final String MATCH_FOUND_DISPATCH_LOCAL_HITS = "sse.notification.match_found.dispatch.local.hits";
+
+    /** match_found 메시지 대상 유저가 현재 인스턴스에 연결되어 있지 않던 횟수 (Counter) -> sse_notification_match_found_dispatch_local_misses_total */
+    public static final String MATCH_FOUND_DISPATCH_LOCAL_MISSES = "sse.notification.match_found.dispatch.local.misses";
+
     public static final String TAG_EVENT = "event";
     public static final String TAG_REASON = "reason";
+    public static final String TAG_RESULT = "result";
 
+    public static final String RESULT_SUCCESS = "success";
+    public static final String RESULT_FAILURE = "failure";
+    public static final String REASON_DECODE = "decode";
+    public static final String REASON_DISPATCH = "dispatch";
     public static final String REASON_COMPLETION = "completion";
     public static final String REASON_TIMEOUT = "timeout";
     public static final String REASON_ERROR = "error";
