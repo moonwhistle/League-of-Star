@@ -4,6 +4,7 @@ import com.sang.smite.common.path.match.MatchPath;
 import com.sang.smite.global.resolver.annotation.AuthUser;
 import com.sang.smite.global.restdocs.RestDocsSupport;
 import com.sang.smite.match.service.MatchQueueService;
+import com.sang.smite.match.service.MatchResponseService;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,10 +24,11 @@ import static org.mockito.Mockito.mock;
 class MatchControllerRestDocsTest extends RestDocsSupport {
 
     private final MatchQueueService matchQueueService = mock(MatchQueueService.class);
+    private final MatchResponseService matchResponseService = mock(MatchResponseService.class);
 
     @Override
     protected Object initController() {
-        return new MatchController(matchQueueService);
+        return new MatchController(matchQueueService, matchResponseService);
     }
 
     @Override

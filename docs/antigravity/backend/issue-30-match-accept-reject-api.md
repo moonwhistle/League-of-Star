@@ -149,18 +149,30 @@ timeout 정책:
 
 ### 4. API 모듈 Controller 구현
 
-- [ ] `MatchController`에 수락 API 추가
+- [x] `MatchController`에 수락 API 추가
   - `@PostMapping(MatchPath.ACCEPT)`
   - `@AuthUser Long userId`
   - `@PathVariable String matchId`
-- [ ] `MatchController`에 거절 API 추가
+- [x] `MatchController`에 거절 API 추가
   - `@PostMapping(MatchPath.REJECT)`
   - `@AuthUser Long userId`
   - `@PathVariable String matchId`
-- [ ] Controller는 인증 유저와 matchId만 받고 서비스에 위임
-- [ ] 응답은 우선 `200 OK` 또는 `204 No Content` 중 기존 스타일에 맞춰 결정
+- [x] Controller는 인증 유저와 matchId만 받고 서비스에 위임
+- [x] 응답은 우선 `200 OK` 또는 `204 No Content` 중 기존 스타일에 맞춰 결정
   - 현재 `join`, `leave`는 `200 OK` 사용
   - 이번 API도 일관성을 위해 `200 OK` 우선 검토
+
+#### 구현 결과
+
+- `MatchController`에 수락/거절 endpoint를 추가했습니다.
+  - `POST /api/v1/match/{matchId}/accept`
+  - `POST /api/v1/match/{matchId}/reject`
+- 컨트롤러는 `@AuthUser Long userId`와 `@PathVariable String matchId`만 받아 API 서비스에 위임합니다.
+- 기존 `join`, `leave`와 일관성을 맞춰 성공 응답은 `200 OK`로 결정했습니다.
+- 컴파일을 위해 API 레이어 위임 서비스인 `MatchResponseService`를 추가했습니다.
+  - 실제 세션 상태 변경, `matchId` 기준 Redis lock, timeout 처리는 후속 task에서 구현합니다.
+  - 현재 서비스 메서드는 비즈니스 로직 미구현 상태를 명확히 드러내도록 `UnsupportedOperationException`을 던집니다.
+- `MatchControllerTest`를 추가해 accept/reject 요청이 서비스로 위임되는지 검증했습니다.
 
 ### 5. API 모듈 Service 분리
 
