@@ -685,12 +685,56 @@ MVC SseEmitter가 10,000 연결에서 active connection, thread, heap, CPU, 이�
 유지하지 못하면 WebFlux/Netty로 전환하고, 같은 `sse_notification_*` 지표로 개선 폭을 비교합니다.
 
 ### 10. 멀티 인스턴스 match_found 전파 구조 보강
-- [ ] **현재 로컬 이벤트 구조 한계 정리**
+- [x] **현재 로컬 이벤트 구조 한계 정리**
   - `SseConnectionRegistry`가 인스턴스별 메모리에 존재한다는 점 명시
   - Spring `ApplicationEvent`가 같은 JVM 안에서만 전달된다는 점 명시
   - 2대 API 인스턴스 부하 테스트에서 한쪽 인스턴스 연결 유저에게 알림이 누락될 수 있음을 정리
 
-- [ ] **Redis Pub/Sub 메시지 모델 정의**
+#### 현재 로컬 이벤트 구조 한계 정리 결과
+
+현재 `match_found` 알림 흐름은 아래 구조입니다.
+
+```text
+MatchFoundService
+-> ApplicationEventPublisher.publishEvent(MatchFoundEvent)
+-> 같은 JVM의 MatchFoundEventListener
+-> 같은 JVM의 SseConnectionRegistry 조회
+-> 연결이 있으면 SseEmitter.send(match_found)
+```
+
+코드 기준으로 보면 한계는 명확합니다.
+
+- `SseConnectionRegistry`
+  - `ConcurrentHashMap<Long, SseConnection>`으로 유저별 SSE 연결을 저장합니다.
+  - 이 map은 Redis가 아니라 각 API 인스턴스의 JVM 메모리에만 존재합니다.
+  - 따라서 `smite-api-1`에 연결된 유저는 `smite-api-1`만 전송할 수 있고, `smite-api-2`에서는 해당 연결을 알 수 없습니다.
+
+- `MatchFoundService`
+  - 매칭 세션 저장 후 `ApplicationEventPublisher.publishEvent(new MatchFoundEvent(...))`를 호출합니다.
+  - Spring `ApplicationEvent`는 현재 애플리케이션 컨텍스트 내부 이벤트입니다.
+  - 즉, 이벤트가 발생한 인스턴스의 JVM 안에서만 `MatchFoundEventListener`가 실행됩니다.
+
+- `MatchFoundEventListener`
+  - 이벤트를 받으면 자기 인스턴스의 `SseConnectionRegistry`만 조회합니다.
+  - 대상 유저가 다른 인스턴스에 SSE 연결되어 있으면 현재 인스턴스 registry에는 없으므로 전송을 스킵합니다.
+
+2대 인스턴스 테스트에서 확인된 현상은 다음과 같습니다.
+
+```text
+SSE 연결 10,000명
+-> smite-api-1 약 5,000명
+-> smite-api-2 약 5,000명
+
+매칭 엔진 실행 인스턴스에서 MatchFoundEvent 발생
+-> 해당 인스턴스 registry에 있는 유저에게만 match_found 전송
+-> 다른 인스턴스 registry에 있는 유저는 전송 대상에서 누락
+```
+
+따라서 현재 한계는 **MVC SseEmitter 성능 한계가 아니라 멀티 인스턴스 이벤트 전파 한계**입니다.
+
+Netty/WebFlux로 전환해도 `SSE 연결 저장소 = 인스턴스 메모리`, `이벤트 = 로컬 JVM 이벤트` 구조가 그대로라면 동일한 문제가 발생합니다. 다음 작업은 SSE 구현체 전환이 아니라 Redis Pub/Sub 기반으로 `match_found` 이벤트를 모든 API 인스턴스에 전파하는 것입니다.
+
+- [x] **Redis Pub/Sub 메시지 모델 정의**
   - channel 이름 상수화
     - 예: `notification:match_found`
   - publish payload 정의
@@ -698,15 +742,53 @@ MVC SseEmitter가 10,000 연결에서 active connection, thread, heap, CPU, 이�
     - `userA`
     - `userB`
     - `acceptTimeoutSeconds`
-    - `eventCreatedAt`
+  - `eventCreatedAt`
   - JSON 직렬화/역직렬화 방식 결정
   - 메시지 DTO는 API notification 패키지에 둘지, core 이벤트 모델과 분리할지 결정
 
-- [ ] **match_found publish 구현**
+#### Redis Pub/Sub 메시지 모델 정의 결과
+
+- channel 이름은 `notification:match_found`로 정의했습니다.
+- Pub/Sub 메시지는 SSE payload와 분리했습니다.
+  - Pub/Sub 메시지: 매칭 1건을 표현하는 pair-level 메시지
+  - SSE payload: 각 유저에게 전달하는 user-level 메시지
+- Pub/Sub 메시지 필드는 다음과 같습니다.
+  - `matchId`
+  - `userA`
+  - `userB`
+  - `acceptTimeoutSeconds`
+  - `eventCreatedAt`
+- 메시지 모델은 API 모듈의 `notification.pubsub` 패키지에 둡니다.
+  - 이유: Redis Pub/Sub은 API 인스턴스 간 SSE 알림 전파를 위한 애플리케이션 알림 인프라이며, core 도메인 이벤트와는 역할이 다릅니다.
+  - core의 `MatchFoundEvent`는 매칭 성사 도메인 이벤트로 유지합니다.
+  - Pub/Sub 메시지는 해당 이벤트를 인스턴스 간 전달하기 위한 전송 모델로 사용합니다.
+- JSON 직렬화/역직렬화는 Spring Boot가 제공하는 `ObjectMapper`를 사용하는 `MatchFoundPubSubMessageCodec`으로 캡슐화했습니다.
+
+- [x] **match_found publish 구현**
   - `MatchFoundEvent` 발생 시 Redis Pub/Sub channel로 메시지 publish
   - 기존 로컬 `MatchFoundEventListener`가 바로 SSE 전송하지 않도록 책임 재정리
   - publish 실패 시 매칭 상태는 Redis 세션 기준으로 유지하고 에러 로그만 남김
   - publish 성공/실패 메트릭 추가
+
+#### match_found publish 구현 결과
+
+- `MatchFoundPubSubPublisher`를 추가했습니다.
+  - `StringRedisTemplate.convertAndSend()`로 `notification:match_found` channel에 JSON payload를 publish합니다.
+  - payload 직렬화는 `MatchFoundPubSubMessageCodec`을 사용합니다.
+- `MatchFoundPubSubPublishListener`를 추가했습니다.
+  - 로컬 `MatchFoundEvent`를 수신합니다.
+  - `MatchFoundPubSubMessage`로 변환합니다.
+  - Redis Pub/Sub channel로 publish합니다.
+- publish 실패는 예외를 밖으로 던지지 않고 로그와 메트릭으로 격리합니다.
+  - 매칭 상태와 매칭 세션은 이미 Redis에 저장되어 있으므로 publish 실패가 매칭 상태 자체를 되돌리지는 않습니다.
+- publish 성공/실패 메트릭을 추가했습니다.
+  - `sse_notification_pubsub_publish_success_total{event="match_found"}`
+  - `sse_notification_pubsub_publish_failures_total{event="match_found"}`
+
+주의:
+- 이번 단계는 publish 구현까지만 완료했습니다.
+- 아직 subscribe가 구현되지 않았으므로, 현재 운영 흐름에서는 기존 로컬 `MatchFoundEventListener`도 같이 남아 있습니다.
+- 다음 `API 인스턴스별 subscribe 구현` 단계에서 SSE 전송 경로를 Pub/Sub 기반 단일 경로로 정리해야 이중 전송을 피할 수 있습니다.
 
 - [ ] **API 인스턴스별 subscribe 구현**
   - 모든 API 인스턴스가 `notification:match_found` channel subscribe

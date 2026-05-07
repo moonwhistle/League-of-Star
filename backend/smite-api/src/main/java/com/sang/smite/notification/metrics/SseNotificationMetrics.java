@@ -87,6 +87,22 @@ public class SseNotificationMetrics {
         recordSendDuration(eventName, "failure", sample);
     }
 
+    public void incrementPubSubPublishSuccess(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.PUBSUB_PUBLISH_SUCCESS,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
+    public void incrementPubSubPublishFailure(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.PUBSUB_PUBLISH_FAILURES,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
     private void recordSendDuration(String eventName, String result, Timer.Sample sample) {
         sample.stop(Timer.builder(SseNotificationMetricNames.EVENT_SEND_DURATION)
                 .tag(SseNotificationMetricNames.TAG_EVENT, eventName)

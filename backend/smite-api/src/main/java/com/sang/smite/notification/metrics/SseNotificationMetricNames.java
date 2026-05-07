@@ -36,6 +36,12 @@ public final class SseNotificationMetricNames {
     /** SSE 이벤트 전송 소요 시간 (Timer) -> sse_notification_event_send_duration_seconds */
     public static final String EVENT_SEND_DURATION = "sse.notification.event.send.duration";
 
+    /** Pub/Sub publish 성공 횟수 (Counter) -> sse_notification_pubsub_publish_success_total */
+    public static final String PUBSUB_PUBLISH_SUCCESS = "sse.notification.pubsub.publish.success";
+
+    /** Pub/Sub publish 실패 횟수 (Counter) -> sse_notification_pubsub_publish_failures_total */
+    public static final String PUBSUB_PUBLISH_FAILURES = "sse.notification.pubsub.publish.failures";
+
     public static final String TAG_EVENT = "event";
     public static final String TAG_REASON = "reason";
 
