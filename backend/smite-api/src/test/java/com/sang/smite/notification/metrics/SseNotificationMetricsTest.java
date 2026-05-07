@@ -76,4 +76,23 @@ class SseNotificationMetricsTest {
         assertThat(successTimer.count()).isEqualTo(1);
         assertThat(failureTimer.count()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("Pub/Sub publish 성공/실패 카운터를 증가시킨다.")
+    void incrementPubSubPublishCounters() {
+        // when
+        metrics.incrementPubSubPublishSuccess("match_found");
+        metrics.incrementPubSubPublishFailure("match_found");
+
+        // then
+        Counter success = meterRegistry.get(SseNotificationMetricNames.PUBSUB_PUBLISH_SUCCESS)
+                .tag(SseNotificationMetricNames.TAG_EVENT, "match_found")
+                .counter();
+        Counter failure = meterRegistry.get(SseNotificationMetricNames.PUBSUB_PUBLISH_FAILURES)
+                .tag(SseNotificationMetricNames.TAG_EVENT, "match_found")
+                .counter();
+
+        assertThat(success.count()).isEqualTo(1.0);
+        assertThat(failure.count()).isEqualTo(1.0);
+    }
 }
