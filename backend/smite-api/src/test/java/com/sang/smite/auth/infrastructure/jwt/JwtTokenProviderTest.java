@@ -1,5 +1,8 @@
 package com.sang.smite.auth.infrastructure.jwt;
 
+import com.sang.smite.auth.security.dto.AuthenticatedUser;
+import com.sang.smite.common.exception.ApiException;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,9 +55,12 @@ class JwtTokenProviderTest {
         Authentication authentication = jwtTokenProvider.getAuthentication(token);
 
         // then
-        assertThat(authentication.getName()).isEqualTo(email);
+        assertThat(authentication.getPrincipal()).isInstanceOf(AuthenticatedUser.class);
+        AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
+        assertThat(principal.userId()).isEqualTo(userId);
+        assertThat(principal.email()).isEqualTo(email);
+        assertThat(authentication.getName()).isEqualTo(email); // getName()도 email을 반환해야 함
         assertThat(authentication.getAuthorities()).hasSize(1);
-        assertThat(authentication.getAuthorities().iterator().next().getAuthority()).isEqualTo("ROLE_USER");
     }
 
     @Test
@@ -79,7 +85,7 @@ class JwtTokenProviderTest {
         String invalidToken = "bearer.invalid.token";
 
         // when & then
-        org.junit.jupiter.api.Assertions.assertThrows(com.sang.smite.common.exception.ApiException.class, () -> {
+        Assertions.assertThrows(ApiException.class, () -> {
             jwtTokenProvider.validateToken(invalidToken);
         });
     }

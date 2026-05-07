@@ -1,4 +1,4 @@
-package com.sang.smite.common.service;
+package com.sang.smite.auth.service;
 
 /**
  * 범용 이메일 발송 인터페이스입니다.
