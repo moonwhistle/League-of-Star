@@ -1,5 +1,6 @@
 package com.sang.smite.auth.infrastructure.jwt;
 
+import com.sang.smite.auth.security.dto.AuthenticatedUser;
 import com.sang.smite.common.exception.ApiErrorCode;
 import com.sang.smite.common.exception.ApiException;
 import io.jsonwebtoken.*;
@@ -10,7 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -76,12 +76,14 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload();
 
+        Long userId = claims.get(USER_ID_KEY, Long.class);
+        String email = claims.getSubject();
         List<SimpleGrantedAuthority> authorities = Collections.singletonList(
                 new SimpleGrantedAuthority(claims.get(AUTHORITIES_KEY).toString())
         );
 
-        User principal = new User(claims.getSubject(), "", authorities);
-        
+        // AuthenticatedUser 객체를 Principal로 사용하여 ID와 Email을 모두 보존
+        AuthenticatedUser principal = new AuthenticatedUser(userId, email, authorities);
         return new UsernamePasswordAuthenticationToken(principal, token, authorities);
     }
 

@@ -193,6 +193,24 @@ paths:
               examples:
                 auth-password-reset-submit:
                   value: ????? ????? ???????.
+  /api/v1/notifications/match/stream:
+    get:
+      tags:
+      - Notification
+      summary: 매칭 알림 SSE 연결
+      description: 매칭 대기 화면에서 매칭 성사 알림을 받기 위한 SSE 스트림을 연결합니다.
+      operationId: notification-match-stream
+      parameters:
+      - name: Authorization
+        in: header
+        description: 액세스 토큰 (Bearer)
+        required: true
+        schema:
+          type: string
+        example: Bearer access-token
+      responses:
+        "200":
+          description: "200"
 components:
   schemas:
     api-v1-auth-signUp1187183266:

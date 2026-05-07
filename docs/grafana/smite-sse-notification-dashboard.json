@@ -291,20 +291,57 @@
       "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
     },
     {
-      "id": 16,
-      "title": "Tomcat Thread 수",
-      "description": "MVC SseEmitter 환경에서 Tomcat worker thread의 현재 수와 busy 수를 확인합니다. Netty 전환 후에는 비교 공통 지표가 아니라 MVC 병목 진단용으로 봅니다.",
+      "id": 18,
+      "title": "match_found 전송량 vs 목표",
+      "description": "JOIN_TPS=50 기준 기대 match_found 전송량은 약 50 events/s입니다. 1페어가 2명에게 전송되므로 pair/s가 아니라 user event/s로 봅니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 36 },
       "targets": [
         {
-          "expr": "tomcat_threads_current_threads{instance=~\"$instance\"}",
+          "expr": "sum(rate(sse_notification_events_send_success_total{event=\"match_found\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "actual match_found events/s",
+          "refId": "A"
+        },
+        {
+          "expr": "vector(50)",
+          "legendFormat": "target 50 events/s",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 } }
+    },
+    {
+      "id": 19,
+      "title": "Tomcat Busy Thread 비율",
+      "description": "busy / current 비율입니다. 이 값이 장시간 80~90% 이상이면 MVC/Tomcat thread 병목을 의심합니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 36 },
+      "targets": [
+        {
+          "expr": "tomcat_threads_busy{instance=~\"$instance\"} / clamp_min(tomcat_threads_current{instance=~\"$instance\"}, 1) * 100",
+          "legendFormat": "{{instance}} busy %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    },
+    {
+      "id": 16,
+      "title": "Tomcat Thread 수",
+      "description": "MVC SseEmitter 환경에서 Tomcat worker thread의 현재 수와 busy 수를 확인합니다. Netty 전환 후에는 비교 공통 지표가 아니라 MVC 병목 진단용으로 봅니다.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 43 },
+      "targets": [
+        {
+          "expr": "tomcat_threads_current{instance=~\"$instance\"}",
           "legendFormat": "{{instance}} current",
           "refId": "A"
         },
         {
-          "expr": "tomcat_threads_busy_threads{instance=~\"$instance\"}",
+          "expr": "tomcat_threads_busy{instance=~\"$instance\"}",
           "legendFormat": "{{instance}} busy",
           "refId": "B"
         }
@@ -317,10 +354,10 @@
       "description": "MVC/Tomcat이 보유한 현재 연결 수입니다. SSE 활성 연결 수와 함께 보며, Netty 전환 시에는 별도 Netty connection 지표로 대체합니다.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 36 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 43 },
       "targets": [
         {
-          "expr": "tomcat_connections_current_connections{instance=~\"$instance\"}",
+          "expr": "tomcat_connections_current{instance=~\"$instance\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }

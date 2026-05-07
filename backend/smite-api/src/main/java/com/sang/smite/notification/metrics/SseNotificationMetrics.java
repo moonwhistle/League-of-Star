@@ -15,6 +15,11 @@ import java.util.function.Supplier;
 public class SseNotificationMetrics {
 
     private final MeterRegistry meterRegistry;
+    /**
+     * Gauge는 대상 객체를 weak reference로 들고 있기 때문에,
+     * Supplier 참조를 강하게 유지하지 않으면 지표가 사라질 수 있습니다.
+     */
+    private Supplier<Number> activeConnectionGaugeSupplier;
 
     public SseNotificationMetrics(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
@@ -25,9 +30,10 @@ public class SseNotificationMetrics {
     }
 
     public void registerActiveConnectionGauge(Supplier<Number> activeConnectionCount) {
+        this.activeConnectionGaugeSupplier = activeConnectionCount;
         meterRegistry.gauge(
                 SseNotificationMetricNames.CONNECTIONS_ACTIVE,
-                activeConnectionCount,
+                activeConnectionGaugeSupplier,
                 supplier -> supplier.get().doubleValue()
         );
     }

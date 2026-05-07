@@ -1,10 +1,9 @@
 package com.sang.smite.global.resolver;
 
-import com.sang.smite.auth.infrastructure.jwt.JwtTokenProvider;
+import com.sang.smite.auth.security.dto.AuthenticatedUser;
 import com.sang.smite.common.exception.ApiErrorCode;
 import com.sang.smite.common.exception.ApiException;
 import com.sang.smite.global.resolver.annotation.AuthUser;
-import lombok.RequiredArgsConstructor;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,10 +14,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 @Component
-@RequiredArgsConstructor
 public class AuthUserArgumentResolver implements HandlerMethodArgumentResolver {
-
-    private final JwtTokenProvider tokenProvider;
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
@@ -34,14 +30,29 @@ public class AuthUserArgumentResolver implements HandlerMethodArgumentResolver {
         AuthUser annotation = parameter.getParameterAnnotation(AuthUser.class);
         boolean required = annotation != null && annotation.required();
 
-        if (authentication == null || authentication.getCredentials() == null) {
+        // 1. 인증 정보가 없거나 익명 사용자(anonymousUser)인 경우 처리
+        if (authentication == null || "anonymousUser".equals(authentication.getPrincipal())) {
             if (required) {
                 throw new ApiException(ApiErrorCode.AUTH_UNAUTHORIZED);
             }
             return null;
         }
 
-        String token = authentication.getCredentials().toString();
-        return tokenProvider.getUserId(token);
+        // 2. Principal에서 userId(Long)를 추출
+        Object principal = authentication.getPrincipal();
+        
+        if (principal instanceof Long userId) {
+            return userId;
+        }
+        
+        if (principal instanceof AuthenticatedUser authenticatedUser) {
+            return authenticatedUser.userId();
+        }
+
+        // 3. 기대한 타입이 아닐 경우 예외 처리
+        if (required) {
+            throw new ApiException(ApiErrorCode.AUTH_UNAUTHORIZED);
+        }
+        return null;
     }
 }

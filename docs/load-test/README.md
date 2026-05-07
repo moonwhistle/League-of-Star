@@ -416,22 +416,36 @@ MODE=connection CONNECTIONS=10000 HOLD_DURATION=5m RAMP_UP=180s SETUP_CONCURRENC
 
 SSE 연결을 먼저 열고, 같은 유저들로 `joinQueue`를 호출해 실제 매칭 성사 이벤트가 클라이언트까지 도착하는지 확인하는 시나리오입니다.
 
+`HOLD_DURATION`은 `joinQueue`가 끝나고 `match_found`가 충분히 전송될 때까지 유지되어야 합니다.
+
+```text
+HOLD_DURATION > CONNECT_WAIT + (CONNECTIONS / JOIN_TPS) + 매칭 처리 여유 시간
+```
+
+예를 들어 10,000명, 50 TPS 테스트는 `joinQueue`만 약 200초가 걸립니다.
+
+```text
+CONNECT_WAIT 210s + joinQueue 200s + 여유 60s = 470s
+```
+
+따라서 10,000명 이벤트 전송 테스트는 `HOLD_DURATION=10m`으로 실행합니다.
+
 1,000명:
 
 ```bash
-MODE=match CONNECTIONS=1000 HOLD_DURATION=5m RAMP_UP=60s CONNECT_WAIT=70s JOIN_TPS=5 TEST_USER_NAMESPACE=sse-match-1000 node docs/load-test/sse-notification-load.mjs
+MODE=match CONNECTIONS=1000 HOLD_DURATION=6m RAMP_UP=60s CONNECT_WAIT=70s JOIN_TPS=5 TEST_USER_NAMESPACE=sse-match-1000-v2 node docs/load-test/sse-notification-load.mjs
 ```
 
 5,000명:
 
 ```bash
-MODE=match CONNECTIONS=5000 HOLD_DURATION=5m RAMP_UP=120s CONNECT_WAIT=140s JOIN_TPS=25 SETUP_CONCURRENCY=150 TEST_USER_NAMESPACE=sse-match-5000 node docs/load-test/sse-notification-load.mjs
+MODE=match CONNECTIONS=5000 HOLD_DURATION=8m RAMP_UP=120s CONNECT_WAIT=140s JOIN_TPS=25 SETUP_CONCURRENCY=150 TEST_USER_NAMESPACE=sse-match-5000-v2 node docs/load-test/sse-notification-load.mjs
 ```
 
 10,000명:
 
 ```bash
-MODE=match CONNECTIONS=10000 HOLD_DURATION=5m RAMP_UP=180s CONNECT_WAIT=210s JOIN_TPS=50 SETUP_CONCURRENCY=200 TEST_USER_NAMESPACE=sse-match-10000 node docs/load-test/sse-notification-load.mjs
+MODE=match CONNECTIONS=10000 HOLD_DURATION=10m RAMP_UP=180s CONNECT_WAIT=210s JOIN_TPS=50 SETUP_CONCURRENCY=200 TEST_USER_NAMESPACE=sse-match-10000-v2 node docs/load-test/sse-notification-load.mjs
 ```
 
 `CONNECT_WAIT`는 SSE 연결을 충분히 연 뒤 `joinQueue`를 시작하기 위한 대기 시간입니다. 보통 `RAMP_UP`보다 조금 길게 잡습니다.

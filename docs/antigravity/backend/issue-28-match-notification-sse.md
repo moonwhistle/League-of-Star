@@ -221,6 +221,7 @@ sequenceDiagram
     Found->>Redis: match:session:{matchId} 저장, TTL 12초
     Found->>API: MatchFoundEvent 발행
 
+    Note over API,Listener: 현재 V1은 같은 JVM 내부 이벤트만 전달
     API->>Listener: MatchFoundEvent 수신
     Listener->>Registry: userA SSE 연결 조회
     Listener->>Registry: userB SSE 연결 조회
@@ -245,6 +246,42 @@ sequenceDiagram
 6. API 모듈의 이벤트 리스너가 이벤트를 받아 두 유저의 SSE 연결을 조회합니다.
 7. 연결이 살아 있으면 `match_found` 이벤트를 전송합니다.
 8. 연결이 없거나 전송에 실패하면 알림 실패만 로그로 남기고, 매칭 상태는 Redis 기준으로 유지합니다.
+
+### 멀티 인스턴스 한계
+
+현재 V1 구현은 로컬 메모리 기반 SSE registry와 로컬 Spring `ApplicationEvent`를 사용합니다.
+
+```text
+SSE 연결 저장소 = 각 API 인스턴스 메모리
+MatchFoundEvent = 이벤트가 발생한 JVM 내부에서만 전달
+```
+
+따라서 API 인스턴스가 2대 이상이면 아래 문제가 생깁니다.
+
+```text
+userA SSE 연결 -> smite-api-1
+userB SSE 연결 -> smite-api-2
+
+매칭 엔진 실행 -> smite-api-1
+MatchFoundEvent 발행 -> smite-api-1 JVM 내부
+
+smite-api-1은 userA 연결만 찾을 수 있음
+smite-api-2에 붙은 userB 연결은 찾을 수 없음
+```
+
+부하 테스트에서도 10,000명 연결은 안정적으로 유지됐지만, `match_found`는 이벤트가 발생한 인스턴스에 연결된 유저에게만 전달되는 한계가 확인되었습니다.
+
+이 문제는 MVC `SseEmitter` 자체의 스레드 병목이 아니라 **멀티 인스턴스 간 알림 이벤트 전파 부재**입니다. Netty/WebFlux로 전환해도 각 인스턴스 메모리에 SSE 연결을 저장하는 구조라면 동일한 문제가 발생합니다.
+
+따라서 다음 개선은 Netty 전환이 아니라 Redis Pub/Sub 기반의 인스턴스 간 `match_found` 전파 구조입니다.
+
+```text
+MatchFoundEvent 발생
+-> Redis Pub/Sub channel publish
+-> 모든 API 인스턴스가 subscribe
+-> 각 인스턴스가 자기 메모리 registry에서 대상 유저 연결 조회
+-> 연결이 있는 인스턴스만 SSE 전송
+```
 
 ## 📌 Related Issue
 - Closes #28
@@ -647,7 +684,81 @@ MVC SseEmitter가 10,000 연결에서 active connection, thread, heap, CPU, 이�
 
 유지하지 못하면 WebFlux/Netty로 전환하고, 같은 `sse_notification_*` 지표로 개선 폭을 비교합니다.
 
-### 10. 후속 이슈 분리
+### 10. 멀티 인스턴스 match_found 전파 구조 보강
+- [ ] **현재 로컬 이벤트 구조 한계 정리**
+  - `SseConnectionRegistry`가 인스턴스별 메모리에 존재한다는 점 명시
+  - Spring `ApplicationEvent`가 같은 JVM 안에서만 전달된다는 점 명시
+  - 2대 API 인스턴스 부하 테스트에서 한쪽 인스턴스 연결 유저에게 알림이 누락될 수 있음을 정리
+
+- [ ] **Redis Pub/Sub 메시지 모델 정의**
+  - channel 이름 상수화
+    - 예: `notification:match_found`
+  - publish payload 정의
+    - `matchId`
+    - `userA`
+    - `userB`
+    - `acceptTimeoutSeconds`
+    - `eventCreatedAt`
+  - JSON 직렬화/역직렬화 방식 결정
+  - 메시지 DTO는 API notification 패키지에 둘지, core 이벤트 모델과 분리할지 결정
+
+- [ ] **match_found publish 구현**
+  - `MatchFoundEvent` 발생 시 Redis Pub/Sub channel로 메시지 publish
+  - 기존 로컬 `MatchFoundEventListener`가 바로 SSE 전송하지 않도록 책임 재정리
+  - publish 실패 시 매칭 상태는 Redis 세션 기준으로 유지하고 에러 로그만 남김
+  - publish 성공/실패 메트릭 추가
+
+- [ ] **API 인스턴스별 subscribe 구현**
+  - 모든 API 인스턴스가 `notification:match_found` channel subscribe
+  - 메시지 수신 시 자기 인스턴스의 `SseConnectionRegistry`에서 `userA`, `userB` 연결 조회
+  - 연결이 있는 유저에게만 `match_found` SSE 전송
+  - 연결이 없는 유저는 정상 스킵으로 처리
+
+- [ ] **중복 전송 방지 정책 정리**
+  - Pub/Sub 메시지는 모든 인스턴스가 받지만, 각 인스턴스는 자기 메모리에 존재하는 연결에만 전송
+  - 같은 유저가 재연결하면 registry가 기존 연결을 교체하므로 동일 인스턴스 중복 연결은 방지됨
+  - 로컬 이벤트 전송과 Pub/Sub 전송이 동시에 동작해 이중 전송되지 않도록 전송 경로를 하나로 고정
+
+- [ ] **관측 지표 보강**
+  - Pub/Sub publish 성공/실패 수
+  - Pub/Sub subscribe 수신 수
+  - 연결 없음으로 인한 `match_found` 스킵 수
+  - 인스턴스별 `match_found` 전송 성공 수
+  - 인스턴스별 활성 SSE 연결 수와 `match_found` 전송 수를 함께 볼 수 있도록 Grafana 패널 보강
+
+- [ ] **테스트 코드 작성**
+  - publish payload 생성 테스트
+  - subscribe 메시지 수신 시 연결된 유저에게만 전송되는지 테스트
+  - 연결 없는 유저는 예외 없이 스킵되는지 테스트
+  - 로컬 이벤트와 Pub/Sub 경로가 중복 전송하지 않는지 테스트
+
+- [ ] **부하 테스트 재실행**
+  - 2대 API 인스턴스 기준 `MODE=match`, `CONNECTIONS=10000`, `JOIN_TPS=50` 재실행
+  - 기대 결과
+    - 10,000 SSE 연결 성공률 99% 이상
+    - `match_found` 서버 전송량이 목표 50 events/s에 근접
+    - 인스턴스별 활성 SSE 연결 수와 전송 수가 균형 있게 분산
+    - `send_failure`, `error`, `timeout` 급증 없음
+
+#### 구현 방향
+
+현재 프로젝트는 API 인스턴스가 2대 올라가는 구조이고, Redis는 이미 공통 인프라로 사용 중입니다.
+
+따라서 V1.1에서는 Redis Pub/Sub을 사용해 `match_found` 알림 이벤트를 모든 API 인스턴스에 전파합니다.
+
+```text
+MatchFoundService
+-> Spring MatchFoundEvent 발행
+-> MatchFoundEventPublisher가 Redis Pub/Sub publish
+-> 모든 API 인스턴스의 subscriber가 메시지 수신
+-> 각 인스턴스는 자기 SseConnectionRegistry에서 연결된 유저만 찾아 SSE 전송
+```
+
+이 구조는 메시지 영속성을 보장하지 않습니다. 다만 이번 요구사항은 "현재 SSE로 연결되어 있는 유저에게 즉시 match_found 알림을 전달"하는 것이므로 Pub/Sub이 적합합니다.
+
+재전송 보장, 장애 복구, 오프라인 유저 알림까지 필요해지면 Redis Stream 또는 별도 알림 저장소를 후속 개선으로 검토합니다.
+
+### 11. 후속 이슈 분리
 - [ ] **수락/거절 API 후속 이슈로 분리**
   - `POST /api/v1/match/{matchId}/accept`
   - `POST /api/v1/match/{matchId}/reject`
