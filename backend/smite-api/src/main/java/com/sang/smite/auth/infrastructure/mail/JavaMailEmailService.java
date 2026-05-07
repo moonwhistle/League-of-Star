@@ -1,6 +1,6 @@
 package com.sang.smite.auth.infrastructure.mail;
 
-import com.sang.smite.common.service.EmailService;
+import com.sang.smite.auth.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.SimpleMailMessage;

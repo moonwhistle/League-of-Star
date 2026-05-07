@@ -24,17 +24,19 @@ public class SseHeartbeatService {
     private final SseConnectionRegistry sseConnectionRegistry;
     private final SseNotificationSender sseNotificationSender;
     private final TaskScheduler notificationTaskScheduler;
-    private final Clock clock = Clock.systemUTC();
+    private final Clock clock;
     private ScheduledFuture<?> heartbeatTask;
 
     public SseHeartbeatService(
             SseConnectionRegistry sseConnectionRegistry,
             SseNotificationSender sseNotificationSender,
-            @Qualifier("notificationTaskScheduler") TaskScheduler notificationTaskScheduler
+            @Qualifier("notificationTaskScheduler") TaskScheduler notificationTaskScheduler,
+            Clock clock
     ) {
         this.sseConnectionRegistry = sseConnectionRegistry;
         this.sseNotificationSender = sseNotificationSender;
         this.notificationTaskScheduler = notificationTaskScheduler;
+        this.clock = clock;
     }
 
     @PostConstruct

@@ -16,14 +16,16 @@ public class MatchNotificationService {
 
     private final SseConnectionRegistry sseConnectionRegistry;
     private final SseNotificationSender sseNotificationSender;
-    private final Clock clock = Clock.systemUTC();
+    private final Clock clock;
 
     public MatchNotificationService(
             SseConnectionRegistry sseConnectionRegistry,
-            SseNotificationSender sseNotificationSender
+            SseNotificationSender sseNotificationSender,
+            Clock clock
     ) {
         this.sseConnectionRegistry = sseConnectionRegistry;
         this.sseNotificationSender = sseNotificationSender;
+        this.clock = clock;
     }
 
     /**

@@ -3,7 +3,6 @@ package com.sang.smite.auth.service;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import com.sang.smite.common.service.EmailService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import com.sang.smite.auth.repository.PasswordResetStore;

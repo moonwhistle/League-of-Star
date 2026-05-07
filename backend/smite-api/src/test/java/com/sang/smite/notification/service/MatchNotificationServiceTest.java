@@ -9,6 +9,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -18,9 +22,15 @@ import static org.mockito.Mockito.when;
 
 class MatchNotificationServiceTest {
 
+    private static final Instant CONNECTED_AT = Instant.parse("2026-05-07T00:00:00Z");
+
     private final SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
     private final SseNotificationSender sender = mock(SseNotificationSender.class);
-    private final MatchNotificationService service = new MatchNotificationService(registry, sender);
+    private final MatchNotificationService service = new MatchNotificationService(
+            registry,
+            sender,
+            Clock.fixed(CONNECTED_AT, ZoneOffset.UTC)
+    );
 
     @Test
     @DisplayName("SSE 연결을 생성하면 유저별 연결을 저장하고 connected 이벤트를 전송한다.")
@@ -44,6 +54,6 @@ class MatchNotificationServiceTest {
 
         SseConnectedEvent event = eventCaptor.getValue();
         assertThat(event.userId()).isEqualTo(1L);
-        assertThat(event.connectedAt()).isNotNull();
+        assertThat(event.connectedAt()).isEqualTo(CONNECTED_AT);
     }
 }

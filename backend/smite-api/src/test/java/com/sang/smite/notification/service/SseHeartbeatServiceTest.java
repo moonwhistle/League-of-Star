@@ -8,6 +8,9 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -17,9 +20,16 @@ import static org.mockito.Mockito.verify;
 
 class SseHeartbeatServiceTest {
 
+    private static final Instant HEARTBEAT_SENT_AT = Instant.parse("2026-05-07T00:00:00Z");
+
     private final SseConnectionRegistry registry = new SseConnectionRegistry(SseNotificationMetrics.noop());
     private final SseNotificationSender sender = new SseNotificationSender(registry, SseNotificationMetrics.noop());
-    private final SseHeartbeatService heartbeatService = new SseHeartbeatService(registry, sender, mock(TaskScheduler.class));
+    private final SseHeartbeatService heartbeatService = new SseHeartbeatService(
+            registry,
+            sender,
+            mock(TaskScheduler.class),
+            Clock.fixed(HEARTBEAT_SENT_AT, ZoneOffset.UTC)
+    );
 
     @Test
     @DisplayName("등록된 SSE 연결에 heartbeat 이벤트를 전송한다.")
