@@ -127,12 +127,23 @@ timeout 정책:
 
 ### 3. API 경로 정의
 
-- [ ] `MatchPath`에 수락/거절 경로 추가
+- [x] `MatchPath`에 수락/거절 경로 추가
   - `/{matchId}/accept`
   - `/{matchId}/reject`
-- [ ] path variable 이름 상수화 여부 검토
+- [x] path variable 이름 상수화 여부 검토
   - `matchId`
-- [ ] API endpoint 정책 확정
+- [x] API endpoint 정책 확정
+  - `POST /api/v1/match/{matchId}/accept`
+  - `POST /api/v1/match/{matchId}/reject`
+
+#### 구현 결과
+
+- `MatchPath`에 수락/거절 API path 상수를 추가했습니다.
+  - `ACCEPT = "/{matchId}/accept"`
+  - `REJECT = "/{matchId}/reject"`
+- path variable 이름도 상수화했습니다.
+  - `MATCH_ID = "matchId"`
+- 최종 API 경로는 다음과 같습니다.
   - `POST /api/v1/match/{matchId}/accept`
   - `POST /api/v1/match/{matchId}/reject`
 
