@@ -2,6 +2,7 @@ package com.sang.smite.redis.lock.aop;
 
 import com.sang.smite.redis.lock.annotation.DistributedLock;
 import com.sang.smite.redis.common.constant.LockConstants;
+import com.sang.smite.redis.lock.exception.RedisLockAcquisitionException;
 import com.sang.smite.redis.lock.parser.CustomSpringELParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,11 +41,10 @@ public class DistributedLockAop {
         RLock rLock = redissonClient.getLock(key);
 
         try {
-            boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(),
-                    distributedLock.timeUnit());
+            boolean available = tryLock(rLock, distributedLock, key);
             if (!available) {
                 log.warn("Lock acquisition failed for key: {}", key);
-                return false;
+                throw new RedisLockAcquisitionException(key);
             }
 
             /* [REQUIRES_NEW 트랜잭션 설계 의도]
@@ -53,13 +53,6 @@ public class DistributedLockAop {
              * 락 해제와 트랜잭션 롤백 사이의 타이밍 문제가 발생하지 않음
              */
             return aopForTransaction.proceed(joinPoint);
-        } catch (InterruptedException e) {
-            log.error("Lock acquisition interrupted for key: {}", key, e);
-            // 원본 예외를 cause로 연결하여 스택 트레이스를 보존
-            InterruptedException wrapped = new InterruptedException(e.getMessage());
-            wrapped.initCause(e);
-            Thread.currentThread().interrupt();
-            throw wrapped;
         } finally {
             try {
                 if (rLock.isHeldByCurrentThread()) {
@@ -68,6 +61,20 @@ public class DistributedLockAop {
             } catch (IllegalMonitorStateException e) {
                 log.info("Redisson Lock Already Unlocked: method={}, key={}", method.getName(), key);
             }
+        }
+    }
+
+    private boolean tryLock(RLock lock, DistributedLock distributedLock, String key) {
+        try {
+            if (distributedLock.leaseTime() < 0) {
+                return lock.tryLock(distributedLock.waitTime(), distributedLock.timeUnit());
+            }
+
+            return lock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
+        } catch (InterruptedException e) {
+            log.error("Lock acquisition interrupted for key: {}", key, e);
+            Thread.currentThread().interrupt();
+            throw new RedisLockAcquisitionException(key, e);
         }
     }
 }

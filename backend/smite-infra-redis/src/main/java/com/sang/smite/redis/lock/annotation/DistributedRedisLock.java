@@ -7,15 +7,19 @@ import java.lang.annotation.Target;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Redisson 분산 락을 선언적으로 적용하기 위한 어노테이션입니다.
+ * Redis 작업만 수행하는 구간에 Redisson 분산 락을 적용하기 위한 어노테이션입니다.
  *
  * <p>{@code leaseTime}을 음수로 설정하면 Redisson watchdog을 사용합니다.</p>
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface DistributedLock {
+public @interface DistributedRedisLock {
+
     String key();
+
     TimeUnit timeUnit() default TimeUnit.MILLISECONDS;
-    long waitTime() default 5000L;
-    long leaseTime() default 3000L;
+
+    long waitTime() default 500L;
+
+    long leaseTime() default -1L;
 }

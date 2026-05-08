@@ -201,57 +201,263 @@ timeout 정책:
 
 ### 6. Matching 모듈 서비스 설계
 
-- [ ] `MatchAcceptanceService` 또는 `MatchResponseService` 추가
+- [x] `MatchAcceptanceService` 또는 `MatchResponseService` 추가
   - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service`
-- [ ] 메서드 정의
+- [x] 메서드 정의
   - `accept(String matchId, Long userId)`
   - `reject(String matchId, Long userId)`
-- [ ] 책임 정의
+- [x] 책임 정의
   - 매칭 세션 조회
   - 참여자 검증
   - 세션 상태 검증
   - 수락/거절 상태 변경
   - 유저 상태 변경/정리
-- [ ] `matchId` 기준 Redis lock 적용 위치 정의
+- [x] `matchId` 기준 Redis lock 적용 위치 정의
   - `accept(matchId, userId)` 전체 처리 구간
   - `reject(matchId, userId)` 전체 처리 구간
   - timeout 처리 메서드가 생길 경우 동일하게 적용
-- [ ] timeout 처리 메서드 정의 검토
+- [x] timeout 처리 메서드 정의 검토
   - `timeout(String matchId)`
   - 또는 accept/reject 요청 시 세션 만료를 감지해 timeout 정리
-- [ ] `MatchService`와 책임 분리
+- [x] `MatchService`와 책임 분리
   - `MatchService`: join/leave
   - `MatchFoundService`: 매칭 성사 후 세션 생성 및 알림 이벤트 발행
   - 새 서비스: 성사된 매칭에 대한 유저 응답 처리
 
-### 7. MatchSessionStore 기능 확장
+#### 설계 결과
 
-- [ ] `MatchSessionStore` 인터페이스에 응답 상태 저장 메서드 추가 검토
-  - `accept(matchId, userId)`
-  - `reject(matchId, userId)`
-  - `timeout(matchId)`
-  - 또는 더 명시적인 결과 타입 반환
-- [ ] 단순 `findById -> save` 방식은 동시 요청에서 위험하므로 지양
-- [ ] `matchId` 기준 lock이 서비스에서 상태 변경 전체를 감싸므로 store는 Hash 저장 책임에 집중
-- [ ] store 메서드의 책임 분리 검토
-  - 세션 조회
-  - 특정 유저 수락 flag 변경
-  - 세션 status 변경
-  - 세션 삭제 또는 TTL 조정
-- [ ] 반환 결과 타입 정의 검토
-  - 세션 없음
-  - 참여자 아님
-  - 이미 종료됨
-  - 수락 저장됨
-  - 양쪽 수락 완료
-  - 거절 완료
+- matching 모듈의 수락/거절 서비스는 기존 `MatchResponseCommandService`를 사용합니다.
+  - API 모듈에 이미 같은 이름의 `MatchResponseService`가 있으므로, matching 모듈까지 같은 이름으로 만들면 책임 경계가 흐려질 수 있습니다.
+  - `Command`를 붙여서 "세션 상태를 변경하는 명령 서비스"라는 의도를 명확히 둡니다.
+- 공개 메서드는 다음 2개를 우선 구현합니다.
+  - `accept(String matchId, Long userId)`
+  - `reject(String matchId, Long userId)`
+- timeout은 별도 메서드로 확장 가능하게 설계합니다.
+  - `timeout(String matchId)`
+  - 다만 현재 클라이언트 수락/거절 API 구현이 우선이므로, timeout 스케줄러/이벤트 처리는 후속 작업에서 붙일 수 있게 경계만 열어둡니다.
+
+#### 서비스 책임
+
+`MatchResponseCommandService`는 다음 책임만 가집니다.
+
+1. `matchId` 기준 Redis lock 획득
+2. `MatchSessionStore`에서 세션 조회
+3. 요청 유저가 `userA` 또는 `userB`인지 검증
+4. 현재 세션 상태가 응답 가능한 상태인지 검증
+5. accept/reject에 따라 세션 상태 변경
+6. `MatchUserStatusStore`에 유저 상태 반영 또는 정리
+
+다음 책임은 포함하지 않습니다.
+
+- `joinQueue`, `leaveQueue`
+  - 기존 `MatchService` 책임입니다.
+- 매칭 성사 세션 생성 및 `match_found` 알림 발행
+  - 기존 `MatchFoundService` 책임입니다.
+- 수락/거절 결과를 상대방에게 SSE로 다시 알려주는 기능
+  - 후속 이슈로 분리합니다.
+- 게임 세션 생성 및 `IN_GAME` 전환
+  - 게임 시작 플로우 이슈에서 처리합니다.
+
+#### Redis lock 적용 방식
+
+- lock key는 `matchId` 단위로 잡습니다.
+  - 예: `match:session:lock:{matchId}`
+- 같은 매칭 세션에 대한 `accept`, `reject`, `timeout`만 직렬화합니다.
+- 서로 다른 `matchId`는 동시에 처리될 수 있어야 하므로 전역 lock은 사용하지 않습니다.
+- 현재 `@DistributedLock`은 SpEL 기반 key 생성은 가능하지만, AOP 내부에서 `AopForTransaction`을 항상 거칩니다.
+  - 이번 수락/거절 처리는 Redis Hash와 Redis 상태 저장소만 다루는 matching 모듈 명령입니다.
+  - JPA 트랜잭션 경계가 필요하지 않으므로 `RLock.tryLock()`을 서비스 내부에서 직접 사용하는 방식이 더 적합합니다.
+  - 매칭 엔진에서 사용한 방식과 동일하게 Redis-only 작업은 명시적 lock으로 처리합니다.
+
+#### 상태 전이 규칙
+
+수락 처리:
+
+```text
+FOUND
+  -> userA만 수락: FOUND + userAAccepted=true
+  -> userB만 수락: FOUND + userBAccepted=true
+  -> 둘 다 수락: ACCEPTED + userAAccepted=true + userBAccepted=true
+```
+
+- 요청 유저 상태는 `ACCEPTED`로 변경합니다.
+- 한 명만 수락한 경우 세션 status는 아직 `FOUND`로 유지합니다.
+  - 이유: 매칭은 "양쪽 모두 수락"해야 완료입니다.
+- 양쪽 모두 수락하면 세션 status를 `ACCEPTED`로 변경합니다.
+- `IN_GAME` 전환은 이번 이슈 범위가 아닙니다.
+
+거절 처리:
+
+```text
+FOUND -> DECLINED
+ACCEPTED -> 거절 불가
+DECLINED/TIMEOUT -> 이미 종료된 세션
+```
+
+- 한 명이라도 거절하면 세션 status는 `DECLINED`로 변경합니다.
+- 양쪽 유저의 매칭 상태는 제거합니다.
+  - 이유: 다시 매칭 버튼을 누를 수 있어야 합니다.
+- 분석 목적의 거절 상태 보관은 Redis 세션 status로 확인하고, 유저 status는 재매칭 가능성을 우선합니다.
+
+timeout 처리:
+
+```text
+FOUND -> TIMEOUT
+ACCEPTED -> timeout 불가
+DECLINED/TIMEOUT -> 이미 종료된 세션
+```
+
+- timeout은 reject와 같은 정리 흐름을 사용합니다.
+- 단, 사용자가 직접 거절한 것과 구분하기 위해 세션 status는 `TIMEOUT`으로 분리합니다.
+- 세션 TTL이 먼저 만료되어 세션이 없으면, API 요청에서는 만료/없음 에러를 반환합니다.
+- 남아 있는 유저 status 보정은 timeout 처리 작업에서 별도로 다룹니다.
+
+#### 중복 요청 정책
+
+- 같은 유저가 같은 세션에 accept를 두 번 보내는 경우는 멱등 처리 후보입니다.
+  - 이미 해당 유저의 accepted flag가 `true`이면 성공으로 간주해도 상태가 꼬이지 않습니다.
+  - V1에서는 클라이언트 재시도 안정성을 위해 중복 accept는 성공 처리하는 방향이 적합합니다.
+- 이미 `ACCEPTED`, `DECLINED`, `TIMEOUT`으로 종료된 세션에 반대 응답이 들어오면 conflict로 처리합니다.
+- lock 획득 실패는 같은 `matchId`에 대한 요청이 처리 중이라는 뜻이므로 conflict 또는 retryable error로 처리합니다.
+
+### 7. Redis-only 분산락 어노테이션 구현
+
+- [x] 기존 `@DistributedLock` 역할 재정의
+  - 위치: `smite-infra-redis/src/main/java/com/sang/smite/redis/lock/annotation/DistributedLock.java`
+  - 역할: Redis lock + `AopForTransaction` 기반 `REQUIRES_NEW` 트랜잭션
+  - 사용처: DB 트랜잭션 정합성이 필요한 작업
+- [x] 신규 `@DistributedRedisLock` 추가
+  - 위치: `smite-infra-redis/src/main/java/com/sang/smite/redis/lock/annotation/DistributedRedisLock.java`
+  - 역할: Redis lock만 적용
+  - 트랜잭션 AOP를 태우지 않음
+  - 사용처: Redis-only 작업
+    - 매칭 수락/거절
+    - timeout 처리
+    - 향후 Redis 상태 기반 동시성 제어
+- [x] 신규 AOP 추가
+  - 위치: `smite-infra-redis/src/main/java/com/sang/smite/redis/lock/aop/DistributedRedisLockAop.java`
+  - 기존 `CustomSpringELParser` 재사용
+  - 기존 `LockConstants.REDISSON_LOCK_PREFIX` 재사용
+  - `RedissonClient.getLock(key)` 사용
+- [x] 어노테이션 속성 정의
+  - `key`
+  - `timeUnit`
+  - `waitTime`
+  - `leaseTime`
+- [x] watchdog 정책 지원
+  - `leaseTime > 0`: `tryLock(waitTime, leaseTime, timeUnit)` 사용
+  - `leaseTime < 0`: `tryLock(waitTime, timeUnit)` 사용
+  - `leaseTime < 0`이면 Redisson watchdog이 lock을 자동 연장하도록 설계
+- [x] lock 획득 실패 정책 정의
+  - 기존 `@DistributedLock`처럼 `false`를 반환하지 않음
+  - 수락/거절 API는 반환 타입이 `void`이므로 `false` 반환 방식이 맞지 않음
+  - lock 획득 실패 시 명확한 예외를 던져 API 계층에서 에러 응답으로 변환
+- [x] 예외 타입 정의
+  - 기존 `ApiException`/`MatchingException` 흐름을 확인해 프로젝트 예외 정책에 맞춤
+  - Redis lock 공통 예외를 infra-redis에 둘지, matching 도메인 예외로 변환할지 결정
+- [x] 테스트 작성
+  - SpEL key 생성 검증
+  - lock 획득 시 원본 메서드 실행 검증
+  - lock 획득 실패 시 예외 발생 검증
+  - `leaseTime < 0` watchdog 분기 검증
+
+#### 작업 이유
+
+현재 `@DistributedLock`은 Redis lock을 잡은 뒤 항상 `AopForTransaction.proceed()`를 호출합니다.
+
+```text
+@DistributedLock
+  -> Redis lock 획득
+  -> REQUIRES_NEW 트랜잭션 시작
+  -> 비즈니스 로직 실행
+  -> 트랜잭션 종료
+  -> lock 해제
+```
+
+이 구조는 DB 정합성이 필요한 작업에는 적합합니다. 하지만 매칭 수락/거절은 Redis Hash 세션과 Redis 유저 상태만 변경하는 Redis-only 작업입니다. 이 작업에 JPA 트랜잭션을 강제로 붙이면 의미 없는 트랜잭션 경계가 생기고, matching 모듈의 책임도 흐려집니다.
+
+따라서 락을 다음처럼 분리합니다.
+
+```text
+@DistributedLock
+  DB 트랜잭션이 필요한 분산락
+
+@DistributedRedisLock
+  Redis-only 작업에 사용하는 분산락
+```
+
+#### 패키지 구조
+
+```text
+smite-infra-redis
+└── src/main/java/com/sang/smite/redis
+    ├── common/constant
+    │   └── LockConstants.java
+    └── lock
+        ├── annotation
+        │   ├── DistributedLock.java
+        │   └── DistributedRedisLock.java
+        ├── aop
+        │   ├── AopForTransaction.java
+        │   ├── DistributedLockAop.java
+        │   └── DistributedRedisLockAop.java
+        └── parser
+            └── CustomSpringELParser.java
+```
+
+#### 수락/거절 적용 예시
+
+```java
+@DistributedRedisLock(
+        key = "'match:session:lock:' + #matchId",
+        waitTime = 500,
+        leaseTime = -1
+)
+public void accept(String matchId, Long userId) {
+    // 세션 조회
+    // 참여자 검증
+    // 수락 상태 저장
+    // 양쪽 수락 시 ACCEPTED 전환
+}
+```
+
+`leaseTime = -1`은 watchdog 사용 의도를 나타냅니다. 수락/거절은 짧은 작업이지만, Redis 지연이나 GC pause 같은 상황에서 고정 lease time 때문에 lock이 먼저 풀리는 위험을 피할 수 있습니다.
+
+#### 구현 결과
+
+- `DistributedRedisLock` 어노테이션을 추가했습니다.
+  - 기본 `waitTime`: `500ms`
+  - 기본 `leaseTime`: `-1`
+  - `leaseTime < 0`이면 Redisson watchdog을 사용합니다.
+- `DistributedRedisLockAop`를 추가했습니다.
+  - 기존 `CustomSpringELParser`로 SpEL key를 파싱합니다.
+  - 기존 `LockConstants.REDISSON_LOCK_PREFIX`를 사용해 lock key prefix를 통일합니다.
+  - 기존 `@DistributedLock`과 달리 `AopForTransaction`을 호출하지 않습니다.
+- 기존 `DistributedLockAop`도 락 계열 정책에 맞춰 정리했습니다.
+  - lock 획득 실패 시 `false`를 반환하지 않고 `RedisLockAcquisitionException`을 던집니다.
+  - `leaseTime < 0`이면 watchdog을 사용할 수 있게 했습니다.
+  - `InterruptedException` 변환 범위를 `tryLock()` 구간으로 좁혀 원본 메서드 예외를 보존합니다.
+- lock 획득 실패 시 `false`를 반환하지 않고 `RedisLockAcquisitionException`을 던지도록 했습니다.
+  - 수락/거절 API는 `void` 반환 흐름이므로 `false` 반환 방식은 맞지 않습니다.
+- 테스트를 추가했습니다.
+  - watchdog 분기: `tryLock(waitTime, timeUnit)`
+  - 고정 lease time 분기: `tryLock(waitTime, leaseTime, timeUnit)`
+  - lock 획득 실패 시 원본 메서드 미실행
+
+검증:
+
+```bash
+./gradlew :smite-infra-redis:test --tests 'com.sang.smite.redis.lock.aop.*LockAopTest'
+```
+
+결과: `BUILD SUCCESSFUL`
 
 ### 8. Redis lock 기반 동시성 처리 설계
 
-- [ ] 기존 Redis 분산락 어노테이션 구조 확인
-  - lock key를 `matchId` 기준으로 생성할 수 있는지 확인
-  - wait time, lease time, watchdog 사용 여부 확인
-  - AOP 적용 시 트랜잭션/부가 로직이 불필요하게 섞이지 않는지 확인
+- [ ] 신규 `@DistributedRedisLock` 적용 위치 확정
+  - `MatchResponseCommandService.accept(matchId, userId)`
+  - `MatchResponseCommandService.reject(matchId, userId)`
+  - timeout 처리 메서드가 추가되면 동일하게 적용
 - [ ] lock key 정책 정의
   - 예: `match:session:lock:{matchId}`
   - 같은 매칭 세션의 accept/reject/timeout 요청만 직렬화
@@ -282,6 +488,11 @@ timeout 정책:
 - [ ] Redis Hash field 상수화
   - `userAAccepted`
   - `userBAccepted`
+- [ ] `MatchSessionStore` 기능 확장 검토
+  - `MatchSessionStore`는 Redis Hash 저장/조회 책임에 집중
+  - 동시성은 `@DistributedRedisLock`이 서비스 메서드 전체를 감싸서 보장
+  - 단순 `findById -> save`는 lock 안에서만 사용
+  - 필요 시 `save` 외에 상태 변경 의도가 드러나는 메서드 추가
 - [ ] lock 기반 V1로 충분한지 검증
   - 동시 accept
   - accept/reject 충돌
