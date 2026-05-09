@@ -1128,17 +1128,27 @@ matchStore.add(returnTicket);
 
 ### 17. API 문서화 및 RestDocs
 
-- [ ] 수락 API RestDocs 작성
+- [x] 수락 API RestDocs 작성
   - path parameter: `matchId`
   - 인증 필요
   - 성공 응답
   - 주요 실패 응답
-- [ ] 거절 API RestDocs 작성
+- [x] 거절 API RestDocs 작성
   - path parameter: `matchId`
   - 인증 필요
   - 성공 응답
   - 주요 실패 응답
-- [ ] OpenAPI 문서 생성 흐름 확인
+- [x] OpenAPI 문서 생성 흐름 확인
+
+#### 구현 결과
+
+- `MatchControllerRestDocsTest`에 매칭 수락/거절 API 문서화 테스트를 추가했습니다.
+  - `POST /api/v1/match/{matchId}/accept`
+  - `POST /api/v1/match/{matchId}/reject`
+- 두 API 모두 인증 헤더와 path parameter `matchId`를 문서화했습니다.
+- 성공 응답은 기존 match API 스타일에 맞춰 `200 OK`로 문서화했습니다.
+- 주요 실패 응답은 API 설명 범위에 반영하고, 실제 에러 응답 스키마는 공통 `GlobalExceptionHandler` 정책을 따릅니다.
+- `:smite-api:test`를 실행해 RestDocs 테스트와 OpenAPI 생성 입력 흐름이 깨지지 않는 것을 확인했습니다.
 
 ### 18. 단위 테스트 작성
 
