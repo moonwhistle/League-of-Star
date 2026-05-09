@@ -1152,7 +1152,7 @@ matchStore.add(returnTicket);
 
 ### 18. 단위 테스트 작성
 
-- [ ] Matching service 단위 테스트
+- [x] Matching service 단위 테스트
   - 수락 성공
   - 중복 수락 멱등 처리
   - 양쪽 수락 완료
@@ -1163,12 +1163,36 @@ matchStore.add(returnTicket);
   - 참여자 아님
   - 이미 종료된 세션
   - lock 획득 실패 변환
-- [ ] API service 단위 테스트
+- [x] API service 단위 테스트
   - controller/service 위임 검증
-- [ ] Controller 테스트
+- [x] Controller 테스트
   - 인증 유저 기준 accept 요청
   - 인증 유저 기준 reject 요청
   - path variable 전달 검증
+
+#### 구현 결과
+
+- `MatchResponseProcessorTest`로 매칭 응답 처리 정책을 검증했습니다.
+  - 수락 성공
+  - 중복 수락 멱등 처리
+  - 양쪽 수락 시 `ACCEPTED` 전환
+  - 거절 시 세션 유지/정산 정책
+  - 먼저 거절 후 상대가 제한 시간 안에 수락하면 수락 유저 큐 복귀
+  - 세션 만료, 참여자 아님, 이미 종료된 세션, 이미 수락한 유저의 거절 요청
+- `MatchResponseCommandServiceTest`를 추가했습니다.
+  - processor 위임 검증
+  - `RedisLockAcquisitionException`을 `MatchingException(MATCH_RESPONSE_LOCK_FAILED)`로 변환하는지 검증
+- `MatchResponseServiceTest`로 API service가 matching command service에 위임하는지 검증했습니다.
+- `MatchControllerTest`를 `RestAssuredMockMvc` 기반으로 전환했습니다.
+  - 인증 유저 기준 accept/reject 요청
+  - path variable `matchId` 전달
+  - HTTP 200 응답 검증
+- 데이터와 직접 통신하는 Redis 저장소 테스트는 기존 Testcontainers 기반 테스트를 유지합니다.
+  - `RedisMatchSessionStoreTest`
+  - `RedisMatchStoreTest`
+- 검증 명령:
+  - `:smite-matching:test`
+  - `:smite-api:test`
 
 ### 19. Redis 통합 테스트 작성
 
