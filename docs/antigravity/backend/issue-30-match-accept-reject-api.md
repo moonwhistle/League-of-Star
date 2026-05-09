@@ -979,8 +979,7 @@ matchStore.add(returnTicket);
 
 ### 13. 에러 코드 정의
 
-- [ ] `MatchingErrorCode`에 수락/거절 관련 코드 추가
-  - `MATCH_SESSION_NOT_FOUND`
+- [x] `MatchingErrorCode`에 수락/거절 관련 코드 추가
   - `MATCH_SESSION_EXPIRED`
   - `MATCH_SESSION_NOT_PARTICIPANT`
   - `MATCH_SESSION_ALREADY_ACCEPTED`
@@ -988,14 +987,30 @@ matchStore.add(returnTicket);
   - `MATCH_SESSION_ALREADY_DECLINED`
   - `MATCH_SESSION_TIMEOUT`
   - `MATCH_RESPONSE_LOCK_FAILED`
-- [ ] HTTP status 정책 결정
+- [x] HTTP status 정책 결정
   - 세션 없음/만료: `410 Gone` 우선
   - 참여자 아님: `403 Forbidden`
   - 이미 완료/거절/timeout: `409 Conflict`
   - lock 획득 실패: `409 Conflict` 우선
   - 내부 Redis 처리 실패: `500`
-- [ ] 기존 `MatchingException` 사용
-- [ ] `RedisLockAcquisitionException`은 matching service 경계에서 `MatchingException`으로 변환
+- [x] 기존 `MatchingException` 사용
+- [x] `RedisLockAcquisitionException`은 matching service 경계에서 `MatchingException`으로 변환
+
+#### 구현 결과
+
+`MatchingErrorCode`에 수락/거절 응답 처리용 에러 코드를 추가했습니다.
+
+| 코드 | HTTP | 의미 |
+| :--- | ---: | :--- |
+| `MATCH_006` | 410 | 매칭 수락 시간이 만료됨 |
+| `MATCH_007` | 403 | 요청 유저가 해당 매칭 참여자가 아님 |
+| `MATCH_008` | 409 | 이미 수락한 매칭 |
+| `MATCH_009` | 409 | 이미 완료된 매칭 |
+| `MATCH_010` | 409 | 이미 거절된 매칭 |
+| `MATCH_011` | 409 | 이미 timeout 처리된 매칭 |
+| `MATCH_012` | 409 | 같은 matchId 응답 처리 중 lock 획득 실패 |
+
+`MATCH_SESSION_NOT_FOUND`는 별도 코드로 만들지 않고 `MATCH_SESSION_EXPIRED`로 통합합니다. 수락/거절 API 관점에서 세션 없음은 대부분 TTL 만료 또는 이미 정리된 수락 세션이므로, 클라이언트에는 "수락 시간이 만료됨"으로 안내하는 편이 더 명확합니다.
 
 ### 14. MatchResponseProcessor 구현
 
