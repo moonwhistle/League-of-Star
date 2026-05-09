@@ -2,6 +2,7 @@ package com.sang.smite.matching.service;
 
 import com.sang.smite.domain.match.domain.MatchSession;
 import com.sang.smite.domain.match.domain.MatchStatus;
+import com.sang.smite.domain.match.domain.MatchResponseStatus;
 import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.domain.match.event.MatchFoundEvent;
 import com.sang.smite.matching.common.constant.MatchingConstants;
@@ -63,8 +64,8 @@ class MatchFoundServiceTest {
         assertThat(savedSession.userBEntryTime()).isEqualTo(userB.entryTime());
         assertThat(savedSession.status()).isEqualTo(MatchStatus.FOUND);
         assertThat(savedSession.matchId()).isNotBlank();
-        assertThat(savedSession.userAAccepted()).isFalse();
-        assertThat(savedSession.userBAccepted()).isFalse();
+        assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.PENDING);
+        assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.PENDING);
 
         // 3. 이벤트 발행 검증
         ArgumentCaptor<MatchFoundEvent> eventCaptor = ArgumentCaptor.forClass(MatchFoundEvent.class);

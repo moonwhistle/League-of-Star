@@ -12,8 +12,9 @@ Issue-28에서 SSE `match_found` 알림은 이미 구현했습니다. 이번 이
 - 유저의 `accept`, `reject` 선택은 HTTP API로 처리합니다.
 - 요청 유저는 해당 `matchId`의 참여자여야 합니다.
 - 양쪽 유저가 모두 수락하면 매칭 세션은 완료 상태로 전환하고 게임 진행 단계로 넘어갑니다.
-- 한 명이라도 거절하면 매칭 세션은 거절 상태로 전환합니다.
-- 거절/타임아웃 유저는 큐에서 이탈하고, 이미 수락한 유저는 기존 큐 진입 시간을 유지해 최우선 복귀합니다.
+- 한 명이 거절해도 10초 수락/거절 모달 윈도우는 상대방에게 계속 유지됩니다.
+- 최종 정산은 양쪽 응답이 모두 확정되었거나 timeout 처리 시점에 수행합니다.
+- 거절/타임아웃/미응답 유저는 큐에서 이탈하고, 제한 시간 안에 수락한 유저는 기존 큐 진입 시간을 유지해 최우선 복귀합니다.
 - 수락 제한 시간이 지나면 timeout으로 처리합니다. timeout은 reject와 같은 종료/복귀 흐름을 사용하되, 상태값은 `TIMEOUT`으로 분리합니다.
 - 동시 수락/거절 요청에서도 세션 상태가 꼬이지 않도록 `matchId` 기준 Redis 분산락을 사용합니다.
 
@@ -21,20 +22,20 @@ Issue-28에서 SSE `match_found` 알림은 이미 구현했습니다. 이번 이
 
 ```text
 상태 저장:
-  MatchSession에 userAAccepted, userBAccepted 추가
+  MatchSession에 userAStatus, userBStatus 추가
+  각 유저 응답 상태는 PENDING / ACCEPTED / REJECTED / TIMEOUT으로 표현
   MatchSession에 userAEntryTime, userBEntryTime 추가
 
 동시성 제어:
   accept/reject/timeout 처리는 matchId 기준 Redis lock으로 직렬화
 
 timeout 정책:
-  reject와 동일하게 매칭 실패 종료 흐름을 타지만,
-  유저가 직접 거절한 것은 DECLINED,
-  시간 초과는 TIMEOUT으로 상태를 분리
+  10초 응답 윈도우 종료 시 PENDING 유저를 TIMEOUT/미응답으로 정산
+  제한 시간 안에 ACCEPTED인 유저만 기존 entryTime으로 큐 복귀
 
 큐 복귀 정책:
-  수락한 유저는 기존 entryTime으로 대기열에 재삽입
-  거절/타임아웃 유저는 큐 이탈
+  제한 시간 안에 수락한 유저는 기존 entryTime으로 대기열에 재삽입
+  거절/타임아웃/미응답 유저는 큐 이탈
 ```
 
 ## 📚 Tasks
@@ -54,8 +55,8 @@ timeout 정책:
   - key: `match:user:status:{userId}`
   - status: `MATCHING`, `FOUND`, `ACCEPTED`, `DECLINED`, `TIMEOUT`, `IN_GAME`
 - [x] 이번 이슈에서 추가로 필요한 세션 필드 정의
-  - `userAAccepted`
-  - `userBAccepted`
+  - `userAStatus`
+  - `userBStatus`
   - `userAEntryTime`
   - `userBEntryTime`
 
@@ -82,9 +83,10 @@ timeout 정책:
 
 #### 수락/거절 구현 시 필요한 보강
 
-- 양쪽 유저의 수락 여부를 세션에 저장해야 합니다.
-  - `userAAccepted`
-  - `userBAccepted`
+- 양쪽 유저의 응답 상태를 세션에 저장해야 합니다.
+  - `userAStatus`
+  - `userBStatus`
+  - 값: `PENDING`, `ACCEPTED`, `REJECTED`, `TIMEOUT`
 - 한쪽 거절/타임아웃 시 수락한 유저를 최우선 복귀시키려면 기존 큐 진입 시간이 필요합니다.
   - 매칭 엔진은 매칭 성사 시 두 유저를 대기열에서 원자 제거합니다.
   - 따라서 수락한 유저는 "계속 큐에 남아 있는 것"이 아니라 기존 `entryTime`으로 재삽입되어야 합니다.
@@ -103,16 +105,16 @@ timeout 정책:
 
 ### 2. 도메인 모델 확장
 
-- [x] `MatchSession`에 수락 상태 필드 추가
-  - `boolean userAAccepted`
-  - `boolean userBAccepted`
+- [x] `MatchSession`에 유저별 응답 상태 필드 추가
+  - `MatchResponseStatus userAStatus`
+  - `MatchResponseStatus userBStatus`
 - [x] `MatchSession`에 원래 큐 정보 필드 추가
   - `int userATierScore`
   - `int userBTierScore`
   - `long userAEntryTime`
   - `long userBEntryTime`
 - [x] 생성 메서드 수정
-  - `MatchSession.create()`는 수락 기본값 `false, false`와 각 유저의 기존 `entryTime`을 함께 저장
+- `MatchSession.create()`는 응답 기본값 `PENDING, PENDING`과 각 유저의 기존 `entryTime`을 함께 저장
 - [x] 편의 메서드 검토
   - `isParticipant(Long userId)`
   - `isAcceptedByBoth()`
@@ -124,24 +126,25 @@ timeout 정책:
 
 #### 구현 결과
 
-- `MatchSession`에 유저별 수락 여부를 추가했습니다.
-  - `userAAccepted`
-  - `userBAccepted`
+- `MatchSession`에 유저별 응답 상태를 추가했습니다.
+  - `userAStatus`
+  - `userBStatus`
+  - 값: `PENDING`, `ACCEPTED`, `REJECTED`, `TIMEOUT`
 - `MatchSession`에 각 유저의 기존 큐 정보를 추가로 저장했습니다.
   - `userATierScore`
   - `userBTierScore`
   - `userAEntryTime`
   - `userBEntryTime`
   - 한쪽 거절/타임아웃 시 이미 수락한 유저를 기존 우선순위로 큐에 복귀시키기 위한 필드입니다.
-- `MatchSession.create()`는 매칭 성사 직후 수락 대기 상태를 만들기 때문에 두 수락 필드를 모두 `false`로 초기화하고, 두 유저의 기존 `tierScore`, `entryTime`을 함께 저장합니다.
+- `MatchSession.create()`는 매칭 성사 직후 수락 대기 상태를 만들기 때문에 두 응답 상태를 모두 `PENDING`으로 초기화하고, 두 유저의 기존 `tierScore`, `entryTime`을 함께 저장합니다.
 - 참여자/수락 완료 판단 메서드를 추가했습니다.
   - `isParticipant(Long userId)`
   - `isUserA(Long userId)`
   - `isUserB(Long userId)`
   - `isAcceptedByBoth()`
 - `RedisMatchSessionStore` 저장/복원 필드를 확장했습니다.
-  - `userAAccepted`
-  - `userBAccepted`
+  - `userAStatus`
+  - `userBStatus`
 - `RedisMatchSessionStore` 저장/복원 필드에 기존 큐 정보를 추가했습니다.
   - `userATierScore`
   - `userBTierScore`
@@ -302,9 +305,9 @@ timeout 정책:
 
 ```text
 FOUND
-  -> userA만 수락: FOUND + userAAccepted=true
-  -> userB만 수락: FOUND + userBAccepted=true
-  -> 둘 다 수락: ACCEPTED + userAAccepted=true + userBAccepted=true
+  -> userA만 수락: FOUND + userAStatus=ACCEPTED
+  -> userB만 수락: FOUND + userBStatus=ACCEPTED
+  -> 둘 다 수락: ACCEPTED + userAStatus=ACCEPTED + userBStatus=ACCEPTED
 ```
 
 - 요청 유저 상태는 `ACCEPTED`로 변경합니다.
@@ -316,21 +319,25 @@ FOUND
 거절 처리:
 
 ```text
-FOUND -> DECLINED
+FOUND
+  -> 요청 유저만 status=REJECTED
+  -> 상대가 아직 미응답이면 FOUND 유지
+  -> 양쪽 응답 완료 후 실패 정산 시 DECLINED
 ACCEPTED -> 거절 불가
 DECLINED/TIMEOUT -> 이미 종료된 세션
 ```
 
-- 한 명이라도 거절하면 세션 status는 `DECLINED`로 변경합니다.
+- 한 명이 거절해도 상대방의 10초 응답 윈도우는 유지합니다.
+- 거절 요청만으로 세션 status를 즉시 `DECLINED`로 변경하지 않습니다.
 - 거절한 유저는 매칭에서 제외합니다.
   - user status 제거
   - 대기열 재삽입 없음
-- 이미 수락한 상대 유저는 기존 큐 진입 시간으로 대기열에 재삽입합니다.
+- 양쪽 응답이 모두 끝났을 때, 제한 시간 안에 수락한 유저는 기존 큐 진입 시간으로 대기열에 재삽입합니다.
   - user status는 `MATCHING`으로 변경
   - ZSET score는 세션에 저장된 기존 `entryTime` 사용
   - 새 `now`를 쓰면 최우선 복귀 정책이 깨지므로 사용하지 않습니다.
-- 아직 수락하지 않은 상대 유저는 큐에 복귀시키지 않습니다.
-  - 거절 시점에 수락한 사람이 없다면 양쪽 모두 매칭에서 빠집니다.
+- 아직 응답하지 않은 상대 유저는 10초 안에 수락 또는 거절할 수 있습니다.
+  - 예: B가 3초에 거절하고 A가 6초에 수락하면 A는 큐 최우선 복귀 대상입니다.
 
 timeout 처리:
 
@@ -340,10 +347,9 @@ ACCEPTED -> timeout 불가
 DECLINED/TIMEOUT -> 이미 종료된 세션
 ```
 
-- timeout은 reject와 같은 정리 흐름을 사용합니다.
-- 단, 사용자가 직접 거절한 것과 구분하기 위해 세션 status는 `TIMEOUT`으로 분리합니다.
-- timeout 대상 유저는 매칭에서 제외합니다.
-- 이미 수락한 상대 유저는 기존 큐 진입 시간으로 대기열에 재삽입합니다.
+- timeout은 10초 응답 윈도우가 끝난 뒤 남은 PENDING 유저를 미응답으로 정산합니다.
+- 제한 시간 안에 수락한 유저는 기존 큐 진입 시간으로 대기열에 재삽입합니다.
+- 거절/timeout/미응답 유저는 매칭에서 제외합니다.
 - 아무도 수락하지 않은 상태에서 timeout이면 양쪽 모두 매칭에서 제외합니다.
 - 세션 TTL이 먼저 만료되어 세션이 없으면, API 요청에서는 만료/없음 에러를 반환합니다.
 - 세션 TTL 만료 후 남아 있는 유저 status 보정은 timeout 처리 작업에서 별도로 다룹니다.
@@ -351,7 +357,7 @@ DECLINED/TIMEOUT -> 이미 종료된 세션
 #### 중복 요청 정책
 
 - 같은 유저가 같은 세션에 accept를 두 번 보내는 경우는 멱등 처리 후보입니다.
-  - 이미 해당 유저의 accepted flag가 `true`이면 성공으로 간주해도 상태가 꼬이지 않습니다.
+  - 이미 해당 유저의 응답 상태가 `ACCEPTED`이면 성공으로 간주해도 상태가 꼬이지 않습니다.
   - V1에서는 클라이언트 재시도 안정성을 위해 중복 accept는 성공 처리하는 방향이 적합합니다.
 - 이미 `ACCEPTED`, `DECLINED`, `TIMEOUT`으로 종료된 세션에 반대 응답이 들어오면 conflict로 처리합니다.
 - lock 획득 실패는 같은 `matchId`에 대한 요청이 처리 중이라는 뜻이므로 conflict 또는 retryable error로 처리합니다.
@@ -503,8 +509,8 @@ public void accept(String matchId, Long userId) {
   - 세션 key 존재 여부 확인
   - 요청 유저가 `userA` 또는 `userB`인지 확인
   - 세션 status가 `FOUND`인지 확인
-  - 해당 유저 accepted field를 `true`로 변경
-  - 양쪽 accepted가 모두 `true`면 status를 `ACCEPTED`로 변경
+  - 해당 유저 응답 상태를 `ACCEPTED`로 변경
+  - 양쪽 응답 상태가 모두 `ACCEPTED`면 status를 `ACCEPTED`로 변경
   - 유저 상태를 `ACCEPTED`로 변경
   - lock 해제
 - [x] 거절 처리 흐름 설계
@@ -512,20 +518,22 @@ public void accept(String matchId, Long userId) {
   - 세션 key 존재 여부 확인
   - 요청 유저가 참여자인지 확인
   - 이미 완료/거절/timeout된 세션인지 확인
-  - status를 `DECLINED`로 변경
+  - 해당 유저 응답 상태를 `REJECTED`로 변경
+  - 상대가 미응답이면 세션 status는 `FOUND` 유지
+  - 양쪽 응답이 완료되면 실패 정산 후 status를 `DECLINED`로 변경
   - 거절 유저 상태 제거
-  - 이미 수락한 상대 유저가 있으면 기존 `entryTime`으로 큐 복귀
+  - 응답 상태가 `ACCEPTED`인 유저가 있으면 기존 `entryTime`으로 큐 복귀
   - lock 해제
 - [x] timeout 처리 흐름 설계
   - `matchId` lock 획득
   - 세션이 남아 있으면 status를 `TIMEOUT`으로 변경
   - timeout 대상 유저 상태 제거
-  - 이미 수락한 상대 유저가 있으면 기존 `entryTime`으로 큐 복귀
+  - 응답 상태가 `ACCEPTED`인 유저가 있으면 기존 `entryTime`으로 큐 복귀
   - 세션이 이미 TTL로 삭제된 경우 유저 상태 보정 가능 여부 검토
   - lock 해제
 - [x] Redis Hash field 상수화
-  - `userAAccepted`
-  - `userBAccepted`
+  - `userAStatus`
+  - `userBStatus`
 - [x] `MatchSessionStore` 기능 확장 검토
   - `MatchSessionStore`는 Redis Hash 저장/조회 책임에 집중
   - 동시성은 `@DistributedRedisLock`이 서비스 메서드 전체를 감싸서 보장
@@ -622,20 +630,20 @@ userA accept 요청
 userB accept 요청
 
 1. userA 요청이 lock 획득
-2. userA accepted=true 저장
-3. 아직 userB는 false이므로 status=FOUND 유지
+2. userAStatus=ACCEPTED 저장
+3. 아직 userBStatus=PENDING이므로 status=FOUND 유지
 4. userA lock 해제
 5. userB 요청이 lock 획득
-6. userB accepted=true 저장
-7. userA/userB 모두 true이므로 status=ACCEPTED 저장
+6. userBStatus=ACCEPTED 저장
+7. userAStatus/userBStatus 모두 ACCEPTED이므로 status=ACCEPTED 저장
 8. userB lock 해제
 ```
 
 결과:
 
 ```text
-userAAccepted=true
-userBAccepted=true
+userAStatus=ACCEPTED
+userBStatus=ACCEPTED
 status=ACCEPTED
 ```
 
@@ -650,7 +658,7 @@ userB reject 요청
 
 ```text
 accept 먼저 처리:
-  userA accepted=true
+  userAStatus=ACCEPTED
   status=FOUND
   이후 reject 처리:
     status=DECLINED
@@ -658,14 +666,17 @@ accept 먼저 처리:
     userA는 기존 entryTime으로 큐 최우선 복귀
 
 reject 먼저 처리:
-  status=DECLINED
+  userBStatus=REJECTED
   userB는 큐 이탈
-  아직 userA가 수락하지 않았으므로 userA도 큐 복귀 없음
+  아직 userA가 응답하지 않았으므로 세션은 FOUND 유지
   이후 accept 처리:
-    이미 종료된 세션이므로 conflict
+    userAStatus=ACCEPTED
+    양쪽 응답 완료
+    status=DECLINED
+    userA는 제한 시간 안에 수락했으므로 기존 entryTime으로 큐 복귀
 ```
 
-정책상 한 명이라도 거절하면 현재 매칭은 실패합니다. 다만 이미 수락한 유저는 잘못한 것이 없으므로 기존 대기 우선순위를 유지해 큐로 복귀시키는 것이 맞습니다.
+정책상 한 명이라도 거절하면 현재 매칭은 실패합니다. 다만 10초 응답 윈도우는 양쪽 모두에게 보장되므로, 상대가 먼저 거절했더라도 제한 시간 안에 수락한 유저는 기존 대기 우선순위를 유지해 큐로 복귀시키는 것이 맞습니다.
 
 #### 중복 accept 시나리오
 
@@ -673,7 +684,7 @@ reject 먼저 처리:
 같은 user가 accept를 여러 번 전송
 ```
 
-이미 해당 유저의 accepted flag가 `true`이면 같은 요청의 재시도로 보고 성공 처리합니다.
+이미 해당 유저의 응답 상태가 `ACCEPTED`이면 같은 요청의 재시도로 보고 성공 처리합니다.
 
 이유:
 
@@ -735,8 +746,8 @@ userA
 userB
 status
 createdAt
-userAAccepted
-userBAccepted
+userAStatus
+userBStatus
 userAEntryTime
 userBEntryTime
 ```
@@ -752,14 +763,15 @@ userBEntryTime
   - 두 유저 status는 `ACCEPTED`
   - `IN_GAME` 전환은 게임 세션 생성 이슈에서 처리
 - [x] 거절 시 처리 정책 확인
-  - 세션 status는 `DECLINED`
+  - 상대가 미응답이면 세션 status는 `FOUND` 유지
+  - 양쪽 응답이 모두 끝나면 세션 status는 `DECLINED`
   - 거절한 유저는 큐 이탈
-  - 이미 수락한 상대 유저는 기존 `entryTime`으로 큐 최우선 복귀
-  - 아직 수락하지 않은 상대 유저는 큐 복귀 없음
+  - 제한 시간 안에 수락한 유저는 기존 `entryTime`으로 큐 최우선 복귀
+  - 미응답 상대 유저의 수락/거절 모달은 10초 동안 유지
 - [x] timeout 시 처리 정책 확인
   - 세션 status는 `TIMEOUT`
-  - timeout 대상 유저는 큐 이탈
-  - 이미 수락한 상대 유저는 기존 `entryTime`으로 큐 최우선 복귀
+  - timeout/미응답 대상 유저는 큐 이탈
+  - 제한 시간 안에 수락한 유저는 기존 `entryTime`으로 큐 최우선 복귀
   - 아무도 수락하지 않았으면 양쪽 모두 큐 이탈
 - [x] 세션 만료 후 유저 상태 보정 정책 확인
   - accept/reject 요청 시 세션 없음이면 만료/없음 에러를 반환
@@ -862,15 +874,16 @@ userB.entryTime -> userBEntryTime
 
 #### 상태 처리 표
 
-| 상황 | 세션 status | 수락한 유저 | 거절/timeout 유저 |
+| 상황 | 세션 status | 수락한 유저 | 거절/timeout/미응답 유저 |
 | :--- | :--- | :--- | :--- |
 | 둘 다 수락 | `ACCEPTED` | `ACCEPTED`, 게임 단계로 이동 | `ACCEPTED`, 게임 단계로 이동 |
 | A 수락 후 B 거절 | `DECLINED` | A는 기존 `entryTime`으로 큐 복귀, status `MATCHING` | B는 status 제거 |
 | A 수락 후 B timeout | `TIMEOUT` | A는 기존 `entryTime`으로 큐 복귀, status `MATCHING` | B는 status 제거 |
 | 아무도 수락하지 않고 timeout | `TIMEOUT` | 없음 | 양쪽 status 제거 |
-| B가 먼저 거절 | `DECLINED` | 없음 | 양쪽 status 제거 |
+| B가 먼저 거절, A가 10초 안에 수락 | `DECLINED` | A는 기존 `entryTime`으로 큐 복귀, status `MATCHING` | B는 status 제거 |
+| B가 먼저 거절, A도 거절 또는 미응답 | `DECLINED` 또는 `TIMEOUT` | 없음 | 양쪽 status 제거 |
 
-`B가 먼저 거절`한 경우 A는 아직 수락하지 않았으므로 큐에 복귀하지 않습니다. 이 정책은 "거절한 사람만 불이익"이 아니라 "수락한 유저만 최우선 복귀"입니다.
+`B가 먼저 거절`한 경우에도 A의 수락/거절 모달은 10초 동안 유지됩니다. A가 제한 시간 안에 수락하면 큐 최우선 복귀 대상이고, A도 거절하거나 끝까지 응답하지 않으면 큐에 복귀하지 않습니다.
 
 #### 구현에 필요한 추가 작업
 
@@ -881,8 +894,8 @@ userB.entryTime -> userBEntryTime
 - 매칭 세션 생성 시 `MatchTicket.tierScore`를 세션에 저장
 - 수락한 유저 큐 복귀를 위해 `MatchStore`에 기존 entryTime 기반 enqueue 메서드 추가 검토
   - 예: `addToQueue(Long userId, int tierScore, long entryTime)`
-- 거절/timeout 처리 시 accepted flag가 `true`인 유저만 큐 복귀
-- accepted flag가 `false`인 유저는 상대가 거절/timeout 하더라도 큐 복귀 없음
+- 거절/timeout 정산 시 응답 상태가 `ACCEPTED`인 유저만 큐 복귀
+- 응답 상태가 `ACCEPTED`가 아닌 유저는 큐 복귀 없음
 
 ### 10. MatchSession 복귀 정보 확장
 
@@ -918,7 +931,11 @@ userB.entryTime -> userBEntryTime
   - `tierScoreOf(userId)`
   - `entryTimeOf(userId)`
   - `acceptedBy(userId)`
+  - `rejectedBy(userId)`
+  - `isRespondedBy(userId)`
+  - `isRespondedByBoth()`
   - `accept(userId)`
+  - `reject(userId)`
   - `withStatus(status)`
 - record 필드 확장으로 세션 저장/복원 데이터가 누락되면 복귀 정책이 깨지므로, `RedisMatchSessionStore` 저장/복원 필드도 함께 확장했습니다.
 
@@ -930,8 +947,8 @@ userB.entryTime -> userBEntryTime
   - `userB`
   - `status`
   - `createdAt`
-  - `userAAccepted`
-  - `userBAccepted`
+  - `userAStatus`
+  - `userBStatus`
   - `userATierScore`
   - `userBTierScore`
   - `userAEntryTime`
@@ -1014,50 +1031,100 @@ matchStore.add(returnTicket);
 
 ### 14. MatchResponseProcessor 구현
 
-- [ ] `MatchResponseProcessor` 추가
+- [x] `MatchResponseProcessor` 추가
   - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service`
   - `@DistributedRedisLock` 적용 대상
-- [ ] `acceptWithLock(String matchId, Long userId)` 구현
+- [x] `acceptWithLock(String matchId, Long userId)` 구현
   - 세션 조회
   - 참여자 검증
   - status 검증
   - 중복 accept 멱등 처리
-  - 요청 유저 accepted flag 저장
+  - 요청 유저 응답 상태를 `ACCEPTED`로 저장
   - 양쪽 수락 완료 시 status `ACCEPTED`
   - 요청 유저 status `ACCEPTED`
-- [ ] `rejectWithLock(String matchId, Long userId)` 구현
+- [x] `rejectWithLock(String matchId, Long userId)` 구현
   - 세션 조회
   - 참여자 검증
   - status 검증
-  - 세션 status `DECLINED`
+  - 요청 유저 응답 상태를 `REJECTED`로 저장
   - 거절 유저 status 제거
-  - accepted flag가 `true`인 상대가 있으면 기존 tierScore/entryTime으로 큐 복귀
-  - accepted flag가 `false`인 상대는 큐 복귀 없음
+  - 상대가 미응답이면 세션 status `FOUND` 유지
+  - 양쪽 응답이 모두 끝났고 응답 상태가 `ACCEPTED`인 유저가 있으면 기존 tierScore/entryTime으로 큐 복귀
+  - 응답 상태가 `ACCEPTED`가 아닌 유저는 큐 복귀 없음
   - 복귀 유저 status `MATCHING`
-- [ ] timeout 처리 메서드는 이번 API 구현과 분리
+- [x] timeout 처리 메서드는 이번 API 구현과 분리
   - 정책은 정리하되 스케줄러/만료 감지는 후속 작업 우선
+
+#### 구현 결과
+
+- `MatchResponseProcessor`를 추가했습니다.
+  - `acceptWithLock(matchId, userId)`
+  - `rejectWithLock(matchId, userId)`
+- 두 메서드 모두 `@DistributedRedisLock`을 적용했습니다.
+  - key: `match:session:lock:{matchId}`
+  - 같은 matchId의 accept/reject 요청은 직렬화됩니다.
+- accept 처리:
+  - 세션 조회
+  - 참여자 검증
+  - `FOUND` 상태 검증
+  - 중복 accept는 멱등 처리
+  - 요청 유저 응답 상태를 `ACCEPTED`로 저장
+  - 양쪽 모두 수락하면 세션 status `ACCEPTED`
+  - 요청 유저 status `ACCEPTED`
+- reject 처리:
+  - 세션 조회
+  - 참여자 검증
+  - `FOUND` 상태 검증
+  - 이미 수락한 유저의 reject는 `MATCH_SESSION_ALREADY_ACCEPTED`
+  - 요청 유저 응답 상태를 `REJECTED`로 저장
+  - 거절 유저 status 제거
+  - 상대가 아직 미응답이면 세션 status `FOUND` 유지
+  - 양쪽 응답이 모두 끝났고 응답 상태가 `ACCEPTED`인 유저만 기존 `tierScore`, `entryTime`으로 큐 복귀
+  - 양쪽 응답이 모두 끝났고 응답 상태가 `ACCEPTED`가 아닌 유저는 status 제거 후 큐 복귀 없음
+- timeout 처리 메서드는 이번 API 구현 범위에서 제외했습니다.
+  - timeout 감지/스케줄링은 후속 작업에서 같은 lock key로 처리합니다.
 
 ### 15. MatchResponseCommandService 연결
 
-- [ ] 현재 `UnsupportedOperationException` 제거
-- [ ] `MatchResponseProcessor` 위임
+- [x] 현재 `UnsupportedOperationException` 제거
+- [x] `MatchResponseProcessor` 위임
   - `accept(matchId, userId)`
   - `reject(matchId, userId)`
-- [ ] `RedisLockAcquisitionException` 변환
+- [x] `RedisLockAcquisitionException` 변환
   - `MatchingException(MATCH_RESPONSE_LOCK_FAILED)`
-- [ ] API 모듈 `MatchResponseService`는 변경 최소화
+- [x] API 모듈 `MatchResponseService`는 변경 최소화
   - 이미 matching command service로 위임 중
+
+#### 구현 결과
+
+- `MatchResponseCommandService`의 임시 `UnsupportedOperationException`을 제거했습니다.
+- `accept()` / `reject()`는 각각 `MatchResponseProcessor.acceptWithLock()` / `rejectWithLock()`로 위임합니다.
+- `RedisLockAcquisitionException`은 API 경계로 그대로 노출하지 않고 `MatchingException(MATCH_RESPONSE_LOCK_FAILED)`로 변환합니다.
+- API 모듈 `MatchResponseService`는 기존 위임 구조를 유지했습니다.
 
 ### 16. 이벤트 후속 확장 지점 정리
 
-- [ ] 이번 이슈에서 클라이언트에게 추가 SSE 이벤트를 보낼지 결정
+- [x] 이번 이슈에서 클라이언트에게 추가 SSE 이벤트를 보낼지 결정
   - 예: `match_accept`, `match_reject`, `match_completed`, `match_timeout`
-- [ ] 범위 초과라면 후속 이슈로 분리
-- [ ] 최소한 내부 이벤트 발행 지점은 열어둘지 검토
+- [x] 범위 초과라면 후속 이슈로 분리
+- [x] 최소한 내부 이벤트 발행 지점은 열어둘지 검토
   - `MatchAcceptedEvent`
   - `MatchRejectedEvent`
   - `MatchCompletedEvent`
-- [ ] 현재 이슈는 API 상태 변경까지만 하고, 실시간 상태 동기화 이벤트는 후속 이슈로 남기는 방향 우선
+- [x] 현재 이슈는 API 상태 변경까지만 하고, 실시간 상태 동기화 이벤트는 후속 이슈로 남기는 방향 우선
+
+#### 결정 결과
+
+- 이번 이슈에서는 accept/reject 관련 추가 SSE 이벤트를 발행하지 않습니다.
+- 현재 정책상 한쪽이 먼저 거절해도 상대방의 수락/거절 모달은 10초 동안 유지됩니다.
+  - 이때 `match_reject` 이벤트를 즉시 보내면 "상대가 거절했지만 나는 수락해야 큐 최우선 복귀가 가능하다"는 정책과 UX가 충돌합니다.
+- `match_accept` 이벤트도 이번 범위에서는 실익이 작습니다.
+  - 상대 수락 여부와 무관하게 클라이언트가 해야 할 일은 10초 안에 자기 응답을 보내는 것입니다.
+- 둘 다 수락된 이후의 게임 진입 알림은 게임 세션 생성 흐름에서 `game_ready` 또는 별도 완료 이벤트로 설계합니다.
+- timeout 정산 알림은 timeout 스케줄러/정산 후속 이슈에서 함께 설계합니다.
+- 내부 이벤트(`MatchAcceptedEvent`, `MatchRejectedEvent`, `MatchCompletedEvent`)도 현재는 만들지 않습니다.
+  - 소비자가 없고, 게임 세션 생성/timeout 정산 정책과 결합될 가능성이 높아 이름과 payload가 다시 바뀔 수 있기 때문입니다.
+- 따라서 issue-30의 이벤트 범위는 기존 `match_found` SSE 유지로 제한하고, accept/reject API는 Redis 세션 상태 변경까지만 담당합니다.
 
 ### 17. API 문서화 및 RestDocs
 

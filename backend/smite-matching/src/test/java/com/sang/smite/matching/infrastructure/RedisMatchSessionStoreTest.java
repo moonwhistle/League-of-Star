@@ -2,6 +2,7 @@ package com.sang.smite.matching.infrastructure;
 
 import com.sang.smite.domain.match.domain.MatchSession;
 import com.sang.smite.domain.match.domain.MatchStatus;
+import com.sang.smite.domain.match.domain.MatchResponseStatus;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +40,7 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         String matchId = "test-match-1";
         long now = System.currentTimeMillis();
         MatchSession session = new MatchSession(matchId, 1L, 2L, 10, 11, 1000L, 2000L,
-                MatchStatus.FOUND, now, false, false);
+                MatchStatus.FOUND, now, MatchResponseStatus.PENDING, MatchResponseStatus.PENDING);
         long ttlSeconds = 12L;
 
         // when
@@ -59,8 +60,8 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         assertThat(sessionHash.get("userBEntryTime")).isEqualTo("2000");
         assertThat(sessionHash.get("status")).isEqualTo("FOUND");
         assertThat(sessionHash.get("createdAt")).isEqualTo(String.valueOf(now));
-        assertThat(sessionHash.get("userAAccepted")).isEqualTo("false");
-        assertThat(sessionHash.get("userBAccepted")).isEqualTo("false");
+        assertThat(sessionHash.get("userAStatus")).isEqualTo("PENDING");
+        assertThat(sessionHash.get("userBStatus")).isEqualTo("PENDING");
 
         // TTL 검증 (테스트 실행 지연을 고려해 10초 이상, 설정값 이하)
         long remainTimeToLive = sessionHash.remainTimeToLive();
@@ -74,7 +75,7 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         String matchId = "test-match-2";
         long now = System.currentTimeMillis();
         MatchSession session = new MatchSession(matchId, 3L, 4L, 12, 13, 3000L, 4000L,
-                MatchStatus.FOUND, now, true, false);
+                MatchStatus.FOUND, now, MatchResponseStatus.ACCEPTED, MatchResponseStatus.REJECTED);
         matchSessionStore.save(session, 12L);
 
         // when
@@ -91,8 +92,8 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         assertThat(foundSession.get().userBEntryTime()).isEqualTo(4000L);
         assertThat(foundSession.get().status()).isEqualTo(MatchStatus.FOUND);
         assertThat(foundSession.get().createdAt()).isEqualTo(now);
-        assertThat(foundSession.get().userAAccepted()).isTrue();
-        assertThat(foundSession.get().userBAccepted()).isFalse();
+        assertThat(foundSession.get().userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(foundSession.get().userBStatus()).isEqualTo(MatchResponseStatus.REJECTED);
     }
 
     @Test
@@ -101,7 +102,7 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         // given
         String matchId = "test-match-3";
         MatchSession session = new MatchSession(matchId, 5L, 6L, 14, 15, 5000L, 6000L,
-                MatchStatus.FOUND, System.currentTimeMillis(), false, false);
+                MatchStatus.FOUND, System.currentTimeMillis(), MatchResponseStatus.PENDING, MatchResponseStatus.PENDING);
         matchSessionStore.save(session, 12L);
 
         // when

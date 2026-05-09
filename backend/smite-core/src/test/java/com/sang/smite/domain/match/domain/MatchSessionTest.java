@@ -20,15 +20,15 @@ class MatchSessionTest {
         assertThat(session.userAEntryTime()).isEqualTo(1000L);
         assertThat(session.userBEntryTime()).isEqualTo(2000L);
         assertThat(session.status()).isEqualTo(MatchStatus.FOUND);
-        assertThat(session.userAAccepted()).isFalse();
-        assertThat(session.userBAccepted()).isFalse();
+        assertThat(session.userAStatus()).isEqualTo(MatchResponseStatus.PENDING);
+        assertThat(session.userBStatus()).isEqualTo(MatchResponseStatus.PENDING);
     }
 
     @Test
     @DisplayName("세션 참여자 여부를 확인한다.")
     void isParticipant() {
         MatchSession session = new MatchSession("match-1", 1L, 2L, 10, 11, 1000L, 2000L,
-                MatchStatus.FOUND, 3000L, false, false);
+                MatchStatus.FOUND, 3000L, MatchResponseStatus.PENDING, MatchResponseStatus.PENDING);
 
         assertThat(session.isParticipant(1L)).isTrue();
         assertThat(session.isParticipant(2L)).isTrue();
@@ -41,9 +41,9 @@ class MatchSessionTest {
     @DisplayName("두 유저가 모두 수락했는지 확인한다.")
     void isAcceptedByBoth() {
         MatchSession notAccepted = new MatchSession("match-1", 1L, 2L, 10, 11, 1000L, 2000L,
-                MatchStatus.FOUND, 3000L, true, false);
+                MatchStatus.FOUND, 3000L, MatchResponseStatus.ACCEPTED, MatchResponseStatus.PENDING);
         MatchSession acceptedByBoth = new MatchSession("match-1", 1L, 2L, 10, 11, 1000L, 2000L,
-                MatchStatus.ACCEPTED, 3000L, true, true);
+                MatchStatus.ACCEPTED, 3000L, MatchResponseStatus.ACCEPTED, MatchResponseStatus.ACCEPTED);
 
         assertThat(notAccepted.isAcceptedByBoth()).isFalse();
         assertThat(acceptedByBoth.isAcceptedByBoth()).isTrue();
@@ -68,10 +68,26 @@ class MatchSessionTest {
         MatchSession acceptedByA = session.accept(1L);
         MatchSession acceptedByBoth = acceptedByA.accept(2L);
 
-        assertThat(acceptedByA.userAAccepted()).isTrue();
-        assertThat(acceptedByA.userBAccepted()).isFalse();
+        assertThat(acceptedByA.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(acceptedByA.userBStatus()).isEqualTo(MatchResponseStatus.PENDING);
         assertThat(acceptedByA.acceptedBy(1L)).isTrue();
         assertThat(acceptedByBoth.isAcceptedByBoth()).isTrue();
+    }
+
+    @Test
+    @DisplayName("특정 참여자의 거절 상태를 변경한다.")
+    void reject() {
+        MatchSession session = MatchSession.create("match-1", 1L, 2L, 10, 11, 1000L, 2000L);
+
+        MatchSession rejectedByB = session.reject(2L);
+        MatchSession respondedByBoth = rejectedByB.accept(1L);
+
+        assertThat(rejectedByB.userAStatus()).isEqualTo(MatchResponseStatus.PENDING);
+        assertThat(rejectedByB.userBStatus()).isEqualTo(MatchResponseStatus.REJECTED);
+        assertThat(rejectedByB.rejectedBy(2L)).isTrue();
+        assertThat(rejectedByB.isRespondedByBoth()).isFalse();
+        assertThat(respondedByBoth.isRespondedByBoth()).isTrue();
+        assertThat(respondedByBoth.hasFailedResponse()).isTrue();
     }
 
     @Test
@@ -84,8 +100,8 @@ class MatchSessionTest {
         MatchSession accepted = session.withStatus(MatchStatus.ACCEPTED);
 
         assertThat(accepted.status()).isEqualTo(MatchStatus.ACCEPTED);
-        assertThat(accepted.userAAccepted()).isTrue();
-        assertThat(accepted.userBAccepted()).isTrue();
+        assertThat(accepted.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(accepted.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
         assertThat(accepted.userATierScore()).isEqualTo(10);
         assertThat(accepted.userBEntryTime()).isEqualTo(2000L);
     }

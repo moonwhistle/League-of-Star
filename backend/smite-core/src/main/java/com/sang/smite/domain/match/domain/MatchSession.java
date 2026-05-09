@@ -13,8 +13,8 @@ public record MatchSession(
         long userBEntryTime,
         MatchStatus status,
         long createdAt,
-        boolean userAAccepted,
-        boolean userBAccepted
+        MatchResponseStatus userAStatus,
+        MatchResponseStatus userBStatus
 ) {
     public static MatchSession create(
             String matchId,
@@ -35,8 +35,8 @@ public record MatchSession(
                 userBEntryTime,
                 MatchStatus.FOUND,
                 System.currentTimeMillis(),
-                false,
-                false
+                MatchResponseStatus.PENDING,
+                MatchResponseStatus.PENDING
         );
     }
 
@@ -53,7 +53,18 @@ public record MatchSession(
     }
 
     public boolean isAcceptedByBoth() {
-        return userAAccepted && userBAccepted;
+        return userAStatus == MatchResponseStatus.ACCEPTED && userBStatus == MatchResponseStatus.ACCEPTED;
+    }
+
+    public boolean hasFailedResponse() {
+        return userAStatus == MatchResponseStatus.REJECTED
+                || userBStatus == MatchResponseStatus.REJECTED
+                || userAStatus == MatchResponseStatus.TIMEOUT
+                || userBStatus == MatchResponseStatus.TIMEOUT;
+    }
+
+    public boolean isRespondedByBoth() {
+        return isRespondedBy(userA) && isRespondedBy(userB);
     }
 
     public int tierScoreOf(Long userId) {
@@ -77,11 +88,23 @@ public record MatchSession(
     }
 
     public boolean acceptedBy(Long userId) {
+        return responseStatusOf(userId) == MatchResponseStatus.ACCEPTED;
+    }
+
+    public boolean rejectedBy(Long userId) {
+        return responseStatusOf(userId) == MatchResponseStatus.REJECTED;
+    }
+
+    public boolean isRespondedBy(Long userId) {
+        return responseStatusOf(userId).isResponded();
+    }
+
+    public MatchResponseStatus responseStatusOf(Long userId) {
         if (isUserA(userId)) {
-            return userAAccepted;
+            return userAStatus;
         }
         if (isUserB(userId)) {
-            return userBAccepted;
+            return userBStatus;
         }
         throw new IllegalArgumentException("매칭 세션 참여자가 아닙니다.");
     }
@@ -89,17 +112,29 @@ public record MatchSession(
     public MatchSession accept(Long userId) {
         if (isUserA(userId)) {
             return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
-                    userBEntryTime, status, createdAt, true, userBAccepted);
+                    userBEntryTime, status, createdAt, MatchResponseStatus.ACCEPTED, userBStatus);
         }
         if (isUserB(userId)) {
             return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
-                    userBEntryTime, status, createdAt, userAAccepted, true);
+                    userBEntryTime, status, createdAt, userAStatus, MatchResponseStatus.ACCEPTED);
+        }
+        throw new IllegalArgumentException("매칭 세션 참여자가 아닙니다.");
+    }
+
+    public MatchSession reject(Long userId) {
+        if (isUserA(userId)) {
+            return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+                    userBEntryTime, status, createdAt, MatchResponseStatus.REJECTED, userBStatus);
+        }
+        if (isUserB(userId)) {
+            return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+                    userBEntryTime, status, createdAt, userAStatus, MatchResponseStatus.REJECTED);
         }
         throw new IllegalArgumentException("매칭 세션 참여자가 아닙니다.");
     }
 
     public MatchSession withStatus(MatchStatus status) {
         return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
-                userBEntryTime, status, createdAt, userAAccepted, userBAccepted);
+                userBEntryTime, status, createdAt, userAStatus, userBStatus);
     }
 }

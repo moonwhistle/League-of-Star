@@ -1,6 +1,7 @@
 package com.sang.smite.matching.infrastructure;
 
 import com.sang.smite.domain.match.domain.MatchSession;
+import com.sang.smite.domain.match.domain.MatchResponseStatus;
 import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.repository.MatchSessionStore;
@@ -33,8 +34,8 @@ public class RedisMatchSessionStore implements MatchSessionStore {
     private static final String FIELD_USER_B_ENTRY_TIME = "userBEntryTime";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_CREATED_AT = "createdAt";
-    private static final String FIELD_USER_A_ACCEPTED = "userAAccepted";
-    private static final String FIELD_USER_B_ACCEPTED = "userBAccepted";
+    private static final String FIELD_USER_A_STATUS = "userAStatus";
+    private static final String FIELD_USER_B_STATUS = "userBStatus";
 
     private final RedissonClient redissonClient;
 
@@ -65,8 +66,8 @@ public class RedisMatchSessionStore implements MatchSessionStore {
                 Long.parseLong(fields.get(FIELD_USER_B_ENTRY_TIME)),
                 MatchStatus.valueOf(fields.get(FIELD_STATUS)),
                 Long.parseLong(fields.get(FIELD_CREATED_AT)),
-                Boolean.parseBoolean(fields.get(FIELD_USER_A_ACCEPTED)),
-                Boolean.parseBoolean(fields.get(FIELD_USER_B_ACCEPTED))
+                MatchResponseStatus.valueOf(fields.get(FIELD_USER_A_STATUS)),
+                MatchResponseStatus.valueOf(fields.get(FIELD_USER_B_STATUS))
         ));
     }
 
@@ -92,8 +93,8 @@ public class RedisMatchSessionStore implements MatchSessionStore {
         fields.put(FIELD_USER_B_ENTRY_TIME, String.valueOf(session.userBEntryTime()));
         fields.put(FIELD_STATUS, session.status().name());
         fields.put(FIELD_CREATED_AT, String.valueOf(session.createdAt()));
-        fields.put(FIELD_USER_A_ACCEPTED, String.valueOf(session.userAAccepted()));
-        fields.put(FIELD_USER_B_ACCEPTED, String.valueOf(session.userBAccepted()));
+        fields.put(FIELD_USER_A_STATUS, session.userAStatus().name());
+        fields.put(FIELD_USER_B_STATUS, session.userBStatus().name());
         return fields;
     }
 }

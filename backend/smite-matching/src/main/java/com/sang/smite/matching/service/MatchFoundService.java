@@ -25,7 +25,6 @@ import java.util.UUID;
 public class MatchFoundService {
 
     private static final int ACCEPT_TIMEOUT_SECONDS = 10;
-    private static final long SESSION_TTL_SECONDS = 12L;
 
     private final MatchUserStatusStore userStatusStore;
     private final MatchSessionStore sessionStore;
@@ -54,7 +53,7 @@ public class MatchFoundService {
                 userA.entryTime(),
                 userB.entryTime()
         );
-        sessionStore.save(session, SESSION_TTL_SECONDS);
+        sessionStore.save(session, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
 
         eventPublisher.publishEvent(new MatchFoundEvent(
                 matchId,
