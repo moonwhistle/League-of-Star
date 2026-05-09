@@ -38,7 +38,8 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         // given
         String matchId = "test-match-1";
         long now = System.currentTimeMillis();
-        MatchSession session = new MatchSession(matchId, 1L, 2L, MatchStatus.FOUND, now, false, false);
+        MatchSession session = new MatchSession(matchId, 1L, 2L, 10, 11, 1000L, 2000L,
+                MatchStatus.FOUND, now, false, false);
         long ttlSeconds = 12L;
 
         // when
@@ -52,6 +53,10 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         assertThat(sessionHash.get("matchId")).isEqualTo(matchId);
         assertThat(sessionHash.get("userA")).isEqualTo("1");
         assertThat(sessionHash.get("userB")).isEqualTo("2");
+        assertThat(sessionHash.get("userATierScore")).isEqualTo("10");
+        assertThat(sessionHash.get("userBTierScore")).isEqualTo("11");
+        assertThat(sessionHash.get("userAEntryTime")).isEqualTo("1000");
+        assertThat(sessionHash.get("userBEntryTime")).isEqualTo("2000");
         assertThat(sessionHash.get("status")).isEqualTo("FOUND");
         assertThat(sessionHash.get("createdAt")).isEqualTo(String.valueOf(now));
         assertThat(sessionHash.get("userAAccepted")).isEqualTo("false");
@@ -68,7 +73,8 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         // given
         String matchId = "test-match-2";
         long now = System.currentTimeMillis();
-        MatchSession session = new MatchSession(matchId, 3L, 4L, MatchStatus.FOUND, now, true, false);
+        MatchSession session = new MatchSession(matchId, 3L, 4L, 12, 13, 3000L, 4000L,
+                MatchStatus.FOUND, now, true, false);
         matchSessionStore.save(session, 12L);
 
         // when
@@ -79,6 +85,10 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         assertThat(foundSession.get().matchId()).isEqualTo(matchId);
         assertThat(foundSession.get().userA()).isEqualTo(3L);
         assertThat(foundSession.get().userB()).isEqualTo(4L);
+        assertThat(foundSession.get().userATierScore()).isEqualTo(12);
+        assertThat(foundSession.get().userBTierScore()).isEqualTo(13);
+        assertThat(foundSession.get().userAEntryTime()).isEqualTo(3000L);
+        assertThat(foundSession.get().userBEntryTime()).isEqualTo(4000L);
         assertThat(foundSession.get().status()).isEqualTo(MatchStatus.FOUND);
         assertThat(foundSession.get().createdAt()).isEqualTo(now);
         assertThat(foundSession.get().userAAccepted()).isTrue();
@@ -90,7 +100,8 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
     void delete() {
         // given
         String matchId = "test-match-3";
-        MatchSession session = new MatchSession(matchId, 5L, 6L, MatchStatus.FOUND, System.currentTimeMillis(), false, false);
+        MatchSession session = new MatchSession(matchId, 5L, 6L, 14, 15, 5000L, 6000L,
+                MatchStatus.FOUND, System.currentTimeMillis(), false, false);
         matchSessionStore.save(session, 12L);
 
         // when

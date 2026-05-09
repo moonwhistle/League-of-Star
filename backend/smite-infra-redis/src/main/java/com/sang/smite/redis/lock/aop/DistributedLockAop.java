@@ -1,7 +1,7 @@
 package com.sang.smite.redis.lock.aop;
 
-import com.sang.smite.redis.lock.annotation.DistributedLock;
 import com.sang.smite.redis.common.constant.LockConstants;
+import com.sang.smite.redis.lock.annotation.DistributedLock;
 import com.sang.smite.redis.lock.exception.RedisLockAcquisitionException;
 import com.sang.smite.redis.lock.parser.CustomSpringELParser;
 import lombok.RequiredArgsConstructor;
@@ -33,11 +33,7 @@ public class DistributedLockAop {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
         DistributedLock distributedLock = method.getAnnotation(DistributedLock.class);
-
-        String key = LockConstants.REDISSON_LOCK_PREFIX +
-                CustomSpringELParser.getDynamicValue(signature.getParameterNames(), joinPoint.getArgs(),
-                        distributedLock.key());
-
+        String key = createLockKey(signature, joinPoint.getArgs(), distributedLock.key());
         RLock rLock = redissonClient.getLock(key);
 
         try {
@@ -54,14 +50,17 @@ public class DistributedLockAop {
              */
             return aopForTransaction.proceed(joinPoint);
         } finally {
-            try {
-                if (rLock.isHeldByCurrentThread()) {
-                    rLock.unlock();
-                }
-            } catch (IllegalMonitorStateException e) {
-                log.info("Redisson Lock Already Unlocked: method={}, key={}", method.getName(), key);
-            }
+            unlockIfHeldByCurrentThread(rLock, method, key);
         }
+    }
+
+    private String createLockKey(MethodSignature signature, Object[] args, String lockKeyExpression) {
+        Object dynamicValue = CustomSpringELParser.getDynamicValue(
+                signature.getParameterNames(),
+                args,
+                lockKeyExpression
+        );
+        return LockConstants.REDISSON_LOCK_PREFIX + dynamicValue;
     }
 
     private boolean tryLock(RLock lock, DistributedLock distributedLock, String key) {
@@ -75,6 +74,16 @@ public class DistributedLockAop {
             log.error("Lock acquisition interrupted for key: {}", key, e);
             Thread.currentThread().interrupt();
             throw new RedisLockAcquisitionException(key, e);
+        }
+    }
+
+    private void unlockIfHeldByCurrentThread(RLock lock, Method method, String key) {
+        try {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        } catch (IllegalMonitorStateException e) {
+            log.info("Redis lock already unlocked: method={}, key={}", method.getName(), key);
         }
     }
 }

@@ -45,7 +45,15 @@ public class MatchFoundService {
         userStatusStore.updateStatus(userB.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
 
         String matchId = UUID.randomUUID().toString();
-        MatchSession session = MatchSession.create(matchId, userA.userId(), userB.userId());
+        MatchSession session = MatchSession.create(
+                matchId,
+                userA.userId(),
+                userB.userId(),
+                userA.tierScore(),
+                userB.tierScore(),
+                userA.entryTime(),
+                userB.entryTime()
+        );
         sessionStore.save(session, SESSION_TTL_SECONDS);
 
         eventPublisher.publishEvent(new MatchFoundEvent(
