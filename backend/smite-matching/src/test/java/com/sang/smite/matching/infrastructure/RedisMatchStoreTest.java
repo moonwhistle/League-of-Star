@@ -105,4 +105,23 @@ class RedisMatchStoreTest extends AbstractRedisTest {
         assertThat(countTier12).isEqualTo(1);
         assertThat(countTier15).isEqualTo(0);
     }
+
+    @Test
+    @DisplayName("기존 entryTime으로 티켓을 재삽입하면 대기열 score가 유지된다")
+    void reAddWithOriginalEntryTime() {
+        // given
+        long originalEntryTime = 100_000L;
+        MatchTicket ticket = new MatchTicket(1L, 10, originalEntryTime);
+
+        // when
+        matchStore.add(ticket);
+
+        // then
+        List<MatchTicket> tickets = matchStore.findAll();
+        assertThat(tickets).hasSize(1);
+        assertThat(tickets.get(0).userId()).isEqualTo(1L);
+        assertThat(tickets.get(0).tierScore()).isEqualTo(10);
+        assertThat(tickets.get(0).entryTime()).isEqualTo(originalEntryTime);
+        assertThat(matchStore.countByTierScore(10)).isEqualTo(1);
+    }
 }

@@ -948,15 +948,34 @@ userB.entryTime -> userBEntryTime
 
 ### 12. MatchStore 큐 복귀 메서드 추가
 
-- [ ] 기존 `add(MatchTicket ticket)` 재사용 가능 여부 확인
+- [x] 기존 `add(MatchTicket ticket)` 재사용 가능 여부 확인
   - `MatchTicket`이 `tierScore`, `entryTime`을 이미 갖고 있으므로 우선 재사용 가능
-- [ ] 서비스 의도를 드러내기 위해 별도 메서드가 필요한지 결정
+- [x] 서비스 의도를 드러내기 위해 별도 메서드가 필요한지 결정
   - 후보: `returnToQueue(MatchTicket ticket)`
   - 후보: `addToQueue(Long userId, int tierScore, long entryTime)`
-- [ ] DRY 관점에서 Redis ZADD 구현은 기존 `add()` 하나로 유지
-- [ ] `MatchResponseProcessor`에서는 세션 값으로 `MatchTicket`을 만들어 `matchStore.add(ticket)` 호출하는 방향 우선
-- [ ] `RedisMatchStoreTest` 보강
+- [x] DRY 관점에서 Redis ZADD 구현은 기존 `add()` 하나로 유지
+- [x] `MatchResponseProcessor`에서는 세션 값으로 `MatchTicket`을 만들어 `matchStore.add(ticket)` 호출하는 방향 우선
+- [x] `RedisMatchStoreTest` 보강
   - 기존 `entryTime`으로 재삽입하면 score가 유지되는지 확인
+
+#### 결정 결과
+
+- 별도 큐 복귀 메서드는 추가하지 않습니다.
+- 기존 `MatchStore.add(MatchTicket ticket)`을 재사용합니다.
+  - `MatchTicket`은 이미 `userId`, `tierScore`, `entryTime`을 모두 가집니다.
+  - `RedisMatchStore.add()`는 `ticket.entryTime()`을 Redis ZSET score로 그대로 저장합니다.
+- 따라서 수락 유저 복귀 시에는 세션에 저장된 값으로 `MatchTicket`을 다시 만들어 추가하면 됩니다.
+
+```java
+MatchTicket returnTicket = new MatchTicket(userId, tierScore, entryTime);
+matchStore.add(returnTicket);
+```
+
+이 방식이 맞는 이유:
+
+- Redis ZADD 구현을 중복하지 않습니다.
+- `returnToQueue()` 같은 별도 메서드는 현재 구현상 `add()`와 완전히 같은 일을 하므로 불필요합니다.
+- 정책적 의미는 `MatchResponseProcessor`의 메서드명과 흐름에서 드러내고, 저장소는 "티켓을 큐에 추가한다"는 물리적 책임만 유지합니다.
 
 ### 13. 에러 코드 정의
 
