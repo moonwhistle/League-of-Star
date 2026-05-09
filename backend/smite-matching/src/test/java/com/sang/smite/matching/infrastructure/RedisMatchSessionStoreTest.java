@@ -1,8 +1,8 @@
 package com.sang.smite.matching.infrastructure;
 
 import com.sang.smite.domain.match.domain.MatchSession;
-import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.domain.match.domain.MatchResponseStatus;
+import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.AfterEach;
@@ -94,6 +94,30 @@ class RedisMatchSessionStoreTest extends AbstractRedisTest {
         assertThat(foundSession.get().createdAt()).isEqualTo(now);
         assertThat(foundSession.get().userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
         assertThat(foundSession.get().userBStatus()).isEqualTo(MatchResponseStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("findById() 호출 시 없는 세션은 empty를 반환한다")
+    void findByIdNotFound() {
+        Optional<MatchSession> foundSession = matchSessionStore.findById("not-found-match");
+
+        assertThat(foundSession).isEmpty();
+    }
+
+    @Test
+    @DisplayName("응답 상태 TIMEOUT까지 Redis Hash에 저장하고 복원할 수 있다")
+    void saveAndFindResponseStatus() {
+        String matchId = "test-match-status";
+        MatchSession session = new MatchSession(matchId, 7L, 8L, 16, 17, 7000L, 8000L,
+                MatchStatus.TIMEOUT, System.currentTimeMillis(), MatchResponseStatus.ACCEPTED, MatchResponseStatus.TIMEOUT);
+
+        matchSessionStore.save(session, 12L);
+
+        Optional<MatchSession> foundSession = matchSessionStore.findById(matchId);
+        assertThat(foundSession).isPresent();
+        assertThat(foundSession.get().status()).isEqualTo(MatchStatus.TIMEOUT);
+        assertThat(foundSession.get().userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(foundSession.get().userBStatus()).isEqualTo(MatchResponseStatus.TIMEOUT);
     }
 
     @Test

@@ -1196,19 +1196,37 @@ matchStore.add(returnTicket);
 
 ### 19. Redis 통합 테스트 작성
 
-- [ ] `RedisMatchSessionStoreTest` 보강
+- [x] `RedisMatchSessionStoreTest` 보강
   - 신규 세션 필드 저장/복원
-  - 수락 field 저장/복원
+  - 유저별 응답 상태 저장/복원
   - 없는 세션 처리
   - TTL 유지 여부
-- [ ] `RedisMatchStoreTest` 보강
+- [x] `RedisMatchStoreTest` 보강
   - 기존 entryTime 기반 재삽입
   - 재삽입 후 tier queue count
-- [ ] 동시성 테스트
+- [x] 동시성 테스트
   - userA/userB 동시 accept
   - accept와 reject가 거의 동시에 들어오는 경우
   - 같은 유저가 중복 accept 하는 경우
   - timeout과 accept/reject가 거의 동시에 들어오는 경우는 timeout 구현 후 진행
+
+#### 구현 결과
+
+- `RedisMatchSessionStoreTest`를 보강했습니다.
+  - `userAStatus`, `userBStatus` Redis Hash 저장 검증
+  - `ACCEPTED`, `REJECTED`, `TIMEOUT` 응답 상태 복원 검증
+  - 없는 세션 조회 시 `Optional.empty()` 반환 검증
+  - TTL 설정 유지 검증
+- `RedisMatchStoreTest`를 보강했습니다.
+  - 기존 `entryTime` 기반 재삽입 시 score 유지 검증
+  - 재삽입 후 같은 tier queue count 증가 검증
+- 동시성 정책은 service 단위 테스트에서 현재 이슈 범위를 검증했습니다.
+  - 양쪽 accept 순차 직렬화 결과
+  - accept/reject 순서 차이에 따른 정산 결과
+  - 중복 accept 멱등 처리
+- timeout과 accept/reject가 동시에 들어오는 케이스는 timeout 스케줄러/정산 구현 후 후속 이슈에서 통합 테스트로 다룹니다.
+- 검증 명령:
+  - `:smite-matching:test`
 
 ### 20. 관측 지표 검토
 

@@ -1,20 +1,18 @@
 package com.sang.smite.matching.infrastructure;
 
 import com.sang.smite.domain.match.domain.MatchTicket;
-
+import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
-import com.sang.smite.redis.AbstractRedisTest;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -123,5 +121,26 @@ class RedisMatchStoreTest extends AbstractRedisTest {
         assertThat(tickets.get(0).tierScore()).isEqualTo(10);
         assertThat(tickets.get(0).entryTime()).isEqualTo(originalEntryTime);
         assertThat(matchStore.countByTierScore(10)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("기존 entryTime으로 재삽입한 티켓은 같은 티어 큐 인원에 반영된다")
+    void reAddWithOriginalEntryTimeIncreasesTierQueueCount() {
+        MatchTicket originalTicket = new MatchTicket(1L, 10, 1000L);
+        MatchTicket returnedTicket = new MatchTicket(2L, 10, 500L);
+
+        matchStore.add(originalTicket);
+        matchStore.add(returnedTicket);
+
+        List<MatchTicket> tickets = matchStore.findAll();
+        assertThat(matchStore.countByTierScore(10)).isEqualTo(2);
+        assertThat(tickets)
+                .extracting(MatchTicket::userId)
+                .containsExactlyInAnyOrder(1L, 2L);
+        assertThat(tickets)
+                .filteredOn(ticket -> ticket.userId().equals(2L))
+                .singleElement()
+                .extracting(MatchTicket::entryTime)
+                .isEqualTo(500L);
     }
 }
