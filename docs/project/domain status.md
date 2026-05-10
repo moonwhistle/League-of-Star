@@ -27,8 +27,9 @@ stateDiagram-v2
     MATCHING --> FOUND: 상대 탐색 완료 / 수락 대기
 
     FOUND --> ACCEPTED: 수락 (Accept)
-    FOUND --> DECLINED: 거절 (Decline)
-    FOUND --> TIMEOUT: 응답 시간 초과
+    FOUND --> FOUND: 한쪽만 수락/거절 응답
+    FOUND --> DECLINED: 양쪽 응답 완료 후 실패 정산
+    FOUND --> TIMEOUT: 10초 응답 시간 초과 정산
 
     ACCEPTED --> IN_GAME: 양측 모두 수락
     DECLINED --> [*]: 거절 완료 후 대기열 이탈

@@ -3,9 +3,11 @@ package com.sang.smite.match.controller;
 import com.sang.smite.common.path.match.MatchPath;
 import com.sang.smite.global.resolver.annotation.AuthUser;
 import com.sang.smite.match.service.MatchQueueService;
+import com.sang.smite.match.service.MatchResponseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MatchController {
 
     private final MatchQueueService matchQueueService;
+    private final MatchResponseService matchResponseService;
 
     /**
      * 매칭 대기열에 진입합니다.
@@ -42,6 +45,34 @@ public class MatchController {
     @DeleteMapping(MatchPath.LEAVE)
     public ResponseEntity<Void> leaveQueue(@AuthUser Long userId) {
         matchQueueService.leaveQueue(userId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 매칭 성사 후 수락합니다.
+     *
+     * @return 200 OK (성공) / 404 NOT_FOUND (세션 없음) / 403 FORBIDDEN (참여자 아님) / 409 CONFLICT (이미 종료됨)
+     */
+    @PostMapping(MatchPath.ACCEPT)
+    public ResponseEntity<Void> accept(
+            @PathVariable(MatchPath.MATCH_ID) String matchId,
+            @AuthUser Long userId
+    ) {
+        matchResponseService.accept(matchId, userId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 매칭 성사 후 거절합니다.
+     *
+     * @return 200 OK (성공) / 404 NOT_FOUND (세션 없음) / 403 FORBIDDEN (참여자 아님) / 409 CONFLICT (이미 종료됨)
+     */
+    @PostMapping(MatchPath.REJECT)
+    public ResponseEntity<Void> reject(
+            @PathVariable(MatchPath.MATCH_ID) String matchId,
+            @AuthUser Long userId
+    ) {
+        matchResponseService.reject(matchId, userId);
         return ResponseEntity.ok().build();
     }
 }

@@ -4,6 +4,7 @@ import com.sang.smite.common.path.match.MatchPath;
 import com.sang.smite.global.resolver.annotation.AuthUser;
 import com.sang.smite.global.restdocs.RestDocsSupport;
 import com.sang.smite.match.service.MatchQueueService;
+import com.sang.smite.match.service.MatchResponseService;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,18 +16,21 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 
 class MatchControllerRestDocsTest extends RestDocsSupport {
 
     private final MatchQueueService matchQueueService = mock(MatchQueueService.class);
+    private final MatchResponseService matchResponseService = mock(MatchResponseService.class);
 
     @Override
     protected Object initController() {
-        return new MatchController(matchQueueService);
+        return new MatchController(matchQueueService, matchResponseService);
     }
 
     @Override
@@ -92,6 +96,66 @@ class MatchControllerRestDocsTest extends RestDocsSupport {
                                 .description("사용자가 매칭 대기열에서 나갑니다.")
                                 .requestHeaders(
                                         headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("매칭 수락 API 문서화")
+    void accept() {
+        // given
+        String matchId = "match-1";
+        doNothing().when(matchResponseService).accept(anyString(), anyLong());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(MatchPath.MATCH_BASE + "/{matchId}/accept", matchId)
+                .then()
+                .statusCode(200)
+                .apply(document("match-accept",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Match")
+                                .summary("매칭 수락")
+                                .description("매칭 성사 후 제한 시간 안에 매칭을 수락합니다.")
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .pathParameters(
+                                        parameterWithName(MatchPath.MATCH_ID).description("매칭 세션 ID")
+                                )
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("매칭 거절 API 문서화")
+    void reject() {
+        // given
+        String matchId = "match-1";
+        doNothing().when(matchResponseService).reject(anyString(), anyLong());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(MatchPath.MATCH_BASE + "/{matchId}/reject", matchId)
+                .then()
+                .statusCode(200)
+                .apply(document("match-reject",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Match")
+                                .summary("매칭 거절")
+                                .description("매칭 성사 후 제한 시간 안에 매칭을 거절합니다. 한쪽이 먼저 거절해도 상대방의 응답 윈도우는 유지됩니다.")
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .pathParameters(
+                                        parameterWithName(MatchPath.MATCH_ID).description("매칭 세션 ID")
                                 )
                                 .build()
                         )

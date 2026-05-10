@@ -1,7 +1,7 @@
 package com.sang.smite.redis.lock.aop;
 
 import com.sang.smite.redis.common.constant.LockConstants;
-import com.sang.smite.redis.lock.annotation.DistributedLock;
+import com.sang.smite.redis.lock.annotation.DistributedRedisLock;
 import com.sang.smite.redis.lock.exception.RedisLockAcquisitionException;
 import com.sang.smite.redis.lock.parser.CustomSpringELParser;
 import lombok.RequiredArgsConstructor;
@@ -17,40 +17,34 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.Method;
 
 /**
- * 분산 락의 핵심 흐름을 제어하는 Aspect 클래스
+ * Redis-only 작업에 분산 락만 적용하는 Aspect입니다.
  */
 @Aspect
 @Component
 @Slf4j
 @RequiredArgsConstructor
-public class DistributedLockAop {
+public class DistributedRedisLockAop {
 
     private final RedissonClient redissonClient;
-    private final AopForTransaction aopForTransaction;
 
-    @Around("@annotation(com.sang.smite.redis.lock.annotation.DistributedLock)")
+    @Around("@annotation(com.sang.smite.redis.lock.annotation.DistributedRedisLock)")
     public Object lock(final ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
-        DistributedLock distributedLock = method.getAnnotation(DistributedLock.class);
-        String key = createLockKey(signature, joinPoint.getArgs(), distributedLock.key());
-        RLock rLock = redissonClient.getLock(key);
+        DistributedRedisLock distributedRedisLock = method.getAnnotation(DistributedRedisLock.class);
+        String key = createLockKey(signature, joinPoint.getArgs(), distributedRedisLock.key());
+        RLock lock = redissonClient.getLock(key);
 
         try {
-            boolean available = tryLock(rLock, distributedLock, key);
-            if (!available) {
-                log.warn("Lock acquisition failed for key: {}", key);
+            boolean locked = tryLock(lock, distributedRedisLock, key);
+            if (!locked) {
+                log.warn("Redis lock acquisition failed: method={}, key={}", method.getName(), key);
                 throw new RedisLockAcquisitionException(key);
             }
 
-            /* [REQUIRES_NEW 트랜잭션 설계 의도]
-             * AopForTransaction.proceed()는 REQUIRES_NEW 트랜잭션 안에서 비즈니스 로직을 실행
-             * 트랜잭션이 완전히 커밋된 후 finally 블록에서 락이 해제되므로,
-             * 락 해제와 트랜잭션 롤백 사이의 타이밍 문제가 발생하지 않음
-             */
-            return aopForTransaction.proceed(joinPoint);
+            return joinPoint.proceed();
         } finally {
-            unlockIfHeldByCurrentThread(rLock, method, key);
+            unlockIfHeldByCurrentThread(lock, method, key);
         }
     }
 
@@ -63,15 +57,18 @@ public class DistributedLockAop {
         return LockConstants.REDISSON_LOCK_PREFIX + dynamicValue;
     }
 
-    private boolean tryLock(RLock lock, DistributedLock distributedLock, String key) {
+    private boolean tryLock(RLock lock, DistributedRedisLock distributedRedisLock, String key) {
         try {
-            if (distributedLock.leaseTime() < 0) {
-                return lock.tryLock(distributedLock.waitTime(), distributedLock.timeUnit());
+            if (distributedRedisLock.leaseTime() < 0) {
+                return lock.tryLock(distributedRedisLock.waitTime(), distributedRedisLock.timeUnit());
             }
 
-            return lock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
+            return lock.tryLock(
+                    distributedRedisLock.waitTime(),
+                    distributedRedisLock.leaseTime(),
+                    distributedRedisLock.timeUnit()
+            );
         } catch (InterruptedException e) {
-            log.error("Lock acquisition interrupted for key: {}", key, e);
             Thread.currentThread().interrupt();
             throw new RedisLockAcquisitionException(key, e);
         }

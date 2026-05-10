@@ -25,7 +25,6 @@ import java.util.UUID;
 public class MatchFoundService {
 
     private static final int ACCEPT_TIMEOUT_SECONDS = 10;
-    private static final long SESSION_TTL_SECONDS = 12L;
 
     private final MatchUserStatusStore userStatusStore;
     private final MatchSessionStore sessionStore;
@@ -45,8 +44,16 @@ public class MatchFoundService {
         userStatusStore.updateStatus(userB.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
 
         String matchId = UUID.randomUUID().toString();
-        MatchSession session = MatchSession.create(matchId, userA.userId(), userB.userId());
-        sessionStore.save(session, SESSION_TTL_SECONDS);
+        MatchSession session = MatchSession.create(
+                matchId,
+                userA.userId(),
+                userB.userId(),
+                userA.tierScore(),
+                userB.tierScore(),
+                userA.entryTime(),
+                userB.entryTime()
+        );
+        sessionStore.save(session, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
 
         eventPublisher.publishEvent(new MatchFoundEvent(
                 matchId,

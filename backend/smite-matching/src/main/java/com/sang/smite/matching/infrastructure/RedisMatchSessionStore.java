@@ -1,6 +1,7 @@
 package com.sang.smite.matching.infrastructure;
 
 import com.sang.smite.domain.match.domain.MatchSession;
+import com.sang.smite.domain.match.domain.MatchResponseStatus;
 import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.repository.MatchSessionStore;
@@ -10,6 +11,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -26,8 +28,14 @@ public class RedisMatchSessionStore implements MatchSessionStore {
     private static final String FIELD_MATCH_ID = "matchId";
     private static final String FIELD_USER_A = "userA";
     private static final String FIELD_USER_B = "userB";
+    private static final String FIELD_USER_A_TIER_SCORE = "userATierScore";
+    private static final String FIELD_USER_B_TIER_SCORE = "userBTierScore";
+    private static final String FIELD_USER_A_ENTRY_TIME = "userAEntryTime";
+    private static final String FIELD_USER_B_ENTRY_TIME = "userBEntryTime";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_CREATED_AT = "createdAt";
+    private static final String FIELD_USER_A_STATUS = "userAStatus";
+    private static final String FIELD_USER_B_STATUS = "userBStatus";
 
     private final RedissonClient redissonClient;
 
@@ -35,13 +43,7 @@ public class RedisMatchSessionStore implements MatchSessionStore {
     public void save(MatchSession session, long ttlSeconds) {
         String key = getSessionKey(session.matchId());
         RMap<String, String> sessionHash = redissonClient.getMap(key);
-        sessionHash.putAll(Map.of(
-                FIELD_MATCH_ID, session.matchId(),
-                FIELD_USER_A, String.valueOf(session.userA()),
-                FIELD_USER_B, String.valueOf(session.userB()),
-                FIELD_STATUS, session.status().name(),
-                FIELD_CREATED_AT, String.valueOf(session.createdAt())
-        ));
+        sessionHash.putAll(createSessionFields(session));
         sessionHash.expire(Duration.ofSeconds(ttlSeconds));
     }
 
@@ -58,8 +60,14 @@ public class RedisMatchSessionStore implements MatchSessionStore {
                 fields.get(FIELD_MATCH_ID),
                 Long.valueOf(fields.get(FIELD_USER_A)),
                 Long.valueOf(fields.get(FIELD_USER_B)),
+                Integer.parseInt(fields.get(FIELD_USER_A_TIER_SCORE)),
+                Integer.parseInt(fields.get(FIELD_USER_B_TIER_SCORE)),
+                Long.parseLong(fields.get(FIELD_USER_A_ENTRY_TIME)),
+                Long.parseLong(fields.get(FIELD_USER_B_ENTRY_TIME)),
                 MatchStatus.valueOf(fields.get(FIELD_STATUS)),
-                Long.parseLong(fields.get(FIELD_CREATED_AT))
+                Long.parseLong(fields.get(FIELD_CREATED_AT)),
+                MatchResponseStatus.valueOf(fields.get(FIELD_USER_A_STATUS)),
+                MatchResponseStatus.valueOf(fields.get(FIELD_USER_B_STATUS))
         ));
     }
 
@@ -72,5 +80,21 @@ public class RedisMatchSessionStore implements MatchSessionStore {
 
     private String getSessionKey(String matchId) {
         return MatchingConstants.SESSION_KEY_PREFIX + matchId;
+    }
+
+    private Map<String, String> createSessionFields(MatchSession session) {
+        Map<String, String> fields = new HashMap<>();
+        fields.put(FIELD_MATCH_ID, session.matchId());
+        fields.put(FIELD_USER_A, String.valueOf(session.userA()));
+        fields.put(FIELD_USER_B, String.valueOf(session.userB()));
+        fields.put(FIELD_USER_A_TIER_SCORE, String.valueOf(session.userATierScore()));
+        fields.put(FIELD_USER_B_TIER_SCORE, String.valueOf(session.userBTierScore()));
+        fields.put(FIELD_USER_A_ENTRY_TIME, String.valueOf(session.userAEntryTime()));
+        fields.put(FIELD_USER_B_ENTRY_TIME, String.valueOf(session.userBEntryTime()));
+        fields.put(FIELD_STATUS, session.status().name());
+        fields.put(FIELD_CREATED_AT, String.valueOf(session.createdAt()));
+        fields.put(FIELD_USER_A_STATUS, session.userAStatus().name());
+        fields.put(FIELD_USER_B_STATUS, session.userBStatus().name());
+        return fields;
     }
 }
