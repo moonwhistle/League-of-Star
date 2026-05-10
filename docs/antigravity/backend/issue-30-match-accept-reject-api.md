@@ -1230,44 +1230,199 @@ matchStore.add(returnTicket);
 
 ### 20. 관측 지표 검토
 
-- [ ] 수락/거절 API 호출 수
-- [ ] 수락 성공/실패 수
-- [ ] 거절 성공/실패 수
-- [ ] 양쪽 수락 완료 수
-- [ ] 세션 만료/없음 실패 수
-- [ ] timeout 처리 수
-- [ ] 동시성 conflict 수
-- [ ] lock 획득 실패 수
-- [ ] 이번 이슈에서 Micrometer를 바로 추가할지, 부하 테스트 단계에서 추가할지 결정
+- [x] 수락/거절 API 호출 수
+- [x] 수락 성공/실패 수
+- [x] 거절 성공/실패 수
+- [x] 양쪽 수락 완료 수
+- [x] 세션 만료/없음 실패 수
+- [x] timeout 처리 수
+- [x] 동시성 conflict 수
+- [x] lock 획득 실패 수
+- [x] 이번 이슈에서 Micrometer를 바로 추가할지, 부하 테스트 단계에서 추가할지 결정
+
+#### 검토 결과
+
+- 이번 issue-30에서는 Micrometer 지표를 추가하지 않습니다.
+- accept/reject는 현재 Redis 세션 상태 변경까지만 담당하고, 최종 10초 응답 윈도우 정산은 timeout 후속 이슈와 결합됩니다.
+- 후보 지표는 다음 이슈에서 timeout 정산/스케줄러 지표와 함께 설계합니다.
+  - accept/reject API 호출 수
+  - accept/reject 성공/실패 수
+  - 양쪽 수락 완료 수
+  - 세션 만료/없음 실패 수
+  - lock 획득 실패 수
+  - timeout 처리 수
+  - timeout backlog / scheduler scan duration / processed count
+- 실제 지표 구현은 timeout 정산 스케줄러와 부하 테스트 후속 이슈에서 진행합니다.
 
 ### 21. 부하 테스트 계획
 
-- [ ] SSE `match_found` 수신 이후 accept API를 호출하는 시나리오 작성 여부 검토
-- [ ] 1,000 / 5,000 / 10,000명 기준 수락 API 부하 테스트 계획
-- [ ] 양쪽 모두 수락하는 정상 시나리오
-- [ ] 일부 유저 거절 시나리오
-- [ ] timeout 이후 accept 요청 시나리오
-- [ ] 10초 수락 제한 근처에서 accept/reject/timeout이 섞이는 시나리오
-- [ ] 이번 이슈에서는 기능 테스트까지, 부하 테스트는 별도 task로 분리할지 결정
+- [x] SSE `match_found` 수신 이후 accept API를 호출하는 시나리오 작성 여부 검토
+- [x] 1,000 / 5,000 / 10,000명 기준 수락 API 부하 테스트 계획
+- [x] 양쪽 모두 수락하는 정상 시나리오
+- [x] 일부 유저 거절 시나리오
+- [x] timeout 이후 accept 요청 시나리오
+- [x] 10초 수락 제한 근처에서 accept/reject/timeout이 섞이는 시나리오
+- [x] 이번 이슈에서는 기능 테스트까지, 부하 테스트는 별도 task로 분리할지 결정
+
+#### 검토 결과
+
+- 이번 issue-30에서는 부하 테스트를 작성하지 않습니다.
+- timeout 정산 로직이 아직 없으므로 10초 응답 윈도우 전체 플로우를 부하 테스트로 검증할 수 없습니다.
+- 부하 테스트는 timeout 후속 이슈에서 다음 시나리오와 함께 진행합니다.
+  - `match_found` 수신 후 양쪽 accept
+  - 한쪽 reject 후 상대 accept
+  - 한쪽 accept 후 상대 timeout
+  - 양쪽 미응답 timeout
+  - accept/reject/timeout 경합
+  - timeout scheduler backlog 및 처리 지연
 
 ### 22. 최종 검증
 
-- [ ] `:smite-core:test`
-- [ ] `:smite-matching:test`
-- [ ] `:smite-api:test`
-- [ ] 필요 시 `./gradlew build`
-- [ ] 기존 SSE `match_found` 흐름이 깨지지 않는지 확인
-- [ ] join/leave 기존 API 회귀 확인
+- [x] `:smite-core:test`
+- [x] `:smite-matching:test`
+- [x] `:smite-api:test`
+- [x] 필요 시 `./gradlew build`
+- [x] 기존 SSE `match_found` 흐름이 깨지지 않는지 확인
+- [x] join/leave 기존 API 회귀 확인
+
+#### 검증 결과
+
+- 아래 명령을 실행해 핵심 모듈 테스트를 통과했습니다.
+
+```bash
+./gradlew :smite-core:test :smite-matching:test :smite-api:test
+```
+
+- 결과: `BUILD SUCCESSFUL`
+- `./gradlew build` 전체 빌드는 이번 변경 범위가 `core`, `matching`, `api` 테스트로 충분히 검증되어 별도 실행하지 않았습니다.
+- 기존 SSE `match_found` 흐름은 `smite-api` notification 테스트가 함께 통과한 것으로 회귀 확인했습니다.
+  - `MatchFoundPubSubPublishListenerTest`
+  - `MatchFoundPubSubSubscriberTest`
+  - `MatchFoundNotificationDispatcherTest`
+  - `MatchNotificationControllerRestDocsTest`
+- join/leave 기존 API는 match controller/service 테스트가 함께 통과한 것으로 회귀 확인했습니다.
+  - `MatchControllerRestDocsTest`
+  - `MatchQueueServiceTest`
+  - `MatchServiceTest`
+
+## 📌 Summary
+
+매칭 성사 후 유저가 10초 안에 HTTP로 수락/거절 응답을 기록하는 API를 구현했습니다.
+
+```mermaid
+flowchart TD
+    A["match_found SSE"] --> B["match session by matchId"]
+    B --> C["10초 응답 윈도우"]
+    C --> D{"유저별 응답"}
+    D -->|"둘 다 ACCEPTED"| E["session = ACCEPTED"]
+    E --> E1["게임 세션 생성 후속 플로우"]
+    D -->|"REJECTED + PENDING"| F["session = FOUND 유지"]
+    F --> F1["상대 모달 계속 유지"]
+    F1 -->|"상대가 제한 시간 안에 ACCEPTED"| G["session = DECLINED"]
+    G --> G1["ACCEPTED 유저 기존 entryTime으로 큐 복귀"]
+    G --> G2["REJECTED 유저 큐 이탈"]
+    C -->|"timeout"| H["후속 이슈에서 TIMEOUT 정산"]
+```
+
+핵심 정책은 “한쪽이 먼저 거절해도 상대의 10초 응답 윈도우는 유지하고, 제한 시간 안에 수락한 유저는 기존 대기 우선순위로 큐에 복귀한다”입니다.
+
+## 📚 Changes
+
+- `POST /api/v1/match/{matchId}/accept`, `POST /api/v1/match/{matchId}/reject` 추가
+- `MatchSession`에 유저별 응답 상태 도입
+  - `userAStatus`, `userBStatus`
+  - `PENDING`, `ACCEPTED`, `REJECTED`, `TIMEOUT`
+- boolean 조합 대신 enum 상태로 설계
+  - timeout 확장 가능
+  - “수락이면서 거절” 같은 잘못된 조합 방지
+- `matchId` 기준 Redis 분산락 적용
+  - 같은 매칭 세션의 accept/reject만 직렬화
+  - 다른 match는 병렬 처리 가능
+  - `userId` lock은 같은 세션의 lost update와 큐 복귀 누락을 막지 못하고, global lock은 범위가 과도함
+
+  현재 응답 처리는 Redis 세션을 읽고, 메모리에서 새 `MatchSession`을 만든 뒤, Redis Hash에 다시 저장하는 read-modify-write 구조입니다.
+
+  ```text
+  findById(matchId)
+    -> session.accept(userId) or session.reject(userId)
+    -> save(session)
+  ```
+
+  `userId` 기준 lock을 잡으면 A와 B가 서로 다른 lock을 획득하므로 같은 세션을 동시에 읽고 서로의 변경을 덮어쓸 수 있습니다.
+
+  ```mermaid
+  sequenceDiagram
+      autonumber
+      participant A as User A
+      participant B as User B
+      participant API as MatchResponse API
+      participant LockA as lock user A
+      participant LockB as lock user B
+      participant Session as match session
+
+      A->>API: accept match-1
+      API->>LockA: lock user A
+      API->>Session: read FOUND, A=PENDING, B=PENDING
+
+      B->>API: reject match-1
+      API->>LockB: lock user B
+      API->>Session: read FOUND, A=PENDING, B=PENDING
+
+      API->>Session: save A=ACCEPTED, B=PENDING
+      API->>LockA: unlock user A
+
+      API->>Session: save A=PENDING, B=REJECTED
+      API->>LockB: unlock user B
+  ```
+
+  이 경우 A가 제한 시간 안에 수락했는데도 마지막 저장으로 `A=ACCEPTED`가 사라져 큐 복귀 대상에서 누락될 수 있습니다. 반대로 B의 거절이 사라지면 실패 정산 자체가 누락될 수 있습니다.
+
+  `matchId` 기준 lock은 같은 세션의 read-modify-write 전체를 하나의 임계 구역으로 묶습니다.
+
+  ```mermaid
+  sequenceDiagram
+      autonumber
+      participant A as User A
+      participant B as User B
+      participant API as MatchResponse API
+      participant Lock as matchId lock
+      participant Session as match session
+
+      A->>API: accept match-1
+      API->>Lock: lock match-1
+      API->>Session: save A=ACCEPTED, B=PENDING
+      API->>Lock: unlock match-1
+
+      B->>API: reject match-1
+      API->>Lock: lock match-1
+      API->>Session: save A=ACCEPTED, B=REJECTED
+      API->>Session: session=DECLINED, return A to queue
+      API->>Lock: unlock match-1
+  ```
+
+  전역 lock도 정합성은 보장하지만 모든 match response를 직렬화합니다. `matchId` lock은 같은 세션만 직렬화하고 서로 다른 match는 병렬 처리할 수 있어, 정합성과 처리량 사이에서 가장 좁고 충분한 lock 범위입니다.
+- Redis Hash 세션 저장 필드 확장
+  - `userAStatus`, `userBStatus`
+  - 기존 큐 복귀용 `tierScore`, `entryTime` 유지
+- 수락 유저 큐 복귀 시 새 시간이 아니라 기존 `entryTime` 사용
+- 추가 SSE 이벤트는 만들지 않음
+  - `match_reject`를 즉시 보내면 상대 모달을 10초 유지하는 정책과 UX가 충돌함
+  - 게임 진입/timeout 알림은 후속 이슈에서 설계
+- RestDocs 및 테스트 보강
+  - controller는 `RestAssuredMockMvc` 기반 테스트
+  - Redis 저장소는 Testcontainers 기반 통합 테스트
 
 ## 📝 Note
 
-- 이번 이슈는 **수락/거절 API와 Redis 상태 변경**이 핵심입니다.
-- `match_found` 알림 전송은 Issue-28에서 완료된 SSE/PubSub 구조를 그대로 사용합니다.
-- 수락/거절 결과를 상대방에게 실시간으로 알려주는 SSE 이벤트는 후속 이슈로 분리하는 것을 우선합니다.
-- 세션 상태 변경은 동시 요청 가능성이 있으므로 `findById -> save` 방식만 단독으로 사용하지 않습니다.
-- V1 동시성 제어는 `matchId` 기준 Redis 분산락으로 처리합니다.
-- timeout은 reject와 같은 종료/정리 흐름을 사용하지만, 상태값은 `TIMEOUT`으로 분리합니다.
-- 최종 게임 생성/입장 처리는 별도 게임 플로우 이슈와 연결될 수 있으므로, 이번 이슈에서는 상태 전환 경계만 명확히 합니다.
+- timeout 정산 로직은 후속 이슈에서 구현합니다.
+- 관측 지표와 부하 테스트도 timeout 정산 로직과 함께 후속 이슈에서 처리합니다.
+- 게임 세션 생성/입장은 별도 게임 플로우 이슈에서 처리합니다.
+- 기존 `match_found` SSE/PubSub 흐름은 유지했습니다.
+- 검증 완료:
+
+```bash
+./gradlew :smite-core:test :smite-matching:test :smite-api:test
+```
 
 ## 📌 Related Issue
 
