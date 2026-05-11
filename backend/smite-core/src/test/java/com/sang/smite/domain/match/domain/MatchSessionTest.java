@@ -105,4 +105,19 @@ class MatchSessionTest {
         assertThat(accepted.userATierScore()).isEqualTo(10);
         assertThat(accepted.userBEntryTime()).isEqualTo(2000L);
     }
+
+    @Test
+    @DisplayName("미응답 참여자만 TIMEOUT 상태로 변경한다.")
+    void timeoutPendingUsers() {
+        MatchSession session = MatchSession.create("match-1", 1L, 2L, 10, 11, 1000L, 2000L)
+                .accept(1L);
+
+        MatchSession timedOut = session.timeoutPendingUsers();
+
+        assertThat(timedOut.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(timedOut.userBStatus()).isEqualTo(MatchResponseStatus.TIMEOUT);
+        assertThat(timedOut.hasPendingResponse()).isFalse();
+        assertThat(timedOut.hasFailedResponse()).isTrue();
+        assertThat(timedOut.status()).isEqualTo(MatchStatus.FOUND);
+    }
 }

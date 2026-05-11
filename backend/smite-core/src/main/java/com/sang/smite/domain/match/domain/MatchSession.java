@@ -63,6 +63,10 @@ public record MatchSession(
                 || userBStatus == MatchResponseStatus.TIMEOUT;
     }
 
+    public boolean hasPendingResponse() {
+        return userAStatus == MatchResponseStatus.PENDING || userBStatus == MatchResponseStatus.PENDING;
+    }
+
     public boolean isRespondedByBoth() {
         return isRespondedBy(userA) && isRespondedBy(userB);
     }
@@ -131,6 +135,17 @@ public record MatchSession(
                     userBEntryTime, status, createdAt, userAStatus, MatchResponseStatus.REJECTED);
         }
         throw new IllegalArgumentException("매칭 세션 참여자가 아닙니다.");
+    }
+
+    public MatchSession timeoutPendingUsers() {
+        MatchResponseStatus nextUserAStatus = userAStatus == MatchResponseStatus.PENDING
+                ? MatchResponseStatus.TIMEOUT
+                : userAStatus;
+        MatchResponseStatus nextUserBStatus = userBStatus == MatchResponseStatus.PENDING
+                ? MatchResponseStatus.TIMEOUT
+                : userBStatus;
+        return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+                userBEntryTime, status, createdAt, nextUserAStatus, nextUserBStatus);
     }
 
     public MatchSession withStatus(MatchStatus status) {

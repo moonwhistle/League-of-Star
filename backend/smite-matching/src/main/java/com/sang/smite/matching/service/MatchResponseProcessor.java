@@ -73,6 +73,15 @@ public class MatchResponseProcessor {
         userStatusStore.removeStatus(userId);
     }
 
+    @DistributedRedisLock(key = "'match:session:lock:' + #matchId")
+    public void timeoutWithLock(String matchId) {
+        sessionStore.findById(matchId)
+                .filter(session -> session.status() == MatchStatus.FOUND)
+                .filter(MatchSession::hasPendingResponse)
+                .map(MatchSession::timeoutPendingUsers)
+                .ifPresent(this::completeTimeoutSession);
+    }
+
     private MatchSession getSession(String matchId) {
         return sessionStore.findById(matchId)
                 .orElseThrow(() -> new MatchingException(MatchingErrorCode.MATCH_SESSION_EXPIRED));
@@ -108,6 +117,12 @@ public class MatchResponseProcessor {
 
     private void completeDeclinedSession(MatchSession session) {
         sessionStore.save(session.withStatus(MatchStatus.DECLINED), MatchingConstants.MATCH_SESSION_TTL_SECONDS);
+        applyFailedMatchResult(session, session.userA());
+        applyFailedMatchResult(session, session.userB());
+    }
+
+    private void completeTimeoutSession(MatchSession session) {
+        sessionStore.save(session.withStatus(MatchStatus.TIMEOUT), MatchingConstants.MATCH_SESSION_TTL_SECONDS);
         applyFailedMatchResult(session, session.userA());
         applyFailedMatchResult(session, session.userB());
     }

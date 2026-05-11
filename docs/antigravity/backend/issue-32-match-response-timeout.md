@@ -252,16 +252,42 @@ flowchart TD
 
 ### 4. MatchResponseProcessor timeout 정산 구현
 
-- [ ] `timeoutWithLock(matchId)` 추가
-- [ ] accept/reject와 동일한 `match:session:lock:{matchId}` 사용
-- [ ] `FOUND` 상태 세션만 timeout 정산
-- [ ] `PENDING` 유저를 `TIMEOUT`으로 변경
-- [ ] `ACCEPTED` 유저는 기존 `entryTime`으로 큐 복귀
-- [ ] `REJECTED`/`TIMEOUT` 유저는 큐 이탈
-- [ ] 세션 status를 `TIMEOUT`으로 변경
-- [ ] 이미 `ACCEPTED`/`DECLINED`/`TIMEOUT`인 세션은 no-op 처리
-- [ ] 세션 없음/TTL 만료 케이스는 no-op 가능 여부 결정 후 index 정리
-- [ ] timeout 정산 로직이 accept/reject의 큐 복귀 정책과 중복되지 않도록 공통 helper 정리
+- [x] `timeoutWithLock(matchId)` 추가
+- [x] accept/reject와 동일한 `match:session:lock:{matchId}` 사용
+- [x] `FOUND` 상태 세션만 timeout 정산
+- [x] `PENDING` 유저를 `TIMEOUT`으로 변경
+- [x] `ACCEPTED` 유저는 기존 `entryTime`으로 큐 복귀
+- [x] `REJECTED`/`TIMEOUT` 유저는 큐 이탈
+- [x] 세션 status를 `TIMEOUT`으로 변경
+- [x] 이미 `ACCEPTED`/`DECLINED`/`TIMEOUT`인 세션은 no-op 처리
+- [x] 세션 없음/TTL 만료 케이스는 no-op 가능 여부 결정 후 index 정리
+- [x] timeout 정산 로직이 accept/reject의 큐 복귀 정책과 중복되지 않도록 공통 helper 정리
+
+#### 구현 결과
+
+- `MatchSession`에 timeout 도메인 메서드를 추가했습니다.
+  - `hasPendingResponse()`
+  - `timeoutPendingUsers()`
+- `MatchResponseProcessor.timeoutWithLock(matchId)`를 추가했습니다.
+  - accept/reject와 동일한 `match:session:lock:{matchId}` 분산락을 사용합니다.
+  - 세션이 없거나 이미 최종 상태이면 no-op 처리합니다.
+  - `FOUND` 상태이고 `PENDING` 응답이 남아 있는 세션만 timeout 정산합니다.
+- timeout 정산 정책은 다음과 같이 구현했습니다.
+  - `PENDING` 유저 응답 상태는 `TIMEOUT`으로 변경
+  - 세션 status는 `TIMEOUT`으로 저장
+  - `ACCEPTED` 유저는 기존 `entryTime`으로 큐 복귀
+  - `REJECTED`/`TIMEOUT` 유저는 큐 이탈
+- 수락 유저 큐 복귀와 이탈 처리는 기존 실패 정산 helper를 재사용했습니다.
+  - accept/reject 실패 정산과 timeout 실패 정산의 큐 정책이 갈라지지 않도록 유지합니다.
+- `MatchResponseProcessorTest`를 보강했습니다.
+  - `ACCEPTED + PENDING` timeout
+  - `REJECTED + PENDING` timeout
+  - `PENDING + PENDING` timeout
+  - 이미 종료된 세션 timeout no-op
+  - 없는 세션 timeout no-op
+- 검증 명령:
+  - `:smite-core:test`
+  - `:smite-matching:test`
 
 ### 5. accept/reject 완료 시 timeout index 정리
 
