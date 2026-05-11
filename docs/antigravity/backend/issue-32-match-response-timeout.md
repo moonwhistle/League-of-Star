@@ -117,23 +117,55 @@ flowchart TD
 
 ### 1. timeout 추적 구조 설계
 
-- [ ] timeout 대상 matchId를 관리할 Redis 자료구조 결정
+- [x] timeout 대상 matchId를 관리할 Redis 자료구조 결정
   - `match:response:timeout:pending` ZSET
     - score: timeout deadline epoch millis
     - member: matchId
   - `match:response:timeout:processing` ZSET
     - score: processing expire epoch millis
     - member: matchId
-- [ ] pending/processing 이동을 Lua script로 원자 처리
-- [ ] processing에 남은 작업을 pending으로 복구하는 reclaim 정책 정의
-- [ ] 세션 TTL 12초와 응답 제한 10초의 관계 정리
-- [ ] timeout 처리 완료/세션 완료 시 pending/processing index 제거 정책 정의
-- [ ] timeout 관련 상수 위치 정리
+- [x] pending/processing 이동을 Lua script로 원자 처리
+- [x] processing에 남은 작업을 pending으로 복구하는 reclaim 정책 정의
+- [x] 세션 TTL 12초와 응답 제한 10초의 관계 정리
+- [x] timeout 처리 완료/세션 완료 시 pending/processing index 제거 정책 정의
+- [x] timeout 관련 상수 위치 정리
   - 응답 제한 시간 10초
   - session TTL 12초
   - scheduler batch size
   - processing lease 시간
-- [ ] 시간 계산은 테스트 가능하도록 현재 시각 주입 방식 검토
+- [x] 시간 계산은 테스트 가능하도록 현재 시각 주입 방식 검토
+
+#### 설계 결과
+
+- timeout 대상은 단일 ZSET이 아니라 `pending` / `processing` ZSET으로 분리합니다.
+  - `pending`: 아직 scheduler가 가져가지 않은 timeout 후보
+  - `processing`: scheduler가 claim 후 처리 중인 timeout 후보
+- `pending -> processing` 이동은 Lua script로 원자 처리합니다.
+  - 여러 API 인스턴스 scheduler가 같은 due matchId를 조회해도 하나만 claim에 성공합니다.
+  - claim은 scheduler 간 timeout job 중복 처리를 줄이는 역할입니다.
+- `processing -> pending` 복구도 Lua script로 원자 처리합니다.
+  - claim 후 서버가 죽으면 matchId는 processing에 남습니다.
+  - `processingExpireAt`이 지난 job은 reclaim 대상이 되고, 다음 scheduler tick에서 재처리됩니다.
+- session 동시 수정은 여전히 `match:session:lock:{matchId}`로 보호합니다.
+  - claim은 timeout scheduler 간 중복 처리 방지입니다.
+  - lock은 accept/reject/timeout이 같은 session을 동시에 read-modify-write 하지 못하게 하는 보호 장치입니다.
+- 시간 정책은 기존 프로젝트 정책을 따릅니다.
+  - 클라이언트 응답 윈도우: 10초
+  - Redis match session TTL: 12초
+  - TTL 12초는 10초 응답 윈도우에 네트워크/스케줄링 지연 버퍼를 더한 값입니다.
+- 상수는 `MatchingConstants`를 우선 확장합니다.
+  - 기존 `MATCH_SESSION_TTL_SECONDS = 12`는 유지합니다.
+  - timeout 응답 제한 시간, timeout ZSET key, Lua script path는 matching 모듈 공통 상수로 둡니다.
+  - scheduler interval, batch size, processing lease time은 운영 조정 가능성이 있어 설정값 분리도 함께 검토합니다.
+- timeout deadline 계산은 테스트 가능해야 하므로 `Clock` 주입을 사용합니다.
+  - `smite-api`의 `ClockConfig`에 의존하지 않습니다.
+  - `smite-matching` 모듈에 `@ConditionalOnMissingBean(Clock.class)` 기반 Clock 설정을 추가합니다.
+  - core 모듈에는 Spring config를 두지 않습니다.
+  - matching 모듈 timeout 구현에서는 `System.currentTimeMillis()` 직접 호출을 피하고 `clock.millis()` 기준으로 계산합니다.
+- timeout index cleanup 정책은 다음과 같습니다.
+  - 매칭이 최종 `ACCEPTED` 또는 `DECLINED`로 끝나면 pending/processing 양쪽에서 제거를 시도합니다.
+  - cleanup 실패는 accept/reject API 성공을 깨지 않습니다.
+  - 남은 timeout job은 scheduler가 나중에 claim 후 session 상태를 보고 no-op/ack로 정리합니다.
 
 ### 2. timeout index 저장소 구현
 
