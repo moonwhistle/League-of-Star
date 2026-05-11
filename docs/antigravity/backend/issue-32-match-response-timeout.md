@@ -169,23 +169,57 @@ flowchart TD
 
 ### 2. timeout index 저장소 구현
 
-- [ ] `MatchTimeoutStore` 포트 추가
+- [x] `MatchTimeoutStore` 포트 추가
   - matching service/scheduler는 Redis 구현체에 직접 의존하지 않음
-- [ ] `RedisMatchTimeoutStore` 구현
+- [x] `RedisMatchTimeoutStore` 구현
   - Lua script와 Redis ZSET 명령은 infrastructure에 격리
-- [ ] due pending matchId 조회
-- [ ] Lua claim 구현
+- [x] due pending matchId 조회
+- [x] Lua claim 구현
   - pending에 있는 due matchId만 processing으로 이동
   - 이미 다른 scheduler가 가져간 matchId는 claim 실패 처리
-- [ ] Lua reclaim 구현
+- [x] Lua reclaim 구현
   - processing 만료 시간이 지난 matchId를 pending으로 복구
-- [ ] 처리 완료된 matchId ack 제거
+- [x] 처리 완료된 matchId ack 제거
   - processing ZSET에서 제거
-- [ ] 세션이 먼저 완료된 경우 pending/processing cleanup
+- [x] 세션이 먼저 완료된 경우 pending/processing cleanup
   - pending과 processing 둘 다 제거 시도
-- [ ] batch size 정책 결정
-- [ ] Lua script 파일 경로와 로딩 방식 결정
-- [ ] Redis 통합 테스트 작성
+- [x] batch size 정책 결정
+- [x] Lua script 파일 경로와 로딩 방식 결정
+- [x] Redis 통합 테스트 작성
+
+#### 구현 결과
+
+- `MatchTimeoutStore` 포트를 추가했습니다.
+  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/repository/MatchTimeoutStore.java`
+  - matching service/scheduler는 timeout index 저장소를 포트로 의존합니다.
+- `RedisMatchTimeoutStore` 구현체를 추가했습니다.
+  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/infrastructure/RedisMatchTimeoutStore.java`
+  - Redis ZSET과 Lua script 실행은 infrastructure에 격리했습니다.
+- timeout ZSET key와 Lua script path를 `MatchingConstants`에 추가했습니다.
+  - `match:response:timeout:pending`
+  - `match:response:timeout:processing`
+  - `scripts/timeout_claim.lua`
+  - `scripts/timeout_reclaim.lua`
+- `timeout_claim.lua`를 추가했습니다.
+  - pending에 matchId가 있고 deadline이 지났을 때만 claim 성공
+  - claim 성공 시 `pending ZREM + processing ZADD`를 Redis 안에서 원자 처리
+- `timeout_reclaim.lua`를 추가했습니다.
+  - processing에 matchId가 있고 lease가 만료되었을 때만 reclaim 성공
+  - reclaim 성공 시 `processing ZREM + pending ZADD`를 Redis 안에서 원자 처리
+- timeout ZSET과 Lua script 실행은 `StringCodec`으로 통일했습니다.
+  - script ARGV 숫자 비교와 ZSET member 조회가 같은 codec 기준으로 동작해야 하기 때문입니다.
+- Redis 통합 테스트를 추가했습니다.
+  - due pending 조회
+  - batch size 제한
+  - claim 성공
+  - 중복 claim 실패
+  - deadline 이전 claim 실패
+  - ack 제거
+  - pending/processing cleanup
+  - expired processing reclaim
+  - lease 만료 전 reclaim 실패
+- 검증 명령:
+  - `:smite-matching:test`
 
 ### 3. MatchFoundService timeout 등록
 
