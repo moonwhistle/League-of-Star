@@ -223,10 +223,32 @@ flowchart TD
 
 ### 3. MatchFoundService timeout 등록
 
-- [ ] 매칭 세션 생성 시 timeout deadline 등록
-- [ ] `createdAt + 10_000ms` 기준으로 pending ZSET에 저장
-- [ ] 세션 저장 성공 후 timeout index 등록 순서 보장
-- [ ] 기존 `match_found` 이벤트 발행 흐름 유지
+- [x] 매칭 세션 생성 시 timeout deadline 등록
+- [x] `createdAt + 10_000ms` 기준으로 pending ZSET에 저장
+- [x] 세션 저장 성공 후 timeout index 등록 순서 보장
+- [x] 기존 `match_found` 이벤트 발행 흐름 유지
+
+#### 구현 결과
+
+- `MatchFoundService`에서 매칭 세션 저장 직후 timeout pending index를 등록하도록 연결했습니다.
+  - `sessionStore.save(...)`
+  - `timeoutStore.addPending(matchId, deadlineMillis)`
+  - `eventPublisher.publishEvent(...)`
+- timeout deadline은 `clock.millis() + MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L` 기준으로 계산합니다.
+  - 테스트 가능성을 위해 `System.currentTimeMillis()` 직접 호출을 사용하지 않습니다.
+- `smite-matching` 모듈에 `MatchingClockConfig`를 추가했습니다.
+  - `@ConditionalOnMissingBean(Clock.class)`로 기본 Clock을 제공합니다.
+  - `smite-api`의 Clock 설정에 의존하지 않습니다.
+  - core 모듈에는 Spring config를 추가하지 않았습니다.
+- 기존 `match_found` 이벤트 발행 흐름은 유지했습니다.
+  - 이벤트 payload의 `acceptTimeoutSeconds`는 `MATCH_RESPONSE_TIMEOUT_SECONDS` 상수를 사용합니다.
+- `MatchFoundServiceTest`를 보강했습니다.
+  - timeout pending index 등록 검증
+  - deadline 계산 검증
+- 테스트 전용 `TestMatchingApplication`의 중복 Clock bean은 제거했습니다.
+  - matching 모듈 기본 Clock 설정을 테스트에서도 사용합니다.
+- 검증 명령:
+  - `:smite-matching:test`
 
 ### 4. MatchResponseProcessor timeout 정산 구현
 

@@ -7,6 +7,7 @@ import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.domain.match.event.MatchFoundEvent;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.repository.MatchSessionStore;
+import com.sang.smite.matching.repository.MatchTimeoutStore;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,8 +18,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Clock;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,7 +38,13 @@ class MatchFoundServiceTest {
     private MatchSessionStore sessionStore;
 
     @Mock
+    private MatchTimeoutStore timeoutStore;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private Clock clock;
 
     @Test
     @DisplayName("매칭 성사 시 상태 변경, 세션 생성, 이벤트 발행이 모두 정상 수행된다")
@@ -42,6 +52,7 @@ class MatchFoundServiceTest {
         // given
         MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
         MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        when(clock.millis()).thenReturn(1_000L);
 
         // when
         matchFoundService.process(userA, userB);
@@ -67,7 +78,13 @@ class MatchFoundServiceTest {
         assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.PENDING);
         assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.PENDING);
 
-        // 3. 이벤트 발행 검증
+        // 3. timeout index 등록 검증
+        verify(timeoutStore).addPending(
+                savedSession.matchId(),
+                1_000L + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
+        );
+
+        // 4. 이벤트 발행 검증
         ArgumentCaptor<MatchFoundEvent> eventCaptor = ArgumentCaptor.forClass(MatchFoundEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         MatchFoundEvent publishedEvent = eventCaptor.getValue();
@@ -75,6 +92,6 @@ class MatchFoundServiceTest {
         assertThat(publishedEvent.userA()).isEqualTo(1L);
         assertThat(publishedEvent.userB()).isEqualTo(2L);
         assertThat(publishedEvent.matchId()).isEqualTo(savedSession.matchId());
-        assertThat(publishedEvent.acceptTimeoutSeconds()).isEqualTo(10);
+        assertThat(publishedEvent.acceptTimeoutSeconds()).isEqualTo(MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS);
     }
 }
