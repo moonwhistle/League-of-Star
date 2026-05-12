@@ -23,6 +23,10 @@
   - *특징*: 매칭 성사 후 수락/거절 상태를 관리하는 TTL 기반 임시 데이터.
   - 클라이언트 수락/거절 모달 유효 시간은 10초입니다.
   - Redis 세션 TTL은 네트워크/스케줄링 지연 버퍼를 포함해 12초로 둡니다.
+- **응답 timeout pending index (ZSET)**: `match:response:timeout:pending`
+  - *특징*: 아직 scheduler가 가져가지 않은 timeout 후보 matchId를 deadline epoch millis 기준으로 저장합니다.
+- **응답 timeout processing index (ZSET)**: `match:response:timeout:processing`
+  - *특징*: scheduler가 Lua claim으로 가져가 처리 중인 matchId를 processing lease 만료 시각 기준으로 저장합니다.
 
 ---
 
@@ -85,9 +89,78 @@ sequenceDiagram
 
 ---
 
-## 6. 매칭 정책과 성능 기준
+## 6. 매칭 응답 timeout 정산
 
-### 6.1 시간 정책 분리
+매칭 성사 이후 10초 응답 윈도우가 끝나면 서버가 남은 `PENDING` 응답을 timeout으로 정산합니다. 클라이언트는 모달 표시와 accept/reject 요청만 담당하고, timeout 최종 정산은 서버가 책임집니다.
+
+### 6.1 처리 흐름
+
+```mermaid
+flowchart TD
+    A["match_found 생성"] --> B["match:session:{matchId} 저장"]
+    B --> C["pending ZSET에 timeout deadline 저장"]
+    C --> D["scheduler tick"]
+    D --> E["due pending matchId 조회"]
+    E --> F["Lua claim: pending -> processing"]
+    F --> G{"claim 성공?"}
+    G -->|"no"| H["skip"]
+    G -->|"yes"| I["matchId lock 획득"]
+    I --> J["timeoutWithLock(matchId)"]
+    J --> K["PENDING 유저 TIMEOUT 정산"]
+    K --> L["성공 또는 no-op이면 processing ack"]
+```
+
+### 6.2 claim과 lock의 역할
+
+| 구분 | 역할 |
+| :--- | :--- |
+| Lua claim | 여러 API 인스턴스 scheduler 중 하나만 같은 timeout job을 가져가게 함 |
+| `matchId` lock | accept/reject/timeout이 같은 match session을 동시에 수정하지 못하게 함 |
+
+claim은 scheduler 중복 처리 비용을 줄이는 장치이고, lock은 세션 read-modify-write 정합성을 지키는 장치입니다. 둘은 대체 관계가 아닙니다.
+
+### 6.3 실패 복구
+
+```text
+1. scheduler가 pending에서 due matchId 조회
+2. Lua claim으로 pending -> processing 원자 이동
+3. timeout 정산 성공 또는 no-op이면 processing에서 ack 제거
+4. 처리 중 서버가 죽으면 processing에 남음
+5. processing lease가 만료되면 Lua reclaim으로 pending에 복구
+6. 다음 scheduler tick에서 재처리
+```
+
+### 6.4 정산 정책
+
+| 응답 상태 | 처리 |
+| :--- | :--- |
+| `ACCEPTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, `ACCEPTED` 유저는 기존 `entryTime`으로 큐 복귀 |
+| `REJECTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, 두 유저 모두 큐 이탈 |
+| `PENDING + PENDING` | 두 유저 모두 `TIMEOUT`, 두 유저 모두 큐 이탈 |
+| 이미 `ACCEPTED` / `DECLINED` / `TIMEOUT` | timeout scheduler는 no-op 후 index ack |
+
+### 6.5 관측 지표
+
+응답/timeout 지표는 `match_response_*` Prometheus metric으로 노출하고, Grafana 응답 전용 대시보드에서 확인합니다.
+
+| 지표 | 의미 |
+| :--- | :--- |
+| `match_response_requests_total` | accept/reject 요청 시도/성공/실패 |
+| `match_response_completions_total` | 최종 `accepted` / `declined` 완료 |
+| `match_response_lock_failures_total` | matchId lock 획득 실패 |
+| `match_response_timeout_claims_total` | timeout job claim 결과 |
+| `match_response_timeout_reclaims_total` | processing job reclaim 결과 |
+| `match_response_timeout_settlements_total` | timeout 정산 success/no-op/failure |
+| `match_response_timeout_queue_returned_users_total` | timeout 정산으로 큐 복귀한 유저 수 |
+| `match_response_timeout_pending_backlog` | pending timeout job 수 |
+| `match_response_timeout_processing_backlog` | processing timeout job 수 |
+| `match_response_timeout_processing_delay_seconds` | deadline 대비 실제 정산 지연 |
+
+---
+
+## 7. 매칭 정책과 성능 기준
+
+### 7.1 시간 정책 분리
 
 매칭 대기 시간과 수락/거절 모달 시간은 서로 다른 정책입니다.
 
@@ -99,7 +172,7 @@ sequenceDiagram
 
 수락/거절 모달 10초는 매칭 성사 이후부터 시작됩니다. 따라서 이 값을 매칭 대기 시간의 실패 기준으로 사용하지 않습니다.
 
-### 6.2 매칭 대기 시간 등급
+### 7.2 매칭 대기 시간 등급
 
 이 게임은 짧은 캐주얼 1:1 대전이므로 매칭 버튼을 누른 뒤 거의 즉시 상대가 잡히는 경험을 목표로 합니다.
 
@@ -110,7 +183,7 @@ sequenceDiagram
 
 목표 기준은 최종적으로 달성해야 할 UX 기준입니다. 허용 기준은 V1이 장애 없이 처리 가능한 최소선이며, 허용 기준을 넘으면 매칭 엔진 구조 개선 대상으로 봅니다.
 
-### 6.3 부하 테스트 공통 성공 기준
+### 7.3 부하 테스트 공통 성공 기준
 
 | 테스트 유형 | 기준 | 판단 |
 | :--- | :--- | :--- |
@@ -119,7 +192,7 @@ sequenceDiagram
 | 공통 | 테스트 종료 후 큐가 1분 내 0으로 수렴 | 매칭 엔진이 유입을 끝까지 소화했는지 확인 |
 | 공통 | join-only 원자 제거 실패율 0% 근접 | 취소/중복이 없는 조건에서 동시성 문제가 없는지 확인 |
 
-### 6.4 매칭 엔진 병목 판단 지표
+### 7.4 매칭 엔진 병목 판단 지표
 
 | 지표 | 판단 기준 |
 | :--- | :--- |
@@ -129,7 +202,7 @@ sequenceDiagram
 | 전체 대기 인원 | 테스트 중 일시 증가 가능하나 종료 후 빠르게 감소해야 함 |
 | 분당 락 스킵 수 | 큐 적체와 함께 증가하면 전역 락 병목 가능성 |
 
-### 6.5 현재 V1 부하 테스트 판단
+### 7.5 현재 V1 부하 테스트 판단
 
 | 시나리오 | 결과 | 판단 |
 | :--- | :--- | :--- |
@@ -141,11 +214,11 @@ sequenceDiagram
 
 ---
 
-## 7. 확장 및 최적화 전략 (Scalability & Optimization)
+## 8. 확장 및 최적화 전략 (Scalability & Optimization)
 
 본 시스템은 초기 구축의 단순함과 미래의 확장성을 모두 고려한 **3단계 성장형 아키텍처**를 지향합니다.
 
-### 7.1 매칭 아키텍처 확장 로드맵
+### 8.1 매칭 아키텍처 확장 로드맵
 
 | 단계 | 방식 | 특징 | 적합 규모 |
 | :--- | :--- | :--- | :--- |
@@ -153,14 +226,14 @@ sequenceDiagram
 | **Stage 2 (중간)** | **티어 그룹별 분산 락** | 특정 티어 범위(예: 골드 구간)만 담당하는 엔진 배치. 구간별 독립적 병렬 처리. | CCU 5,000 ~ 20,000 |
 | **Stage 3 (최종)** | **유저 단위 루아 스크립트** | 글로벌 락 제거. 루아 스크립트로 인접 큐를 즉시 조회하고 원자적으로 페어링. | CCU 20,000+ |
 
-### 7.2 Stage 1에서 Stage 3로의 진화 (Transition)
+### 8.2 Stage 1에서 Stage 3로의 진화 (Transition)
 - **전환 시점**: 동시 접속자가 늘어나 전체 큐 스캔 부하가 커지거나, 글로벌 락으로 인해 매칭 엔진의 처리 속도가 유저 유입 속도를 따라가지 못할 때 전환합니다.
 - **구현 변경**: 
   - **Stage 1**: 모든 티어 큐 스캔 -> 자바 매칭 -> **다중 키 Lua Script** (원자적 제거)
   - **Stage 3**: 타겟 유저 선정 -> **탐색형 Lua Script** (루아 내부에서 인접 큐 탐색 및 즉시 제거)
   - *핵심 포인트*: 데이터 구조(`matching:queue:{tier}`)가 동일하므로, 인프라 변경 없이 로직 코드만 교체하여 확장이 가능합니다.
 
-### 7.3 Lua Script를 이용한 원자적 페어링 (Stage 1용)
+### 8.3 Lua Script를 이용한 원자적 페어링 (Stage 1용)
 서로 다른 티어 큐에 있는 두 유저를 한 번에 확인하고 제거하여 정합성을 보장합니다.
 
 **[Lua Script: `atomic_pair_remove.lua`]**
@@ -179,7 +252,7 @@ end
 return 0 -- 실패
 ```
 
-### 7.4 기대 효과
+### 8.4 기대 효과
 1. **경쟁 감소**: 여러 서버에서 수백 개의 엔진 스레드가 동시에 돌아도 Redis 루아 스크립트의 원자성 덕분에 데이터가 꼬이지 않습니다.
 2. **지연 시간 단축**: 불필요한 락 획득/해제 단계가 생략되어 매칭 처리 속도가 향상됩니다.
 3. **무결성 보장**: 유저의 '매칭 취소'와 엔진의 '매칭 성공'이 겹치는 찰나의 순간을 완벽하게 방어합니다.

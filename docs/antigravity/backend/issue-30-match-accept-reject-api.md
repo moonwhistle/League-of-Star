@@ -1244,15 +1244,14 @@ matchStore.add(returnTicket);
 
 - 이번 issue-30에서는 Micrometer 지표를 추가하지 않습니다.
 - accept/reject는 현재 Redis 세션 상태 변경까지만 담당하고, 최종 10초 응답 윈도우 정산은 timeout 후속 이슈와 결합됩니다.
-- 후보 지표는 다음 이슈에서 timeout 정산/스케줄러 지표와 함께 설계합니다.
+- 실제 지표 구현은 issue-32 timeout 정산 이슈에서 진행했습니다.
   - accept/reject API 호출 수
   - accept/reject 성공/실패 수
   - 양쪽 수락 완료 수
   - 세션 만료/없음 실패 수
   - lock 획득 실패 수
   - timeout 처리 수
-  - timeout backlog / scheduler scan duration / processed count
-- 실제 지표 구현은 timeout 정산 스케줄러와 부하 테스트 후속 이슈에서 진행합니다.
+  - timeout backlog / scheduler tick duration / processed count
 
 ### 21. 부하 테스트 계획
 
@@ -1268,7 +1267,7 @@ matchStore.add(returnTicket);
 
 - 이번 issue-30에서는 부하 테스트를 작성하지 않습니다.
 - timeout 정산 로직이 아직 없으므로 10초 응답 윈도우 전체 플로우를 부하 테스트로 검증할 수 없습니다.
-- 부하 테스트는 timeout 후속 이슈에서 다음 시나리오와 함께 진행합니다.
+- issue-32에서 timeout 정산 구현 후 다음 시나리오를 부하 테스트 스크립트로 작성했습니다.
   - `match_found` 수신 후 양쪽 accept
   - 한쪽 reject 후 상대 accept
   - 한쪽 accept 후 상대 timeout
@@ -1321,7 +1320,7 @@ flowchart TD
     F1 -->|"상대가 제한 시간 안에 ACCEPTED"| G["session = DECLINED"]
     G --> G1["ACCEPTED 유저 기존 entryTime으로 큐 복귀"]
     G --> G2["REJECTED 유저 큐 이탈"]
-    C -->|"timeout"| H["후속 이슈에서 TIMEOUT 정산"]
+    C -->|"timeout"| H["issue-32에서 TIMEOUT 정산 구현"]
 ```
 
 핵심 정책은 “한쪽이 먼저 거절해도 상대의 10초 응답 윈도우는 유지하고, 제한 시간 안에 수락한 유저는 기존 대기 우선순위로 큐에 복귀한다”입니다.
@@ -1414,8 +1413,8 @@ flowchart TD
 
 ## 📝 Note
 
-- timeout 정산 로직은 후속 이슈에서 구현합니다.
-- 관측 지표와 부하 테스트도 timeout 정산 로직과 함께 후속 이슈에서 처리합니다.
+- timeout 정산 로직은 issue-32에서 구현했습니다.
+- 관측 지표와 부하 테스트도 issue-32에서 timeout 정산 로직과 함께 처리했습니다.
 - 게임 세션 생성/입장은 별도 게임 플로우 이슈에서 처리합니다.
 - 기존 `match_found` SSE/PubSub 흐름은 유지했습니다.
 - 검증 완료:

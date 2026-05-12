@@ -526,9 +526,24 @@ flowchart TD
 
 ### 9. 문서 갱신
 
-- [ ] `docs/project/policy.md` timeout 정산 정책 확인
-- [ ] `docs/project/matching.md` timeout scheduler/index 구조 반영
-- [ ] issue-30에서 후속 이슈로 남긴 timeout note와 정합성 확인
+- [x] `docs/project/policy.md` timeout 정산 정책 확인
+- [x] `docs/project/matching.md` timeout scheduler/index 구조 반영
+- [x] issue-30에서 후속 이슈로 남긴 timeout note와 정합성 확인
+
+#### 구현 결과
+
+- `docs/project/policy.md`에 서버 timeout 정산 정책을 보강했습니다.
+  - `ACCEPTED + PENDING`
+  - `REJECTED + PENDING`
+  - `PENDING + PENDING`
+  - 서버 scheduler / Lua claim / matchId lock 역할
+- `docs/project/matching.md`에 timeout index와 scheduler 구조를 반영했습니다.
+  - `match:response:timeout:pending`
+  - `match:response:timeout:processing`
+  - pending -> processing claim
+  - processing reclaim
+  - timeout 정산 지표
+- issue-30 문서의 timeout 후속 note를 issue-32 구현 완료 상태와 일치하도록 갱신했습니다.
 
 ### 10. 최종 검증
 

@@ -38,6 +38,15 @@
 - 최종 정산은 양쪽 응답이 모두 확정되었거나 수락 제한 시간이 만료되었을 때 수행한다.
 - 예: B가 3초에 거절하고 A가 6초에 수락하면, A는 제한 시간 안에 수락했으므로 기존 큐 진입 시각으로 최우선 복귀한다.
 
+#### 매칭 정산 표
+
+| 응답 상태 | 정산 결과 |
+|------|------|
+| `ACCEPTED + ACCEPTED` | 매칭 성공 처리. timeout 대상 아님 |
+| `ACCEPTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, `ACCEPTED` 유저는 기존 큐 진입 시각으로 복귀 |
+| `REJECTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, 두 유저 모두 큐 이탈 |
+| `PENDING + PENDING` | 두 유저 모두 `TIMEOUT`, 두 유저 모두 큐 이탈 |
+
 ---
 
 ## 2. 게임 진행 정책
