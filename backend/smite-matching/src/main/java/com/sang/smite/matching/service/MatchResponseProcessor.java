@@ -8,14 +8,17 @@ import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchStore;
+import com.sang.smite.matching.repository.MatchTimeoutStore;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
 import com.sang.smite.redis.lock.annotation.DistributedRedisLock;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
  * matchId 기준 Redis lock 안에서 매칭 수락/거절 상태 변경을 처리합니다.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MatchResponseProcessor {
@@ -23,6 +26,7 @@ public class MatchResponseProcessor {
     private final MatchSessionStore sessionStore;
     private final MatchUserStatusStore userStatusStore;
     private final MatchStore matchStore;
+    private final MatchTimeoutStore timeoutStore;
 
     @DistributedRedisLock(key = "'match:session:lock:' + #matchId")
     public void acceptWithLock(String matchId, Long userId) {
@@ -113,12 +117,14 @@ public class MatchResponseProcessor {
         sessionStore.save(session.withStatus(MatchStatus.ACCEPTED), MatchingConstants.MATCH_SESSION_TTL_SECONDS);
         userStatusStore.updateStatus(session.userA(), MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
         userStatusStore.updateStatus(session.userB(), MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        cleanupTimeoutIndex(session.matchId());
     }
 
     private void completeDeclinedSession(MatchSession session) {
         sessionStore.save(session.withStatus(MatchStatus.DECLINED), MatchingConstants.MATCH_SESSION_TTL_SECONDS);
         applyFailedMatchResult(session, session.userA());
         applyFailedMatchResult(session, session.userB());
+        cleanupTimeoutIndex(session.matchId());
     }
 
     private void completeTimeoutSession(MatchSession session) {
@@ -140,5 +146,13 @@ public class MatchResponseProcessor {
         MatchTicket ticket = new MatchTicket(userId, session.tierScoreOf(userId), session.entryTimeOf(userId));
         matchStore.add(ticket);
         userStatusStore.updateStatus(userId, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+    }
+
+    private void cleanupTimeoutIndex(String matchId) {
+        try {
+            timeoutStore.cleanup(matchId);
+        } catch (Exception e) {
+            log.warn("Failed to cleanup match response timeout index: matchId={}", matchId, e);
+        }
     }
 }

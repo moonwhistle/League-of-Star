@@ -291,27 +291,84 @@ flowchart TD
 
 ### 5. accept/reject 완료 시 timeout index 정리
 
-- [ ] 양쪽 accept로 `ACCEPTED` 된 경우 timeout index 제거
-- [ ] accept/reject 조합으로 `DECLINED` 정산된 경우 timeout index 제거
-- [ ] 한쪽만 응답해 `FOUND`가 유지되는 경우 timeout index 유지
-- [ ] timeout scheduler가 이미 claim한 뒤라면 timeout 정산 쪽에서 lock 획득 후 no-op/ack 처리
-- [ ] accept/reject 완료 후 timeout index cleanup 실패 시 API 성공은 유지
+- [x] 양쪽 accept로 `ACCEPTED` 된 경우 timeout index 제거
+- [x] accept/reject 조합으로 `DECLINED` 정산된 경우 timeout index 제거
+- [x] 한쪽만 응답해 `FOUND`가 유지되는 경우 timeout index 유지
+- [x] timeout scheduler가 이미 claim한 뒤라면 timeout 정산 쪽에서 lock 획득 후 no-op/ack 처리
+- [x] accept/reject 완료 후 timeout index cleanup 실패 시 API 성공은 유지
   - 로그/지표로 관측
   - scheduler가 나중에 no-op/ack로 후속 정리
 
+#### 구현 결과
+
+- `MatchResponseProcessor`에 `MatchTimeoutStore`를 주입했습니다.
+- 최종 `ACCEPTED` 정산 시 timeout index를 cleanup합니다.
+  - 양쪽 accept 완료 후 `timeoutStore.cleanup(matchId)` 호출
+- 최종 `DECLINED` 정산 시 timeout index를 cleanup합니다.
+  - reject 후 양쪽 응답 완료
+  - 상대 reject 이후 제한 시간 안에 accept하여 실패 정산 완료
+- 한쪽만 응답해 세션이 `FOUND`로 유지되는 경우 timeout index는 유지합니다.
+  - 남은 유저가 10초 응답 윈도우 안에 계속 응답할 수 있어야 하기 때문입니다.
+- cleanup 실패는 accept/reject 성공을 깨지 않습니다.
+  - cleanup 예외는 warn 로그로 남기고 삼킵니다.
+  - timeout scheduler가 나중에 해당 matchId를 claim하더라도 session 최종 상태를 보고 no-op/ack로 정리할 수 있습니다.
+- `MatchResponseProcessorTest`를 보강했습니다.
+  - 한쪽 accept만 반영된 경우 cleanup 미호출
+  - 양쪽 accept 완료 시 cleanup 호출
+  - 한쪽 reject만 반영된 경우 cleanup 미호출
+  - accept/reject 조합으로 최종 `DECLINED` 시 cleanup 호출
+  - cleanup 실패가 accept 성공을 깨지 않는지 검증
+- 검증 명령:
+  - `:smite-matching:test`
+
 ### 6. timeout scheduler 구현
 
-- [ ] scheduler 활성화 설정 추가
+- [x] scheduler 활성화 설정 추가
   - interval
   - batch size
   - processing lease time
-- [ ] 주기적으로 due pending matchId 조회
-- [ ] due matchId별 Lua claim 시도
-- [ ] claim 성공한 matchId만 timeout 정산 호출
-- [ ] timeout 정산 성공 또는 no-op 후 processing ack 제거
-- [ ] processing 만료 작업 reclaim 후 다음 tick에서 재시도
-- [ ] claim은 scheduler 중복 처리를 줄이고, matchId lock은 accept/reject/timeout 경합을 보호하도록 역할 분리
-- [ ] 개별 matchId 처리 실패가 전체 batch를 중단하지 않도록 처리
+- [x] 주기적으로 due pending matchId 조회
+- [x] due matchId별 Lua claim 시도
+- [x] claim 성공한 matchId만 timeout 정산 호출
+- [x] timeout 정산 성공 또는 no-op 후 processing ack 제거
+- [x] processing 만료 작업 reclaim 후 다음 tick에서 재시도
+- [x] claim은 scheduler 중복 처리를 줄이고, matchId lock은 accept/reject/timeout 경합을 보호하도록 역할 분리
+- [x] 개별 matchId 처리 실패가 전체 batch를 중단하지 않도록 처리
+
+#### 구현 결과
+
+- `MatchResponseTimeoutScheduler`를 추가했습니다.
+  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/scheduler/MatchResponseTimeoutScheduler.java`
+- scheduler는 `TIMEOUT_SCHEDULER_FIXED_DELAY_MS` 주기로 실행되며, timeout 처리 서비스를 호출하는 트리거 역할만 담당합니다.
+  - 현재 값: `1000ms`
+- `MatchResponseTimeoutService`를 추가했습니다.
+  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service/MatchResponseTimeoutService.java`
+  - timeout job orchestration은 service에서 담당합니다.
+- service 처리 흐름은 다음과 같습니다.
+  - `Clock` 기준 현재 시각 조회
+  - 만료된 processing job 조회
+  - expired processing job reclaim
+  - due pending job 조회
+  - matchId별 Lua claim 시도
+  - claim 성공한 matchId만 `timeoutWithLock(matchId)` 호출
+  - timeout 정산 성공 또는 no-op이면 processing ack
+  - timeout 정산 실패 시 ack하지 않고 processing lease 만료 후 reclaim 대상이 되도록 유지
+- 역할 분리를 유지했습니다.
+  - scheduler: 주기적 실행 트리거
+  - service: timeout job claim/reclaim/ack orchestration
+  - Lua claim/reclaim: scheduler 간 timeout job 소유권 처리
+  - `matchId` lock: accept/reject/timeout 간 session 동시 수정 보호
+- 개별 matchId 처리 실패는 warn 로그로 남기고 같은 batch의 다음 matchId 처리를 계속합니다.
+- `MatchResponseTimeoutSchedulerTest`를 추가했습니다.
+  - scheduler가 timeout 처리 서비스를 호출하는지 검증
+- `MatchResponseTimeoutServiceTest`를 추가했습니다.
+  - claim 성공 시 timeout 정산 후 ack
+  - claim 실패 시 timeout 정산/ack 미호출
+  - timeout 정산 실패 시 ack 미호출
+  - expired processing reclaim
+  - batch 일부 실패 시 나머지 처리 계속
+- 검증 명령:
+  - `:smite-matching:test`
 
 ### 7. 테스트 작성
 

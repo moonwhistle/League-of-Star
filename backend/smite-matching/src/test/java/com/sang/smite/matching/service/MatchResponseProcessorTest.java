@@ -9,6 +9,7 @@ import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchStore;
+import com.sang.smite.matching.repository.MatchTimeoutStore;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +45,9 @@ class MatchResponseProcessorTest {
     @Mock
     private MatchStore matchStore;
 
+    @Mock
+    private MatchTimeoutStore timeoutStore;
+
     @Test
     @DisplayName("수락 요청 시 해당 유저의 수락 상태와 유저 상태를 갱신한다")
     void accept() {
@@ -58,6 +63,7 @@ class MatchResponseProcessorTest {
         assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.PENDING);
         assertThat(savedSession.status()).isEqualTo(MatchStatus.FOUND);
         verify(userStatusStore).updateStatus(1L, MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(timeoutStore, never()).cleanup("match-1");
     }
 
     @Test
@@ -74,6 +80,7 @@ class MatchResponseProcessorTest {
         assertThat(savedSession.status()).isEqualTo(MatchStatus.ACCEPTED);
         assertThat(savedSession.isAcceptedByBoth()).isTrue();
         verify(userStatusStore).updateStatus(2L, MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(timeoutStore).cleanup("match-1");
     }
 
     @Test
@@ -126,6 +133,7 @@ class MatchResponseProcessorTest {
         verify(userStatusStore).removeStatus(2L);
         verify(userStatusStore, never()).removeStatus(1L);
         verify(matchStore, never()).add(any());
+        verify(timeoutStore, never()).cleanup("match-1");
     }
 
     @Test
@@ -148,6 +156,33 @@ class MatchResponseProcessorTest {
         assertThat(ticket.entryTime()).isEqualTo(1000L);
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).removeStatus(2L);
+        verify(timeoutStore).cleanup("match-1");
+    }
+
+    @Test
+    @DisplayName("거절로 세션이 최종 종료되면 timeout index를 정리한다")
+    void cleanupTimeoutIndexWhenDeclinedByReject() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+
+        processor.rejectWithLock("match-1", 2L);
+
+        verify(timeoutStore).cleanup("match-1");
+    }
+
+    @Test
+    @DisplayName("timeout index cleanup 실패는 수락 API 성공을 깨지 않는다")
+    void cleanupFailureDoesNotBreakAccept() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        doThrow(new IllegalStateException("cleanup failed")).when(timeoutStore).cleanup("match-1");
+
+        processor.acceptWithLock("match-1", 2L);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(12L));
+        assertThat(sessionCaptor.getValue().status()).isEqualTo(MatchStatus.ACCEPTED);
+        verify(timeoutStore).cleanup("match-1");
     }
 
     @Test
