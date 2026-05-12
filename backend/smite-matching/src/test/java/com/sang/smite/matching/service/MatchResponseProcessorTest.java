@@ -7,6 +7,7 @@ import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
+import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchStore;
 import com.sang.smite.matching.repository.MatchTimeoutStore;
@@ -47,6 +48,9 @@ class MatchResponseProcessorTest {
 
     @Mock
     private MatchTimeoutStore timeoutStore;
+
+    @Mock
+    private MatchResponseMetrics matchResponseMetrics;
 
     @Test
     @DisplayName("수락 요청 시 해당 유저의 수락 상태와 유저 상태를 갱신한다")

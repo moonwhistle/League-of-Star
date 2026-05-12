@@ -44,6 +44,9 @@ class RedisMatchTimeoutStoreTest extends AbstractRedisTest {
 
         // then
         assertThat(dueMatchIds).containsExactly("match-due-1", "match-due-2");
+        assertThat(timeoutStore.pendingSize()).isEqualTo(3);
+        assertThat(timeoutStore.overduePendingSize(2_000L)).isEqualTo(2);
+        assertThat(timeoutStore.deadlineOfPending("match-due-1")).hasValue(1_000L);
     }
 
     @Test
@@ -74,6 +77,7 @@ class RedisMatchTimeoutStoreTest extends AbstractRedisTest {
         assertThat(claimed).isTrue();
         assertThat(pendingSet().contains("match-claim")).isFalse();
         assertThat(processingSet().getScore("match-claim")).isEqualTo(6_000D);
+        assertThat(timeoutStore.processingSize()).isEqualTo(1);
     }
 
     @Test

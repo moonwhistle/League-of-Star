@@ -6,10 +6,12 @@ import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
+import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchStore;
 import com.sang.smite.matching.repository.MatchTimeoutStore;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
+import com.sang.smite.matching.service.result.MatchTimeoutSettlementResult;
 import com.sang.smite.redis.lock.annotation.DistributedRedisLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ public class MatchResponseProcessor {
     private final MatchUserStatusStore userStatusStore;
     private final MatchStore matchStore;
     private final MatchTimeoutStore timeoutStore;
+    private final MatchResponseMetrics matchResponseMetrics;
 
     @DistributedRedisLock(key = "'match:session:lock:' + #matchId")
     public void acceptWithLock(String matchId, Long userId) {
@@ -78,12 +81,13 @@ public class MatchResponseProcessor {
     }
 
     @DistributedRedisLock(key = "'match:session:lock:' + #matchId")
-    public void timeoutWithLock(String matchId) {
-        sessionStore.findById(matchId)
+    public MatchTimeoutSettlementResult timeoutWithLock(String matchId) {
+        return sessionStore.findById(matchId)
                 .filter(session -> session.status() == MatchStatus.FOUND)
                 .filter(MatchSession::hasPendingResponse)
                 .map(MatchSession::timeoutPendingUsers)
-                .ifPresent(this::completeTimeoutSession);
+                .map(this::completeTimeoutSession)
+                .orElseGet(MatchTimeoutSettlementResult::noOp);
     }
 
     private MatchSession getSession(String matchId) {
@@ -118,6 +122,7 @@ public class MatchResponseProcessor {
         userStatusStore.updateStatus(session.userA(), MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
         userStatusStore.updateStatus(session.userB(), MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
         cleanupTimeoutIndex(session.matchId());
+        matchResponseMetrics.incrementAcceptedCompletion();
     }
 
     private void completeDeclinedSession(MatchSession session) {
@@ -125,21 +130,29 @@ public class MatchResponseProcessor {
         applyFailedMatchResult(session, session.userA());
         applyFailedMatchResult(session, session.userB());
         cleanupTimeoutIndex(session.matchId());
+        matchResponseMetrics.incrementDeclinedCompletion();
     }
 
-    private void completeTimeoutSession(MatchSession session) {
+    private MatchTimeoutSettlementResult completeTimeoutSession(MatchSession session) {
         sessionStore.save(session.withStatus(MatchStatus.TIMEOUT), MatchingConstants.MATCH_SESSION_TTL_SECONDS);
-        applyFailedMatchResult(session, session.userA());
-        applyFailedMatchResult(session, session.userB());
+        int returnedUserCount = 0;
+        if (applyFailedMatchResult(session, session.userA())) {
+            returnedUserCount++;
+        }
+        if (applyFailedMatchResult(session, session.userB())) {
+            returnedUserCount++;
+        }
+        return MatchTimeoutSettlementResult.settled(returnedUserCount);
     }
 
-    private void applyFailedMatchResult(MatchSession session, Long userId) {
+    private boolean applyFailedMatchResult(MatchSession session, Long userId) {
         if (session.acceptedBy(userId)) {
             returnAcceptedUserToQueue(session, userId);
-            return;
+            return true;
         }
 
         userStatusStore.removeStatus(userId);
+        return false;
     }
 
     private void returnAcceptedUserToQueue(MatchSession session, Long userId) {

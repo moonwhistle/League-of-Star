@@ -1,6 +1,7 @@
 package com.sang.smite.matching.repository;
 
 import java.util.List;
+import java.util.OptionalLong;
 
 /**
  * 매칭 수락/거절 응답 timeout job 저장소입니다.
@@ -41,4 +42,24 @@ public interface MatchTimeoutStore {
      * 세션이 먼저 종료된 경우 pending/processing 양쪽 timeout index를 정리합니다.
      */
     void cleanup(String matchId);
+
+    /**
+     * pending timeout job 수를 조회합니다.
+     */
+    int pendingSize();
+
+    /**
+     * processing timeout job 수를 조회합니다.
+     */
+    int processingSize();
+
+    /**
+     * 현재 시각 기준 deadline이 지난 pending timeout job 수를 조회합니다.
+     */
+    int overduePendingSize(long nowMillis);
+
+    /**
+     * pending timeout job의 deadline score를 조회합니다.
+     */
+    OptionalLong deadlineOfPending(String matchId);
 }

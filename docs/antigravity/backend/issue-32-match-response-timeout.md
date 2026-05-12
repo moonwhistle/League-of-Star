@@ -422,7 +422,7 @@ flowchart TD
 
 ### 8. 관측 지표 및 부하 테스트
 
-- [ ] issue-30에서 보류한 accept/reject 기본 지표 반영
+- [x] issue-30에서 보류한 accept/reject 기본 지표 반영
   - accept API 호출 수
   - accept 성공/실패 수
   - reject API 호출 수
@@ -430,17 +430,99 @@ flowchart TD
   - 양쪽 수락 완료 수
   - 세션 만료/없음 실패 수
   - lock 획득 실패 수
-- [ ] timeout 처리 수
-- [ ] timeout 성공/실패 수
-- [ ] timeout no-op 처리 수
-- [ ] timeout으로 큐 복귀한 유저 수
-- [ ] timeout scheduler 처리량/backlog 지표
-- [ ] pending/processing backlog 지표
-- [ ] claim 성공/실패 수
-- [ ] reclaim 처리 수
-- [ ] scheduler scan duration / batch processing duration 지표
-- [ ] timeout deadline 대비 실제 처리 지연 시간 지표
-- [ ] accept/reject/timeout 경합 부하 테스트 작성
+- [x] timeout 처리 수
+- [x] timeout 성공/실패 수
+- [x] timeout no-op 처리 수
+- [x] timeout으로 큐 복귀한 유저 수
+- [x] timeout scheduler 처리량/backlog 지표
+- [x] pending/processing backlog 지표
+- [x] claim 성공/실패 수
+- [x] reclaim 처리 수
+- [x] scheduler scan duration / batch processing duration 지표
+- [x] timeout deadline 대비 실제 처리 지연 시간 지표
+- [x] accept/reject/timeout 경합 부하 테스트 작성
+
+#### 구현 결과
+
+- `MatchResponseMetrics`와 `MatchResponseMetricNames`를 추가했습니다.
+  - metric 이름과 tag key를 상수화해 PromQL/Grafana 작성 시 magic string을 줄였습니다.
+  - 같은 metric name은 동일한 tag key set을 사용하도록 맞췄습니다.
+- accept/reject 명령 경계 지표를 추가했습니다.
+  - `match.response.requests`
+    - tags: `action`, `result`, `reason`
+    - Prometheus: `match_response_requests_total`
+  - `match.response.lock.failures`
+    - tags: `action`
+    - Prometheus: `match_response_lock_failures_total`
+- 최종 세션 완료 지표를 추가했습니다.
+  - `match.response.completions`
+    - tags: `result=accepted|declined`
+    - Prometheus: `match_response_completions_total`
+- timeout 정산 지표를 추가했습니다.
+  - `match.response.timeout.settlements`
+    - tags: `outcome=success|failure|no_op`
+    - Prometheus: `match_response_timeout_settlements_total`
+  - `match.response.timeout.queue_returned.users`
+    - Prometheus: `match_response_timeout_queue_returned_users_total`
+- timeout job 처리 지표를 추가했습니다.
+  - `match.response.timeout.claims`
+    - tags: `outcome=claimed|skipped`
+    - Prometheus: `match_response_timeout_claims_total`
+  - `match.response.timeout.reclaims`
+    - tags: `outcome=reclaimed|skipped|failure`
+    - Prometheus: `match_response_timeout_reclaims_total`
+  - `match.response.timeout.batch.duration`
+    - Prometheus: `match_response_timeout_batch_duration_seconds`
+  - `match.response.timeout.processing.delay`
+    - Prometheus: `match_response_timeout_processing_delay_seconds`
+- timeout backlog gauge를 추가했습니다.
+  - `match.response.timeout.pending.backlog`
+    - Prometheus: `match_response_timeout_pending_backlog`
+  - `match.response.timeout.processing.backlog`
+    - Prometheus: `match_response_timeout_processing_backlog`
+  - `match.response.timeout.overdue.pending`
+    - Prometheus: `match_response_timeout_overdue_pending`
+- `MatchTimeoutStore`에 backlog gauge용 조회 메서드를 추가했습니다.
+  - `pendingSize()`
+  - `processingSize()`
+  - `overduePendingSize(nowMillis)`
+  - `deadlineOfPending(matchId)`
+- Grafana 대시보드를 갱신했습니다.
+  - 매칭 엔진 대시보드: `docs/grafana/smite-match-queue-dashboard.json`
+  - 매칭 응답 전용 대시보드: `docs/grafana/smite-match-response-dashboard.json`
+  - 엔진 대시보드에서는 `match_response_*` 패널을 제거했습니다.
+  - 응답 대시보드는 accept/reject와 timeout 운영 질문을 분리해서 확인하도록 구성했습니다.
+  - 추가 패널:
+    - 수락/거절 요청 처리량
+    - 수락/거절 실패율
+    - 최종 완료 상태
+    - matchId Lock 실패
+    - Timeout Backlog
+    - Timeout Claim/Reclaim
+    - Timeout 정산 결과
+    - Timeout 큐 복귀 유저
+    - Timeout 정산 지연
+    - Timeout Batch 소요 시간
+- 지표 수집 검증 테스트를 추가했습니다.
+  - `MatchResponseMetricsTest`: `SimpleMeterRegistry` 기준 counter/gauge/timer 값 검증
+  - `MatchResponsePrometheusMetricsTest`: `/actuator/prometheus` 응답에 새 Prometheus metric이 실제 노출되는지 검증
+- 부하 테스트 확인 기준은 Grafana/Prometheus에서 다음 PromQL로 확인합니다.
+  - `sum by (action, result) (rate(match_response_requests_total[1m]))`
+  - `sum(rate(match_response_requests_total{result="failure"}[5m])) / clamp_min(sum(rate(match_response_requests_total{result="attempt"}[5m])), 0.001) * 100`
+  - `sum(match_response_timeout_pending_backlog)`
+  - `sum(match_response_timeout_processing_backlog)`
+  - `sum by (outcome) (rate(match_response_timeout_claims_total[1m]))`
+  - `sum by (outcome) (rate(match_response_timeout_settlements_total[1m]))`
+  - `histogram_quantile(0.95, sum(rate(match_response_timeout_processing_delay_seconds_bucket[5m])) by (le))`
+- Grafana 연동 검증을 수행했습니다.
+  - 두 Grafana JSON 파일 모두 `json.tool` 기준 유효한 JSON입니다.
+  - 매칭 엔진 대시보드에는 `match_response_*` 참조가 남아 있지 않습니다.
+  - 매칭 응답 대시보드가 참조하는 `match_response_*` metric은 모두 `MatchResponseMetricNames` 기반 Prometheus 이름과 일치합니다.
+  - timer metric은 `publishPercentileHistogram()`을 사용해 `_bucket` 기반 p95 PromQL과 연결됩니다.
+- 검증 명령:
+  - `:smite-core:test`
+  - `:smite-matching:test`
+  - `:smite-api:test`
 
 ### 9. 문서 갱신
 

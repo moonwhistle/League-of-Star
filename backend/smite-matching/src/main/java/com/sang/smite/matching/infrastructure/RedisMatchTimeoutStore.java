@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.OptionalLong;
 
 /**
  * Redis ZSET 기반 timeout job 저장소입니다.
@@ -91,6 +92,30 @@ public class RedisMatchTimeoutStore implements MatchTimeoutStore {
     public void cleanup(String matchId) {
         pendingSet().remove(matchId);
         processingSet().remove(matchId);
+    }
+
+    @Override
+    public int pendingSize() {
+        return pendingSet().size();
+    }
+
+    @Override
+    public int processingSize() {
+        return processingSet().size();
+    }
+
+    @Override
+    public int overduePendingSize(long nowMillis) {
+        return pendingSet().count(0, true, nowMillis, true);
+    }
+
+    @Override
+    public OptionalLong deadlineOfPending(String matchId) {
+        Double score = pendingSet().getScore(matchId);
+        if (score == null) {
+            return OptionalLong.empty();
+        }
+        return OptionalLong.of(score.longValue());
     }
 
     private List<String> findDue(RScoredSortedSet<String> set, long nowMillis, int batchSize) {

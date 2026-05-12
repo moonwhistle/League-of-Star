@@ -2,6 +2,8 @@ package com.sang.smite.matching.service;
 
 import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
+import com.sang.smite.matching.metrics.MatchResponseMetricNames;
+import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.redis.lock.exception.RedisLockAcquisitionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,8 +16,9 @@ import static org.mockito.Mockito.verify;
 class MatchResponseCommandServiceTest {
 
     private final MatchResponseProcessor matchResponseProcessor = mock(MatchResponseProcessor.class);
+    private final MatchResponseMetrics matchResponseMetrics = mock(MatchResponseMetrics.class);
     private final MatchResponseCommandService matchResponseCommandService =
-            new MatchResponseCommandService(matchResponseProcessor);
+            new MatchResponseCommandService(matchResponseProcessor, matchResponseMetrics);
 
     @Test
     @DisplayName("매칭 수락 요청을 processor에 위임한다")
@@ -23,6 +26,8 @@ class MatchResponseCommandServiceTest {
         matchResponseCommandService.accept("match-1", 1L);
 
         verify(matchResponseProcessor).acceptWithLock("match-1", 1L);
+        verify(matchResponseMetrics).incrementResponseAttempt(MatchResponseMetricNames.ACTION_ACCEPT);
+        verify(matchResponseMetrics).incrementResponseSuccess(MatchResponseMetricNames.ACTION_ACCEPT);
     }
 
     @Test
@@ -31,6 +36,8 @@ class MatchResponseCommandServiceTest {
         matchResponseCommandService.reject("match-1", 1L);
 
         verify(matchResponseProcessor).rejectWithLock("match-1", 1L);
+        verify(matchResponseMetrics).incrementResponseAttempt(MatchResponseMetricNames.ACTION_REJECT);
+        verify(matchResponseMetrics).incrementResponseSuccess(MatchResponseMetricNames.ACTION_REJECT);
     }
 
     @Test
@@ -44,6 +51,11 @@ class MatchResponseCommandServiceTest {
                 .isInstanceOf(MatchingException.class)
                 .extracting("errorCode")
                 .isEqualTo(MatchingErrorCode.MATCH_RESPONSE_LOCK_FAILED);
+        verify(matchResponseMetrics).incrementLockFailure(MatchResponseMetricNames.ACTION_ACCEPT);
+        verify(matchResponseMetrics).incrementResponseFailure(
+                MatchResponseMetricNames.ACTION_ACCEPT,
+                MatchingErrorCode.MATCH_RESPONSE_LOCK_FAILED.customCode()
+        );
     }
 
     @Test
@@ -57,5 +69,10 @@ class MatchResponseCommandServiceTest {
                 .isInstanceOf(MatchingException.class)
                 .extracting("errorCode")
                 .isEqualTo(MatchingErrorCode.MATCH_RESPONSE_LOCK_FAILED);
+        verify(matchResponseMetrics).incrementLockFailure(MatchResponseMetricNames.ACTION_REJECT);
+        verify(matchResponseMetrics).incrementResponseFailure(
+                MatchResponseMetricNames.ACTION_REJECT,
+                MatchingErrorCode.MATCH_RESPONSE_LOCK_FAILED.customCode()
+        );
     }
 }

@@ -1,7 +1,12 @@
 package com.sang.smite.matching.service;
 
 import com.sang.smite.matching.common.constant.MatchingConstants;
+import com.sang.smite.matching.metrics.MatchResponseMetricNames;
+import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.matching.repository.MatchTimeoutStore;
+import com.sang.smite.matching.service.result.MatchTimeoutSettlementResult;
+import io.micrometer.core.instrument.Timer;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,15 +30,30 @@ public class MatchResponseTimeoutService {
 
     private final MatchTimeoutStore timeoutStore;
     private final MatchResponseProcessor matchResponseProcessor;
+    private final MatchResponseMetrics matchResponseMetrics;
     private final Clock clock;
+
+    @PostConstruct
+    public void init() {
+        matchResponseMetrics.registerTimeoutBacklogGauges(
+                timeoutStore::pendingSize,
+                timeoutStore::processingSize,
+                () -> timeoutStore.overduePendingSize(clock.millis())
+        );
+    }
 
     /**
      * 만료된 processing job을 먼저 복구한 뒤, due pending job을 claim하여 timeout 정산을 시도합니다.
      */
     public void processTimeouts() {
+        Timer.Sample sample = matchResponseMetrics.startTimer();
         long nowMillis = clock.millis();
-        reclaimExpiredProcessing(nowMillis);
-        processDuePending(nowMillis);
+        try {
+            reclaimExpiredProcessing(nowMillis);
+            processDuePending(nowMillis);
+        } finally {
+            matchResponseMetrics.recordTimeoutBatchDuration(sample);
+        }
     }
 
     /**
@@ -47,8 +67,12 @@ public class MatchResponseTimeoutService {
 
         for (String matchId : expiredMatchIds) {
             try {
-                timeoutStore.reclaim(matchId, nowMillis, nowMillis);
+                boolean reclaimed = timeoutStore.reclaim(matchId, nowMillis, nowMillis);
+                matchResponseMetrics.incrementTimeoutReclaim(reclaimed
+                        ? MatchResponseMetricNames.OUTCOME_RECLAIMED
+                        : MatchResponseMetricNames.OUTCOME_SKIPPED);
             } catch (Exception e) {
+                matchResponseMetrics.incrementTimeoutReclaim(MatchResponseMetricNames.OUTCOME_FAILURE);
                 log.warn("Failed to reclaim match response timeout job: matchId={}", matchId, e);
             }
         }
@@ -74,14 +98,25 @@ public class MatchResponseTimeoutService {
     private void processMatchTimeout(String matchId, long nowMillis) {
         long processingExpireAtMillis = nowMillis + MatchingConstants.TIMEOUT_PROCESSING_LEASE_MILLIS;
         try {
+            long deadlineMillis = timeoutStore.deadlineOfPending(matchId).orElse(nowMillis);
             boolean claimed = timeoutStore.claim(matchId, nowMillis, processingExpireAtMillis);
             if (!claimed) {
+                matchResponseMetrics.incrementTimeoutClaim(MatchResponseMetricNames.OUTCOME_SKIPPED);
                 return;
             }
+            matchResponseMetrics.incrementTimeoutClaim(MatchResponseMetricNames.OUTCOME_CLAIMED);
+            matchResponseMetrics.recordTimeoutProcessingDelay(nowMillis - deadlineMillis);
 
-            matchResponseProcessor.timeoutWithLock(matchId);
+            MatchTimeoutSettlementResult result = matchResponseProcessor.timeoutWithLock(matchId);
+            if (result.settled()) {
+                matchResponseMetrics.incrementTimeoutSettlement(MatchResponseMetricNames.OUTCOME_SUCCESS);
+                matchResponseMetrics.incrementTimeoutReturnedUsers(result.returnedUserCount());
+            } else {
+                matchResponseMetrics.incrementTimeoutSettlement(MatchResponseMetricNames.OUTCOME_NO_OP);
+            }
             timeoutStore.ack(matchId);
         } catch (Exception e) {
+            matchResponseMetrics.incrementTimeoutSettlement(MatchResponseMetricNames.OUTCOME_FAILURE);
             log.warn("Failed to process match response timeout job: matchId={}", matchId, e);
         }
     }
