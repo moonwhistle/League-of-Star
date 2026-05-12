@@ -25,7 +25,7 @@ stateDiagram-v2
 - **세션 상태**: matchId 단위의 전체 상태입니다. `FOUND`, `ACCEPTED`, `DECLINED`, `TIMEOUT`으로 정산됩니다.
 - **유저 응답 상태**: 세션 안에서 각 유저가 10초 응답 윈도우 동안 어떤 응답을 했는지 나타냅니다. `PENDING`, `ACCEPTED`, `REJECTED`, `TIMEOUT`으로 관리됩니다.
 
-한 명이 먼저 `ACCEPTED` 또는 `REJECTED`가 되어도 세션은 바로 종료되지 않습니다. 상대방의 10초 응답권을 보장하기 위해 세션은 `FOUND`를 유지하고, 양쪽 응답이 모두 확정되었거나 제한 시간이 만료되었을 때 최종 정산됩니다.
+한 명이 먼저 `ACCEPTED` 또는 `REJECTED`가 되어도 세션은 바로 종료되지 않습니다. 상대방의 10초 응답권을 보장하기 위해 세션은 `FOUND`를 유지합니다. 단, 양쪽 모두 `ACCEPTED`가 되면 즉시 `ACCEPTED`로 완료하고, 그 외 실패 조합은 10초 deadline 정산 시점에 최종 결과로 확정합니다.
 
 ```mermaid
 stateDiagram-v2
@@ -35,8 +35,8 @@ stateDiagram-v2
 
     FOUND --> FOUND: 한쪽만 수락 또는 거절
     FOUND --> ACCEPTED: 양쪽 모두 수락
-    FOUND --> DECLINED: 양쪽 응답 완료 후 실패 정산
-    FOUND --> TIMEOUT: 10초 응답 시간 초과 정산
+    FOUND --> DECLINED: 10초 deadline 후 거절 포함 실패 정산
+    FOUND --> TIMEOUT: 10초 deadline 후 미응답 포함 실패 정산
 
     ACCEPTED --> IN_GAME: 게임 세션 생성
     DECLINED --> [*]: 거절 완료 후 대기열 이탈
@@ -79,7 +79,8 @@ sequenceDiagram
 ```
 
 - A/B 모두 게임 대기 화면으로 이동합니다.
-- `match_response_result` 이벤트에는 상대 `nickname`, `tier`, `tierScore`와 게임 대기 정보가 포함됩니다.
+- `match_response_result` 이벤트에는 상대 `nickname`, `tier`, `tierScore`가 포함됩니다.
+- 게임 세션 생성과 `gameId` payload 채우기는 별도 게임 이슈에서 처리하며, 이번 매칭 응답 이슈에서는 `game=null`을 유지합니다.
 
 #### A 수락, B 거절
 
@@ -88,12 +89,16 @@ sequenceDiagram
     participant A
     participant S as MatchSession
     participant B
+    participant T as TimeoutScheduler
 
     S->>S: status=FOUND, A=PENDING, B=PENDING
     A->>S: accept
     S->>S: status=FOUND, A=ACCEPTED, B=PENDING
     B->>S: reject
     B-->>B: HTTP 200 OK empty body
+    S->>S: status=FOUND, A=ACCEPTED, B=REJECTED
+    Note over S: 10초 deadline까지 정산 대기
+    T->>S: settle after 10 seconds
     S->>S: status=DECLINED, A=ACCEPTED, B=REJECTED
     S->>S: A returns to MATCHING with original entryTime
     S->>S: B leaves matching status
@@ -111,12 +116,16 @@ sequenceDiagram
     participant A
     participant S as MatchSession
     participant B
+    participant T as TimeoutScheduler
 
     S->>S: status=FOUND, A=PENDING, B=PENDING
     A->>S: reject
     S->>S: status=FOUND, A=REJECTED, B=PENDING
     A-->>A: HTTP 200 OK empty body
     B->>S: accept within 10 seconds
+    S->>S: status=FOUND, A=REJECTED, B=ACCEPTED
+    Note over S: 10초 deadline까지 정산 대기
+    T->>S: settle after 10 seconds
     S->>S: status=DECLINED, A=REJECTED, B=ACCEPTED
     S->>S: A leaves matching status
     S->>S: B returns to MATCHING with original entryTime
@@ -190,6 +199,9 @@ sequenceDiagram
     A-->>A: HTTP 200 OK empty body
     B->>S: reject
     B-->>B: HTTP 200 OK empty body
+    S->>S: status=FOUND, A=REJECTED, B=REJECTED
+    Note over S: 10초 deadline까지 정산 대기
+    T->>S: settle after 10 seconds
     S->>S: status=DECLINED, A=REJECTED, B=REJECTED
     S->>S: A and B leave matching status
     S-->>A: SSE match_response_result FAILED

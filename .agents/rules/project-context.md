@@ -18,7 +18,7 @@ trigger: always_on
 
 | 영역 | 기술 |
 |------|------|
-| **Backend** | Java 17, Spring Boot 4.0, Spring WebSocket (STOMP), Spring Security + JWT, OAuth2 Client, JPA (Hibernate), MySQL, Redis |
+| **Backend** | Java 17, Spring Boot 4.0, Spring MVC SSE, Spring WebSocket (STOMP), Spring Security + JWT, OAuth2 Client, JPA (Hibernate), MySQL, Redis |
 | **Frontend** | React 19, TypeScript, Vite, STOMP.js + SockJS, Canvas / HTML5 |
 | **Infra** | Docker, Nginx, GitHub Actions |
 
@@ -41,6 +41,7 @@ smite/
 ├── backend/                  # Gradle 루트
 │   ├── smite-api/            # API 모듈 (Controller, DTO, Config, Service 구현체)
 │   ├── smite-core/           # Core 모듈 (Entity, Repository, 게임 로직, Service 인터페이스)
+│   ├── smite-matching/       # 매칭 큐, 매칭 엔진, 수락/거절/timeout 정산
 │   └── smite-infra-redis/    # Redis 인프라 모듈 (매칭 큐, 세션 관리)
 ├── frontend/                 # React 19 + TypeScript + Vite
 └── docs/                     # 기획, 정책, DB 설계 문서
@@ -50,7 +51,10 @@ smite/
 
 ```
 smite-api → smite-core
+smite-api → smite-matching
 smite-api → smite-infra-redis
+smite-matching → smite-core
+smite-matching → smite-infra-redis
 smite-infra-redis → smite-core
 smite-core → (독립, JPA/Hibernate만 의존)
 ```
@@ -76,7 +80,7 @@ smite-core → (독립, JPA/Hibernate만 의존)
 |--------|------|
 | **Auth** | 회원가입, 로그인 (이메일 + 소셜), JWT 발급/검증 |
 | **User** | 유저 프로필, 티어/LP 관리 |
-| **Match** | 매칭 큐 관리, 티어 기반 상대 탐색, 매칭 수락 처리 |
+| **Match** | 매칭 큐 관리, 티어 기반 상대 탐색, 수락/거절/timeout 정산, SSE 매칭 알림 |
 | **Game** | 시나리오 생성, WebSocket 통신, Rewind 판정, 결과 처리 |
 | **Ranking** | 랭킹 조회, 리더보드 |
 | **Record** | 전적 기록, 통계 |

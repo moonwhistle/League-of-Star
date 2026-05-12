@@ -22,6 +22,6 @@ public final class MatchingConstants {
     public static final String TIMEOUT_SCHEDULER_FIXED_DELAY_MS = "1000";
     public static final int TIMEOUT_CANDIDATE_BATCH_SIZE = 100;
     public static final long STATUS_TTL_SECONDS = 1800; // 30분
-    public static final long MATCH_SESSION_TTL_SECONDS = 12; // 수락 제한 10초 + 네트워크/스케줄링 버퍼
+    public static final long MATCH_SESSION_TTL_SECONDS = 3600; // cleanup 실패 대비 안전장치 TTL 60분
     public static final long TIMEOUT_PROCESSING_LEASE_MILLIS = 5_000L;
 }

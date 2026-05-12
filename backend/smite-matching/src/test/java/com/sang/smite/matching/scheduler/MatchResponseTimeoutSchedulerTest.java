@@ -1,6 +1,6 @@
 package com.sang.smite.matching.scheduler;
 
-import com.sang.smite.matching.service.MatchResponseTimeoutService;
+import com.sang.smite.matching.domain.service.MatchResponseTimeoutService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

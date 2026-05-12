@@ -196,7 +196,7 @@ sequenceDiagram
     participant Found as MatchFoundService
     participant Publisher as MatchFoundPubSubPublishListener
     participant Subscriber as MatchFoundPubSubSubscriber
-    participant Dispatcher as MatchFoundNotificationDispatcher
+    participant Sender as MatchFoundSseSender
     participant Redis as Redis
 
     ClientA->>API: GET /api/v1/notifications/match/stream
@@ -220,22 +220,22 @@ sequenceDiagram
 
     Engine->>Found: process(userA, userB)
     Found->>Redis: userA/userB 상태 FOUND 저장
-    Found->>Redis: match:session:{matchId} 저장, TTL 12초
+    Found->>Redis: match:session:{matchId} 저장, TTL 60분
     Found->>API: MatchFoundEvent 발행
     API->>Publisher: MatchFoundEvent 수신
     Publisher->>Redis: notification:match_found publish
     Redis-->>Subscriber: 모든 API 인스턴스가 메시지 수신
-    Subscriber->>Dispatcher: match_found 전송 위임
-    Dispatcher->>Registry: userA SSE 연결 조회
-    Dispatcher->>Registry: userB SSE 연결 조회
-    Dispatcher-->>ClientA: event: match_found
-    Dispatcher-->>ClientB: event: match_found
+    Subscriber->>Sender: match_found 전송 위임
+    Sender->>Registry: userA SSE 연결 조회
+    Sender->>Registry: userB SSE 연결 조회
+    Sender-->>ClientA: event: match_found
+    Sender-->>ClientB: event: match_found
 
     alt 특정 유저 SSE 연결 없음
-        Dispatcher->>Dispatcher: 전송 스킵 및 로그 기록
+        Sender->>Sender: 전송 스킵 및 로그 기록
     else 이벤트 전송 실패
-        Dispatcher->>Registry: 실패한 연결 제거
-        Dispatcher->>Dispatcher: 실패 로그 기록
+        Sender->>Registry: 실패한 연결 제거
+        Sender->>Sender: 실패 로그 기록
     end
 ```
 
@@ -583,7 +583,7 @@ eventSource.onerror = () => {
   - 재연결 시 기존 연결 종료 후 새 연결 교체
   - 현재 연결만 제거하고 오래된 연결 제거 요청은 무시
   - `onCompletion`, `onTimeout`, `onError` 콜백 실행 시 registry 제거
-- `MatchFoundNotificationDispatcherTest`를 작성했습니다.
+- `MatchFoundSseSenderTest`를 작성했습니다.
   - 두 유저 모두 연결된 경우 두 유저에게 `match_found` 전송
   - 한 유저만 연결된 경우 연결된 유저에게만 전송
   - 두 유저 모두 미연결이어도 예외 없이 종료
@@ -811,9 +811,9 @@ Netty/WebFlux로 전환해도 `SSE 연결 저장소 = 인스턴스 메모리`, `
 - `MatchFoundPubSubSubscriber`를 추가했습니다.
   - Redis Pub/Sub 메시지를 수신합니다.
   - JSON payload를 `MatchFoundPubSubMessage`로 decode합니다.
-  - `MatchFoundNotificationDispatcher`에 전송 처리를 위임합니다.
+  - `MatchFoundSseSender`에 전송 처리를 위임합니다.
   - 메시지 처리 실패는 로그로 격리하고 listener thread 밖으로 예외를 전파하지 않습니다.
-- `MatchFoundNotificationDispatcher`를 추가했습니다.
+- `MatchFoundSseSender`를 추가했습니다.
   - 현재 인스턴스의 `SseConnectionRegistry`에서 `userA`, `userB` 연결을 조회합니다.
   - 연결이 있는 유저에게만 `match_found` SSE를 전송합니다.
   - 연결이 없는 유저는 정상 스킵합니다.
@@ -830,7 +830,7 @@ Netty/WebFlux로 전환해도 `SSE 연결 저장소 = 인스턴스 메모리`, `
 
 - `MatchFoundEvent`는 더 이상 직접 SSE 전송을 수행하지 않습니다.
 - `MatchFoundPubSubPublishListener`는 `MatchFoundEvent`를 Redis Pub/Sub 메시지로 변환해 publish만 담당합니다.
-- 실제 SSE 전송은 각 API 인스턴스의 `MatchFoundPubSubSubscriber -> MatchFoundNotificationDispatcher` 경로에서만 수행합니다.
+- 실제 SSE 전송은 각 API 인스턴스의 `MatchFoundPubSubSubscriber -> MatchFoundSseSender` 경로에서만 수행합니다.
 - 모든 API 인스턴스가 같은 Pub/Sub 메시지를 받지만, 각 인스턴스는 자기 JVM 메모리의 `SseConnectionRegistry`에 존재하는 연결에만 전송합니다.
 - 따라서 `smite-api-1`에 붙은 유저는 `smite-api-1`에서만, `smite-api-2`에 붙은 유저는 `smite-api-2`에서만 알림을 받습니다.
 - 로컬 직접 전송 리스너를 제거했기 때문에 같은 인스턴스에서 Pub/Sub 전송과 로컬 전송이 동시에 실행되어 중복 알림이 발생하지 않습니다.
@@ -879,7 +879,7 @@ Netty/WebFlux로 전환해도 `SSE 연결 저장소 = 인스턴스 메모리`, `
 - `MatchFoundPubSubSubscriberTest`
   - Pub/Sub 메시지 수신 후 decode와 dispatcher 위임을 검증합니다.
   - decode 실패와 dispatch 실패가 listener 밖으로 전파되지 않고 실패 메트릭으로 기록되는지 검증합니다.
-- `MatchFoundNotificationDispatcherTest`
+- `MatchFoundSseSenderTest`
   - 두 유저 모두 현재 인스턴스에 연결된 경우 두 유저에게 전송되는지 검증합니다.
   - 한 유저만 연결된 경우 연결된 유저에게만 전송되는지 검증합니다.
   - 두 유저 모두 미연결이어도 예외 없이 종료되는지 검증합니다.
@@ -1009,7 +1009,7 @@ flowchart TD
 - `MatchFoundPubSubMessage`로 Pub/Sub 전송 메시지 모델 정의
 - `MatchFoundPubSubPublisher`로 `notification:match_found` publish 구현
 - `MatchFoundPubSubSubscriber`로 모든 API 인스턴스 subscribe 구현
-- `MatchFoundNotificationDispatcher`로 현재 인스턴스에 연결된 유저에게만 `match_found` 전송
+- `MatchFoundSseSender`로 현재 인스턴스에 연결된 유저에게만 `match_found` 전송
 - 기존 로컬 직접 전송 리스너 제거로 중복 전송 방지
 - SSE, Pub/Sub, dispatch 관련 Micrometer 지표 추가
 - Grafana SSE 대시보드에 연결, 이벤트 전송, Pub/Sub 전파, JVM/Tomcat 리소스 패널 추가

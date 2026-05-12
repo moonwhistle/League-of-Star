@@ -23,7 +23,7 @@ flowchart TD
 
     subgraph Redis["Redis"]
         Status["Bucket<br/>match:status:{userId}<br/>value: MatchStatus<br/>ttl: 30 minutes"]
-        Session["Hash<br/>match:session:{matchId}<br/>fields: matchId, userA, userB, status<br/>ttl: accept timeout"]
+        Session["Hash<br/>match:session:{matchId}<br/>fields: matchId, userA, userB, status<br/>ttl: 60 minutes"]
 
         subgraph Queues["Tier-partitioned Sorted Sets"]
             Q1["matching:queue:1<br/>Iron IV"]
@@ -58,7 +58,7 @@ flowchart TD
 | Key 명칭 | 데이터 타입 | Score | Member |
 | :--- | :--- | :--- | :--- |
 | `matching:queue:{tierScore}` | Sorted Set | **entryTime** (ms) | **userId** (Long) |
-| `match:session:{matchId}` | Hash (TTL) | - | `{matchId, userA, userB, status}` |
+| `match:session:{matchId}` | Hash (TTL 60분) | - | `{matchId, userA, userB, status}` |
 
 > **[Core 연동]** `tierScore`는 `com.sang.smite.domain.rank.domain.vo.Rank` 클래스의 `getTierScore()` 공식을 따릅니다.
 > - **범위**: 1 (아이언 IV) ~ 28 (다이아몬드 I)
@@ -91,7 +91,7 @@ sequenceDiagram
 
     Note over User, Engine: [3. 알림] WebSocket을 통해 매칭 성사 알림
     Engine->>API: MatchFoundEvent 발행
-    API->>User: WebSocket 전송
+    API->>User: SSE 전송
 ```
 
 ---

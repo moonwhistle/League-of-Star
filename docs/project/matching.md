@@ -20,9 +20,9 @@
 - **유저 매칭 상태 (STRING)**: `match:status:{userId}`
   - *특징*: `MATCHING`, `FOUND` 등 유저의 현재 매칭 상태를 저장합니다.
 - **매칭 세션 (HASH)**: `match:session:{matchId}`
-  - *특징*: 매칭 성사 후 수락/거절 상태를 관리하는 TTL 기반 임시 데이터.
+  - *특징*: 매칭 성사 후 수락/거절 상태를 관리하는 임시 데이터.
   - 클라이언트 수락/거절 모달 유효 시간은 10초입니다.
-  - Redis 세션 TTL은 네트워크/스케줄링 지연 버퍼를 포함해 12초로 둡니다.
+  - Redis 세션 TTL은 cleanup 실패 대비 안전장치로 60분을 둡니다.
 - **응답 timeout pending index (ZSET)**: `match:response:timeout:pending`
   - *특징*: 아직 scheduler가 가져가지 않은 timeout 후보 matchId를 deadline epoch millis 기준으로 저장합니다.
 - **응답 timeout processing index (ZSET)**: `match:response:timeout:processing`
@@ -71,7 +71,7 @@ sequenceDiagram
         Engine->>Redis: 매칭 성공 시 데이터 삭제 및 세션 생성
     end
 
-    Note over User, Engine: [3. 알림] MatchFoundEvent 발행 -> WebSocket 전송
+    Note over User, Engine: [3. 알림] MatchFoundEvent 발행 -> SSE 전송
     Engine->>API: 이벤트 발행
     API->>User: 수락 팝업 노출
 ```
@@ -91,7 +91,7 @@ sequenceDiagram
 
 ## 6. 매칭 응답 timeout 정산
 
-매칭 성사 이후 10초 응답 윈도우가 끝나면 서버가 남은 `PENDING` 응답을 timeout으로 정산합니다. 클라이언트는 모달 표시와 accept/reject 요청만 담당하고, timeout 최종 정산은 서버가 책임집니다.
+매칭 성사 이후 10초 응답 윈도우가 끝나면 서버가 해당 matchId의 실패 조합을 최종 정산합니다. 남은 `PENDING` 응답은 `TIMEOUT`으로 바꾸고, 이미 수락/거절이 모두 기록된 실패 조합도 deadline 시점에 최종 결과로 확정합니다. 클라이언트는 모달 표시와 accept/reject 요청만 담당하고, 최종 정산은 서버가 책임집니다.
 
 ### 6.1 처리 흐름
 
@@ -106,7 +106,7 @@ flowchart TD
     G -->|"no"| H["skip"]
     G -->|"yes"| I["matchId lock 획득"]
     I --> J["timeoutWithLock(matchId)"]
-    J --> K["PENDING 유저 TIMEOUT 정산"]
+    J --> K["deadline 최종 결과 정산"]
     K --> L["성공 또는 no-op이면 processing ack"]
 ```
 
@@ -134,14 +134,17 @@ claim은 scheduler 중복 처리 비용을 줄이는 장치이고, lock은 세�
 
 | 응답 상태 | 처리 |
 | :--- | :--- |
+| `ACCEPTED + ACCEPTED` | accept 처리 시 즉시 성공 완료되어 timeout scheduler 대상 아님 |
+| `ACCEPTED + REJECTED` | deadline 시 `DECLINED`, `ACCEPTED` 유저는 기존 `entryTime`으로 큐 복귀 |
 | `ACCEPTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, `ACCEPTED` 유저는 기존 `entryTime`으로 큐 복귀 |
+| `REJECTED + REJECTED` | deadline 시 `DECLINED`, 두 유저 모두 큐 이탈 |
 | `REJECTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, 두 유저 모두 큐 이탈 |
 | `PENDING + PENDING` | 두 유저 모두 `TIMEOUT`, 두 유저 모두 큐 이탈 |
 | 이미 `ACCEPTED` / `DECLINED` / `TIMEOUT` | timeout scheduler는 no-op 후 index ack |
 
 ### 6.5 관측 지표
 
-응답/timeout 지표는 `match_response_*` Prometheus metric으로 노출하고, Grafana 응답 전용 대시보드에서 확인합니다.
+응답/timeout 지표는 `match_response_*` Prometheus metric으로 노출하고, Grafana 매칭 응답 전용 대시보드에서 확인합니다.
 
 | 지표 | 의미 |
 | :--- | :--- |
@@ -168,7 +171,7 @@ claim은 scheduler 중복 처리 비용을 줄이는 장치이고, lock은 세�
 | :--- | :--- | :--- |
 | 매칭 성공 유저 대기 시간 | `joinQueue` 진입 후 `match found`까지 걸린 시간 | 매칭 엔진 성능 지표 |
 | 수락/거절 모달 유효 시간 | `match found` 이후 클라이언트가 응답할 수 있는 시간 | 10초 |
-| 매칭 세션 Redis TTL | 수락/거절 처리를 위한 서버 측 임시 세션 유지 시간 | 12초 |
+| 매칭 세션 Redis TTL | cleanup 실패 대비 서버 측 임시 세션 안전장치 TTL | 60분 |
 
 수락/거절 모달 10초는 매칭 성사 이후부터 시작됩니다. 따라서 이 값을 매칭 대기 시간의 실패 기준으로 사용하지 않습니다.
 

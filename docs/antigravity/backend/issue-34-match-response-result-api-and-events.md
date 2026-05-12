@@ -27,12 +27,15 @@ SSE 연결은 `match_found`를 받은 직후 닫지 않습니다. 클라이언�
 
 | 시나리오 | 화면 전이 |
 | :--- | :--- |
-| 둘 다 수락 | 게임 진행 대기 화면으로 이동. 상대 정보/닉네임 표시 |
+| 둘 다 수락 | 게임 진행 대기 화면으로 이동. 상대 정보/닉네임/티어 표시 |
 | 한 명 거절, 상대 미응답 | 거절한 유저도 정산 대기 모달 유지. 상대는 10초 모달 유지 |
 | 한 명 거절, 상대가 10초 안에 수락 | 거절 유저는 start 버튼 복귀. 수락 유저는 기존 entryTime으로 매칭 대기 상태 복귀 |
 | 둘 다 거절 | 최종 정산 후 둘 다 start 버튼 복귀 |
 | 한 명 수락, 상대 timeout | 수락한 유저는 매칭 대기 상태 복귀. timeout 유저는 start 버튼 복귀 |
 | 둘 다 timeout | 둘 다 start 버튼 복귀 |
+
+이번 이슈는 수락/거절 HTTP 응답과 `match_response_result` SSE 반환값까지 구현합니다.
+게임 테이블 생성, 게임 세션 생성, `gameId` 채우기는 매칭 응답 이슈가 끝난 뒤 별도 게임 이슈에서 처리합니다.
 
 ## 📚 Tasks
 
@@ -114,6 +117,7 @@ Content-Length: 0
 - [x] 내가 accept했지만 상대가 이미 reject한 상태라면 HTTP 응답과 별개로 `match_response_result` SSE 이벤트가 큐 복귀 전환을 담당
 - [x] 중복 accept는 기존 멱등 정책을 유지하고 `200 OK` empty body
 - [x] accept 후 session이 최종 `ACCEPTED`가 되는 경우 상대 정보/게임 대기 정보는 SSE 이벤트에 포함
+- [x] 게임 세션 생성과 `gameId` payload는 이번 이슈 범위에서 제외
 
 #### 주요 케이스
 
@@ -137,7 +141,7 @@ Content-Length: 0
 - [x] 내가 reject하면 내 화면은 즉시 start 버튼으로 돌아가지 않고 정산 대기 상태 유지
 - [x] reject 후 수락/거절 버튼은 비활성화하고 정산 대기 상태를 표시
 - [x] 상대가 아직 미응답이면 session은 `FOUND`로 유지
-- [x] 상대도 reject했거나 이미 응답 완료된 경우 session은 `DECLINED`
+- [x] 상대도 reject했거나 이미 응답 완료된 경우에도 둘 다 수락이 아니면 deadline 정산까지 session은 `FOUND` 유지
 - [x] 내가 reject한 순간 상대에게 실패 이벤트를 보내지 않음
 - [x] reject 응답에는 큐 복귀/화면 최종 전환 없음
 - [x] reject한 유저도 최종 `match_response_result` SSE 이벤트로 `GO_TO_MATCH_START` 전환
@@ -274,6 +278,9 @@ Content-Length: 0
 }
 ```
 
+`game` 필드는 후속 게임 세션 생성 이슈를 위한 예약 필드입니다.
+이번 이슈에서는 양쪽 수락으로 `GO_TO_GAME_WAITING`이 내려가도 `game=null`을 유지합니다.
+
 #### 구현 위치
 
 - 이벤트 이름: `MatchNotificationEventName.MATCH_RESPONSE_RESULT`
@@ -282,51 +289,149 @@ Content-Length: 0
 
 ### 7. 시나리오별 SSE 이벤트 발행 정책
 
-- [ ] 둘 다 accept
+- [x] 둘 다 accept
   - 양쪽 모두에게 `outcome=MATCHED`, `reason=BOTH_ACCEPTED`, `action=GO_TO_GAME_WAITING`
   - 동시에 accept한 경우 한쪽 HTTP ack보다 SSE 최종 이벤트가 먼저 도착할 수 있으므로 클라이언트는 `match_response_result` 이벤트를 우선 적용
-- [ ] 내가 reject
+- [x] 내가 reject
   - HTTP 응답은 `200 OK` empty body
   - 버튼은 비활성화하고 정산 대기 상태를 표시
   - 상대에게는 즉시 실패 이벤트를 보내지 않음
-  - 상대가 제한 시간 안에 accept하거나 timeout 정산이 끝났을 때 양쪽 필요한 대상에게 최종 실패 이벤트를 보냄
-- [ ] 상대 reject 후 내가 accept
+  - 상대가 제한 시간 안에 accept/reject하거나 timeout 정산이 끝났을 때 최종 실패 이벤트를 보냄
+- [x] 상대 reject 후 내가 accept
   - 나에게 `outcome=FAILED`, `reason=OPPONENT_REJECTED`, `action=RETURN_TO_MATCHING`
-- [ ] 둘 다 reject
+- [x] 둘 다 reject
   - 양쪽 모두 `outcome=FAILED`, 각자 `reason=MY_REJECTED`, `action=GO_TO_MATCH_START`
-- [ ] 내가 accept, 상대 timeout
+- [x] 내가 accept, 상대 timeout
   - 나에게 `outcome=FAILED`, `reason=OPPONENT_TIMEOUT`, `action=RETURN_TO_MATCHING`
-- [ ] 내가 timeout
+- [x] 내가 timeout
   - 나에게 `outcome=FAILED`, `reason=MY_TIMEOUT`, `action=GO_TO_MATCH_START`
-- [ ] 둘 다 timeout
+- [x] 둘 다 timeout
   - 양쪽 모두 `outcome=FAILED`, `reason=BOTH_TIMEOUT`, `action=GO_TO_MATCH_START`
+
+#### 발행 기준
+
+- `match_response_result`는 matchId 최종 정산 시점에만 발행합니다.
+- 한 명이 먼저 reject해도 상대가 아직 `PENDING`이면 즉시 이벤트를 보내지 않습니다.
+- `reason`은 이벤트를 받는 유저 기준입니다. 같은 정산 결과라도 A/B에게 내려가는 `reason`이 다를 수 있습니다.
+- `action`은 프론트가 따라야 하는 최종 화면 전환 기준입니다.
+- 멀티 인스턴스 환경에서는 최종적으로 유저별 Pub/Sub message로 발행하고, 각 API 인스턴스가 로컬 SSE 연결이 있는 유저에게만 전송합니다.
+
+#### 시나리오별 유저 이벤트
+
+| 시나리오 | A 이벤트 | B 이벤트 |
+| :--- | :--- | :--- |
+| A accept, B accept | `MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING` | `MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING` |
+| A accept, B reject | `FAILED / OPPONENT_REJECTED / RETURN_TO_MATCHING` | `FAILED / MY_REJECTED / GO_TO_MATCH_START` |
+| A reject, B accept | `FAILED / MY_REJECTED / GO_TO_MATCH_START` | `FAILED / OPPONENT_REJECTED / RETURN_TO_MATCHING` |
+| A reject, B reject | `FAILED / MY_REJECTED / GO_TO_MATCH_START` | `FAILED / MY_REJECTED / GO_TO_MATCH_START` |
+| A accept, B timeout | `FAILED / OPPONENT_TIMEOUT / RETURN_TO_MATCHING` | `FAILED / MY_TIMEOUT / GO_TO_MATCH_START` |
+| A timeout, B accept | `FAILED / MY_TIMEOUT / GO_TO_MATCH_START` | `FAILED / OPPONENT_TIMEOUT / RETURN_TO_MATCHING` |
+| A reject, B timeout | `FAILED / MY_REJECTED / GO_TO_MATCH_START` | `FAILED / MY_TIMEOUT / GO_TO_MATCH_START` |
+| A timeout, B reject | `FAILED / MY_TIMEOUT / GO_TO_MATCH_START` | `FAILED / MY_REJECTED / GO_TO_MATCH_START` |
+| A timeout, B timeout | `FAILED / BOTH_TIMEOUT / GO_TO_MATCH_START` | `FAILED / BOTH_TIMEOUT / GO_TO_MATCH_START` |
 
 ### 8. 기존 match_found SSE 흐름과 연결
 
-- [ ] `match_found` payload는 유지
-- [ ] 클라이언트는 `match_found` 수신 후 SSE를 닫지 않고 최종 `match_response_result` 또는 게임 이동 이벤트까지 유지하도록 정책 명시
-- [ ] start 버튼 복귀, 게임 대기 화면 이동, 매칭 대기 복귀 시점별 SSE close/keep 정책 정의
-- [ ] `match_response_result` 이벤트를 notification 패키지에 추가할지 검토
-- [ ] Redis Pub/Sub message 추가 여부 결정
-- [ ] 멀티 인스턴스에서 대상 유저 SSE 연결로 이벤트 전달되는지 확인
-- [ ] 기존 `match_found` SSE 회귀 테스트 유지
+- [x] `match_found` payload는 유지
+- [x] 클라이언트는 `match_found` 수신 후 SSE를 닫지 않고 최종 `match_response_result` 또는 게임 이동 이벤트까지 유지하도록 정책 명시
+- [x] start 버튼 복귀, 게임 대기 화면 이동, 매칭 대기 복귀 시점별 SSE close/keep 정책 정의
+- [x] `match_response_result` 이벤트를 notification 패키지에 추가
+- [x] Redis Pub/Sub message 추가 여부 결정
+- [x] 멀티 인스턴스에서 대상 유저 SSE 연결로 이벤트 전달되는지 확인
+- [x] 기존 `match_found` SSE 회귀 테스트 유지
+
+#### 연결 정책
+
+- `match_found` 이벤트 이름과 payload는 변경하지 않습니다.
+- `match_response_result`는 `match_found` 이후 같은 SSE 연결에서 받을 최종 결과 이벤트입니다.
+- `match_response_result`도 `match_found`와 같은 Redis Pub/Sub fan-out 구조를 사용합니다.
+- publish한 API 인스턴스와 SSE 연결을 가진 API 인스턴스가 다를 수 있으므로, 모든 API 인스턴스가 Pub/Sub 메시지를 수신하고 로컬 `SseConnectionRegistry`에 대상 유저 연결이 있을 때만 SSE를 전송합니다.
+- Redis Pub/Sub channel은 `notification:match_response_result`를 사용합니다.
+
+#### 구현 연결점
+
+- SSE event name: `MatchNotificationEventName.MATCH_RESPONSE_RESULT`
+- Redis Pub/Sub channel: `MatchNotificationChannelName.MATCH_RESPONSE_RESULT`
+- payload DTO: `MatchResponseResultNotification`
+- 실제 publisher/subscriber/sender 구현은 task 9에서 책임 위치를 확정한 뒤 추가합니다.
 
 ### 9. 구현 구조 설계
 
-- [ ] matching service 내부 결과 모델과 API DTO 분리
-- [ ] API 응답 DTO는 `smite-api` controller response 패키지에 위치
-- [ ] SSE payload DTO는 notification dto 패키지에 위치
-- [ ] matching 모듈은 클라이언트 DTO에 직접 의존하지 않도록 설계
-- [ ] 이벤트 발행 책임 위치 결정
+- [x] matching service 내부 결과 모델과 API/SSE DTO 분리
+- [x] accept/reject API 성공 응답 DTO는 만들지 않고 `ResponseEntity<Void>` 유지
+- [x] SSE payload DTO는 notification dto 패키지에 위치
+- [x] matching 모듈은 클라이언트 DTO에 직접 의존하지 않도록 설계
+- [x] 이벤트 발행 책임 위치 결정
   - matching service
   - api service
-  - notification bridge
-- [ ] 상대 nickname 조회 책임 위치 결정
+  - notification adapter/factory
+- [x] 상대 nickname 조회 책임 위치 결정
   - API layer에서 user/rank/profile 조회 후 조립
-- [ ] 상대 tier/tierScore 조회 책임 위치 결정
+- [x] 상대 tier/tierScore 조회 책임 위치 결정
   - API layer에서 rank/profile 조회 후 조립
 
-### 10. API 문서 및 RestDocs 갱신
+#### 모듈 책임
+
+| 모듈 | 책임 | 금지 |
+| :--- | :--- | :--- |
+| `smite-matching` | session/queue/userStatus 정산, matchId lock, timeout claim, 내부 정산 결과 생성 | `MatchResponseResultNotification` 같은 클라이언트 DTO 의존 |
+| `smite-api` match service | accept/reject HTTP command 위임, 성공 시 `200 OK` empty body 유지 | 성공 응답 body 조립 |
+| `smite-api` notification adapter/factory | matching 내부 정산 결과를 유저별 SSE payload로 변환, 상대 nickname/tier/tierScore 조립, Pub/Sub publish | 세션/큐 정산 직접 수행 |
+| notification pub/sub | `match_response_result` 메시지 fan-out, 로컬 SSE connection이 있는 유저에게만 전송 | 매칭 정책 판단 |
+
+#### 권장 구현 흐름
+
+```text
+accept/reject API
+-> MatchResponseCommandService
+-> MatchResponseResultService(matchId lock)
+-> 내부 정산 결과 반환 또는 이벤트 port 호출
+-> notification adapter/factory가 유저별 MatchResponseResultNotification 생성
+-> notification:match_response_result Pub/Sub publish
+-> 각 API instance subscriber가 로컬 SSE connection 확인 후 전송
+```
+
+```text
+timeout scheduler
+-> MatchResponseTimeoutService
+-> MatchResponseResultService.timeoutWithLock(matchId)
+-> 내부 정산 결과 반환 또는 이벤트 port 호출
+-> notification adapter/factory가 유저별 MatchResponseResultNotification 생성
+-> notification:match_response_result Pub/Sub publish
+-> 각 API instance subscriber가 로컬 SSE connection 확인 후 전송
+```
+
+#### 내부 결과 모델 방향
+
+- matching 모듈에는 클라이언트 DTO가 아닌 내부 정산 결과 모델을 둡니다.
+- 내부 결과는 최소한 `matchId`, 유저별 최종 응답 상태, 큐 복귀 여부를 표현합니다.
+- `outcome/reason/action`, `opponent`, `game`은 api notification adapter/factory에서 유저별 관점으로 변환합니다.
+- `game`은 후속 게임 세션 생성 이슈 전까지 `null`로 내려갑니다.
+- timeout no-op이나 이미 종료된 세션은 SSE 발행 대상이 아니므로 내부 결과에서 구분합니다.
+
+#### 이벤트 발행 포트 방향
+
+- timeout scheduler도 matching 모듈 내부에서 실행되므로, api service 반환값만으로는 timeout SSE 발행을 처리할 수 없습니다.
+- matching 모듈에 클라이언트 DTO를 모르는 이벤트 발행 port를 두고, `smite-api` notification adapter가 이를 구현하는 방향을 우선합니다.
+- port 구현체는 내부 정산 결과를 받아 상대 정보 조회 후 `match_response_result` Pub/Sub message를 발행합니다.
+
+### 10. match_response_result 발행 구현
+
+- [x] matching 내부 정산 결과 모델 정의
+- [x] matching event publisher port 정의
+- [x] accept/reject 최종 정산 시 event publisher 호출
+- [x] timeout 최종 정산 시 event publisher 호출
+- [x] smite-api notification adapter/factory 구현
+- [x] 상대 nickname/tier/tierScore 조회 후 유저별 SSE payload 조립
+- [x] match_response_result Pub/Sub message 정의
+- [x] match_response_result Pub/Sub codec 구현
+- [x] match_response_result Pub/Sub publisher 구현
+- [x] match_response_result Pub/Sub subscriber 구현
+- [x] subscriber에서 로컬 SSE connection 확인 후 `match_response_result` 전송
+- [x] 발행 실패가 매칭 정산 성공을 깨지 않도록 처리
+- [x] 멀티 인스턴스에서 publish 인스턴스와 SSE 연결 인스턴스가 달라도 전송되도록 구성
+
+### 11. API 문서 및 RestDocs 갱신
 
 - [ ] accept API 성공 응답 문서화
 - [ ] reject API 성공 응답 문서화
@@ -339,10 +444,10 @@ Content-Length: 0
 - [ ] `MatchControllerRestDocsTest` 갱신
 - [ ] notification RestDocs 또는 별도 이벤트 문서 갱신
 
-### 11. 테스트 작성
+### 12. 테스트 작성
 
-- [ ] accept API 응답 DTO 테스트
-- [ ] reject API 응답 DTO 테스트
+- [ ] accept API `200 OK` empty body 테스트
+- [ ] reject API `200 OK` empty body 테스트
 - [ ] accept controller/service 테스트 갱신
 - [ ] reject controller/service 테스트 갱신
 - [ ] 양쪽 accept 완료 이벤트 테스트
@@ -392,9 +497,10 @@ HTTP 성공 응답은 `200 OK` empty body이므로 `WAIT_FOR_OPPONENT`, `WAIT_FO
 | 내가 accept 후 상대 reject/timeout으로 매칭 대기 복귀 | 새 `match_found`를 받을 수 있도록 유지 가능 |
 | 내가 timeout 또는 둘 다 timeout 후 start 버튼 복귀 | 클라이언트가 닫음 |
 
-### 우선 결정해야 할 질문
+### 결정된 범위
 
-- 양쪽 accept 시 게임 세션 생성이 이번 이슈 범위인지, 이벤트 payload만 먼저 정의할지?
-- `match_response_result` 하나로 모든 최종 결과를 통합할지, `game_ready`만 별도 이벤트로 분리할지?
-- 이미 종료된 세션에 대한 API 요청을 error로만 줄지, 현재 상태 응답 body를 줄지?
-- timeout 정산 이벤트 발행 실패가 timeout 정산 성공을 깨야 하는지, 아니면 별도 재전송/로그로 처리할지?
+- 이번 이슈는 accept/reject HTTP 응답과 `match_response_result` SSE 반환값까지만 처리합니다.
+- 양쪽 accept 시 게임 세션 생성과 `gameId` payload 채우기는 후속 게임 이슈에서 처리합니다.
+- 최종 매칭 응답 결과는 `match_response_result` 하나로 통합합니다.
+- 이미 종료된 세션에 대한 API 요청은 기존 `ErrorResponse`만 반환하고 상태 body를 별도로 만들지 않습니다.
+- timeout 정산 이벤트 발행 실패는 정산 성공을 깨지 않고 로그/메트릭으로 격리합니다.
