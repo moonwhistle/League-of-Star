@@ -433,16 +433,66 @@ timeout scheduler
 
 ### 11. API 문서 및 RestDocs 갱신
 
-- [ ] accept API 성공 응답 문서화
-- [ ] reject API 성공 응답 문서화
-- [ ] 주요 실패 응답 문서화
-- [ ] `match_response_result` SSE 이벤트 payload 문서화
-- [ ] `match_response_result.outcome` enum 표 문서화
-- [ ] `match_response_result.reason` enum 표 문서화
-- [ ] `match_response_result.action` enum 표 문서화
-- [ ] `outcome/reason/action` 조합별 프론트 처리 매핑표 문서화
-- [ ] `MatchControllerRestDocsTest` 갱신
-- [ ] notification RestDocs 또는 별도 이벤트 문서 갱신
+- [x] accept API 성공 응답 문서화
+- [x] reject API 성공 응답 문서화
+- [x] 주요 실패 응답 문서화
+- [x] `match_response_result` SSE 이벤트 payload 문서화
+- [x] `match_response_result.outcome` enum 표 문서화
+- [x] `match_response_result.reason` enum 표 문서화
+- [x] `match_response_result.action` enum 표 문서화
+- [x] `outcome/reason/action` 조합별 프론트 처리 매핑표 문서화
+- [x] `MatchControllerRestDocsTest` 갱신
+- [x] notification RestDocs 또는 별도 이벤트 문서 갱신
+
+#### 구현 결과
+
+- `MatchControllerRestDocsTest`를 갱신했습니다.
+  - accept 성공 응답은 `200 OK` empty body로 문서화했습니다.
+  - reject 성공 응답은 `200 OK` empty body로 문서화했습니다.
+  - accept/reject 성공 응답은 command ack일 뿐 화면 전환 책임이 없음을 description에 명시했습니다.
+  - accept 실패 문서를 추가해 기존 전역 `ErrorResponse` 필드를 문서화했습니다.
+  - reject 실패 문서를 추가해 이미 수락한 유저의 reject 같은 정책 실패 응답을 문서화했습니다.
+- `MatchNotificationControllerRestDocsTest`를 갱신했습니다.
+  - SSE 연결에서 `match_found` 이후 `match_response_result`까지 같은 연결로 받는 정책을 문서화했습니다.
+  - `match_response_result` payload 필드를 문서화했습니다.
+  - `outcome`, `reason`, `action` enum 목록을 문서화했습니다.
+  - `outcome/reason/action` 조합별 프론트 화면 전환 기준을 문서화했습니다.
+- 이번 이슈 범위상 `game` payload는 후속 게임 세션 생성 이슈 전까지 `null`로 내려간다고 명시했습니다.
+
+#### HTTP 성공 응답
+
+```http
+HTTP/1.1 200 OK
+Content-Length: 0
+```
+
+#### 주요 실패 응답
+
+| 코드 | HTTP | 의미 | 클라이언트 처리 |
+| :--- | ---: | :--- | :--- |
+| `MATCH_006` | 410 | 세션 없음 또는 만료 | start 버튼 화면 복귀 |
+| `MATCH_007` | 403 | 세션 참여자 아님 | start 버튼 화면 복귀 |
+| `MATCH_008` | 409 | 이미 수락한 유저가 거절 시도 | start 버튼 화면 복귀 |
+| `MATCH_009` | 409 | 이미 완료된 세션 | start 버튼 화면 복귀 |
+| `MATCH_010` | 409 | 이미 거절된 세션 | start 버튼 화면 복귀 |
+| `MATCH_011` | 409 | 이미 timeout 정산된 세션 | start 버튼 화면 복귀 |
+| `MATCH_012` | 409 | 같은 matchId 응답 처리 중 | 모달 유지, 버튼 비활성화, SSE 최종 결과 대기 |
+
+#### SSE enum
+
+| 필드 | 값 | 의미 |
+| :--- | :--- | :--- |
+| `outcome` | `MATCHED` | 양쪽 수락으로 매칭 성공 |
+| `outcome` | `FAILED` | 거절 또는 timeout으로 매칭 실패 |
+| `reason` | `BOTH_ACCEPTED` | 양쪽 모두 수락 |
+| `reason` | `MY_REJECTED` | 내가 거절 |
+| `reason` | `OPPONENT_REJECTED` | 상대가 거절 |
+| `reason` | `MY_TIMEOUT` | 내가 미응답 timeout |
+| `reason` | `OPPONENT_TIMEOUT` | 상대가 미응답 timeout |
+| `reason` | `BOTH_TIMEOUT` | 양쪽 모두 미응답 timeout |
+| `action` | `GO_TO_GAME_WAITING` | 게임 진행 대기 화면으로 이동 |
+| `action` | `GO_TO_MATCH_START` | 매칭 start 버튼 화면으로 복귀 |
+| `action` | `RETURN_TO_MATCHING` | 기존 우선순위로 매칭 대기 상태 복귀 |
 
 ### 12. 테스트 작성
 

@@ -64,7 +64,41 @@ class MatchNotificationControllerRestDocsTest extends RestDocsSupport {
                         resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
                                 .tag("Notification")
                                 .summary("매칭 알림 SSE 연결")
-                                .description("매칭 대기 화면에서 매칭 성사 알림을 받기 위한 SSE 스트림을 연결합니다.")
+                                .description("""
+                                        매칭 대기 화면에서 매칭 성사와 매칭 응답 최종 결과를 받기 위한 SSE 스트림을 연결합니다.
+                                        
+                                        클라이언트는 매칭 시작 화면 진입 시 SSE를 연결하고, `match_found` 수신 후에도 같은 연결을 유지합니다.
+                                        accept/reject HTTP 응답은 command ack만 의미하며, 최종 화면 전환은 `match_response_result` 이벤트를 기준으로 처리합니다.
+                                        
+                                        ## event: match_found
+                                        
+                                        매칭이 성사되어 수락/거절 모달을 띄워야 할 때 전송합니다.
+                                        
+                                        ## event: match_response_result
+                                        
+                                        matchId 단위 최종 결과 이벤트입니다. 상대의 개별 응답 로그가 아니라 최종 성공/실패 결과만 전달합니다.
+                                        
+                                        Payload:
+                                        - `matchId`: 매칭 세션 ID
+                                        - `outcome`: `MATCHED`, `FAILED`
+                                        - `reason`: `BOTH_ACCEPTED`, `MY_REJECTED`, `OPPONENT_REJECTED`, `MY_TIMEOUT`, `OPPONENT_TIMEOUT`, `BOTH_TIMEOUT`
+                                        - `action`: `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`, `RETURN_TO_MATCHING`
+                                        - `opponent`: 상대 `userId`, `nickname`, `tier`, `tierScore`
+                                        - `game`: 후속 게임 세션 생성 이슈 전까지 `null`
+                                        
+                                        Action mapping:
+                                        - `GO_TO_GAME_WAITING`: 게임 진행 대기 화면으로 이동
+                                        - `GO_TO_MATCH_START`: 매칭 start 버튼 화면으로 복귀
+                                        - `RETURN_TO_MATCHING`: 기존 우선순위로 매칭 대기 상태 복귀
+                                        
+                                        Result mapping:
+                                        - `MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING`
+                                        - `FAILED / MY_REJECTED / GO_TO_MATCH_START`
+                                        - `FAILED / OPPONENT_REJECTED / RETURN_TO_MATCHING`
+                                        - `FAILED / MY_TIMEOUT / GO_TO_MATCH_START`
+                                        - `FAILED / OPPONENT_TIMEOUT / RETURN_TO_MATCHING`
+                                        - `FAILED / BOTH_TIMEOUT / GO_TO_MATCH_START`
+                                        """)
                                 .requestHeaders(
                                         headerWithName("Authorization").description("액세스 토큰 (Bearer)")
                                 )
