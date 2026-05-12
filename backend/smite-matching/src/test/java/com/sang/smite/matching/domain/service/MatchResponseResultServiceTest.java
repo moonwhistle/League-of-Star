@@ -90,7 +90,13 @@ class MatchResponseResultServiceTest {
         assertThat(savedSession.isAcceptedByBoth()).isTrue();
         verify(userStatusStore).updateStatus(2L, MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
         verify(timeoutStore).cleanup("match-1");
-        verify(settlementEventPublisher).publish(any(MatchResponseResultEvent.class));
+        ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
+        verify(settlementEventPublisher).publish(eventCaptor.capture());
+        MatchResponseResultEvent event = eventCaptor.getValue();
+        assertThat(event.matchId()).isEqualTo("match-1");
+        assertThat(event.sessionStatus()).isEqualTo(MatchStatus.ACCEPTED);
+        assertThat(event.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
     }
 
     @Test
@@ -122,6 +128,7 @@ class MatchResponseResultServiceTest {
         verify(userStatusStore, never()).removeStatus(any());
         verify(matchStore, never()).add(any());
         verify(timeoutStore, never()).cleanup("match-1");
+        verify(settlementEventPublisher, never()).publish(any(MatchResponseResultEvent.class));
     }
 
     @Test
@@ -141,6 +148,7 @@ class MatchResponseResultServiceTest {
         verify(userStatusStore, never()).removeStatus(1L);
         verify(matchStore, never()).add(any());
         verify(timeoutStore, never()).cleanup("match-1");
+        verify(settlementEventPublisher, never()).publish(any(MatchResponseResultEvent.class));
     }
 
     @Test
@@ -256,6 +264,12 @@ class MatchResponseResultServiceTest {
         assertThat(ticket.entryTime()).isEqualTo(1000L);
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).removeStatus(2L);
+        ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
+        verify(settlementEventPublisher).publish(eventCaptor.capture());
+        MatchResponseResultEvent event = eventCaptor.getValue();
+        assertThat(event.sessionStatus()).isEqualTo(MatchStatus.TIMEOUT);
+        assertThat(event.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.userBStatus()).isEqualTo(MatchResponseStatus.TIMEOUT);
     }
 
     @Test
@@ -276,6 +290,7 @@ class MatchResponseResultServiceTest {
         verify(userStatusStore).removeStatus(1L);
         verify(userStatusStore).removeStatus(2L);
         verify(matchStore, never()).add(any());
+        verify(settlementEventPublisher).publish(any(MatchResponseResultEvent.class));
     }
 
     @Test
@@ -302,6 +317,12 @@ class MatchResponseResultServiceTest {
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).removeStatus(2L);
         verify(timeoutStore).cleanup("match-1");
+        ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
+        verify(settlementEventPublisher).publish(eventCaptor.capture());
+        MatchResponseResultEvent event = eventCaptor.getValue();
+        assertThat(event.sessionStatus()).isEqualTo(MatchStatus.DECLINED);
+        assertThat(event.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.userBStatus()).isEqualTo(MatchResponseStatus.REJECTED);
     }
 
     @Test
@@ -323,6 +344,7 @@ class MatchResponseResultServiceTest {
         verify(userStatusStore).removeStatus(2L);
         verify(matchStore, never()).add(any());
         verify(timeoutStore).cleanup("match-1");
+        verify(settlementEventPublisher).publish(any(MatchResponseResultEvent.class));
     }
 
     @Test
@@ -342,6 +364,7 @@ class MatchResponseResultServiceTest {
         verify(userStatusStore).removeStatus(1L);
         verify(userStatusStore).removeStatus(2L);
         verify(matchStore, never()).add(any());
+        verify(settlementEventPublisher).publish(any(MatchResponseResultEvent.class));
     }
 
     @Test
@@ -355,6 +378,7 @@ class MatchResponseResultServiceTest {
         verify(sessionStore, never()).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
         verify(userStatusStore, never()).removeStatus(any());
         verify(matchStore, never()).add(any());
+        verify(settlementEventPublisher, never()).publish(any(MatchResponseResultEvent.class));
     }
 
     @Test

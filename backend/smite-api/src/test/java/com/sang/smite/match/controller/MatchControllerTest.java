@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.hamcrest.Matchers.emptyString;
 
 class MatchControllerTest {
 
@@ -51,7 +52,8 @@ class MatchControllerTest {
                 .when()
                 .post(MatchPath.MATCH_BASE + "/{matchId}/accept", "match-1")
                 .then()
-                .statusCode(200);
+                .statusCode(200)
+                .body(emptyString());
 
         verify(matchResponseService).accept("match-1", 1L);
     }
@@ -66,7 +68,8 @@ class MatchControllerTest {
                 .when()
                 .post(MatchPath.MATCH_BASE + "/{matchId}/reject", "match-1")
                 .then()
-                .statusCode(200);
+                .statusCode(200)
+                .body(emptyString());
 
         verify(matchResponseService).reject("match-1", 1L);
     }

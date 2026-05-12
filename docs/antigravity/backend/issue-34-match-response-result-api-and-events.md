@@ -496,15 +496,62 @@ Content-Length: 0
 
 ### 12. 테스트 작성
 
-- [ ] accept API `200 OK` empty body 테스트
-- [ ] reject API `200 OK` empty body 테스트
-- [ ] accept controller/service 테스트 갱신
-- [ ] reject controller/service 테스트 갱신
-- [ ] 양쪽 accept 완료 이벤트 테스트
-- [ ] reject 후 상대 모달 유지 정책 테스트
-- [ ] reject 후 상대 accept 시 큐 복귀 이벤트 테스트
-- [ ] timeout 정산 후 이벤트 테스트
-- [ ] 기존 `match_found` SSE 회귀 테스트
+- [x] accept API `200 OK` empty body 테스트
+- [x] reject API `200 OK` empty body 테스트
+- [x] accept controller/service 테스트 갱신
+- [x] reject controller/service 테스트 갱신
+- [x] 양쪽 accept 완료 이벤트 테스트
+- [x] reject 후 상대 모달 유지 정책 테스트
+- [x] reject 후 상대 accept 시 큐 복귀 이벤트 테스트
+- [x] timeout 정산 후 이벤트 테스트
+- [x] 기존 `match_found` SSE 회귀 테스트
+
+#### 구현 결과
+
+- `MatchControllerTest`
+  - accept/reject API가 `200 OK` empty body를 반환하는지 검증했습니다.
+- `MatchResponseServiceTest`
+  - API service가 matching command service로 accept/reject를 위임하는지 검증했습니다.
+- `MatchResponseResultServiceTest`
+  - 양쪽 accept 시 `ACCEPTED` 최종 이벤트가 발행되는지 검증했습니다.
+  - reject만으로는 최종 이벤트가 발행되지 않고 세션이 `FOUND`로 유지되는지 검증했습니다.
+  - 상대 reject 후 제한 시간 안에 accept하면 deadline까지 세션을 유지하고, deadline 정산 후 수락 유저를 큐로 복귀시키는지 검증했습니다.
+  - timeout 정산 후 `TIMEOUT` 최종 이벤트가 발행되는지 검증했습니다.
+  - 이미 종료된 세션 timeout no-op에서는 이벤트가 발행되지 않는지 검증했습니다.
+- `MatchResponseResultNotificationFactoryTest`
+  - `BOTH_ACCEPTED`, `OPPONENT_REJECTED`, `MY_REJECTED`, `OPPONENT_TIMEOUT`, `MY_TIMEOUT`, `BOTH_TIMEOUT` 관점별 `outcome/reason/action` 매핑을 검증했습니다.
+  - 양쪽 accept 결과에서도 이번 이슈 범위에 맞게 `game=null`을 유지하는지 검증했습니다.
+- `MatchResponseResultPubSubPublisherTest`
+  - `notification:match_response_result` channel publish와 publish 성공/실패 메트릭을 검증했습니다.
+- `MatchResponseResultPubSubSubscriberTest`
+  - Pub/Sub 메시지 수신, decode 실패, dispatch 실패 격리와 수신/실패 메트릭을 검증했습니다.
+- `MatchResponseResultSseSenderTest`
+  - 로컬 SSE 연결 hit/miss에 따라 `match_response_result` 전송 여부와 dispatch hit/miss 메트릭을 검증했습니다.
+- 기존 `match_found` Pub/Sub/SSE 테스트는 `:smite-api:test`에 함께 포함되어 회귀 검증했습니다.
+
+#### 메트릭 검증 결과
+
+- matching 응답 지표
+  - `MatchResponseCommandService`에서 accept/reject 요청 attempt/success/failure와 lock failure를 기록합니다.
+  - `MatchResponseResultService`에서 양쪽 accept 완료와 deadline declined 완료를 기록합니다.
+  - `MatchResponseTimeoutService`에서 timeout claim/reclaim/settlement, queue returned users, processing delay, batch duration, pending/processing/overdue backlog gauge를 기록합니다.
+- SSE/PubSub 지표
+  - `MatchResponseResultPubSubPublisher`에서 `event=match_response_result` publish success/failure를 기록합니다.
+  - `MatchResponseResultPubSubSubscriber`에서 `event=match_response_result` message received와 decode/dispatch failure를 기록합니다.
+  - `MatchResponseResultSseSender`에서 `event=match_response_result` local hit/miss를 기록합니다.
+  - 실제 SSE 전송 attempt/success/failure/duration은 공통 `SseEventSender`에서 `event=match_response_result` 태그로 기록됩니다.
+- Grafana 연계
+  - 매칭 응답 대시보드는 `match_response_*` metric을 참조하고, 해당 이름은 `MatchResponseMetricNames`의 Micrometer 이름이 Prometheus로 변환된 이름과 일치합니다.
+  - SSE 대시보드의 공통 event별 패널은 `match_response_result`도 `event` 태그로 자동 집계할 수 있습니다.
+  - 다만 SSE 대시보드의 일부 match_found 전용 패널은 의도적으로 `event="match_found"`만 봅니다. `match_response_result` 전용 전송량/누락 패널이 필요하면 후속으로 별도 패널을 추가하면 됩니다.
+
+#### 검증 명령
+
+```bash
+./gradlew :smite-api:test :smite-matching:test
+```
+
+결과: `BUILD SUCCESSFUL`
 
 ## 📝 Note
 
