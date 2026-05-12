@@ -215,35 +215,35 @@ Content-Length: 0
 
 ### 6. SSE 최종 결과 이벤트 설계
 
-- [ ] 이벤트 이름 결정
-  - 후보: `match_response_result`
-- [ ] 통합 이벤트 payload 정의
+- [x] 이벤트 이름 결정
+  - `match_response_result`
+- [x] 통합 이벤트 payload 정의
   - `matchId`
   - `outcome`
   - `reason`
   - `action`
   - `opponent`
   - `game`
-- [ ] `outcome` enum 정의
+- [x] `outcome` enum 정의
   - `MATCHED`
   - `FAILED`
-- [ ] `outcome` enum별 의미 문서화
-- [ ] `reason` enum 정의
+- [x] `outcome` enum별 의미 문서화
+- [x] `reason` enum 정의
   - `BOTH_ACCEPTED`
   - `MY_REJECTED`
   - `OPPONENT_REJECTED`
   - `MY_TIMEOUT`
   - `OPPONENT_TIMEOUT`
   - `BOTH_TIMEOUT`
-- [ ] `reason` enum별 의미 문서화
-- [ ] `action` enum 정의
+- [x] `reason` enum별 의미 문서화
+- [x] `action` enum 정의
   - `GO_TO_GAME_WAITING`
   - `GO_TO_MATCH_START`
   - `RETURN_TO_MATCHING`
-- [ ] `action` enum별 프론트 화면 전환 의미 문서화
-- [ ] `outcome/reason/action` 조합별 프론트 처리 매핑표 정의
-- [ ] 이벤트 payload에 상대 nickname/tier/tierScore 포함
-- [ ] `match_response_result` 이벤트 이름 자체가 최종 이벤트임을 클라이언트 정책에 명시
+- [x] `action` enum별 프론트 화면 전환 의미 문서화
+- [x] `outcome/reason/action` 조합별 프론트 처리 매핑표 정의
+- [x] 이벤트 payload에 상대 nickname/tier/tierScore 포함
+- [x] `match_response_result` 이벤트 이름 자체가 최종 이벤트임을 클라이언트 정책에 명시
 
 #### SSE result code mapping
 
@@ -273,6 +273,12 @@ Content-Length: 0
   "game": null
 }
 ```
+
+#### 구현 위치
+
+- 이벤트 이름: `MatchNotificationEventName.MATCH_RESPONSE_RESULT`
+- payload DTO: `MatchResponseResultNotification`
+- enum: `MatchResponseOutcome`, `MatchResponseReason`, `MatchResponseAction`
 
 ### 7. 시나리오별 SSE 이벤트 발행 정책
 
