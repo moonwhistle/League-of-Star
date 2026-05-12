@@ -372,19 +372,53 @@ flowchart TD
 
 ### 7. 테스트 작성
 
-- [ ] `MatchSession` timeout 상태 변경 domain unit test
-- [ ] `MatchResponseProcessor` timeout service unit test
-- [ ] A accept, B pending → timeout 시 A 큐 복귀, B timeout
-- [ ] A reject, B pending → timeout 시 둘 다 큐 이탈
-- [ ] A/B pending → timeout 시 둘 다 큐 이탈
-- [ ] 이미 `ACCEPTED` 세션 timeout → no-op
-- [ ] 이미 `DECLINED` 세션 timeout → no-op
-- [ ] 세션 없음 timeout → no-op 또는 index 정리
-- [ ] timeout과 accept/reject 경합 케이스 검증
-- [ ] `RedisMatchTimeoutStore` Redis/Testcontainers 통합 테스트
-- [ ] 여러 scheduler가 같은 due matchId를 조회해도 하나만 claim 성공
-- [ ] claim 후 서버 crash 상황에서 processing reclaim 가능
-- [ ] scheduler batch 처리 중 일부 실패해도 나머지 처리 계속되는지 검증
+- [x] `MatchSession` timeout 상태 변경 domain unit test
+- [x] `MatchResponseProcessor` timeout service unit test
+- [x] A accept, B pending → timeout 시 A 큐 복귀, B timeout
+- [x] A reject, B pending → timeout 시 둘 다 큐 이탈
+- [x] A/B pending → timeout 시 둘 다 큐 이탈
+- [x] 이미 `ACCEPTED` 세션 timeout → no-op
+- [x] 이미 `DECLINED` 세션 timeout → no-op
+- [x] 세션 없음 timeout → no-op 또는 index 정리
+- [x] timeout과 accept/reject 경합 케이스 검증
+- [x] `RedisMatchTimeoutStore` Redis/Testcontainers 통합 테스트
+- [x] 여러 scheduler가 같은 due matchId를 조회해도 하나만 claim 성공
+- [x] claim 후 서버 crash 상황에서 processing reclaim 가능
+- [x] scheduler batch 처리 중 일부 실패해도 나머지 처리 계속되는지 검증
+
+#### 구현 결과
+
+- `MatchSessionTest`를 보강했습니다.
+  - `timeoutPendingUsers()`가 미응답 참여자만 `TIMEOUT`으로 변경하는지 검증
+- `MatchResponseProcessorTest`를 보강했습니다.
+  - `ACCEPTED + PENDING` timeout 시 수락 유저 큐 복귀
+  - `REJECTED + PENDING` timeout 시 두 유저 큐 이탈
+  - `PENDING + PENDING` timeout 시 두 유저 timeout/큐 이탈
+  - 이미 `ACCEPTED` 세션 timeout no-op
+  - 이미 `DECLINED` 세션 timeout no-op
+  - 세션 없음 timeout no-op
+  - timeout이 먼저 세션을 종료한 뒤 accept가 들어오면 `MATCH_SESSION_TIMEOUT` 예외
+- `RedisMatchTimeoutStoreTest`를 추가했습니다.
+  - due pending 조회
+  - batch size 제한
+  - Lua claim 성공
+  - 중복 claim 실패
+  - deadline 이전 claim 실패
+  - ack 제거
+  - pending/processing cleanup
+  - expired processing reclaim
+  - lease 만료 전 reclaim 실패
+- `MatchResponseTimeoutServiceTest`를 추가했습니다.
+  - claim 성공 시 timeout 정산 후 ack
+  - claim 실패 시 timeout 정산/ack 미호출
+  - timeout 정산 실패 시 ack 미호출
+  - expired processing reclaim
+  - batch 일부 실패 시 나머지 처리 계속
+- `MatchResponseTimeoutSchedulerTest`를 추가했습니다.
+  - scheduler가 timeout 처리 서비스를 호출하는지 검증
+- 검증 명령:
+  - `:smite-core:test`
+  - `:smite-matching:test`
 
 ### 8. 관측 지표 및 부하 테스트
 

@@ -109,6 +109,28 @@ class MatchResponseTimeoutServiceTest {
     }
 
     @Test
+    @DisplayName("reclaim 실패는 같은 tick의 due pending 처리를 막지 않는다")
+    void continueDueProcessingWhenReclaimFails() {
+        // given
+        when(clock.millis()).thenReturn(10_000L);
+        when(timeoutStore.findExpiredProcessing(10_000L, MatchingConstants.TIMEOUT_CANDIDATE_BATCH_SIZE))
+                .thenReturn(List.of("match-expired"));
+        when(timeoutStore.findDuePending(10_000L, MatchingConstants.TIMEOUT_CANDIDATE_BATCH_SIZE))
+                .thenReturn(List.of("match-due"));
+        doThrow(new IllegalStateException("reclaim failed"))
+                .when(timeoutStore).reclaim("match-expired", 10_000L, 10_000L);
+        when(timeoutStore.claim("match-due", 10_000L, 15_000L)).thenReturn(true);
+
+        // when
+        timeoutService.processTimeouts();
+
+        // then
+        verify(timeoutStore).reclaim("match-expired", 10_000L, 10_000L);
+        verify(matchResponseProcessor).timeoutWithLock("match-due");
+        verify(timeoutStore).ack("match-due");
+    }
+
+    @Test
     @DisplayName("개별 matchId 처리 실패는 같은 batch의 나머지 처리를 막지 않는다")
     void continueWhenSingleMatchProcessingFails() {
         // given

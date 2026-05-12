@@ -307,6 +307,32 @@ class MatchResponseProcessorTest {
     }
 
     @Test
+    @DisplayName("이미 거절로 종료된 세션 timeout 정산은 no-op 처리한다")
+    void timeoutAlreadyDeclinedSessionNoOp() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().reject(1L).reject(2L).withStatus(MatchStatus.DECLINED)));
+
+        processor.timeoutWithLock("match-1");
+
+        verify(sessionStore, never()).save(any(MatchSession.class), eq(12L));
+        verify(userStatusStore, never()).removeStatus(any());
+        verify(matchStore, never()).add(any());
+    }
+
+    @Test
+    @DisplayName("이미 timeout으로 종료된 세션 timeout 정산은 no-op 처리한다")
+    void timeoutAlreadyTimeoutSessionNoOp() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().timeoutPendingUsers().withStatus(MatchStatus.TIMEOUT)));
+
+        processor.timeoutWithLock("match-1");
+
+        verify(sessionStore, never()).save(any(MatchSession.class), eq(12L));
+        verify(userStatusStore, never()).removeStatus(any());
+        verify(matchStore, never()).add(any());
+    }
+
+    @Test
     @DisplayName("없는 세션 timeout 정산은 no-op 처리한다")
     void timeoutMissingSessionNoOp() {
         when(sessionStore.findById("match-1")).thenReturn(Optional.empty());
@@ -316,6 +342,30 @@ class MatchResponseProcessorTest {
         verify(sessionStore, never()).save(any(MatchSession.class), eq(12L));
         verify(userStatusStore, never()).removeStatus(any());
         verify(matchStore, never()).add(any());
+    }
+
+    @Test
+    @DisplayName("timeout이 먼저 세션을 종료하면 이후 accept 요청은 TIMEOUT 예외를 던진다")
+    void acceptAfterTimeoutThrowsTimeout() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().timeoutPendingUsers().withStatus(MatchStatus.TIMEOUT)));
+
+        assertThatThrownBy(() -> processor.acceptWithLock("match-1", 1L))
+                .isInstanceOf(MatchingException.class)
+                .extracting("errorCode")
+                .isEqualTo(MatchingErrorCode.MATCH_SESSION_TIMEOUT);
+    }
+
+    @Test
+    @DisplayName("timeout이 먼저 세션을 종료하면 이후 reject 요청은 TIMEOUT 예외를 던진다")
+    void rejectAfterTimeoutThrowsTimeout() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().timeoutPendingUsers().withStatus(MatchStatus.TIMEOUT)));
+
+        assertThatThrownBy(() -> processor.rejectWithLock("match-1", 1L))
+                .isInstanceOf(MatchingException.class)
+                .extracting("errorCode")
+                .isEqualTo(MatchingErrorCode.MATCH_SESSION_TIMEOUT);
     }
 
     private MatchSession foundSession() {
