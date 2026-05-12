@@ -6,11 +6,13 @@ import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.domain.match.event.MatchFoundEvent;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.repository.MatchSessionStore;
+import com.sang.smite.matching.repository.MatchTimeoutStore;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.util.UUID;
 
 /**
@@ -24,11 +26,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MatchFoundService {
 
-    private static final int ACCEPT_TIMEOUT_SECONDS = 10;
-
     private final MatchUserStatusStore userStatusStore;
     private final MatchSessionStore sessionStore;
+    private final MatchTimeoutStore timeoutStore;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     /**
      * 매칭 성사 상태를 저장하고 매칭 성사 이벤트를 발행합니다.
@@ -54,12 +56,16 @@ public class MatchFoundService {
                 userB.entryTime()
         );
         sessionStore.save(session, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
+        timeoutStore.addPending(
+                matchId,
+                clock.millis() + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
+        );
 
         eventPublisher.publishEvent(new MatchFoundEvent(
                 matchId,
                 userA.userId(),
                 userB.userId(),
-                ACCEPT_TIMEOUT_SECONDS
+                MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS
         ));
     }
 }

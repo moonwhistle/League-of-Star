@@ -7,8 +7,10 @@ import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
+import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchStore;
+import com.sang.smite.matching.repository.MatchTimeoutStore;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +46,12 @@ class MatchResponseProcessorTest {
     @Mock
     private MatchStore matchStore;
 
+    @Mock
+    private MatchTimeoutStore timeoutStore;
+
+    @Mock
+    private MatchResponseMetrics matchResponseMetrics;
+
     @Test
     @DisplayName("수락 요청 시 해당 유저의 수락 상태와 유저 상태를 갱신한다")
     void accept() {
@@ -58,6 +67,7 @@ class MatchResponseProcessorTest {
         assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.PENDING);
         assertThat(savedSession.status()).isEqualTo(MatchStatus.FOUND);
         verify(userStatusStore).updateStatus(1L, MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(timeoutStore, never()).cleanup("match-1");
     }
 
     @Test
@@ -74,6 +84,7 @@ class MatchResponseProcessorTest {
         assertThat(savedSession.status()).isEqualTo(MatchStatus.ACCEPTED);
         assertThat(savedSession.isAcceptedByBoth()).isTrue();
         verify(userStatusStore).updateStatus(2L, MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(timeoutStore).cleanup("match-1");
     }
 
     @Test
@@ -126,6 +137,7 @@ class MatchResponseProcessorTest {
         verify(userStatusStore).removeStatus(2L);
         verify(userStatusStore, never()).removeStatus(1L);
         verify(matchStore, never()).add(any());
+        verify(timeoutStore, never()).cleanup("match-1");
     }
 
     @Test
@@ -148,6 +160,33 @@ class MatchResponseProcessorTest {
         assertThat(ticket.entryTime()).isEqualTo(1000L);
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).removeStatus(2L);
+        verify(timeoutStore).cleanup("match-1");
+    }
+
+    @Test
+    @DisplayName("거절로 세션이 최종 종료되면 timeout index를 정리한다")
+    void cleanupTimeoutIndexWhenDeclinedByReject() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+
+        processor.rejectWithLock("match-1", 2L);
+
+        verify(timeoutStore).cleanup("match-1");
+    }
+
+    @Test
+    @DisplayName("timeout index cleanup 실패는 수락 API 성공을 깨지 않는다")
+    void cleanupFailureDoesNotBreakAccept() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        doThrow(new IllegalStateException("cleanup failed")).when(timeoutStore).cleanup("match-1");
+
+        processor.acceptWithLock("match-1", 2L);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(12L));
+        assertThat(sessionCaptor.getValue().status()).isEqualTo(MatchStatus.ACCEPTED);
+        verify(timeoutStore).cleanup("match-1");
     }
 
     @Test
@@ -192,6 +231,145 @@ class MatchResponseProcessorTest {
                 .isInstanceOf(MatchingException.class)
                 .extracting("errorCode")
                 .isEqualTo(MatchingErrorCode.MATCH_SESSION_ALREADY_ACCEPTED);
+    }
+
+    @Test
+    @DisplayName("수락한 유저와 미응답 유저가 있으면 timeout 시 수락 유저는 큐에 복귀하고 미응답 유저는 TIMEOUT 처리한다")
+    void timeoutReturnsAcceptedUserToQueue() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+
+        processor.timeoutWithLock("match-1");
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(12L));
+        MatchSession savedSession = sessionCaptor.getValue();
+        assertThat(savedSession.status()).isEqualTo(MatchStatus.TIMEOUT);
+        assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.TIMEOUT);
+
+        ArgumentCaptor<MatchTicket> ticketCaptor = ArgumentCaptor.forClass(MatchTicket.class);
+        verify(matchStore).add(ticketCaptor.capture());
+        MatchTicket ticket = ticketCaptor.getValue();
+        assertThat(ticket.userId()).isEqualTo(1L);
+        assertThat(ticket.tierScore()).isEqualTo(10);
+        assertThat(ticket.entryTime()).isEqualTo(1000L);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).removeStatus(2L);
+    }
+
+    @Test
+    @DisplayName("거절한 유저와 미응답 유저가 있으면 timeout 시 두 유저 모두 큐에서 이탈한다")
+    void timeoutAfterRejectRemovesBothUsers() {
+        MatchSession session = foundSession().reject(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+
+        processor.timeoutWithLock("match-1");
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(12L));
+        MatchSession savedSession = sessionCaptor.getValue();
+        assertThat(savedSession.status()).isEqualTo(MatchStatus.TIMEOUT);
+        assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.REJECTED);
+        assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.TIMEOUT);
+
+        verify(userStatusStore).removeStatus(1L);
+        verify(userStatusStore).removeStatus(2L);
+        verify(matchStore, never()).add(any());
+    }
+
+    @Test
+    @DisplayName("양쪽 모두 미응답이면 timeout 시 두 유저 모두 TIMEOUT 처리하고 큐에서 이탈한다")
+    void timeoutBothPendingRemovesBothUsers() {
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(foundSession()));
+
+        processor.timeoutWithLock("match-1");
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(12L));
+        MatchSession savedSession = sessionCaptor.getValue();
+        assertThat(savedSession.status()).isEqualTo(MatchStatus.TIMEOUT);
+        assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.TIMEOUT);
+        assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.TIMEOUT);
+
+        verify(userStatusStore).removeStatus(1L);
+        verify(userStatusStore).removeStatus(2L);
+        verify(matchStore, never()).add(any());
+    }
+
+    @Test
+    @DisplayName("이미 종료된 세션 timeout 정산은 no-op 처리한다")
+    void timeoutAlreadyFinishedSessionNoOp() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().accept(1L).accept(2L).withStatus(MatchStatus.ACCEPTED)));
+
+        processor.timeoutWithLock("match-1");
+
+        verify(sessionStore, never()).save(any(MatchSession.class), eq(12L));
+        verify(userStatusStore, never()).removeStatus(any());
+        verify(matchStore, never()).add(any());
+    }
+
+    @Test
+    @DisplayName("이미 거절로 종료된 세션 timeout 정산은 no-op 처리한다")
+    void timeoutAlreadyDeclinedSessionNoOp() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().reject(1L).reject(2L).withStatus(MatchStatus.DECLINED)));
+
+        processor.timeoutWithLock("match-1");
+
+        verify(sessionStore, never()).save(any(MatchSession.class), eq(12L));
+        verify(userStatusStore, never()).removeStatus(any());
+        verify(matchStore, never()).add(any());
+    }
+
+    @Test
+    @DisplayName("이미 timeout으로 종료된 세션 timeout 정산은 no-op 처리한다")
+    void timeoutAlreadyTimeoutSessionNoOp() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().timeoutPendingUsers().withStatus(MatchStatus.TIMEOUT)));
+
+        processor.timeoutWithLock("match-1");
+
+        verify(sessionStore, never()).save(any(MatchSession.class), eq(12L));
+        verify(userStatusStore, never()).removeStatus(any());
+        verify(matchStore, never()).add(any());
+    }
+
+    @Test
+    @DisplayName("없는 세션 timeout 정산은 no-op 처리한다")
+    void timeoutMissingSessionNoOp() {
+        when(sessionStore.findById("match-1")).thenReturn(Optional.empty());
+
+        processor.timeoutWithLock("match-1");
+
+        verify(sessionStore, never()).save(any(MatchSession.class), eq(12L));
+        verify(userStatusStore, never()).removeStatus(any());
+        verify(matchStore, never()).add(any());
+    }
+
+    @Test
+    @DisplayName("timeout이 먼저 세션을 종료하면 이후 accept 요청은 TIMEOUT 예외를 던진다")
+    void acceptAfterTimeoutThrowsTimeout() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().timeoutPendingUsers().withStatus(MatchStatus.TIMEOUT)));
+
+        assertThatThrownBy(() -> processor.acceptWithLock("match-1", 1L))
+                .isInstanceOf(MatchingException.class)
+                .extracting("errorCode")
+                .isEqualTo(MatchingErrorCode.MATCH_SESSION_TIMEOUT);
+    }
+
+    @Test
+    @DisplayName("timeout이 먼저 세션을 종료하면 이후 reject 요청은 TIMEOUT 예외를 던진다")
+    void rejectAfterTimeoutThrowsTimeout() {
+        when(sessionStore.findById("match-1"))
+                .thenReturn(Optional.of(foundSession().timeoutPendingUsers().withStatus(MatchStatus.TIMEOUT)));
+
+        assertThatThrownBy(() -> processor.rejectWithLock("match-1", 1L))
+                .isInstanceOf(MatchingException.class)
+                .extracting("errorCode")
+                .isEqualTo(MatchingErrorCode.MATCH_SESSION_TIMEOUT);
     }
 
     private MatchSession foundSession() {

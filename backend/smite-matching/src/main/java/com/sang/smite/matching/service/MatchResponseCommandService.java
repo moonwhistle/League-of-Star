@@ -2,6 +2,8 @@ package com.sang.smite.matching.service;
 
 import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
+import com.sang.smite.matching.metrics.MatchResponseMetricNames;
+import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.redis.lock.exception.RedisLockAcquisitionException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,20 +19,31 @@ import org.springframework.stereotype.Service;
 public class MatchResponseCommandService {
 
     private final MatchResponseProcessor matchResponseProcessor;
+    private final MatchResponseMetrics matchResponseMetrics;
 
     public void accept(String matchId, Long userId) {
-        try {
-            matchResponseProcessor.acceptWithLock(matchId, userId);
-        } catch (RedisLockAcquisitionException e) {
-            throw new MatchingException(MatchingErrorCode.MATCH_RESPONSE_LOCK_FAILED, e);
-        }
+        processResponse(MatchResponseMetricNames.ACTION_ACCEPT, () -> matchResponseProcessor.acceptWithLock(matchId, userId));
     }
 
     public void reject(String matchId, Long userId) {
+        processResponse(MatchResponseMetricNames.ACTION_REJECT, () -> matchResponseProcessor.rejectWithLock(matchId, userId));
+    }
+
+    private void processResponse(String action, Runnable command) {
+        matchResponseMetrics.incrementResponseAttempt(action);
         try {
-            matchResponseProcessor.rejectWithLock(matchId, userId);
+            command.run();
+            matchResponseMetrics.incrementResponseSuccess(action);
         } catch (RedisLockAcquisitionException e) {
+            matchResponseMetrics.incrementLockFailure(action);
+            matchResponseMetrics.incrementResponseFailure(action, MatchingErrorCode.MATCH_RESPONSE_LOCK_FAILED.customCode());
             throw new MatchingException(MatchingErrorCode.MATCH_RESPONSE_LOCK_FAILED, e);
+        } catch (MatchingException e) {
+            matchResponseMetrics.incrementResponseFailure(action, e.getErrorCode().customCode());
+            throw e;
+        } catch (RuntimeException e) {
+            matchResponseMetrics.incrementResponseFailure(action, e.getClass().getSimpleName());
+            throw e;
         }
     }
 }

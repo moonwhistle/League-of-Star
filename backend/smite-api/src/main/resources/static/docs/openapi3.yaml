@@ -193,6 +193,54 @@ paths:
               examples:
                 auth-password-reset-submit:
                   value: ????? ????? ???????.
+  /api/v1/match/{matchId}/accept:
+    post:
+      tags:
+      - Match
+      summary: 매칭 수락
+      description: 매칭 성사 후 제한 시간 안에 매칭을 수락합니다.
+      operationId: match-accept
+      parameters:
+      - name: matchId
+        in: path
+        description: 매칭 세션 ID
+        required: true
+        schema:
+          type: string
+      - name: Authorization
+        in: header
+        description: 액세스 토큰 (Bearer)
+        required: true
+        schema:
+          type: string
+        example: Bearer access-token
+      responses:
+        "200":
+          description: "200"
+  /api/v1/match/{matchId}/reject:
+    post:
+      tags:
+      - Match
+      summary: 매칭 거절
+      description: 매칭 성사 후 제한 시간 안에 매칭을 거절합니다. 한쪽이 먼저 거절해도 상대방의 응답 윈도우는 유지됩니다.
+      operationId: match-reject
+      parameters:
+      - name: matchId
+        in: path
+        description: 매칭 세션 ID
+        required: true
+        schema:
+          type: string
+      - name: Authorization
+        in: header
+        description: 액세스 토큰 (Bearer)
+        required: true
+        schema:
+          type: string
+        example: Bearer access-token
+      responses:
+        "200":
+          description: "200"
   /api/v1/notifications/match/stream:
     get:
       tags:
