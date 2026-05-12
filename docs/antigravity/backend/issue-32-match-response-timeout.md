@@ -547,11 +547,31 @@ flowchart TD
 
 ### 10. 최종 검증
 
-- [ ] `:smite-core:test`
-- [ ] `:smite-matching:test`
-- [ ] `:smite-api:test`
-- [ ] 기존 accept/reject API 회귀 확인
-- [ ] 기존 `match_found` SSE 흐름 회귀 확인
+- [x] `:smite-core:test`
+- [x] `:smite-matching:test`
+- [x] `:smite-api:test`
+- [x] 기존 accept/reject API 회귀 확인
+- [x] 기존 `match_found` SSE 흐름 회귀 확인
+
+#### 검증 결과
+
+- 전체 모듈 테스트 통과
+  - `./gradlew :smite-core:test :smite-matching:test :smite-api:test`
+- accept/reject API 및 `match_found` SSE 회귀 테스트 재실행 통과
+  - `MatchControllerTest`
+  - `MatchControllerRestDocsTest`
+  - `MatchResponseServiceTest`
+  - `MatchFoundNotificationDispatcherTest`
+  - `MatchNotificationServiceTest`
+  - `MatchFoundPubSubSubscriberTest`
+  - `MatchFoundPubSubPublisherTest`
+- matching timeout 핵심 테스트 재실행 통과
+  - `MatchResponseProcessorTest`
+  - `MatchResponseCommandServiceTest`
+  - `MatchResponseTimeoutServiceTest`
+  - `MatchFoundServiceTest`
+  - `RedisMatchTimeoutStoreTest`
+  - `MatchResponseMetricsTest`
 
 ## 📝 Note
 
@@ -761,3 +781,246 @@ claim 후 서버가 죽으면 matchId는 processing ZSET에 남습니다.
 ```
 
 이 구조는 단순히 pending에서 제거하는 방식보다 안전합니다. 작업을 누가 가져갔는지 표시하면서도, 처리 중 죽었을 때 다시 살릴 수 있기 때문입니다.
+
+## PR
+
+## 📌 Summary
+
+매칭 성사 후 10초 안에 응답하지 않은 유저를 서버가 timeout으로 정산하도록 구현했습니다.
+
+핵심 구조는 `match_found` 시점에 timeout deadline을 Redis ZSET에 등록하고, 서버 scheduler가 due matchId를 claim한 뒤 `matchId` lock 안에서 accept/reject와 같은 세션을 안전하게 정산하는 방식입니다.
+
+```mermaid
+flowchart TD
+    A["match_found"] --> B["match session 저장"]
+    B --> C["pending ZSET에 deadline 등록"]
+    C --> D["scheduler tick"]
+    D --> E["due matchId 조회"]
+    E --> F["Lua claim"]
+    F --> G["pending -> processing"]
+    G --> H["matchId lock"]
+    H --> I["timeout 정산"]
+    I --> J{"정산 결과"}
+    J -->|"success"| K["processing ack"]
+    J -->|"no-op"| K
+    J -->|"failure"| L["processing 유지"]
+    L --> M["lease 만료 후 reclaim"]
+    M --> C
+```
+
+정산 정책은 다음과 같습니다.
+
+| 응답 상태 | 결과 |
+| :--- | :--- |
+| `ACCEPTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, `ACCEPTED` 유저는 기존 `entryTime`으로 큐 복귀 |
+| `REJECTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, 두 유저 모두 큐 이탈 |
+| `PENDING + PENDING` | 두 유저 모두 `TIMEOUT`, 두 유저 모두 큐 이탈 |
+| 이미 종료된 세션 | timeout job은 no-op 후 ack |
+
+## 📚 Changes
+
+### Timeout Index
+
+- timeout 대상 matchId를 Redis ZSET으로 관리했습니다.
+  - `match:response:timeout:pending`
+  - `match:response:timeout:processing`
+- `pending`은 아직 처리되지 않은 timeout 후보입니다.
+- `processing`은 scheduler가 claim 후 처리 중인 timeout job입니다.
+- 단일 ZSET이 아니라 `pending/processing`을 나눈 이유는 claim 후 서버가 죽어도 job을 유실하지 않기 위해서입니다.
+
+### matchId Lock Only에서 Lua Claim 구조로 발전한 이유
+
+처음 구조는 `matchId` 기준 lock만으로도 timeout 정산의 정합성을 지킬 수 있었습니다.
+
+```text
+1. scheduler가 due matchId 조회
+2. matchId lock 획득
+3. timeout 정산
+4. timeout index 제거
+```
+
+이 구조에서 lock은 accept/reject/timeout이 같은 session을 동시에 수정하지 못하게 하므로, 최종 세션 상태는 안전합니다.
+
+하지만 멀티 인스턴스 scheduler에서는 다른 문제가 남습니다.
+
+```text
+API-1 Scheduler: match-1 due 조회
+API-2 Scheduler: match-1 due 조회
+API-3 Scheduler: match-1 due 조회
+```
+
+세 서버가 모두 같은 timeout job을 보고 `matchId` lock 획득을 시도합니다. 정산은 하나만 성공하더라도 나머지 서버는 불필요하게 lock 대기, lock 실패, session no-op을 반복합니다. timeout backlog가 커질수록 이 비용이 커지고, accept/reject API와 같은 lock 자원을 두고 경합할 수 있습니다.
+
+그래서 구조를 다음처럼 나눴습니다.
+
+```text
+job ownership: Lua claim
+session consistency: matchId lock
+```
+
+Lua claim은 “이 timeout job을 어떤 scheduler가 처리할 것인가”를 먼저 정리합니다. matchId lock은 claim 이후에도 유저 API와 timeout 정산이 같은 session을 동시에 수정하지 못하게 막습니다.
+
+### 시나리오별 문제와 선택 이유
+
+| 시나리오 | 발생 가능한 문제 | 선택한 보호 장치 |
+| :--- | :--- | :--- |
+| 여러 scheduler가 같은 due matchId를 동시에 조회 | 같은 timeout job에 대해 여러 서버가 lock 경합을 일으킴 | Lua claim으로 하나의 scheduler만 `pending -> processing` 이동 |
+| scheduler가 claim 후 timeout 정산 전에 crash | pending에서 제거만 했다면 timeout job 유실 | processing ZSET에 lease와 함께 보관하고 만료 시 reclaim |
+| timeout 정산과 유저 accept가 10초 경계에서 동시에 발생 | 같은 session을 read-modify-write 하며 응답 상태가 덮어써질 수 있음 | `matchId` lock으로 accept/reject/timeout 직렬화 |
+| 한 명이 reject 후 상대가 10초 안에 accept | reject 즉시 세션 종료하면 후행 accept 유저가 큐 복귀 기회를 잃음 | 세션은 `FOUND` 유지, 유저별 응답 상태 저장 후 timeout/양쪽 응답 시 정산 |
+| 한 명이 accept 후 상대가 timeout | accepted 유저는 기존 entryTime으로 큐 복귀해야 함 | session에 tierScore/entryTime 보관 후 timeout 정산에서 큐 재삽입 |
+| 이미 accepted/declined/timeout 된 세션의 timeout job이 남음 | scheduler가 뒤늦게 job을 처리하며 잘못된 재정산 가능 | session status 확인 후 no-op, processing ack |
+
+### Lua Claim / Reclaim
+
+- `timeout_claim.lua`
+  - due 상태인 matchId만 `pending -> processing`으로 원자 이동합니다.
+  - 여러 API 인스턴스 scheduler가 같은 matchId를 봐도 하나만 claim에 성공합니다.
+- `timeout_reclaim.lua`
+  - processing lease가 만료된 job을 다시 `pending`으로 복구합니다.
+  - claim 후 서버가 죽어도 다음 tick에서 재처리할 수 있습니다.
+
+### 왜 matchId Lock이 여전히 필요한가
+
+Lua claim은 scheduler끼리 같은 timeout job을 중복 처리하지 않게 하는 장치입니다.
+
+하지만 accept/reject API는 claim 대상이 아닙니다.
+
+```text
+API-1 Scheduler: match-1 timeout claim 성공
+API-2 User API:  match-1 accept 요청
+```
+
+이 경우 두 요청은 같은 `match:session:{matchId}`를 수정합니다. 현재 세션 처리는 Redis Hash를 읽고, 도메인 객체로 상태를 바꾼 뒤, 다시 저장하는 read-modify-write 구조이므로 직렬화가 필요합니다.
+
+그래서 `matchId` 기준 lock으로 다음 작업을 같은 임계 구역에 묶었습니다.
+
+- `acceptWithLock(matchId, userId)`
+- `rejectWithLock(matchId, userId)`
+- `timeoutWithLock(matchId)`
+
+정리하면 역할은 분리됩니다.
+
+| 장치 | 보장 범위 |
+| :--- | :--- |
+| Lua claim | 여러 scheduler 중 하나만 timeout job을 가져감 |
+| matchId lock | accept/reject/timeout이 같은 session을 동시에 수정하지 못하게 함 |
+
+### Timeout Settlement
+
+- timeout 정산은 `MatchResponseProcessor.timeoutWithLock()`에서 처리합니다.
+- `FOUND` 상태이고 `PENDING` 응답이 남은 세션만 timeout 정산 대상입니다.
+- 이미 `ACCEPTED`, `DECLINED`, `TIMEOUT`으로 종료된 세션은 no-op으로 처리합니다.
+- timeout 정산 결과는 내부 result 객체로 반환하여 scheduler service가 metric을 기록할 수 있게 했습니다.
+  - `settled(returnedUserCount)`
+  - `noOp()`
+
+### Scheduler / Service 분리
+
+- `MatchResponseTimeoutScheduler`
+  - Spring scheduled trigger만 담당합니다.
+- `MatchResponseTimeoutService`
+  - expired processing reclaim
+  - due pending 조회
+  - Lua claim
+  - timeout 정산 호출
+  - ack 처리
+  - metric 기록
+
+비즈니스 흐름을 scheduler class에 직접 넣지 않고 service로 분리해 테스트와 책임 경계를 명확히 했습니다.
+
+### Metrics / Grafana / Load Test
+
+- accept/reject 기본 지표와 timeout scheduler 지표를 추가했습니다.
+  - `match_response_requests_total`
+  - `match_response_completions_total`
+  - `match_response_lock_failures_total`
+  - `match_response_timeout_claims_total`
+  - `match_response_timeout_reclaims_total`
+  - `match_response_timeout_settlements_total`
+  - `match_response_timeout_queue_returned_users_total`
+  - `match_response_timeout_pending_backlog`
+  - `match_response_timeout_processing_backlog`
+  - `match_response_timeout_processing_delay_seconds`
+- 매칭 엔진 대시보드와 매칭 응답 대시보드를 분리했습니다.
+  - `smite-match-queue-dashboard.json`
+  - `smite-match-response-dashboard.json`
+- `match-response-timeout-load.mjs`를 추가해 다음 시나리오를 검증할 수 있게 했습니다.
+  - both accept
+  - accept then reject
+  - reject then accept
+  - reject and other silent
+  - accept and other timeout
+  - both timeout
+  - mixed
+
+### Verification
+
+- 전체 테스트 통과
+  - `./gradlew :smite-core:test :smite-matching:test :smite-api:test`
+- 핵심 회귀 테스트 재실행 통과
+  - accept/reject API
+  - match_found SSE
+  - timeout processor/service/store/metrics
+- 10,000명 기준 `one_reject_other_silent` 부하 테스트에서 다음 결과를 확인했습니다.
+  - join success: `10000/10000`
+  - match_found events: `10000`
+  - ready pairs: `5000/5000`
+  - handled pairs: `5000/5000`
+  - reject success: `5000/5000`
+  - errors: `{}`
+
+## 📝 Note
+
+### + Alpha. Trigger 방식 비교
+
+| 방식 | 장점 | 단점 | 판단 |
+| :--- | :--- | :--- | :--- |
+| 클라이언트 timeout API | 구현이 단순하고 모달 타이머와 직관적으로 연결됨 | 브라우저 종료, 네트워크 단절, 악의적 미호출에 취약 | 서버가 timeout을 책임져야 하므로 primary trigger로 부적합 |
+| Redis TTL 만료 이벤트 | TTL과 timeout이 자연스럽게 연결됨 | keyspace notification 설정 필요, 이벤트 유실 가능, key 만료 후 세션 데이터가 없을 수 있음 | 정산 trigger로 위험함 |
+| Message Queue / Delayed Queue | delayed job, retry, DLQ 설계에 강함 | 현재 프로젝트에 MQ가 없고 운영 복잡도 증가 | 대규모 운영 단계 후보 |
+| Redis ZSET + Scheduler + Lua claim | 현재 Redis 중심 구조와 잘 맞고, deadline/backlog/지연 관측이 쉬움 | polling과 pending/processing/reclaim 구조가 추가됨 | V1에서 채택 |
+
+### + Alpha. 왜 Redis ZSET + Scheduler를 선택했나
+
+현재 매칭 시스템은 큐, 세션, 유저 상태를 Redis 중심으로 관리합니다. timeout도 같은 저장소 안에서 deadline index로 관리하면 별도 MQ 없이 다음 요구사항을 만족할 수 있습니다.
+
+- 서버가 10초 timeout 정산 책임을 가짐
+- 멀티 인스턴스 scheduler 중복 처리 방지
+- claim 후 서버 crash 시 reclaim 가능
+- timeout backlog와 처리 지연을 Prometheus/Grafana로 관측 가능
+- accept/reject와 같은 `matchId` lock 정책 재사용 가능
+
+### + Alpha. 왜 단순 ZREM claim이 아닌 processing ZSET인가
+
+단순히 pending에서 `ZREM`으로 제거하고 처리하면 중복 claim은 줄일 수 있습니다.
+
+하지만 제거 직후 서버가 죽으면 timeout job이 사라집니다.
+
+```text
+1. API-1이 pending에서 ZREM 성공
+2. API-1이 timeout 정산 전 crash
+3. matchId는 pending에도 없고 processing에도 없음
+4. timeout 정산 유실
+```
+
+그래서 claim은 `pending ZREM + processing ZADD`를 Lua script로 원자 처리합니다. 처리 성공 또는 no-op이면 ack로 processing에서 제거하고, 처리 중 죽으면 lease 만료 후 reclaim으로 pending에 복구합니다.
+
+### + Alpha. Timeout Batch Metric 의미
+
+`match_response_timeout_batch_duration_seconds`는 실제 timeout job 수가 아니라 scheduler tick 1회 소요 시간입니다.
+
+따라서 데이터가 없어도 scheduler가 돌면 count가 증가할 수 있습니다.
+
+실제 timeout 처리 여부는 다음 지표를 함께 봐야 합니다.
+
+- `match_response_timeout_claims_total`
+- `match_response_timeout_settlements_total`
+- `match_response_timeout_pending_backlog`
+- `match_response_timeout_processing_backlog`
+
+패널명은 운영 관점에서 `Timeout Batch 소요 시간`보다 `Timeout Scheduler Tick 소요 시간`이 더 정확합니다.
+
+## 📌 Related Issue
+
+- Closes #32
