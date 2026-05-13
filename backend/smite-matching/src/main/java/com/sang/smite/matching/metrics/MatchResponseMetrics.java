@@ -76,6 +76,10 @@ public class MatchResponseMetrics {
         incrementCompletion(MatchResponseMetricNames.COMPLETION_DECLINED);
     }
 
+    public void incrementGameSetupFailedCompletion() {
+        incrementCompletion(MatchResponseMetricNames.COMPLETION_GAME_SETUP_FAILED);
+    }
+
     public void incrementTimeoutSettlement(String outcome) {
         meterRegistry.counter(
                 MatchResponseMetricNames.TIMEOUT_SETTLEMENTS,

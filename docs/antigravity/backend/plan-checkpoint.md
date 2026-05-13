@@ -12,20 +12,23 @@ flowchart TD
 
     F -->|"둘 다 accept"| G["gameRoom 생성<br/>participants 생성<br/>scenario 저장"]
     G --> H{"gameRoom 생성 성공?"}
-    H -->|"성공"| I["Redis match:session status = ACCEPTED<br/>Redis match:status = IN_GAME<br/>timeout index cleanup"]
-    I --> J["SSE match_response_result<br/>GO_TO_GAME_WAITING<br/>game={gameRoomId, videoUrl, webSocketUrl}"]
-    J --> K["클라이언트 /game/{gameRoomId}/waiting 이동<br/>매칭 SSE 종료 가능"]
-    K --> L["gameRoom WebSocket 연결"]
-    L --> M["MP4 preload 후 CLIENT_READY"]
-    M --> N["WebSocket RTT 5회 측정<br/>median 저장"]
-    N --> O["COUNTDOWN"]
-    O --> P["GAME_START + scenario 전달"]
-    P --> Q["SMITE command 수신<br/>serverReceiveTime 기준 판정"]
-    Q --> R["game_actions 저장"]
-    R --> S["game_records 생성<br/>rank 반영"]
+    H -->|"성공"| I{"Redis ACCEPTED/IN_GAME<br/>상태 전환 성공?"}
+    I -->|"성공"| J["timeout index cleanup"]
+    J --> K["SSE match_response_result<br/>GO_TO_GAME_WAITING<br/>game={gameRoomId, videoUrl, webSocketUrl}"]
+    K --> L["클라이언트 /game/{gameRoomId}/waiting 이동<br/>매칭 SSE 종료 가능"]
+    L --> M["gameRoom WebSocket 연결"]
+    M --> N["MP4 preload 후 CLIENT_READY"]
+    N --> O["WebSocket RTT 5회 측정<br/>median 저장"]
+    O --> P["COUNTDOWN"]
+    P --> Q["GAME_START + scenario 전달"]
+    Q --> R["SMITE command 수신<br/>serverReceiveTime 기준 판정"]
+    R --> S["game_actions 저장"]
+    S --> SA["game_records 생성<br/>rank 반영"]
 
-    H -->|"실패"| T["Redis match:status = MATCHING 복귀<br/>기존 entryTime으로 queue 복귀"]
-    T --> U["SSE match_response_result<br/>FAILED / GAME_SETUP_FAILED / RETURN_TO_MATCHING"]
+    I -->|"실패"| AB["gameRoom/participants ABORTED<br/>Redis status best-effort 정리"]
+    AB --> T
+    H -->|"실패"| T["Redis match:status 제거<br/>queue 재삽입 없음"]
+    T --> U["SSE match_response_result<br/>FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START"]
 
     F -->|"reject/timeout 포함"| V["deadline까지 응답 윈도우 유지"]
     V --> W["Redis match:session = DECLINED/TIMEOUT"]
@@ -57,7 +60,7 @@ flowchart TD
 - 클라이언트가 보낸 시간은 신뢰하지 않는다.
 - 최종 판정은 서버 수신 시각, RTT median, 서버 시나리오 기준으로 한다.
 - 매칭 SSE는 매칭 결과와 게임 대기 화면 진입 정보까지만 담당한다.
-- `GO_TO_GAME_WAITING`은 gameRoom/scenario 생성이 끝난 뒤 발행한다.
+- `GO_TO_GAME_WAITING`은 gameRoom/scenario 생성과 Redis `ACCEPTED`/`IN_GAME` 상태 전환이 모두 끝난 뒤 발행한다.
 - `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/SMITE/종료 처리는 WebSocket으로 담당한다.
 - 별도의 SSE `game_ready` 이벤트는 만들지 않는다.
 - 클라이언트는 `match_response_result.game` payload를 받은 뒤 매칭 SSE를 닫아도 된다.
@@ -92,62 +95,67 @@ flowchart TD
 
 ### Step 1. 매칭 성공과 게임방 생성 연결
 
-- `MatchResponseResultService`의 양쪽 수락 완료 지점에서 게임 생성 유스케이스 호출
-- `game_rooms` 생성
-- `game_participants` 생성
-- scenario 생성/저장
-- `match_response_result.game` payload에 `gameRoomId`, `videoUrl`, `webSocketUrl` 채우기
-- gameRoom 생성 실패 시 `GO_TO_GAME_WAITING`을 발행하지 않고 매칭 성공 정산 실패로 격리할 정책 정의
-- 이 단계에서는 WebSocket 연결/RTT/SMITE 판정은 구현하지 않음
+- [x] `MatchResponseResultService`의 양쪽 수락 완료 지점에서 게임 생성 유스케이스 호출
+- [x] `game_rooms` 생성
+- [x] `game_participants` 생성
+- [x] scenario 생성/저장
+- [x] `match_response_result.game` payload에 `gameRoomId`, `videoUrl`, `webSocketUrl` 채우기
+- [x] gameRoom 생성 실패 시 `GO_TO_GAME_WAITING`을 발행하지 않고 매칭 성공 정산 실패로 격리할 정책 정의
+- [x] 이 단계에서는 WebSocket 연결/RTT/SMITE 판정은 구현하지 않음
 
 ### Step 2. MP4 정적 서빙
 
-- MP4를 Spring Boot static resource로 이동
-- `/assets/game/dragon-view.mp4`로 접근 가능하게 구성
-- gameRoom마다 MP4를 따로 만들지 않음
-- gameRoom 생성 시 payload에는 고정 `videoUrl`만 포함
+- [ ] MP4를 Spring Boot static resource로 이동
+- [ ] `/assets/game/dragon-view.mp4`로 접근 가능하게 구성
+- [x] gameRoom마다 MP4를 따로 만들지 않음
+- [x] gameRoom 생성 시 payload에는 고정 `videoUrl`만 포함
 
 ### Step 3. 게임 대기 WebSocket 연결
 
-- gameRoomId별 WebSocket 채널 추가
-- WebSocket 인증 및 gameRoom 참가자 검증
-- 두 참가자의 입장/이탈 상태 관리
-- 클라이언트 `CLIENT_READY` 수신
-- MP4 preload 완료 여부는 클라이언트가 `CLIENT_READY`로 보고
-- 매칭 SSE와 게임 WebSocket의 책임 경계 문서화
+- [ ] gameRoomId별 WebSocket 채널 추가
+- [ ] WebSocket 인증 및 gameRoom 참가자 검증
+- [ ] 두 참가자의 입장/이탈 상태 관리
+- [ ] 클라이언트 `CLIENT_READY` 수신
+- [ ] MP4 preload 완료 여부는 클라이언트가 `CLIENT_READY`로 보고
+- [ ] `GO_TO_GAME_WAITING` 이후 WebSocket 미접속 timeout 정책 정의
+- [ ] `CLIENT_READY` 미수신 timeout 정책 정의
+- [ ] WebSocket 미접속/READY timeout 시 gameRoom 상태를 `ABORTED`로 전환
+- [ ] WebSocket 미접속/READY timeout 시 game record/LP는 반영하지 않음
+- [ ] GAME_START 이전 이탈과 GAME_START 이후 disconnect 정책 분리
+- [x] 매칭 SSE와 게임 WebSocket의 책임 경계 문서화
 
 ### Step 4. RTT 측정과 카운트다운
 
-- WebSocket ping-pong으로 각 유저별 RTT 5회 측정
-- median RTT 저장
-- 2000ms 초과 시 게임 시작 차단
-- 양쪽 정상 상태면 `startAt` 결정
-- `COUNTDOWN` 이벤트 전송
-- RTT 실패/초과/상대 이탈 시 gameRoom 상태 전이 정책 정의
+- [ ] WebSocket ping-pong으로 각 유저별 RTT 5회 측정
+- [ ] median RTT 저장
+- [ ] 2000ms 초과 시 게임 시작 차단
+- [ ] 양쪽 정상 상태면 `startAt` 결정
+- [ ] `COUNTDOWN` 이벤트 전송
+- [ ] RTT 실패/초과/상대 이탈 시 gameRoom 상태 전이 정책 정의
 
 ### Step 5. GAME_START와 HP 시나리오 전달
 
-- WebSocket `GAME_START` 직전에만 scenario를 클라이언트에 전달
-- 클라이언트는 `startAt` 기준으로 HP bar overlay 계산
-- MP4는 배경으로만 사용
+- [ ] WebSocket `GAME_START` 직전에만 scenario를 클라이언트에 전달
+- [ ] 클라이언트는 `startAt` 기준으로 HP bar overlay 계산
+- [x] MP4는 배경으로만 사용
 
 ### Step 6. SMITE 입력과 서버 판정
 
-- 클라이언트는 WebSocket으로 `SMITE` 명령만 전송
-- 서버는 `serverReceiveTime` 기록
-- `smiteTimeMs = (serverReceiveTime - gameStartTime) - rttMedian / 2`
-- scenario에서 HP 역산
-- `game_actions` 저장
-- 중복 SMITE 차단
-- 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리해 보정 기준을 일관되게 유지
+- [ ] 클라이언트는 WebSocket으로 `SMITE` 명령만 전송
+- [ ] 서버는 `serverReceiveTime` 기록
+- [ ] `smiteTimeMs = (serverReceiveTime - gameStartTime) - rttMedian / 2`
+- [ ] scenario에서 HP 역산
+- [ ] `game_actions` 저장
+- [ ] 중복 SMITE 차단
+- [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리해 보정 기준을 일관되게 유지
 
 ### Step 7. 게임 종료와 기록
 
-- 승패/무승부 확정
-- `game_rooms` 상태 FINISHED
-- `game_participants` 상태 FINISHED
-- `game_records` 2행 생성
-- LP/배치/승급전 반영 연결
+- [ ] 승패/무승부 확정
+- [ ] `game_rooms` 상태 FINISHED
+- [ ] `game_participants` 상태 FINISHED
+- [ ] `game_records` 2행 생성
+- [ ] LP/배치/승급전 반영 연결
 
 ## 5. MVP 기준
 
@@ -181,8 +189,8 @@ MVP 이후로 미뤄도 되는 것:
 | Redis 데이터 | key | 책임 | 게임 구현 이후 정책 |
 | :--- | :--- | :--- | :--- |
 | 매칭 큐 | `matching:queue:{tierScore}` | 매칭 대기 유저 ZSET | gameRoom 생성 이후에는 사용하지 않음 |
-| 유저 상태 | `match:status:{userId}` | 유저가 매칭/게임 플로우에 묶여 있는지 확인 | gameRoom 생성 성공 시 `IN_GAME`으로 전환 |
-| match session | `match:session:{matchId}` | `match_found` 이후 accept/reject/timeout 정산 | 양쪽 accept 성공 후 `ACCEPTED` 최종 세션으로 TTL 유지 |
+| 유저 상태 | `match:status:{userId}` | 유저가 매칭/게임 플로우에 묶여 있는지 확인 | gameRoom 생성 후 Redis 상태 전환까지 성공하면 `IN_GAME`으로 유지 |
+| match session | `match:session:{matchId}` | `match_found` 이후 accept/reject/timeout 정산 | gameRoom 생성과 Redis 상태 전환 성공 후 `ACCEPTED` 최종 세션으로 TTL 유지 |
 | timeout pending | `match:response:timeout:pending` | 응답 deadline claim 대상 | 양쪽 accept 성공 시 cleanup |
 | timeout processing | `match:response:timeout:processing` | timeout worker 중복 처리 방지 | 양쪽 accept 성공 시 cleanup |
 
@@ -223,7 +231,7 @@ B도 accept
 
 핵심 기준:
 
-- `match:session:{matchId}.status=ACCEPTED`는 매칭 응답 정산이 성공했다는 뜻이다.
+- `match:session:{matchId}.status=ACCEPTED`는 게임방 생성과 Redis 유저 상태 전환이 모두 성공해 매칭 응답 정산이 성공했다는 뜻이다.
 - `match:status:{userId}=IN_GAME`은 유저가 더 이상 매칭 큐에 들어갈 수 없고 게임 플로우에 묶였다는 뜻이다.
 - gameRoom 생성 성공 이후 유저 상태를 `ACCEPTED`에 계속 두지 않는다.
 - 게임방의 실제 진행 상태는 Redis user status가 아니라 DB `game_rooms.status`로 판단한다.
@@ -262,24 +270,49 @@ deadline 정산: REJECTED/TIMEOUT 유저만 존재
 
 ### 6.4 gameRoom 생성 실패 정책
 
-양쪽 accept 이후 `GO_TO_GAME_WAITING`은 gameRoom/scenario 생성이 끝난 뒤에만 발행한다.
-따라서 gameRoom 생성 실패는 명시적인 실패 정책이 필요하다.
+양쪽 accept 이후 `GO_TO_GAME_WAITING`은 gameRoom/scenario 생성과 Redis 상태 전환이 모두 끝난 뒤에만 발행한다.
+따라서 gameRoom 생성 실패와 Redis 상태 전환 실패는 명시적인 실패 정책이 필요하다.
 
 권장 정책:
 
 - gameRoom 생성 실패 시 `GO_TO_GAME_WAITING`을 발행하지 않는다.
-- 두 유저 모두 잘못이 없으므로 기존 `entryTime`으로 매칭 큐에 복귀시킨다.
-- 두 유저의 `match:status:{userId}`는 `MATCHING`으로 되돌린다.
+- 두 유저를 매칭 큐에 자동 복귀시키지 않는다.
+- 두 유저의 `match:status:{userId}`는 제거한다.
 - `match:session:{matchId}`는 게임 세팅 실패로 최종 정산된 상태를 남긴다.
 - 클라이언트에는 `match_response_result` 실패 이벤트를 발행한다.
+- 클라이언트는 안내 메시지를 표시하고 start 버튼 화면으로 돌아간다.
 
 추가로 필요한 enum/API 변경:
 
 - `MatchResponseReason.GAME_SETUP_FAILED` 추가
-- 두 유저 모두 `outcome=FAILED`, `reason=GAME_SETUP_FAILED`, `action=RETURN_TO_MATCHING`
+- 두 유저 모두 `outcome=FAILED`, `reason=GAME_SETUP_FAILED`, `action=GO_TO_MATCH_START`
+- 별도 `message` 필드는 추가하지 않고, 클라이언트가 `GAME_SETUP_FAILED` reason 기준으로 안내 문구를 매핑한다.
 - 필요하면 `MatchStatus.GAME_SETUP_FAILED`를 추가해 `DECLINED`/`TIMEOUT`과 구분한다.
 
 이 실패 정책을 추가하지 않으면 gameRoom 생성 실패 시 유저가 Redis `ACCEPTED` 상태에 남아 재매칭도 게임 진입도 못 하는 상태가 될 수 있다.
+
+### 6.4.1 Redis 상태 전환 실패 보상 정책
+
+gameRoom 생성이 성공했더라도 Redis match session 또는 두 유저 `IN_GAME` 상태 전환이 실패하면 `GO_TO_GAME_WAITING`을 발행하지 않는다.
+Redis는 게임 진행의 source of truth는 아니지만, 성공 이벤트 발행 전 유저 점유 상태를 확정하는 마지막 게이트다.
+
+```text
+gameRoom 생성 성공
+-> Redis 상태 전환 실패
+-> game_rooms.status = ABORTED
+-> game_participants.status = ABORTED
+-> match:status:{userA/userB} best-effort 제거
+-> matching:queue 재삽입 없음
+-> match:session:{matchId}.status = GAME_SETUP_FAILED
+-> match_response_result
+   outcome=FAILED
+   reason=GAME_SETUP_FAILED
+   action=GO_TO_MATCH_START
+   game=null
+```
+
+현재 단계에서는 DB와 Redis를 하나의 원자적 transaction으로 묶지 않고 보상 transaction으로 정리한다.
+outbox/saga/2PC는 Redis 장애, 이벤트 발행 실패, 서버 중단 복구까지 요구되는 단계에서 후속 이슈로 검토한다.
 
 ### 6.5 게임 진행 중 상태
 
@@ -287,14 +320,54 @@ gameRoom 생성 이후의 상태 기준은 다음처럼 분리한다.
 
 | 시점 | Redis `match:status:{userId}` | DB `game_rooms.status` | DB `game_participants.status` |
 | :--- | :--- | :--- | :--- |
-| gameRoom 생성 직후 | `IN_GAME` | `READY` | `READY` |
+| 게임 대기 진입 확정 후 | `IN_GAME` | `READY` | `READY` |
+| gameRoom 생성 후 Redis 상태 전환 실패 | 제거 | `ABORTED` | `ABORTED` |
 | WebSocket 연결/READY 대기 | `IN_GAME` | `READY` | `READY` |
+| WebSocket 미접속/READY timeout | 제거 | `ABORTED` | `ABORTED` 또는 `DISCONNECTED` |
 | GAME_START | `IN_GAME` | `IN_PROGRESS` | `PLAYING` |
 | 정상 종료 | 제거 | `FINISHED` | `FINISHED` |
 | 이탈/중단 | 제거 | `ABORTED` | `DISCONNECTED` 또는 `FINISHED` |
 
 Redis의 `IN_GAME`은 매칭 중복 진입을 막기 위한 유저 점유 상태다.
 게임의 정확한 생명주기와 결과 판정은 DB 상태를 기준으로 한다.
+
+### 6.5.1 게임 시작 전/후 이탈 정책
+
+`GO_TO_GAME_WAITING` 이후 URL 자체에 TTL을 두지는 않는다.
+`/ws/game/{gameRoomId}`는 라우팅 주소로 유지하고, gameRoom `READY` 상태에서 WebSocket 접속과 `CLIENT_READY` 응답 제한 시간을 둔다.
+
+```text
+GO_TO_GAME_WAITING
+-> gameRoom.status = READY
+-> waiting deadline 시작
+-> 두 유저 WebSocket connect
+-> MP4 preload 후 CLIENT_READY
+-> 양쪽 READY + RTT 정상
+-> GAME_START
+```
+
+게임 시작 전 timeout:
+
+```text
+WebSocket 미접속 또는 CLIENT_READY 미수신
+-> gameRoom.status = ABORTED
+-> game_participants.status = ABORTED 또는 DISCONNECTED
+-> game_records 생성 없음
+-> LP 반영 없음
+-> 클라이언트는 start 버튼 화면 또는 후속 정책에 따른 큐 복귀 처리
+```
+
+게임 시작 후 disconnect:
+
+```text
+GAME_START 이후 WebSocket disconnect
+-> 이탈자 패배
+-> 상대 승리
+-> game_records 생성
+-> LP 반영
+```
+
+따라서 WebSocket 대기 timeout은 URL 만료 정책이 아니라 gameRoom `READY` 상태의 준비 응답 timeout으로 구현한다.
 
 ### 6.6 정합성 검증 결과
 
@@ -304,6 +377,7 @@ Redis의 `IN_GAME`은 매칭 중복 진입을 막기 위한 유저 점유 상태
 - 기존 timeout/reject 정책은 유지된다. reject 단독 발생 시 즉시 실패 이벤트를 보내지 않는 정책도 유지된다.
 - Redis match session은 매칭 응답 정산 기록으로만 쓰고, 게임 상태를 Redis match session에 계속 확장하지 않으므로 DB DDL의 `game_rooms` 생명주기와 충돌하지 않는다.
 - gameRoom 생성 실패 이벤트는 Issue 36의 필수 범위로 포함한다. 기존 issue-34 reason/action mapping에는 `GAME_SETUP_FAILED`가 없으므로 Step 1 구현에서 enum, factory mapping, 문서를 함께 확장해야 한다.
+- Redis 상태 전환 실패는 성공 이벤트 발행 전 실패로 취급하고, 이미 생성된 gameRoom/participant는 `ABORTED`로 보상 처리하므로 확정 정책과 일치한다.
 
 ## 7. 이슈 분할안
 
@@ -323,8 +397,11 @@ Redis의 `IN_GAME`은 매칭 중복 진입을 막기 위한 유저 점유 상태
 - scenario 생성/저장
 - `gameRoomId`, `videoUrl`, `webSocketUrl` payload 추가
 - 기존 `GO_TO_GAME_WAITING` 액션 유지
-- gameRoom 생성 성공 시 두 유저 Redis 상태를 `IN_GAME`으로 전환
-- gameRoom 생성 실패 시 두 유저를 기존 `entryTime`으로 큐에 복귀시키고 `GAME_SETUP_FAILED` 이벤트 발행
+- gameRoom 생성 성공 후 두 유저 Redis 상태를 `IN_GAME`으로 전환
+- Redis 상태 전환까지 모두 성공한 뒤에만 `GO_TO_GAME_WAITING` 이벤트 발행
+- gameRoom 생성 실패 또는 Redis 상태 전환 실패 시 두 유저 Redis 상태를 제거하고 `GAME_SETUP_FAILED` 이벤트 발행
+- Redis 상태 전환 실패 시 생성된 gameRoom/participant를 `ABORTED`로 보상 처리
+- gameRoom 생성 실패 또는 Redis 상태 전환 실패 시 매칭 큐에 자동 복귀시키지 않음
 - `GAME_SETUP_FAILED` reason/action factory mapping 추가
 - Issue 34의 `match_response_result` API/SSE 문서 갱신
 
@@ -334,10 +411,11 @@ gameRoom 생성 실패 mapping:
 | :--- | :--- |
 | `outcome` | `FAILED` |
 | `reason` | `GAME_SETUP_FAILED` |
-| `action` | `RETURN_TO_MATCHING` |
+| `action` | `GO_TO_MATCH_START` |
 | `game` | `null` |
 | 대상 | 양쪽 유저 모두 |
-| Redis 후처리 | 두 유저 `match:status=MATCHING`, 기존 `entryTime`으로 큐 복귀 |
+| Redis 후처리 | 두 유저 `match:status` 제거, queue 재삽입 없음 |
+| 안내 문구 | 클라이언트가 `GAME_SETUP_FAILED` reason 기준으로 표시 |
 
 제외:
 
@@ -354,7 +432,7 @@ gameRoom 생성 실패 mapping:
 - 클라이언트가 payload만으로 `/game/{gameRoomId}/waiting` 화면으로 이동 가능
 - MP4는 gameRoom 생성 과정에서 만들지 않고 static URL만 전달
 - gameRoom 생성 성공 후 `match:status:{userA/userB}=IN_GAME`
-- gameRoom 생성 실패 시 두 유저가 재매칭 가능하며 `ACCEPTED` 상태에 갇히지 않음
+- gameRoom 생성 실패 시 두 유저가 `ACCEPTED` 상태에 갇히지 않고 start 버튼 화면으로 복귀 가능
 
 ### Issue 37. MP4 static resource 제공
 
@@ -385,12 +463,17 @@ gameRoom 생성 실패 mapping:
 - gameRoom 참가자 인증/인가
 - `CLIENT_JOIN`, `CLIENT_READY`, `PLAYER_LEFT` 수준의 대기 상태 처리
 - 양쪽 READY 전까지 게임 시작하지 않음
+- `GO_TO_GAME_WAITING` 이후 WebSocket 미접속 timeout 처리
+- `CLIENT_READY` 미수신 timeout 처리
+- GAME_START 이전 timeout은 gameRoom `ABORTED`, game record/LP 미반영
+- GAME_START 이후 disconnect는 이탈자 패배/상대 승리 정책으로 분리
 
 완료 기준:
 
 - 두 참가자가 같은 gameRoom WebSocket에 연결 가능
 - 참가자가 아닌 유저는 연결 또는 구독 거부
 - 양쪽 READY 상태를 서버가 식별 가능
+- WebSocket 미접속/READY timeout 시 게임이 시작되지 않고 gameRoom이 `ABORTED` 처리됨
 
 ### Issue 39. RTT 측정과 GAME_START
 
@@ -458,3 +541,6 @@ gameRoom 생성 실패 mapping:
 | 날짜 | 변경 내용 |
 | :--- | :--- |
 | 2026-05-13 | 매칭 성공 이후 게임 세션 구현 흐름 정리. `GO_TO_GAME_WAITING` 발행 시점, Redis 상태 전이, gameRoom 생성 실패 시 `GAME_SETUP_FAILED` mapping, Issue 36~41 분할안 확정 |
+| 2026-05-13 | gameRoom 생성 실패 정책을 큐 자동 복귀에서 안내 메시지 후 start 화면 복귀로 변경 |
+| 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 및 성공 SSE 발행 금지 정책 반영 |
+| 2026-05-13 | 게임 대기 WebSocket 미접속/READY timeout 정책과 GAME_START 전후 이탈 처리 분리 반영 |

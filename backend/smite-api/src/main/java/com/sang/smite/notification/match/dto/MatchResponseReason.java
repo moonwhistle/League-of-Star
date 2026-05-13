@@ -9,5 +9,6 @@ public enum MatchResponseReason {
     OPPONENT_REJECTED,
     MY_TIMEOUT,
     OPPONENT_TIMEOUT,
-    BOTH_TIMEOUT
+    BOTH_TIMEOUT,
+    GAME_SETUP_FAILED
 }

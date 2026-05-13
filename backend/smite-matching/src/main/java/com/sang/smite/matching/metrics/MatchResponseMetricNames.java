@@ -38,6 +38,7 @@ public final class MatchResponseMetricNames {
 
     public static final String COMPLETION_ACCEPTED = "accepted";
     public static final String COMPLETION_DECLINED = "declined";
+    public static final String COMPLETION_GAME_SETUP_FAILED = "game_setup_failed";
 
     public static final String OUTCOME_SUCCESS = "success";
     public static final String OUTCOME_FAILURE = "failure";

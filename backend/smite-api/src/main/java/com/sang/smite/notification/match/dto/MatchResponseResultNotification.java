@@ -23,12 +23,12 @@ public record MatchResponseResultNotification(
     }
 
     /**
-     * 후속 게임 세션 생성 이슈에서 채울 예약 payload입니다.
-     *
-     * <p>현재 매칭 응답 이슈에서는 양쪽 수락 결과도 {@code null}로 내려갑니다.</p>
+     * 게임 대기 화면 진입에 필요한 payload입니다.
      */
     public record Game(
-            Long gameId
+            Long gameRoomId,
+            String videoUrl,
+            String webSocketUrl
     ) {
     }
 }

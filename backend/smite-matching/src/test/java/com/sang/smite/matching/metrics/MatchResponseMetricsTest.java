@@ -47,6 +47,7 @@ class MatchResponseMetricsTest {
     void completionCounters() {
         metrics.incrementAcceptedCompletion();
         metrics.incrementDeclinedCompletion();
+        metrics.incrementGameSetupFailedCompletion();
 
         assertThat(meterRegistry.get(MatchResponseMetricNames.COMPLETIONS)
                 .tag(MatchResponseMetricNames.TAG_RESULT, MatchResponseMetricNames.COMPLETION_ACCEPTED)
@@ -54,6 +55,10 @@ class MatchResponseMetricsTest {
                 .count()).isEqualTo(1.0);
         assertThat(meterRegistry.get(MatchResponseMetricNames.COMPLETIONS)
                 .tag(MatchResponseMetricNames.TAG_RESULT, MatchResponseMetricNames.COMPLETION_DECLINED)
+                .counter()
+                .count()).isEqualTo(1.0);
+        assertThat(meterRegistry.get(MatchResponseMetricNames.COMPLETIONS)
+                .tag(MatchResponseMetricNames.TAG_RESULT, MatchResponseMetricNames.COMPLETION_GAME_SETUP_FAILED)
                 .counter()
                 .count()).isEqualTo(1.0);
     }

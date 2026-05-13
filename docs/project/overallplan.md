@@ -27,12 +27,14 @@
 - **매칭 큐 진입**: "대전 찾기" 버튼 클릭
 - **매칭 알고리즘**: 티어/디비전 기반 유사 실력 상대와 매칭 (대기 시간에 따라 ±1/±2/±4/±8 디비전 확장)
 - **매칭 수락**: 매칭 성사 시 양쪽에 수락/거절 팝업 (10초 타이머)
-  - 둘 다 수락 → 서버가 게임방/시나리오 생성 → 게임 대기 화면 진입
+  - 둘 다 수락 → 서버가 게임방/시나리오 생성 및 Redis 상태 전환 완료 → 게임 대기 화면 진입
   - 한 명이라도 거절/타임아웃 → 10초 안에 수락한 유저는 큐 최우선 복귀, 거절/타임아웃/미응답 유저는 큐 이탈 (거절 패널티 없음)
   - 한 명이 먼저 거절해도 상대방 팝업은 10초 동안 유지되며, 제한 시간 안에 수락하면 큐 복귀 대상이 됨
 - **매칭 알림 채널**: SSE는 `match_found`와 최종 `match_response_result`까지만 담당
   - 게임방 생성 성공 시 `match_response_result.game`에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
-  - 게임방 생성 실패 시 양쪽 모두 기존 큐 진입 시각으로 복귀하고 `GAME_SETUP_FAILED` 결과 전달
+  - 게임방 생성 실패 시 `GAME_SETUP_FAILED` 결과를 전달하고 양쪽 모두 start 버튼 화면으로 복귀
+  - 게임방 생성 후 Redis 상태 전환 실패 시 생성된 게임방/참여자는 `ABORTED`로 보상 처리하고 동일하게 `GAME_SETUP_FAILED` 결과를 전달
+  - 게임방 생성 실패 또는 Redis 상태 전환 실패 시 매칭 큐에 자동 복귀하지 않음
   - 게임 대기 화면 진입 이후 준비/RTT/카운트다운/게임 시작/입력/종료는 WebSocket 담당
 
 ### 2.3 강타 싸움 게임
@@ -70,7 +72,7 @@
 | **몬스터** | 장로 드래곤 (Elder Dragon) — 추후 바론, 전령 등 확장 가능한 구조로 설계 |
 | **초기 HP** | 10,000 |
 | **강타 데미지** | 1,200 (킬존: HP ≤ 1200) |
-| **게임 제한 시간** | 7 ~ 15초 (매판 랜덤, 시나리오 생성 시 결정) |
+| **게임 제한 시간** | 8 ~ 17초 (매판 랜덤, 시나리오 생성 시 결정) |
 
 #### HP 감소 패턴: 랜덤 버스트 (Random Burst)
 
@@ -364,5 +366,7 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-04-17 | 초안 작성 및 전체 기획 확정 |
 | 2026-04-24 | 프론트엔드 기술 스택 고도화 (PixiJS, Web Worker 도입) |
 | 2026-04-27 | 통합 시리즈 아키텍처(RankSeries) 도입 및 도메인 정규화 |
-| 2026-05-13 | 매칭 SSE는 `match_response_result`까지, 게임 준비/RTT/카운트다운/SMITE/종료는 WebSocket으로 처리하는 흐름 반영. gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 복귀 정책 추가 |
+| 2026-05-13 | 매칭 SSE는 `match_response_result`까지, 게임 준비/RTT/카운트다운/SMITE/종료는 WebSocket으로 처리하는 흐름 반영. gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 정책 추가 |
 | 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화. PixiJS/Web Worker/OffscreenCanvas/STOMP/SockJS는 MVP 이후 검토로 이동 |
+| 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GAME_SETUP_FAILED` reason 기준으로 start 버튼 화면 복귀하도록 정책 조정 |
+| 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책과 8~17초 게임 시간 반영 |

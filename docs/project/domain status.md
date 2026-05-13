@@ -35,10 +35,12 @@ stateDiagram-v2
 
     FOUND --> FOUND: 한쪽만 수락 또는 거절
     FOUND --> ACCEPTED: 양쪽 모두 수락
+    FOUND --> GAME_SETUP_FAILED: 게임방 생성 또는 Redis 상태 전환 실패
     FOUND --> DECLINED: 10초 deadline 후 거절 포함 실패 정산
     FOUND --> TIMEOUT: 10초 deadline 후 미응답 포함 실패 정산
 
     ACCEPTED --> IN_GAME: 게임 세션 생성
+    GAME_SETUP_FAILED --> [*]: start 버튼 화면 복귀
     DECLINED --> [*]: 거절 완료 후 대기열 이탈
     TIMEOUT --> [*]: 응답 시간 초과 후 대기열 이탈
 
@@ -52,6 +54,7 @@ stateDiagram-v2
 | 세션 | `MATCHING` | 유저가 매칭 큐에서 상대를 찾는 중 |
 | 세션 | `FOUND` | 상대를 찾았고 양쪽 수락/거절 응답을 기다리는 중 |
 | 세션 | `ACCEPTED` | 양쪽 모두 수락하여 게임 세션 생성 대상 |
+| 세션 | `GAME_SETUP_FAILED` | 양쪽 수락 후 게임방 생성 또는 Redis 상태 전환 실패로 게임 진입 실패 |
 | 세션 | `DECLINED` | 거절이 포함되어 매칭 실패로 정산 완료 |
 | 세션 | `TIMEOUT` | 10초 응답 윈도우 만료로 매칭 실패 정산 완료 |
 | 유저 응답 | `PENDING` | 아직 수락/거절하지 않음 |

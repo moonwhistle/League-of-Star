@@ -78,7 +78,12 @@ class MatchResponseResultNotificationFactoryTest {
                 13,
                 MatchStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED,
-                MatchResponseStatus.ACCEPTED
+                MatchResponseStatus.ACCEPTED,
+                new MatchResponseResultEvent.Game(
+                        100L,
+                        "/assets/game/dragon-view.mp4",
+                        "/ws/game/100"
+                )
         );
         givenUser(1L, "userA", Tier.SILVER, Division.I);
         givenUser(2L, "userB", Tier.GOLD, Division.IV);
@@ -89,12 +94,16 @@ class MatchResponseResultNotificationFactoryTest {
         assertThat(userAMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.MATCHED);
         assertThat(userAMessage.notification().reason()).isEqualTo(MatchResponseReason.BOTH_ACCEPTED);
         assertThat(userAMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_GAME_WAITING);
-        assertThat(userAMessage.notification().game()).isNull();
+        assertThat(userAMessage.notification().game().gameRoomId()).isEqualTo(100L);
+        assertThat(userAMessage.notification().game().videoUrl()).isEqualTo("/assets/game/dragon-view.mp4");
+        assertThat(userAMessage.notification().game().webSocketUrl()).isEqualTo("/ws/game/100");
 
         assertThat(userBMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.MATCHED);
         assertThat(userBMessage.notification().reason()).isEqualTo(MatchResponseReason.BOTH_ACCEPTED);
         assertThat(userBMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_GAME_WAITING);
-        assertThat(userBMessage.notification().game()).isNull();
+        assertThat(userBMessage.notification().game().gameRoomId()).isEqualTo(100L);
+        assertThat(userBMessage.notification().game().videoUrl()).isEqualTo("/assets/game/dragon-view.mp4");
+        assertThat(userBMessage.notification().game().webSocketUrl()).isEqualTo("/ws/game/100");
     }
 
     @Test
@@ -151,6 +160,36 @@ class MatchResponseResultNotificationFactoryTest {
         assertThat(userBMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.FAILED);
         assertThat(userBMessage.notification().reason()).isEqualTo(MatchResponseReason.BOTH_TIMEOUT);
         assertThat(userBMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_MATCH_START);
+    }
+
+    @Test
+    @DisplayName("게임 준비 실패 결과는 양쪽 모두 start 화면 복귀 메시지로 생성한다")
+    void createGameSetupFailedResult() {
+        MatchResponseResultEvent event = new MatchResponseResultEvent(
+                "match-1",
+                1L,
+                2L,
+                10,
+                13,
+                MatchStatus.GAME_SETUP_FAILED,
+                MatchResponseStatus.ACCEPTED,
+                MatchResponseStatus.ACCEPTED
+        );
+        givenUser(1L, "userA", Tier.SILVER, Division.I);
+        givenUser(2L, "userB", Tier.GOLD, Division.IV);
+
+        MatchResponseResultPubSubMessage userAMessage = factory.createForUserA(event);
+        MatchResponseResultPubSubMessage userBMessage = factory.createForUserB(event);
+
+        assertThat(userAMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.FAILED);
+        assertThat(userAMessage.notification().reason()).isEqualTo(MatchResponseReason.GAME_SETUP_FAILED);
+        assertThat(userAMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_MATCH_START);
+        assertThat(userAMessage.notification().game()).isNull();
+
+        assertThat(userBMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.FAILED);
+        assertThat(userBMessage.notification().reason()).isEqualTo(MatchResponseReason.GAME_SETUP_FAILED);
+        assertThat(userBMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_MATCH_START);
+        assertThat(userBMessage.notification().game()).isNull();
     }
 
     private void givenUser(Long userId, String nickname, Tier tier, Division division) {

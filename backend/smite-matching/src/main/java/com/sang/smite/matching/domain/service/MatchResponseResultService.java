@@ -9,6 +9,8 @@ import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.domain.event.MatchResponseResultEvent;
 import com.sang.smite.matching.domain.event.MatchResponseResultEventPublisher;
+import com.sang.smite.matching.domain.port.GameSetupPort;
+import com.sang.smite.matching.domain.result.GameSetupResult;
 import com.sang.smite.matching.domain.result.MatchResponseTimeoutResult;
 import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.matching.repository.MatchQueueStore;
@@ -23,9 +25,10 @@ import org.springframework.stereotype.Component;
 /**
  * matchId 기준 Redis lock 안에서 매칭 응답 상태와 최종 결과를 직렬화해 반영합니다.
  *
- * <p>HTTP accept/reject 흐름에서는 유저별 응답 상태를 기록하고, 양쪽 모두 수락한 경우만 즉시
- * {@link MatchStatus#ACCEPTED}로 완료합니다. 그 외 실패 조합은 10초 응답 윈도우를 보장한 뒤
- * timeout/deadline 흐름에서 최종 실패 결과로 정리합니다.</p>
+ * <p>HTTP accept/reject 흐름에서는 유저별 응답 상태를 기록하고, 양쪽 모두 수락한 경우 게임 준비를
+ * 먼저 시도한 뒤 성공하면 {@link MatchStatus#ACCEPTED}, 실패하면 {@link MatchStatus#GAME_SETUP_FAILED}로
+ * 완료합니다. 그 외 실패 조합은 10초 응답 윈도우를 보장한 뒤 timeout/deadline 흐름에서 최종 실패
+ * 결과로 정리합니다.</p>
  */
 @Slf4j
 @Component
@@ -38,6 +41,7 @@ public class MatchResponseResultService {
     private final MatchTimeoutStore timeoutStore;
     private final MatchResponseMetrics matchResponseMetrics;
     private final MatchResponseResultEventPublisher resultEventPublisher;
+    private final GameSetupPort gameSetupPort;
 
     /**
      * 유저의 수락 응답을 기록합니다.
@@ -176,16 +180,72 @@ public class MatchResponseResultService {
     }
 
     /**
-     * 양쪽 수락 세션을 ACCEPTED로 저장하고 성공 완료 지표와 최종 결과 이벤트를 기록합니다.
+     * 양쪽 수락 세션의 게임 준비를 시도하고 성공/실패 최종 결과를 기록합니다.
      */
     private void completeAcceptedSession(MatchSession session) {
+        GameSetupResult gameSetupResult;
+        try {
+            gameSetupResult = gameSetupPort.setup(session.userA(), session.userB());
+        } catch (RuntimeException e) {
+            completeGameSetupFailedSession(session, e);
+            return;
+        }
+
         MatchSession completedSession = session.withStatus(MatchStatus.ACCEPTED);
-        sessionStore.save(completedSession, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
-        userStatusStore.updateStatus(session.userA(), MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
-        userStatusStore.updateStatus(session.userB(), MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        try {
+            sessionStore.save(completedSession, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
+            userStatusStore.updateStatus(session.userA(), MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+            userStatusStore.updateStatus(session.userB(), MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        } catch (RuntimeException e) {
+            abortGameSetup(session, gameSetupResult, e);
+            completeGameSetupFailedSession(session, e);
+            return;
+        }
         cleanupTimeoutIndex(session.matchId());
         matchResponseMetrics.incrementAcceptedCompletion();
-        publishResultEvent(completedSession);
+        publishResultEvent(completedSession, gameSetupResult);
+    }
+
+    private void abortGameSetup(MatchSession session, GameSetupResult gameSetupResult, RuntimeException cause) {
+        log.warn("Failed to update Redis state after game room setup: matchId={}, gameRoomId={}",
+                session.matchId(), gameSetupResult.gameRoomId(), cause);
+        try {
+            gameSetupPort.abort(gameSetupResult.gameRoomId());
+        } catch (RuntimeException e) {
+            log.warn("Failed to abort game room after Redis state update failure: matchId={}, gameRoomId={}",
+                    session.matchId(), gameSetupResult.gameRoomId(), e);
+        }
+    }
+
+    /**
+     * 양쪽 수락 후 게임 준비가 실패하면 두 유저를 큐에 복귀시키지 않고 실패 이벤트를 발행합니다.
+     */
+    private void completeGameSetupFailedSession(MatchSession session, RuntimeException cause) {
+        log.warn("Failed to setup game room after both accepted: matchId={}", session.matchId(), cause);
+
+        MatchSession failedSession = session.withStatus(MatchStatus.GAME_SETUP_FAILED);
+        saveGameSetupFailedSession(failedSession);
+        removeUserStatus(session.matchId(), session.userA());
+        removeUserStatus(session.matchId(), session.userB());
+        cleanupTimeoutIndex(session.matchId());
+        matchResponseMetrics.incrementGameSetupFailedCompletion();
+        publishResultEvent(failedSession);
+    }
+
+    private void saveGameSetupFailedSession(MatchSession failedSession) {
+        try {
+            sessionStore.save(failedSession, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
+        } catch (RuntimeException e) {
+            log.warn("Failed to save game setup failed match session: matchId={}", failedSession.matchId(), e);
+        }
+    }
+
+    private void removeUserStatus(String matchId, Long userId) {
+        try {
+            userStatusStore.removeStatus(userId);
+        } catch (RuntimeException e) {
+            log.warn("Failed to remove user match status: matchId={}, userId={}", matchId, userId, e);
+        }
     }
 
     /**
@@ -311,6 +371,14 @@ public class MatchResponseResultService {
     private void publishResultEvent(MatchSession session) {
         try {
             resultEventPublisher.publish(MatchResponseResultEvent.from(session));
+        } catch (Exception e) {
+            log.warn("Failed to publish match response result event: matchId={}", session.matchId(), e);
+        }
+    }
+
+    private void publishResultEvent(MatchSession session, GameSetupResult gameSetupResult) {
+        try {
+            resultEventPublisher.publish(MatchResponseResultEvent.from(session, gameSetupResult));
         } catch (Exception e) {
             log.warn("Failed to publish match response result event: matchId={}", session.matchId(), e);
         }

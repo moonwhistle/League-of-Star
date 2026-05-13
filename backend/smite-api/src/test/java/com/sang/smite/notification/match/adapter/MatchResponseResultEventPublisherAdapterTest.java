@@ -67,4 +67,28 @@ class MatchResponseResultEventPublisherAdapterTest {
         verify(notificationFactory, never()).createForUserB(event);
         verify(publisher, never()).publish(any(MatchResponseResultPubSubMessage.class));
     }
+
+    @Test
+    @DisplayName("GAME_SETUP_FAILED 상태 이벤트는 유저별 Pub/Sub 메시지로 발행한다")
+    void publishGameSetupFailedEvent() {
+        MatchResponseResultEvent event = new MatchResponseResultEvent(
+                "match-1",
+                1L,
+                2L,
+                10,
+                11,
+                MatchStatus.GAME_SETUP_FAILED,
+                MatchResponseStatus.ACCEPTED,
+                MatchResponseStatus.ACCEPTED
+        );
+        MatchResponseResultPubSubMessage userAMessage = mock(MatchResponseResultPubSubMessage.class);
+        MatchResponseResultPubSubMessage userBMessage = mock(MatchResponseResultPubSubMessage.class);
+        when(notificationFactory.createForUserA(event)).thenReturn(userAMessage);
+        when(notificationFactory.createForUserB(event)).thenReturn(userBMessage);
+
+        adapter.publish(event);
+
+        verify(publisher).publish(userAMessage);
+        verify(publisher).publish(userBMessage);
+    }
 }

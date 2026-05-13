@@ -42,4 +42,30 @@ class MatchResponseResultNotificationTest {
         assertThat(payload).contains("\"tier\":\"GOLD_IV\"");
         assertThat(payload).contains("\"tierScore\":13");
     }
+
+    @Test
+    @DisplayName("게임 대기 화면 진입 payload를 JSON으로 직렬화한다.")
+    void serializeGamePayload() throws JsonProcessingException {
+        // given
+        MatchResponseResultNotification notification = new MatchResponseResultNotification(
+                "match-1",
+                MatchResponseOutcome.MATCHED,
+                MatchResponseReason.BOTH_ACCEPTED,
+                MatchResponseAction.GO_TO_GAME_WAITING,
+                new MatchResponseResultNotification.Opponent(2L, "opponent", "GOLD_IV", 13),
+                new MatchResponseResultNotification.Game(
+                        100L,
+                        "/assets/game/dragon-view.mp4",
+                        "/ws/game/100"
+                )
+        );
+
+        // when
+        String payload = objectMapper.writeValueAsString(notification);
+
+        // then
+        assertThat(payload).contains("\"gameRoomId\":100");
+        assertThat(payload).contains("\"videoUrl\":\"/assets/game/dragon-view.mp4\"");
+        assertThat(payload).contains("\"webSocketUrl\":\"/ws/game/100\"");
+    }
 }

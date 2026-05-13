@@ -9,6 +9,8 @@ import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.domain.event.MatchResponseResultEvent;
 import com.sang.smite.matching.domain.event.MatchResponseResultEventPublisher;
+import com.sang.smite.matching.domain.port.GameSetupPort;
+import com.sang.smite.matching.domain.result.GameSetupResult;
 import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchQueueStore;
@@ -26,10 +28,13 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +62,9 @@ class MatchResponseResultServiceTest {
     @Mock
     private MatchResponseResultEventPublisher settlementEventPublisher;
 
+    @Mock
+    private GameSetupPort gameSetupPort;
+
     @Test
     @DisplayName("수락 요청 시 해당 유저의 수락 상태와 유저 상태를 갱신한다")
     void accept() {
@@ -80,6 +88,7 @@ class MatchResponseResultServiceTest {
     void acceptByBoth() {
         MatchSession session = foundSession().accept(1L);
         when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenReturn(gameSetupResult());
 
         processor.acceptWithLock("match-1", 2L);
 
@@ -88,7 +97,9 @@ class MatchResponseResultServiceTest {
         MatchSession savedSession = sessionCaptor.getValue();
         assertThat(savedSession.status()).isEqualTo(MatchStatus.ACCEPTED);
         assertThat(savedSession.isAcceptedByBoth()).isTrue();
-        verify(userStatusStore).updateStatus(2L, MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(gameSetupPort).setup(1L, 2L);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
         verify(timeoutStore).cleanup("match-1");
         ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
         verify(settlementEventPublisher).publish(eventCaptor.capture());
@@ -97,6 +108,145 @@ class MatchResponseResultServiceTest {
         assertThat(event.sessionStatus()).isEqualTo(MatchStatus.ACCEPTED);
         assertThat(event.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
         assertThat(event.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.game().gameRoomId()).isEqualTo(100L);
+        assertThat(event.game().videoUrl()).isEqualTo("/assets/game/dragon-view.mp4");
+        assertThat(event.game().webSocketUrl()).isEqualTo("/ws/game/100");
+    }
+
+    @Test
+    @DisplayName("양쪽 수락 후 게임룸 생성이 실패하면 큐 복귀 없이 GAME_SETUP_FAILED 이벤트를 발행한다")
+    void gameSetupFailureAfterBothAccepted() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenThrow(new IllegalStateException("game setup failed"));
+
+        processor.acceptWithLock("match-1", 2L);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        MatchSession savedSession = sessionCaptor.getValue();
+        assertThat(savedSession.status()).isEqualTo(MatchStatus.GAME_SETUP_FAILED);
+        assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+
+        verify(userStatusStore).removeStatus(1L);
+        verify(userStatusStore).removeStatus(2L);
+        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(matchStore, never()).add(any());
+        verify(timeoutStore).cleanup("match-1");
+        verify(matchResponseMetrics).incrementGameSetupFailedCompletion();
+        verify(matchResponseMetrics, never()).incrementAcceptedCompletion();
+
+        ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
+        verify(settlementEventPublisher).publish(eventCaptor.capture());
+        MatchResponseResultEvent event = eventCaptor.getValue();
+        assertThat(event.sessionStatus()).isEqualTo(MatchStatus.GAME_SETUP_FAILED);
+        assertThat(event.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.game()).isNull();
+    }
+
+    @Test
+    @DisplayName("게임룸 생성 후 Redis user status 전환이 실패하면 게임룸을 ABORTED 보상하고 실패 이벤트를 발행한다")
+    void redisUserStatusFailureAfterGameSetupAbortsGameRoom() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenReturn(gameSetupResult());
+        doAnswer(invocation -> {
+            Long userId = invocation.getArgument(0);
+            if (userId.equals(2L)) {
+                throw new IllegalStateException("redis status failed");
+            }
+            return null;
+        })
+                .when(userStatusStore)
+                .updateStatus(any(), eq(MatchStatus.IN_GAME), eq(MatchingConstants.STATUS_TTL_SECONDS));
+
+        processor.acceptWithLock("match-1", 2L);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore, times(2)).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        assertThat(sessionCaptor.getAllValues())
+                .extracting(MatchSession::status)
+                .containsExactly(MatchStatus.ACCEPTED, MatchStatus.GAME_SETUP_FAILED);
+
+        verify(gameSetupPort).setup(1L, 2L);
+        verify(gameSetupPort).abort(100L);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).removeStatus(1L);
+        verify(userStatusStore).removeStatus(2L);
+        verify(matchStore, never()).add(any());
+        verify(timeoutStore).cleanup("match-1");
+        verify(matchResponseMetrics).incrementGameSetupFailedCompletion();
+        verify(matchResponseMetrics, never()).incrementAcceptedCompletion();
+
+        ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
+        verify(settlementEventPublisher).publish(eventCaptor.capture());
+        MatchResponseResultEvent event = eventCaptor.getValue();
+        assertThat(event.sessionStatus()).isEqualTo(MatchStatus.GAME_SETUP_FAILED);
+        assertThat(event.game()).isNull();
+    }
+
+    @Test
+    @DisplayName("게임룸 생성 후 Redis match session ACCEPTED 저장이 실패하면 게임룸을 ABORTED 보상하고 실패 이벤트를 발행한다")
+    void redisSessionAcceptedSaveFailureAfterGameSetupAbortsGameRoom() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenReturn(gameSetupResult());
+        doThrow(new IllegalStateException("redis session failed"))
+                .when(sessionStore)
+                .save(argThat(savedSession -> savedSession != null && savedSession.status() == MatchStatus.ACCEPTED),
+                        eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+
+        processor.acceptWithLock("match-1", 2L);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore, times(2)).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        assertThat(sessionCaptor.getAllValues())
+                .extracting(MatchSession::status)
+                .containsExactly(MatchStatus.ACCEPTED, MatchStatus.GAME_SETUP_FAILED);
+
+        verify(gameSetupPort).abort(100L);
+        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).removeStatus(1L);
+        verify(userStatusStore).removeStatus(2L);
+        verify(matchStore, never()).add(any());
+        verify(timeoutStore).cleanup("match-1");
+        verify(matchResponseMetrics).incrementGameSetupFailedCompletion();
+        verify(matchResponseMetrics, never()).incrementAcceptedCompletion();
+
+        ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
+        verify(settlementEventPublisher).publish(eventCaptor.capture());
+        MatchResponseResultEvent event = eventCaptor.getValue();
+        assertThat(event.sessionStatus()).isEqualTo(MatchStatus.GAME_SETUP_FAILED);
+        assertThat(event.game()).isNull();
+    }
+
+    @Test
+    @DisplayName("게임 준비 실패 세션 저장이 실패해도 유저 상태 정리와 실패 이벤트 발행을 시도한다")
+    void gameSetupFailedSessionSaveFailureDoesNotStopCleanupAndEvent() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenThrow(new IllegalStateException("game setup failed"));
+        doThrow(new IllegalStateException("redis session failed"))
+                .when(sessionStore)
+                .save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+
+        processor.acceptWithLock("match-1", 2L);
+
+        verify(userStatusStore).removeStatus(1L);
+        verify(userStatusStore).removeStatus(2L);
+        verify(timeoutStore).cleanup("match-1");
+        verify(matchResponseMetrics).incrementGameSetupFailedCompletion();
+
+        ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
+        verify(settlementEventPublisher).publish(eventCaptor.capture());
+        MatchResponseResultEvent event = eventCaptor.getValue();
+        assertThat(event.sessionStatus()).isEqualTo(MatchStatus.GAME_SETUP_FAILED);
+        assertThat(event.game()).isNull();
     }
 
     @Test
@@ -187,6 +337,7 @@ class MatchResponseResultServiceTest {
     void cleanupFailureDoesNotBreakAccept() {
         MatchSession session = foundSession().accept(1L);
         when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenReturn(gameSetupResult());
         doThrow(new IllegalStateException("cleanup failed")).when(timeoutStore).cleanup("match-1");
 
         processor.acceptWithLock("match-1", 2L);
@@ -457,5 +608,9 @@ class MatchResponseResultServiceTest {
                 MatchResponseStatus.PENDING,
                 MatchResponseStatus.PENDING
         );
+    }
+
+    private GameSetupResult gameSetupResult() {
+        return new GameSetupResult(100L, "/assets/game/dragon-view.mp4", "/ws/game/100");
     }
 }

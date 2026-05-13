@@ -81,23 +81,27 @@ class MatchNotificationControllerRestDocsTest extends RestDocsSupport {
                                         Payload:
                                         - `matchId`: 매칭 세션 ID
                                         - `outcome`: `MATCHED`, `FAILED`
-                                        - `reason`: `BOTH_ACCEPTED`, `MY_REJECTED`, `OPPONENT_REJECTED`, `MY_TIMEOUT`, `OPPONENT_TIMEOUT`, `BOTH_TIMEOUT`
+                                        - `reason`: `BOTH_ACCEPTED`, `MY_REJECTED`, `OPPONENT_REJECTED`, `MY_TIMEOUT`, `OPPONENT_TIMEOUT`, `BOTH_TIMEOUT`, `GAME_SETUP_FAILED`
                                         - `action`: `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`, `RETURN_TO_MATCHING`
                                         - `opponent`: 상대 `userId`, `nickname`, `tier`, `tierScore`
-                                        - `game`: 후속 게임 세션 생성 이슈 전까지 `null`
+                                        - `game`: 성공 시 게임 대기 화면 진입 payload, 실패 시 `null`
+                                        - `game.gameRoomId`: 생성된 게임방 ID
+                                        - `game.videoUrl`: 공통 MP4 static resource URL. MVP 기본값은 `/assets/game/dragon-view.mp4`
+                                        - `game.webSocketUrl`: gameRoom WebSocket URL. MVP 기본 형식은 `/ws/game/{gameRoomId}`
                                         
                                         Action mapping:
-                                        - `GO_TO_GAME_WAITING`: 게임 진행 대기 화면으로 이동
+                                        - `GO_TO_GAME_WAITING`: `game` payload를 사용해 게임 진행 대기 화면으로 이동
                                         - `GO_TO_MATCH_START`: 매칭 start 버튼 화면으로 복귀
                                         - `RETURN_TO_MATCHING`: 기존 우선순위로 매칭 대기 상태 복귀
                                         
                                         Result mapping:
-                                        - `MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING`
+                                        - `MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING / game={gameRoomId, videoUrl, webSocketUrl}`
                                         - `FAILED / MY_REJECTED / GO_TO_MATCH_START`
                                         - `FAILED / OPPONENT_REJECTED / RETURN_TO_MATCHING`
                                         - `FAILED / MY_TIMEOUT / GO_TO_MATCH_START`
                                         - `FAILED / OPPONENT_TIMEOUT / RETURN_TO_MATCHING`
                                         - `FAILED / BOTH_TIMEOUT / GO_TO_MATCH_START`
+                                        - `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`
                                         """)
                                 .requestHeaders(
                                         headerWithName("Authorization").description("액세스 토큰 (Bearer)")

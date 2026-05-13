@@ -12,7 +12,8 @@ public enum ParticipantStatus {
     READY("준비"),
     PLAYING("경기중"),
     FINISHED("경기종료"),
-    DISCONNECTED("연결끊김");
+    DISCONNECTED("연결끊김"),
+    ABORTED("중단됨");
 
     private final String description;
 }

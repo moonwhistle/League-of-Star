@@ -1,12 +1,12 @@
 package com.sang.smite.domain.game.domain;
 
+import com.sang.smite.common.domain.BaseEntity;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.domain.vo.ParticipantStatus;
-import com.sang.smite.common.domain.BaseEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -117,5 +117,17 @@ public class GameRoom extends BaseEntity {
         this.status = GameStatus.FINISHED;
         this.finishedAt = LocalDateTime.now();
         this.participants.forEach(p -> p.updateStatus(ParticipantStatus.FINISHED));
+    }
+
+    public void abortBeforeStart() {
+        if (this.status == GameStatus.ABORTED) {
+            return;
+        }
+        if (this.status != GameStatus.READY) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+        this.status = GameStatus.ABORTED;
+        this.finishedAt = LocalDateTime.now();
+        this.participants.forEach(p -> p.updateStatus(ParticipantStatus.ABORTED));
     }
 }
