@@ -96,8 +96,17 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 - [x] `game_participants.status=READY`로 저장
 - [x] HP scenario 생성
 - [x] `scenario_data` 저장
-- [ ] 고정 MP4 URL 반환
-- [ ] game WebSocket URL 반환
+- [x] 고정 MP4 URL 반환
+- [x] game WebSocket URL 반환
+
+결정 사항:
+
+- `GameRoomCommandService`는 DB 저장만 담당한다.
+- `GameRoomSetupService`는 `smite-api`의 game service에 둔다.
+- `smite-matching`은 gameRoom 생성, MP4 URL, WebSocket URL 조립을 알지 않는다.
+- 고정 MP4 URL은 `/assets/game/dragon-view.mp4`로 반환한다.
+- MP4 파일은 아직 프로젝트에 없지만, Spring Boot static resource 경로에 존재한다고 가정한다.
+- game WebSocket URL은 `/ws/game/{gameRoomId}` 형식으로 반환한다.
 
 ### 4. 매칭 성공 흐름과 연결
 
