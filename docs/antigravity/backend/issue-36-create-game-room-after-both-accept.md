@@ -65,26 +65,37 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 
 ### 2. gameRoom 생성 유스케이스 추가
 
-- [ ] 양쪽 수락 완료 후 호출할 gameRoom 생성 유스케이스 정의
-- [ ] 입력값 정의
-  - [ ] `matchId`
-  - [ ] userA/userB
-  - [ ] tierScore
-  - [ ] entryTime
-- [ ] 반환값 정의
-  - [ ] `gameRoomId`
-  - [ ] `videoUrl`
-  - [ ] `webSocketUrl`
-- [ ] 실패 결과 모델 정의
+- [x] 양쪽 수락 완료 후 호출할 gameRoom 생성 서비스 정의
+- [x] 입력값 정의
+  - [x] `firstUserId`
+  - [x] `secondUserId`
+- [x] 반환값 정의
+  - [x] `GameRoom`
+- [x] game 도메인 관심사가 아닌 값 제거
+  - [x] `matchId`
+  - [x] `videoUrl`
+  - [x] `webSocketUrl`
+- [x] 별도 실패 결과 모델 제거
+
+결정 사항:
+
+- 기존 코드 컨벤션에 맞춰 `CreateGameRoomUseCase` 인터페이스 대신 `GameRoomCommandService`를 둔다.
+- `smite-core` game 도메인은 `matchId`, SSE payload, URL 조립을 알지 않는다.
+- `GameRoomCommandService`는 `GameRoom` 생성, participant 추가, 기본 scenario 생성, 저장까지만 담당한다.
+- HP scenario 길이는 gameRoom 생성 시 8초 이상 17초 이하로 랜덤 결정한다.
+- HP scenario는 1초 단위 step으로 구성하고, 시작 HP는 10000, 마지막 step HP는 0으로 둔다.
+- `match_response_result.game`의 `videoUrl`, `webSocketUrl`은 이후 매칭/알림 연결 단계에서 조립한다.
+- gameRoom 생성 실패는 별도 result 타입이 아니라 `CoreException` 계열 예외로 전파하고, 호출부에서 `GAME_SETUP_FAILED` 이벤트로 변환한다.
+- 잘못된 참가자 입력은 `CoreErrorCode.INVALID_GAME_PARTICIPANTS`로 표현한다.
 
 ### 3. gameRoom 저장 구현
 
-- [ ] `GameRoom` 생성 로직 연결
-- [ ] `game_rooms.status=READY`로 저장
-- [ ] `game_participants` 2명 추가
-- [ ] `game_participants.status=READY`로 저장
-- [ ] HP scenario 생성
-- [ ] `scenario_data` 저장
+- [x] `GameRoom` 생성 로직 연결
+- [x] `game_rooms.status=READY`로 저장
+- [x] `game_participants` 2명 추가
+- [x] `game_participants.status=READY`로 저장
+- [x] HP scenario 생성
+- [x] `scenario_data` 저장
 - [ ] 고정 MP4 URL 반환
 - [ ] game WebSocket URL 반환
 
