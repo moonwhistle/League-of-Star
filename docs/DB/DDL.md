@@ -332,7 +332,7 @@ CREATE TABLE rank_series (
 | `result` | VARCHAR(20) | NULLABLE | PLAYER1_WIN / PLAYER2_WIN / DRAW |
 | `winner_id` | BIGINT | FK → users, NULLABLE | 승자 (무승부 시 NULL) |
 | `dragon_max_hp` | INT | NOT NULL, DEFAULT 10000 | 드래곤 초기 HP |
-| `duration_seconds` | INT | NOT NULL | 게임 시간 (7~15) |
+| `duration_seconds` | INT | NOT NULL | 게임 시간 (8~17) |
 | `scenario_data` | JSON | NOT NULL | HP 감소 시나리오 스냅샷 |
 | `game_start_time` | DATETIME(3) | NULLABLE | 게임 실제 시작 시각 (ms 정밀도) |
 | `finished_at` | DATETIME | NULLABLE | 게임 종료일시 |
@@ -367,7 +367,7 @@ CREATE TABLE game_rooms (
 | `id` | BIGINT | PK, AUTO_INCREMENT | 고유 ID |
 | `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 소속 게임방 |
 | `user_id` | BIGINT | FK → users, NOT NULL | 참여 유저 |
-| `status` | VARCHAR(20) | NOT NULL | READY / PLAYING / FINISHED / DISCONNECTED |
+| `status` | VARCHAR(20) | NOT NULL | READY / PLAYING / FINISHED / DISCONNECTED / ABORTED |
 | `created_at` | DATETIME | NOT NULL | 참여일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
 

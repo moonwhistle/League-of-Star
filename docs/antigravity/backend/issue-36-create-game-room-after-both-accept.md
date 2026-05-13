@@ -37,6 +37,7 @@ gameRoom 생성 실패 흐름:
 
 gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않는다.
 클라이언트는 `reason=GAME_SETUP_FAILED`를 기준으로 안내 메시지를 보여준 뒤 start 버튼 화면으로 돌려보낸다.
+gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤트를 발행하지 않고, 생성된 gameRoom/participant를 `ABORTED`로 보상 처리한 뒤 동일하게 `GAME_SETUP_FAILED`로 정리한다.
 
 이번 이슈에서는 WebSocket 연결, RTT 측정, countdown, `GAME_START`, SMITE 판정, `game_actions`, `game_records` 저장은 구현하지 않는다.
 
@@ -153,7 +154,66 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 - 실패 이벤트는 기존 `match_response_result` 경로로 발행하고, notification factory에서 `GAME_SETUP_FAILED / GO_TO_MATCH_START / game=null`로 변환한다.
 - accept HTTP 요청은 gameRoom 생성 실패 예외를 그대로 전파하지 않고, SSE 실패 이벤트로 최종 화면 전환을 안내한다.
 
-### 7. 테스트
+### 7. Redis `IN_GAME` 상태 전환 실패 보상 처리
+
+확정 흐름:
+
+```text
+양쪽 accept 확인
+-> DB transaction으로 game_rooms 저장
+-> 같은 DB transaction에서 game_participants 2명 저장
+-> 같은 DB transaction에서 HP scenario 저장
+-> Redis match session을 ACCEPTED로 저장
+-> Redis userA/userB status를 IN_GAME으로 저장
+-> timeout index cleanup
+-> match_response_result 성공 이벤트 발행
+```
+
+Redis 상태 전환 실패 흐름:
+
+```text
+gameRoom 생성 성공
+-> Redis match session 또는 user status 업데이트 실패
+-> gameRoom ABORTED 보상 처리
+-> game_participants ABORTED 보상 처리
+-> Redis user status best-effort 제거
+-> match session GAME_SETUP_FAILED 저장
+-> timeout index cleanup
+-> match_response_result 실패 이벤트 발행
+```
+
+문제 지점:
+
+- gameRoom 생성 후 Redis `IN_GAME` 업데이트가 실패하면, DB gameRoom은 성공 상태인데 유저 Redis 상태만 일부 또는 전체가 이전 상태로 남을 수 있다.
+- userA 업데이트는 성공하고 userB 업데이트만 실패하면 userA는 `IN_GAME`, userB는 이전 상태가 되어 유저별 상태가 서로 달라질 수 있다.
+- 이 실패는 현재 `GameSetupPort.setup()` 실패 catch 범위 밖에서 발생하므로 `GAME_SETUP_FAILED` 이벤트로 정리되지 않을 수 있다.
+- 이 경우 `GO_TO_GAME_WAITING` 성공 이벤트를 발행하면 안 되며, 큐 재삽입 없이 `GAME_SETUP_FAILED / GO_TO_MATCH_START / game=null`로 정리해야 한다.
+- Redis가 비즈니스 최종 진실은 아니지만, 성공 이벤트를 발행하기 전 마지막 상태 동기화 게이트다.
+
+- [ ] Redis 상태 전환 실패 보상용 gameRoom command 추가
+- [ ] `GameRoom`에 `ABORTED` 전이 메서드 추가
+- [ ] `ParticipantStatus.ABORTED` 추가
+- [ ] gameRoom 보상 처리 시 `game_rooms.status=ABORTED`로 변경
+- [ ] gameRoom 보상 처리 시 `game_participants.status=ABORTED`로 변경
+- [ ] gameRoom 생성 성공 후 Redis match session `ACCEPTED` 저장 실패 케이스 처리
+- [ ] gameRoom 생성 성공 후 Redis user status `IN_GAME` 전환 실패 케이스 처리
+- [ ] Redis 상태 전환 실패 시 두 유저 Redis status 제거를 best-effort로 시도
+- [ ] Redis 상태 전환 실패 시 match session을 `GAME_SETUP_FAILED`로 저장
+- [ ] Redis 상태 전환 실패 시 매칭 큐 재삽입 없음
+- [ ] Redis 상태 전환 실패 시 `GO_TO_GAME_WAITING` 발행 금지
+- [ ] Redis 상태 전환 실패 시 `GAME_SETUP_FAILED / GO_TO_MATCH_START / game=null` 이벤트 발행
+- [ ] Redis 상태 전환 실패 로그/메트릭 기록
+- [ ] 성공 이벤트는 match session `ACCEPTED` 저장과 두 유저 `IN_GAME` 전환이 모두 성공한 뒤에만 발행
+
+결정 사항:
+
+- gameRoom 생성은 성공했더라도 Redis `IN_GAME` 전환이 실패하면 클라이언트에는 게임 대기 화면으로 보내지 않는다.
+- 이 경우 자동 매칭 큐 복귀는 하지 않고 기존 gameRoom 생성 실패와 동일하게 `GAME_SETUP_FAILED`로 정리한다.
+- Redis 상태 전환 실패는 성공 이벤트 발행 전 실패이므로, 이미 생성된 gameRoom과 participant는 `ABORTED`로 보상 처리한다.
+- Redis와 DB를 하나의 원자적 transaction으로 묶으려 하지 않고, 현재 단계에서는 보상 transaction으로 정리한다.
+- outbox/saga/2PC는 Redis 장애, 이벤트 발행 실패, 서버 중단 복구까지 요구되는 단계에서 후속 이슈로 검토한다.
+
+### 8. 테스트
 
 - [x] 양쪽 accept 시 gameRoom이 생성되는지 테스트
 - [x] gameRoom participant가 2명 생성되는지 테스트
@@ -163,6 +223,9 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 - [x] gameRoom 생성 실패 시 두 유저 Redis status가 제거되는지 테스트
 - [x] gameRoom 생성 실패 시 큐에 재삽입하지 않는지 테스트
 - [x] gameRoom 생성 실패 이벤트가 `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`인지 테스트
+- [ ] Redis `IN_GAME` 전환 실패 시 `GAME_SETUP_FAILED` 이벤트를 발행하는지 테스트
+- [ ] Redis `IN_GAME` 전환 실패 시 큐에 재삽입하지 않는지 테스트
+- [ ] Redis `IN_GAME` 전환 실패 시 성공 이벤트를 발행하지 않는지 테스트
 - [x] 기존 reject/timeout 정산 테스트가 깨지지 않는지 확인
 
 테스트 기준:
@@ -172,7 +235,7 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 - Redis 영속 상태가 필요한 matching store 테스트만 Redis Testcontainer로 검증한다.
 - 서비스 계층은 mock 기반 단위 테스트로 성공/실패 분기와 Redis 상태 전이를 검증한다.
 
-### 8. 문서
+### 9. 문서
 
 - [ ] issue-34 `match_response_result` 문서에 `GAME_SETUP_FAILED` reason 추가
 - [x] `GO_TO_GAME_WAITING`은 gameRoom 생성 성공 후에만 발행된다고 명시
@@ -188,6 +251,8 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 - 성공 후 두 유저 Redis status는 `IN_GAME`이다.
 - gameRoom 생성 실패 시 두 유저는 큐에 자동 복귀하지 않는다.
 - gameRoom 생성 실패 시 두 유저는 start 버튼 화면으로 돌아갈 수 있는 실패 이벤트를 받는다.
+- gameRoom 생성 후 Redis 상태 전환 실패 시 gameRoom/participant는 `ABORTED`로 보상 처리된다.
+- gameRoom 생성 후 Redis 상태 전환 실패 시 `GO_TO_GAME_WAITING`은 발행되지 않는다.
 - WebSocket/RTT/SMITE/game_records는 이번 이슈에서 구현하지 않는다.
 
 ## 변경 이력
@@ -195,3 +260,73 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 | 날짜 | 변경 내용 |
 | :--- | :--- |
 | 2026-05-13 | Issue 36 작업 문서 생성. 양쪽 accept 후 gameRoom 생성, 성공 payload, 실패 시 `GAME_SETUP_FAILED / GO_TO_MATCH_START` 정책 정리 |
+| 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 흐름과 Task 7 세부 작업 정리 |
+
+----
+## PR
+
+## 📌 Summary
+
+두 플레이어가 모두 매칭을 수락했을 때 gameRoom을 생성하고, 게임 대기 화면 진입에 필요한 payload를 `match_response_result` SSE로 전달하도록 구현했습니다.
+
+```mermaid
+flowchart TD
+    A["Player A/B accept"] --> B["GameSetupPort.setup()"]
+    B --> C{"gameRoom 생성 성공?"}
+
+    C -->|"성공"| D["game_rooms 저장"]
+    D --> E["game_participants 2명 READY 저장"]
+    E --> F["8~17초 HP scenario 저장"]
+    F --> G["Redis user status = IN_GAME"]
+    G --> H["match_response_result"]
+    H --> I["MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING<br/>game={gameRoomId, videoUrl, webSocketUrl}"]
+
+    C -->|"실패"| J["match session = GAME_SETUP_FAILED"]
+    J --> K["Redis user status 제거"]
+    K --> L["매칭 큐 재삽입 없음"]
+    L --> M["match_response_result"]
+    M --> N["FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START<br/>game=null"]
+```
+
+## 📚 Changes
+
+- gameRoom 생성 및 저장 흐름 추가
+  - `GameRoomCommandService`에서 READY 상태 gameRoom 생성
+  - participant 2명 READY 상태 저장
+  - 8~17초 HP scenario 생성 및 `scenario_data` 저장
+
+- 매칭 성공 흐름과 gameRoom 생성 연결
+  - 양쪽 accept 완료 시 game setup을 먼저 수행
+  - gameRoom 생성 성공 후에만 match session을 `ACCEPTED`로 저장
+  - 두 유저 Redis status를 `IN_GAME`으로 전환
+  - `match_response_result.game`에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
+
+- 관심사 분리
+  - `smite-core`: gameRoom 저장과 도메인 로직
+  - `smite-matching`: 매칭 상태 전이, Redis 상태 정리, 결과 이벤트 발행
+  - `smite-api`: gameRoom setup orchestration, static MP4/WebSocket URL 조립
+  - matching은 `GameSetupPort`만 의존하고 실제 gameRoom 생성 구현은 api adapter에서 연결
+
+- gameRoom 생성 실패 처리
+  - 실패 시 `GAME_SETUP_FAILED` 상태로 저장
+  - 두 유저 Redis status 제거
+  - 매칭 큐 재삽입 없음
+  - 실패 이벤트는 `GO_TO_MATCH_START`, `game=null`로 발행
+  - 실패 metric 및 로그 추가
+
+- 테스트 및 문서 보강
+  - core: gameRoom/participants/scenario 생성 단위 테스트 및 `@DataJpaTest`
+  - matching: 양쪽 accept 성공/실패 상태 전이 테스트
+  - api: game setup adapter/service, notification payload 매핑 테스트
+  - RestAssuredMockMvc 기반 RestDocs에 `GAME_SETUP_FAILED`와 game payload 설명 반영
+
+## 📝 Note
+
+- MP4 파일은 아직 프로젝트에 없으며, `/assets/game/dragon-view.mp4`가 static resource로 제공된다고 가정했습니다.
+- WebSocket endpoint는 아직 구현하지 않았고, payload에는 `/ws/game/{gameRoomId}` 형식의 URL만 포함합니다.
+- `game` payload는 `GO_TO_GAME_WAITING`일 때만 필수이며, 실패 이벤트에서는 `game=null`입니다.
+- gameRoom 생성 실패 시 자동 매칭 복귀는 하지 않는 정책을 따릅니다.
+
+## 📌 Related Issue
+
+- Closes #36

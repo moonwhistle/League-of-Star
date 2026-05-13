@@ -155,7 +155,9 @@ ACCEPTED + ACCEPTED
 -> game_rooms 생성
 -> game_participants 2명 생성
 -> scenario 생성/저장
+-> match:session:{matchId} = ACCEPTED
 -> match:status:{userA/userB} = IN_GAME
+-> Redis 상태 전환 성공
 -> match_response_result
    outcome=MATCHED
    reason=BOTH_ACCEPTED
@@ -169,6 +171,24 @@ gameRoom 생성에 실패하면 두 유저를 매칭 큐에 자동 복귀시키�
 ```text
 gameRoom 생성 실패
 -> match:status:{userA/userB} 제거
+-> matching:queue 재삽입 없음
+-> match_response_result
+   outcome=FAILED
+   reason=GAME_SETUP_FAILED
+   action=GO_TO_MATCH_START
+   game=null
+```
+
+gameRoom 생성은 성공했지만 Redis match session 또는 user status 전환이 실패하면 성공 이벤트를 발행하지 않습니다.
+이 경우 이미 생성된 gameRoom과 participant는 `ABORTED`로 보상 처리하고, 두 유저 Redis status를 best-effort로 제거한 뒤 동일하게 `GAME_SETUP_FAILED` 이벤트를 발행합니다.
+
+```text
+gameRoom 생성 성공
+-> Redis 상태 전환 실패
+-> game_rooms.status = ABORTED
+-> game_participants.status = ABORTED
+-> match:status:{userA/userB} best-effort 제거
+-> match:session:{matchId} = GAME_SETUP_FAILED
 -> matching:queue 재삽입 없음
 -> match_response_result
    outcome=FAILED
@@ -305,5 +325,6 @@ return 0 -- 실패
 
 | 날짜 | 변경 내용 |
 | :--- | :--- |
-| 2026-05-13 | Redis를 매칭 큐/매칭 응답 상태의 source of truth로 한정하고, gameRoom 생성 성공 시 `IN_GAME` 전환 및 실패 시 `GAME_SETUP_FAILED` 실패 정책 추가 |
+| 2026-05-13 | Redis를 매칭 큐/매칭 응답 상태의 source of truth로 한정하고, gameRoom 생성 후 Redis 상태 전환 성공 시 `IN_GAME` 유지 및 실패 시 `GAME_SETUP_FAILED` 실패 정책 추가 |
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 status 제거 후 `GO_TO_MATCH_START`로 종료하는 정책으로 변경 |
+| 2026-05-13 | Redis 상태 전환 실패 시 생성된 gameRoom/participant를 `ABORTED`로 보상 처리하고 성공 SSE를 발행하지 않는 정책 추가 |
