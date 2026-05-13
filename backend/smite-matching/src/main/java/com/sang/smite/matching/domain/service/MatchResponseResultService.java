@@ -9,6 +9,8 @@ import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.domain.event.MatchResponseResultEvent;
 import com.sang.smite.matching.domain.event.MatchResponseResultEventPublisher;
+import com.sang.smite.matching.domain.port.GameSetupPort;
+import com.sang.smite.matching.domain.result.GameSetupResult;
 import com.sang.smite.matching.domain.result.MatchResponseTimeoutResult;
 import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.matching.repository.MatchQueueStore;
@@ -38,6 +40,7 @@ public class MatchResponseResultService {
     private final MatchTimeoutStore timeoutStore;
     private final MatchResponseMetrics matchResponseMetrics;
     private final MatchResponseResultEventPublisher resultEventPublisher;
+    private final GameSetupPort gameSetupPort;
 
     /**
      * 유저의 수락 응답을 기록합니다.
@@ -179,13 +182,14 @@ public class MatchResponseResultService {
      * 양쪽 수락 세션을 ACCEPTED로 저장하고 성공 완료 지표와 최종 결과 이벤트를 기록합니다.
      */
     private void completeAcceptedSession(MatchSession session) {
+        GameSetupResult gameSetupResult = gameSetupPort.setup(session.userA(), session.userB());
         MatchSession completedSession = session.withStatus(MatchStatus.ACCEPTED);
         sessionStore.save(completedSession, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
-        userStatusStore.updateStatus(session.userA(), MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
-        userStatusStore.updateStatus(session.userB(), MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        userStatusStore.updateStatus(session.userA(), MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        userStatusStore.updateStatus(session.userB(), MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
         cleanupTimeoutIndex(session.matchId());
         matchResponseMetrics.incrementAcceptedCompletion();
-        publishResultEvent(completedSession);
+        publishResultEvent(completedSession, gameSetupResult);
     }
 
     /**
@@ -311,6 +315,14 @@ public class MatchResponseResultService {
     private void publishResultEvent(MatchSession session) {
         try {
             resultEventPublisher.publish(MatchResponseResultEvent.from(session));
+        } catch (Exception e) {
+            log.warn("Failed to publish match response result event: matchId={}", session.matchId(), e);
+        }
+    }
+
+    private void publishResultEvent(MatchSession session, GameSetupResult gameSetupResult) {
+        try {
+            resultEventPublisher.publish(MatchResponseResultEvent.from(session, gameSetupResult));
         } catch (Exception e) {
             log.warn("Failed to publish match response result event: matchId={}", session.matchId(), e);
         }

@@ -57,7 +57,7 @@ public class MatchResponseResultNotificationFactory {
                 reasonOf(myStatus, opponentStatus, event.sessionStatus()),
                 actionOf(myStatus, opponentStatus, event.sessionStatus()),
                 opponentProfileProvider.getOpponent(opponentUserId, opponentTierScore),
-                gameOf()
+                gameOf(event)
         );
         return new MatchResponseResultPubSubMessage(targetUserId, notification);
     }
@@ -116,8 +116,15 @@ public class MatchResponseResultNotificationFactory {
         return MatchResponseAction.GO_TO_MATCH_START;
     }
 
-    private MatchResponseResultNotification.Game gameOf() {
-        // 게임 세션 생성은 후속 이슈 범위라 현재 응답 결과 이벤트에서는 game payload를 채우지 않습니다.
-        return null;
+    private MatchResponseResultNotification.Game gameOf(MatchResponseResultEvent event) {
+        MatchResponseResultEvent.Game game = event.game();
+        if (game == null) {
+            return null;
+        }
+        return new MatchResponseResultNotification.Game(
+                game.gameRoomId(),
+                game.videoUrl(),
+                game.webSocketUrl()
+        );
     }
 }

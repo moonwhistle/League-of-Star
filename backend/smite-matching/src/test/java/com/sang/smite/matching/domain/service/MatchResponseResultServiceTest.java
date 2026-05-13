@@ -9,6 +9,8 @@ import com.sang.smite.matching.common.exception.MatchingErrorCode;
 import com.sang.smite.matching.common.exception.MatchingException;
 import com.sang.smite.matching.domain.event.MatchResponseResultEvent;
 import com.sang.smite.matching.domain.event.MatchResponseResultEventPublisher;
+import com.sang.smite.matching.domain.port.GameSetupPort;
+import com.sang.smite.matching.domain.result.GameSetupResult;
 import com.sang.smite.matching.metrics.MatchResponseMetrics;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchQueueStore;
@@ -57,6 +59,9 @@ class MatchResponseResultServiceTest {
     @Mock
     private MatchResponseResultEventPublisher settlementEventPublisher;
 
+    @Mock
+    private GameSetupPort gameSetupPort;
+
     @Test
     @DisplayName("수락 요청 시 해당 유저의 수락 상태와 유저 상태를 갱신한다")
     void accept() {
@@ -80,6 +85,7 @@ class MatchResponseResultServiceTest {
     void acceptByBoth() {
         MatchSession session = foundSession().accept(1L);
         when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenReturn(gameSetupResult());
 
         processor.acceptWithLock("match-1", 2L);
 
@@ -88,7 +94,9 @@ class MatchResponseResultServiceTest {
         MatchSession savedSession = sessionCaptor.getValue();
         assertThat(savedSession.status()).isEqualTo(MatchStatus.ACCEPTED);
         assertThat(savedSession.isAcceptedByBoth()).isTrue();
-        verify(userStatusStore).updateStatus(2L, MatchStatus.ACCEPTED, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(gameSetupPort).setup(1L, 2L);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
         verify(timeoutStore).cleanup("match-1");
         ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
         verify(settlementEventPublisher).publish(eventCaptor.capture());
@@ -97,6 +105,9 @@ class MatchResponseResultServiceTest {
         assertThat(event.sessionStatus()).isEqualTo(MatchStatus.ACCEPTED);
         assertThat(event.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
         assertThat(event.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.game().gameRoomId()).isEqualTo(100L);
+        assertThat(event.game().videoUrl()).isEqualTo("/assets/game/dragon-view.mp4");
+        assertThat(event.game().webSocketUrl()).isEqualTo("/ws/game/100");
     }
 
     @Test
@@ -187,6 +198,7 @@ class MatchResponseResultServiceTest {
     void cleanupFailureDoesNotBreakAccept() {
         MatchSession session = foundSession().accept(1L);
         when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenReturn(gameSetupResult());
         doThrow(new IllegalStateException("cleanup failed")).when(timeoutStore).cleanup("match-1");
 
         processor.acceptWithLock("match-1", 2L);
@@ -457,5 +469,9 @@ class MatchResponseResultServiceTest {
                 MatchResponseStatus.PENDING,
                 MatchResponseStatus.PENDING
         );
+    }
+
+    private GameSetupResult gameSetupResult() {
+        return new GameSetupResult(100L, "/assets/game/dragon-view.mp4", "/ws/game/100");
     }
 }

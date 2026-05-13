@@ -110,21 +110,29 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 
 ### 4. 매칭 성공 흐름과 연결
 
-- [ ] `MatchResponseResultService` 양쪽 accept 완료 지점 확인
-- [ ] 기존 양쪽 accept 완료 흐름에 gameRoom 생성 호출 추가
-- [ ] gameRoom 생성 성공 후 match session을 `ACCEPTED`로 저장
-- [ ] gameRoom 생성 성공 후 timeout index cleanup 유지
-- [ ] gameRoom 생성 성공 후 두 유저 Redis status를 `IN_GAME`으로 전환
-- [ ] gameRoom 생성 성공 후 `match_response_result` 발행
+- [x] `MatchResponseResultService` 양쪽 accept 완료 지점 확인
+- [x] 기존 양쪽 accept 완료 흐름에 gameRoom 생성 호출 추가
+- [x] gameRoom 생성 성공 후 match session을 `ACCEPTED`로 저장
+- [x] gameRoom 생성 성공 후 timeout index cleanup 유지
+- [x] gameRoom 생성 성공 후 두 유저 Redis status를 `IN_GAME`으로 전환
+- [x] gameRoom 생성 성공 후 `match_response_result` 발행
+
+결정 사항:
+
+- `smite-matching`은 `GameSetupPort`만 알고 실제 gameRoom 생성 구현은 모른다.
+- `smite-api`의 `GameSetupPortAdapter`가 `GameRoomSetupService`를 호출해 gameRoom을 생성한다.
+- 양쪽 accept 완료 시 gameRoom 생성이 먼저 성공해야 match session을 `ACCEPTED`로 저장한다.
+- gameRoom 생성 성공 후 두 유저 Redis status는 `IN_GAME`으로 전환한다.
+- gameRoom 생성 성공 후 발행되는 `match_response_result` 이벤트에는 game payload를 포함한다.
 
 ### 5. `match_response_result.game` payload 채우기
 
-- [ ] matching 내부 이벤트에 game payload에 필요한 내부 결과 추가
-- [ ] notification factory에서 성공 이벤트의 `game`을 `null`이 아니게 생성
-- [ ] `gameRoomId` 매핑
-- [ ] `videoUrl` 매핑
-- [ ] `webSocketUrl` 매핑
-- [ ] 실패 이벤트에서는 `game=null` 유지
+- [x] matching 내부 이벤트에 game payload에 필요한 내부 결과 추가
+- [x] notification factory에서 성공 이벤트의 `game`을 `null`이 아니게 생성
+- [x] `gameRoomId` 매핑
+- [x] `videoUrl` 매핑
+- [x] `webSocketUrl` 매핑
+- [x] 실패 이벤트에서는 `game=null` 유지
 
 ### 6. gameRoom 생성 실패 처리
 
