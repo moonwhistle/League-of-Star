@@ -18,8 +18,8 @@ trigger: always_on
 
 | 영역 | 기술 |
 |------|------|
-| **Backend** | Java 17, Spring Boot 4.0, Spring MVC SSE, Spring WebSocket (STOMP), Spring Security + JWT, OAuth2 Client, JPA (Hibernate), MySQL, Redis |
-| **Frontend** | React 19, TypeScript, Vite, STOMP.js + SockJS, Canvas / HTML5 |
+| **Backend** | Java 17, Spring Boot 4.0, Spring MVC SSE, Spring WebSocket, Spring Security + JWT, OAuth2 Client, JPA (Hibernate), MySQL, Redis |
+| **Frontend** | React 19, TypeScript, Vite, React Router, TanStack Query, EventSource, native WebSocket, HTML video + React/CSS overlay |
 | **Infra** | Docker, Nginx, GitHub Actions |
 
 ---
@@ -84,3 +84,11 @@ smite-core → (독립, JPA/Hibernate만 의존)
 | **Game** | 시나리오 생성, WebSocket 통신, Rewind 판정, 결과 처리 |
 | **Ranking** | 랭킹 조회, 리더보드 |
 | **Record** | 전적 기록, 통계 |
+
+---
+
+## 변경 이력
+
+| 날짜 | 변경 내용 |
+| :--- | :--- |
+| 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, React Router, TanStack Query, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화 |

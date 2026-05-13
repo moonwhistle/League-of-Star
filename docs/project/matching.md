@@ -7,7 +7,8 @@
 
 ## 1. 개요 (Overview)
 매칭 시스템은 유저의 실력(Tier Score)과 대기 시간을 고려하여 최적의 상대를 찾아줍니다. 
-- **공통 원칙**: 모든 단계에서 **Redis는 상태의 저장소(Source of Truth)**로 활용됩니다.
+- **공통 원칙**: 모든 단계에서 **Redis는 매칭 큐/매칭 응답 상태의 저장소(Source of Truth)**로 활용됩니다.
+  게임 진행 상태의 source of truth는 DB `game_rooms`, `game_participants`입니다.
 - **진화 방향**: '구현의 단순함'에서 '동시성 극대화' 방향으로 발전합니다.
 
 ---
@@ -18,9 +19,12 @@
 - **매칭 대기열 (ZSET)**: `matching:queue:{tierScore}` (Member: userId, Score: entryTime)
   - *특징*: 티어별 물리적 격리 및 진입 시간 기반의 **자연스러운 FIFO** 보장.
 - **유저 매칭 상태 (STRING)**: `match:status:{userId}`
-  - *특징*: `MATCHING`, `FOUND` 등 유저의 현재 매칭 상태를 저장합니다.
+  - *특징*: `MATCHING`, `FOUND`, `ACCEPTED`, `IN_GAME` 등 유저가 매칭/게임 플로우에 묶여 있는지 저장합니다.
+  - gameRoom 생성 성공 이후에는 `IN_GAME`으로 전환하여 중복 큐 진입을 막습니다.
+  - 게임의 실제 진행 상태는 Redis가 아니라 DB `game_rooms`, `game_participants`를 기준으로 판단합니다.
 - **매칭 세션 (HASH)**: `match:session:{matchId}`
   - *특징*: 매칭 성사 후 수락/거절 상태를 관리하는 임시 데이터.
+  - 양쪽 수락 후에도 게임 진행 상태를 확장 저장하지 않고, 매칭 응답 정산 기록으로만 유지합니다.
   - 클라이언트 수락/거절 모달 유효 시간은 10초입니다.
   - Redis 세션 TTL은 cleanup 실패 대비 안전장치로 60분을 둡니다.
 - **응답 timeout pending index (ZSET)**: `match:response:timeout:pending`
@@ -142,7 +146,39 @@ claim은 scheduler 중복 처리 비용을 줄이는 장치이고, lock은 세�
 | `PENDING + PENDING` | 두 유저 모두 `TIMEOUT`, 두 유저 모두 큐 이탈 |
 | 이미 `ACCEPTED` / `DECLINED` / `TIMEOUT` | timeout scheduler는 no-op 후 index ack |
 
-### 6.5 관측 지표
+### 6.5 양쪽 수락 이후 게임방 생성 연결
+
+`ACCEPTED + ACCEPTED`는 timeout scheduler 대상이 아니며, 서버는 즉시 gameRoom 생성 플로우로 진입합니다.
+
+```text
+ACCEPTED + ACCEPTED
+-> game_rooms 생성
+-> game_participants 2명 생성
+-> scenario 생성/저장
+-> match:status:{userA/userB} = IN_GAME
+-> match_response_result
+   outcome=MATCHED
+   reason=BOTH_ACCEPTED
+   action=GO_TO_GAME_WAITING
+   game={gameRoomId, videoUrl, webSocketUrl}
+```
+
+gameRoom 생성에 실패하면 두 유저 모두 잘못이 없으므로 기존 `entryTime`으로 매칭 큐에 복귀시킵니다.
+
+```text
+gameRoom 생성 실패
+-> match:status:{userA/userB} = MATCHING
+-> matching:queue:{tierScore}에 기존 entryTime으로 재등록
+-> match_response_result
+   outcome=FAILED
+   reason=GAME_SETUP_FAILED
+   action=RETURN_TO_MATCHING
+   game=null
+```
+
+매칭 SSE는 `match_response_result`까지 담당하고, `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/SMITE/종료는 gameRoom WebSocket이 담당합니다.
+
+### 6.6 관측 지표
 
 응답/timeout 지표는 `match_response_*` Prometheus metric으로 노출하고, Grafana 매칭 응답 전용 대시보드에서 확인합니다.
 
@@ -261,3 +297,11 @@ return 0 -- 실패
 3. **무결성 보장**: 유저의 '매칭 취소'와 엔진의 '매칭 성공'이 겹치는 찰나의 순간을 완벽하게 방어합니다.
 
 > **주의**: 현재 V1은 글로벌 락과 다중 키 Lua Script로 안정성을 확보합니다. 트래픽 증가로 전체 큐 스캔 비용이 커지면 Stage 2/3 방식으로 스캔 범위와 락 범위를 줄이는 리팩터링을 진행합니다.
+
+---
+
+## 9. 변경 이력
+
+| 날짜 | 변경 내용 |
+| :--- | :--- |
+| 2026-05-13 | Redis를 매칭 큐/매칭 응답 상태의 source of truth로 한정하고, gameRoom 생성 성공 시 `IN_GAME` 전환 및 실패 시 `GAME_SETUP_FAILED` 큐 복귀 정책 추가 |

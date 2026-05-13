@@ -27,13 +27,18 @@
 - **매칭 큐 진입**: "대전 찾기" 버튼 클릭
 - **매칭 알고리즘**: 티어/디비전 기반 유사 실력 상대와 매칭 (대기 시간에 따라 ±1/±2/±4/±8 디비전 확장)
 - **매칭 수락**: 매칭 성사 시 양쪽에 수락/거절 팝업 (10초 타이머)
-  - 둘 다 수락 → 바로 게임 시작
+  - 둘 다 수락 → 서버가 게임방/시나리오 생성 → 게임 대기 화면 진입
   - 한 명이라도 거절/타임아웃 → 10초 안에 수락한 유저는 큐 최우선 복귀, 거절/타임아웃/미응답 유저는 큐 이탈 (거절 패널티 없음)
   - 한 명이 먼저 거절해도 상대방 팝업은 10초 동안 유지되며, 제한 시간 안에 수락하면 큐 복귀 대상이 됨
+- **매칭 알림 채널**: SSE는 `match_found`와 최종 `match_response_result`까지만 담당
+  - 게임방 생성 성공 시 `match_response_result.game`에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
+  - 게임방 생성 실패 시 양쪽 모두 기존 큐 진입 시각으로 복귀하고 `GAME_SETUP_FAILED` 결과 전달
+  - 게임 대기 화면 진입 이후 준비/RTT/카운트다운/게임 시작/입력/종료는 WebSocket 담당
 
 ### 2.3 강타 싸움 게임
 - 두 플레이어가 **동일한 드래곤의 HP 바**를 실시간으로 공유
 - 드래곤 HP가 **불규칙하게 감소** (서버에서 사전 생성한 시나리오 기반)
+- MP4 배경은 gameRoom별로 만들지 않고 공통 static resource를 사용
 - 드래곤 위에 **마우스를 올린 상태**에서 **D 또는 F 키**를 눌러 강타 발동
 - 각 플레이어는 **단 한 번** 강타 사용 가능
 - 드래곤 HP가 0에 도달하면 **즉시 게임 종료**
@@ -79,7 +84,8 @@ HP: ████░██████░░█░░████░░█░░�
 - HP가 **불규칙한 덩어리(버스트)** 단위로 감소
 - 매판 서버가 새로운 랜덤 시나리오를 생성 → 킬존 진입 시점이 매번 다름
 - HP 바를 읽는 **판독력** + 순간적인 클릭 **반응속도** 둘 다 필요
-- 양쪽 클라이언트에 동일한 시나리오가 실시간 전달 (WebSocket)
+- 양쪽 클라이언트에는 게임 시작 직전 동일한 시나리오를 전달 (WebSocket)
+- 클라이언트는 서버가 내려준 `startAt` 기준으로 MP4 재생과 HP overlay를 동기화
 
 ### 3.2 판정 프로세스 (서버 권위 방식)
 
@@ -87,7 +93,7 @@ HP: ████░██████░░█░░████░░█░░�
 
 ```
 1. 유저: 드래곤 위에 마우스 올림 + 키(D/F) 입력
-2. 클라이언트 → 서버: "SMITE" 액션만 전송 (시간 정보 없음)
+2. 클라이언트 → 서버: WebSocket으로 "SMITE" 액션만 전송 (시간 정보 없음)
 3. 서버: 수신 시각 직접 기록 (server_receive_time)
 4. 서버: smite_time = (server_receive_time - game_start_time) - RTT / 2
 5. 서버: 시나리오에서 smite_time 시점의 HP 역산
@@ -211,7 +217,7 @@ gap = 상대_티어점수 - 내_티어점수
 |------|------|
 | **Java 17** | 메인 언어 |
 | **Spring Boot 4.0** | 백엔드 프레임워크 |
-| **Spring WebSocket (STOMP)** | 실시간 게임 통신 |
+| **Spring WebSocket** | 게임 WebSocket JSON 통신 |
 | **Spring Security + JWT** | 인증/인가 |
 | **Spring OAuth2 Client** | 소셜 로그인 (Google, Discord) |
 | **JPA (Hibernate)** | ORM |
@@ -225,10 +231,12 @@ gap = 상대_티어점수 - 내_티어점수
 | **React 19** | UI 프레임워크 (로비, HUD, 상태 관리) |
 | **TypeScript** | 타입 안전성 |
 | **Vite** | 빌드 도구 |
-| **STOMP.js + SockJS** | WebSocket 클라이언트 |
-| **PixiJS (WebGL)** | 고성능 게임 엔진 (HP 바, 드래곤, 이펙트 렌더링) |
-| **Web Worker** | 독립적인 게임 루프 & 정밀 타이밍 관리 |
-| **OffscreenCanvas** | 메인 스레드 부하와 무관한 60FPS+ 렌더링 보장 |
+| **React Router** | 화면 라우팅 |
+| **TanStack Query** | 서버 상태/REST API 캐싱 |
+| **Native EventSource** | 매칭 SSE 수신 |
+| **Native WebSocket** | 게임 준비, RTT, 카운트다운, SMITE 입력 |
+| **HTML video + React/CSS overlay** | MP4 배경 재생, HP bar/HUD 렌더링 |
+| **Vitest + React Testing Library** | 프론트엔드 테스트 |
 
 ### 5.3 Infra *(확장 시)*
 
@@ -288,10 +296,10 @@ smite-core → (독립, JPA/Hibernate만 의존)
 ┌─────────────────────────────────────────────────────────┐
 │                      Client (React)                     │
 │  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐ │
-│  │  로그인   │  │  로비     │  │  게임 (Canvas + WS)   │ │
+│  │  로그인   │  │  로비     │  │ 게임 (Video + Overlay)│ │
 │  └──────────┘  └──────────┘  └────────────────────────┘ │
 └──────────────────────┬──────────────────────────────────┘
-                       │ HTTP (REST) + WebSocket (STOMP)
+                       │ HTTP (REST) + SSE + WebSocket JSON
 ┌──────────────────────▼──────────────────────────────────┐
 │                   Spring Boot Server                     │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
@@ -323,24 +331,38 @@ smite-core → (독립, JPA/Hibernate만 의존)
 
 ---
 
-## 10. 프론트엔드 아키텍처 전략
+## 9. 프론트엔드 아키텍처 전략
 
-실시간 1v1 강타 싸움의 정밀함과 프리미엄한 비주얼을 위해 다음과 같은 전략을 채택합니다.
+MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
+렌더링 엔진을 별도로 도입하지 않고 브라우저 기본 기능과 React 상태만으로 게임 화면을 구성합니다.
 
-### 10.1 멀티 스레드 렌더링 (Worker-Based)
-- **Main Thread**: React가 담당하며, 전체적인 UI flow와 WebSocket 연결을 관리합니다.
-- **Worker Thread**: PixiJS와 OffscreenCanvas를 사용하여 인게임 렌더링을 수행합니다. 이를 통해 메인 스레드의 UI 렌더링이나 JS 실행 부하와 관계없이 일관된 프레임과 정밀한 입력 판정을 유지합니다.
+### 9.1 MVP 렌더링 방식
 
-### 10.2 시나리오 기반 예측 (Client-Side Prediction)
+- MP4 배경은 HTML `<video>`로 재생합니다.
+- HP bar, countdown, result HUD는 React 컴포넌트와 CSS overlay로 렌더링합니다.
+- HP overlay는 서버가 내려준 `startAt`과 scenario를 기준으로 `requestAnimationFrame`에서 계산합니다.
+- PixiJS, Web Worker, OffscreenCanvas는 MVP 이후 성능 문제가 확인될 때 검토합니다.
+
+### 9.2 시나리오 기반 예측 (Client-Side Prediction)
 - 게임 시작 시 서버로부터 HP 감소 시나리오를 전체 수신합니다.
 - 클라이언트는 `game_start_time`과 현재 시간을 대조하여 HP를 로컬에서 즉시 계산하여 렌더링합니다.
 - 이 방식은 네트워크 지연이 발생하더라도 HP 바가 끊기지 않고 부드럽게 움직이게 하며, 유저의 입력 시점만 서버로 전송하여 판정받는 구조로 공정성을 극대화합니다.
+
+### 9.3 통신 방식
+
+- 매칭 알림은 브라우저 기본 `EventSource`로 수신합니다.
+- 게임방 대기/RTT/카운트다운/SMITE/종료는 native `WebSocket`으로 JSON 메시지를 주고받습니다.
+- STOMP.js, SockJS fallback은 MVP에서 사용하지 않습니다.
+  RTT 측정과 SMITE 입력 경로를 단순하고 일관되게 유지하기 위해 WebSocket 단일 경로를 사용합니다.
+
 ---
 
-## 9. 변경 이력
+## 10. 변경 이력
 
 | 날짜 | 변경 내용 |
 |------|----------|
 | 2026-04-17 | 초안 작성 및 전체 기획 확정 |
 | 2026-04-24 | 프론트엔드 기술 스택 고도화 (PixiJS, Web Worker 도입) |
 | 2026-04-27 | 통합 시리즈 아키텍처(RankSeries) 도입 및 도메인 정규화 |
+| 2026-05-13 | 매칭 SSE는 `match_response_result`까지, 게임 준비/RTT/카운트다운/SMITE/종료는 WebSocket으로 처리하는 흐름 반영. gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 복귀 정책 추가 |
+| 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화. PixiJS/Web Worker/OffscreenCanvas/STOMP/SockJS는 MVP 이후 검토로 이동 |

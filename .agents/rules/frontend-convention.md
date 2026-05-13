@@ -52,7 +52,8 @@ frontend/
     ├── pages/          # 라우트 단위 컴포넌트
     ├── hooks/          # Custom Hooks
     ├── services/       # API 호출 로직
-    ├── stores/         # 상태 관리
+    ├── stores/         # 전역 상태가 꼭 필요할 때만 사용
+    ├── game/           # 게임 런타임 계산, WebSocket 메시지, HP scenario 유틸
     ├── utils/          # 순수 유틸 함수
     ├── types/          # 전역 타입 정의
     └── constants/      # 전역 상수
@@ -107,8 +108,9 @@ utils, types, constants → (독립, 의존 없음)
 | 종류 | 도구 |
 |------|------|
 | 로컬 상태 | `useState` |
-| 서버 상태 | React Query |
-| 전역 상태 | 정말 필요한 경우에만 (Zustand 등) |
+| 복잡한 화면 상태 | `useReducer` |
+| 서버 상태 | TanStack Query |
+| 전역 상태 | MVP에서는 지양. 꼭 필요할 때만 작게 도입 |
 
 ### 4.2 Side Effect 관리
 
@@ -163,17 +165,30 @@ interface GameHpBarProps {
 
 ---
 
-## 8. WebSocket & Canvas (게임 특화)
+## 8. SSE, WebSocket & Game Rendering
 
-- WebSocket 연결/해제는 **Custom Hook**으로 캡슐화. (`useGameWebSocket`)
-- STOMP 메시지 핸들러는 Hook 내부에서 관리, 컴포넌트는 상태만 구독.
-- Canvas 렌더링 로직은 `utils/` 또는 별도 `game/` 디렉토리에 분리.
-- Canvas와 React 상태 동기화 시 `requestAnimationFrame` 기반으로 처리.
+- 매칭 알림 SSE는 브라우저 기본 `EventSource`를 사용하고, 연결/해제는 `useMatchEventSource` 같은 Custom Hook으로 캡슐화한다.
+- 게임 통신은 native `WebSocket`과 JSON message를 사용한다. STOMP.js, SockJS fallback은 MVP에서 사용하지 않는다.
+- WebSocket 연결/해제는 `useGameWebSocket` 같은 Custom Hook으로 캡슐화한다.
+- WebSocket message handler는 Hook 또는 `game/` 모듈 내부에서 관리하고, 컴포넌트는 상태와 command 함수만 사용한다.
+- MP4 배경은 HTML `<video>`로 렌더링한다.
+- HP bar, countdown, result HUD는 React 컴포넌트와 CSS overlay로 렌더링한다.
+- HP scenario 계산은 `game/` 또는 `utils/`의 순수 함수로 분리한다.
+- `startAt` 기준 HP overlay 갱신은 `requestAnimationFrame` 기반으로 처리한다.
+- PixiJS, Web Worker, OffscreenCanvas는 MVP에서 사용하지 않는다. 실제 성능 문제가 확인되면 별도 이슈로 검토한다.
 
 ---
 
 ## 9. Testing
 
-- **React Testing Library** 사용 권장.
+- **Vitest + React Testing Library** 사용 권장.
 - 테스트는 **구현이 아닌 행동**을 검증.
 - 예시: "강타 버튼 클릭 시 서버에 SMITE 액션이 전송된다"
+
+---
+
+## 10. 변경 이력
+
+| 날짜 | 변경 내용 |
+| :--- | :--- |
+| 2026-05-13 | MVP 프론트엔드 스택을 native EventSource/WebSocket, HTML video, React/CSS overlay 중심으로 단순화. STOMP.js/SockJS/PixiJS/Web Worker/OffscreenCanvas는 MVP 이후 검토로 정리 |
