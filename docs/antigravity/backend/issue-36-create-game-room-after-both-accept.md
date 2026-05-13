@@ -155,23 +155,30 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 
 ### 7. 테스트
 
-- [ ] 양쪽 accept 시 gameRoom이 생성되는지 테스트
-- [ ] gameRoom participant가 2명 생성되는지 테스트
-- [ ] scenario가 저장되는지 테스트
-- [ ] 성공 이벤트에 `gameRoomId`, `videoUrl`, `webSocketUrl`이 포함되는지 테스트
-- [ ] 성공 후 두 유저 Redis status가 `IN_GAME`인지 테스트
+- [x] 양쪽 accept 시 gameRoom이 생성되는지 테스트
+- [x] gameRoom participant가 2명 생성되는지 테스트
+- [x] scenario가 저장되는지 테스트
+- [x] 성공 이벤트에 `gameRoomId`, `videoUrl`, `webSocketUrl`이 포함되는지 테스트
+- [x] 성공 후 두 유저 Redis status가 `IN_GAME`인지 테스트
 - [x] gameRoom 생성 실패 시 두 유저 Redis status가 제거되는지 테스트
 - [x] gameRoom 생성 실패 시 큐에 재삽입하지 않는지 테스트
 - [x] gameRoom 생성 실패 이벤트가 `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`인지 테스트
-- [ ] 기존 reject/timeout 정산 테스트가 깨지지 않는지 확인
+- [x] 기존 reject/timeout 정산 테스트가 깨지지 않는지 확인
+
+테스트 기준:
+
+- controller 문서는 RestAssured MockMvc 기반 RestDocs로 갱신한다.
+- JPA 영속성 계층은 `@DataJpaTest`로 `game_rooms`, `game_participants`, JSON scenario 저장을 확인한다.
+- Redis 영속 상태가 필요한 matching store 테스트만 Redis Testcontainer로 검증한다.
+- 서비스 계층은 mock 기반 단위 테스트로 성공/실패 분기와 Redis 상태 전이를 검증한다.
 
 ### 8. 문서
 
 - [ ] issue-34 `match_response_result` 문서에 `GAME_SETUP_FAILED` reason 추가
-- [ ] `GO_TO_GAME_WAITING`은 gameRoom 생성 성공 후에만 발행된다고 명시
-- [ ] gameRoom 생성 실패 시 큐 복귀하지 않고 start 화면으로 복귀한다고 명시
-- [ ] `match_response_result.game` 성공 payload 예시 추가
-- [ ] OpenAPI/RestDocs/SSE 문서 갱신
+- [x] `GO_TO_GAME_WAITING`은 gameRoom 생성 성공 후에만 발행된다고 명시
+- [x] gameRoom 생성 실패 시 큐 복귀하지 않고 start 화면으로 복귀한다고 명시
+- [x] `match_response_result.game` 성공 payload 예시 추가
+- [x] OpenAPI/RestDocs/SSE 문서 갱신
 
 ## ✅ 완료 기준
 
