@@ -1,4 +1,4 @@
-const totalConnections = Number(process.env.CONNECTIONS || 1000);
+const totalConnections = Number(process.env.CONNECTIONS || 5000);
 const holdMillis = parseDuration(process.env.HOLD_DURATION || '5m');
 const rampUpMillis = parseDuration(process.env.RAMP_UP || '60s');
 const setupConcurrency = Number(process.env.SETUP_CONCURRENCY || 100);

@@ -197,8 +197,13 @@ paths:
     post:
       tags:
       - Match
-      summary: 매칭 수락
-      description: 매칭 성사 후 제한 시간 안에 매칭을 수락합니다.
+      summary: 매칭 수락 실패
+      description: "매칭 수락 요청이 이미 완료/거절/timeout된 세션에 도착한 경우 기존 전역 `ErrorResponse`를\
+        \ 반환합니다.\n실패 응답은 최종 정산 이벤트가 아니며, `MATCH_012` lock 실패만 모달 유지 후 SSE 최종 결과 대기\
+        로 처리합니다.\n그 외 매칭 응답 실패는 start 버튼 화면 복귀 기준으로 처리합니다.\n\n주요 실패 코드:\n- `MATCH_006`:\
+        \ 세션 없음 또는 만료\n- `MATCH_007`: 세션 참여자 아님\n- `MATCH_008`: 이미 수락한 유저가 거절 시도\n\
+        - `MATCH_009`: 이미 완료된 세션\n- `MATCH_010`: 이미 거절된 세션\n- `MATCH_011`: 이미 timeout\
+        \ 정산된 세션\n- `MATCH_012`: 같은 matchId 응답 처리 중\n"
       operationId: match-accept
       parameters:
       - name: matchId
@@ -215,6 +220,17 @@ paths:
           type: string
         example: Bearer access-token
       responses:
+        "409":
+          description: "409"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api-v1-match-matchId-reject2042838415'
+              examples:
+                match-accept-failure:
+                  value: "{\n  \"timestamp\" : [ 2026, 5, 13, 9, 46, 20, 43129000\
+                    \ ],\n  \"status\" : 409,\n  \"code\" : \"MATCH_011\",\n  \"message\"\
+                    \ : \"이미 응답 시간이 초과된 매칭입니다.\",\n  \"errors\" : null\n}"
         "200":
           description: "200"
   /api/v1/match/{matchId}/reject:
@@ -222,7 +238,9 @@ paths:
       tags:
       - Match
       summary: 매칭 거절
-      description: 매칭 성사 후 제한 시간 안에 매칭을 거절합니다. 한쪽이 먼저 거절해도 상대방의 응답 윈도우는 유지됩니다.
+      description: "매칭 성사 후 제한 시간 안에 매칭을 거절합니다.\n\n성공 응답은 `200 OK` empty body이며, 사\
+        용자의 거절 요청이 서버에 반영되었다는 command ack만 의미합니다.\n한쪽이 먼저 거절해도 상대방의 응답 윈도우는 유지되고,\
+        \ 거절한 유저도 최종 `match_response_result` SSE 이벤트를 기다립니다.\n"
       operationId: match-reject
       parameters:
       - name: matchId
@@ -241,12 +259,38 @@ paths:
       responses:
         "200":
           description: "200"
+        "409":
+          description: "409"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api-v1-match-matchId-reject2042838415'
+              examples:
+                match-reject-failure:
+                  value: "{\n  \"timestamp\" : [ 2026, 5, 13, 9, 46, 19, 995796000\
+                    \ ],\n  \"status\" : 409,\n  \"code\" : \"MATCH_008\",\n  \"message\"\
+                    \ : \"이미 수락한 매칭입니다.\",\n  \"errors\" : null\n}"
   /api/v1/notifications/match/stream:
     get:
       tags:
       - Notification
       summary: 매칭 알림 SSE 연결
-      description: 매칭 대기 화면에서 매칭 성사 알림을 받기 위한 SSE 스트림을 연결합니다.
+      description: "매칭 대기 화면에서 매칭 성사와 매칭 응답 최종 결과를 받기 위한 SSE 스트림을 연결합니다.\n\n클라이언트는\
+        \ 매칭 시작 화면 진입 시 SSE를 연결하고, `match_found` 수신 후에도 같은 연결을 유지합니다.\naccept/reject\
+        \ HTTP 응답은 command ack만 의미하며, 최종 화면 전환은 `match_response_result` 이벤트를 기준으로\
+        \ 처리합니다.\n\n## event: match_found\n\n매칭이 성사되어 수락/거절 모달을 띄워야 할 때 전송합니다.\n\n\
+        ## event: match_response_result\n\nmatchId 단위 최종 결과 이벤트입니다. 상대의 개별 응답 로그가\
+        \ 아니라 최종 성공/실패 결과만 전달합니다.\n\nPayload:\n- `matchId`: 매칭 세션 ID\n- `outcome`:\
+        \ `MATCHED`, `FAILED`\n- `reason`: `BOTH_ACCEPTED`, `MY_REJECTED`, `OPPONENT_REJECTED`,\
+        \ `MY_TIMEOUT`, `OPPONENT_TIMEOUT`, `BOTH_TIMEOUT`\n- `action`: `GO_TO_GAME_WAITING`,\
+        \ `GO_TO_MATCH_START`, `RETURN_TO_MATCHING`\n- `opponent`: 상대 `userId`, `nickname`,\
+        \ `tier`, `tierScore`\n- `game`: 후속 게임 세션 생성 이슈 전까지 `null`\n\nAction mapping:\n\
+        - `GO_TO_GAME_WAITING`: 게임 진행 대기 화면으로 이동\n- `GO_TO_MATCH_START`: 매칭 start\
+        \ 버튼 화면으로 복귀\n- `RETURN_TO_MATCHING`: 기존 우선순위로 매칭 대기 상태 복귀\n\nResult mapping:\n\
+        - `MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING`\n- `FAILED / MY_REJECTED\
+        \ / GO_TO_MATCH_START`\n- `FAILED / OPPONENT_REJECTED / RETURN_TO_MATCHING`\n\
+        - `FAILED / MY_TIMEOUT / GO_TO_MATCH_START`\n- `FAILED / OPPONENT_TIMEOUT\
+        \ / RETURN_TO_MATCHING`\n- `FAILED / BOTH_TIMEOUT / GO_TO_MATCH_START`\n"
       operationId: notification-match-stream
       parameters:
       - name: Authorization
@@ -341,6 +385,33 @@ components:
         refreshToken:
           type: string
           description: 리프레시 토큰
+    api-v1-match-matchId-reject2042838415:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
     api-v1-auth-login-2103469501:
       required:
       - email

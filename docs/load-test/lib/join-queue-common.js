@@ -1,7 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-export const totalUsers = Number(__ENV.TOTAL_USERS || 1000);
+export const totalUsers = Number(__ENV.TOTAL_USERS || 5000);
 export const vus = Number(__ENV.VUS || 100);
 export const batchSize = Number(__ENV.SETUP_BATCH_SIZE || 250);
 export const duration = __ENV.DURATION || '5m';

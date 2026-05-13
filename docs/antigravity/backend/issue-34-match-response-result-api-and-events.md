@@ -543,7 +543,8 @@ Content-Length: 0
 - Grafana 연계
   - 매칭 응답 대시보드는 `match_response_*` metric을 참조하고, 해당 이름은 `MatchResponseMetricNames`의 Micrometer 이름이 Prometheus로 변환된 이름과 일치합니다.
   - SSE 대시보드의 공통 event별 패널은 `match_response_result`도 `event` 태그로 자동 집계할 수 있습니다.
-  - 다만 SSE 대시보드의 일부 match_found 전용 패널은 의도적으로 `event="match_found"`만 봅니다. `match_response_result` 전용 전송량/누락 패널이 필요하면 후속으로 별도 패널을 추가하면 됩니다.
+  - 매칭 응답 대시보드에 `Load Test Totals` 섹션을 추가해 `increase(...[$__rate_interval])` 기반 총량 추이를 그래프로 확인할 수 있게 했습니다.
+  - 매칭 응답 대시보드에 `JVM / 애플리케이션 리소스` 섹션을 추가해 CPU, Heap/Non-Heap, GC, Thread, SSE active connection을 함께 확인할 수 있게 했습니다.
 
 #### 검증 명령
 
@@ -601,3 +602,122 @@ HTTP 성공 응답은 `200 OK` empty body이므로 `WAIT_FOR_OPPONENT`, `WAIT_FO
 - 최종 매칭 응답 결과는 `match_response_result` 하나로 통합합니다.
 - 이미 종료된 세션에 대한 API 요청은 기존 `ErrorResponse`만 반환하고 상태 body를 별도로 만들지 않습니다.
 - timeout 정산 이벤트 발행 실패는 정산 성공을 깨지 않고 로그/메트릭으로 격리합니다.
+
+---
+
+## PR
+
+[FEAT] 매칭 응답 결과 API 응답 및 클라이언트 이벤트 설계
+
+## 📌 Summary
+
+매칭 응답 흐름을 `HTTP command ack`와 `SSE final result`로 분리했습니다.
+
+accept/reject HTTP 응답은 "내 버튼 입력이 서버에 반영되었는지"만 알려주고, 클라이언트의 최종 화면 전환은 `match_response_result` SSE 이벤트 하나로 통합합니다.
+
+```mermaid
+flowchart TD
+    A["match_found<br/>session=FOUND<br/>A=PENDING, B=PENDING"] --> B{"10초 안에<br/>응답 조합 결정"}
+
+    B --> C["A=ACCEPTED<br/>B=ACCEPTED"]
+    C --> C1["session=ACCEPTED"]
+    C1 --> C2["A/B userStatus=ACCEPTED"]
+    C2 --> C3["SSE: MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING"]
+
+    B --> D["ACCEPTED + REJECTED"]
+    D --> D1["deadline까지 session=FOUND 유지"]
+    D1 --> D2["session=DECLINED"]
+    D2 --> D3["ACCEPTED 유저: MATCHING 큐 복귀"]
+    D2 --> D4["REJECTED 유저: userStatus 삭제"]
+    D3 --> D5["SSE: RETURN_TO_MATCHING"]
+    D4 --> D6["SSE: GO_TO_MATCH_START"]
+
+    B --> E["ACCEPTED + PENDING"]
+    E --> E1["deadline 시 PENDING -> TIMEOUT"]
+    E1 --> E2["session=TIMEOUT"]
+    E2 --> E3["ACCEPTED 유저: MATCHING 큐 복귀"]
+    E2 --> E4["TIMEOUT 유저: userStatus 삭제"]
+    E3 --> E5["SSE: RETURN_TO_MATCHING"]
+    E4 --> E6["SSE: GO_TO_MATCH_START"]
+
+    B --> F["REJECTED/TIMEOUT only"]
+    F --> F1["session=DECLINED 또는 TIMEOUT"]
+    F1 --> F2["대상 유저 userStatus 삭제"]
+    F2 --> F3["SSE: GO_TO_MATCH_START"]
+```
+
+## 📚 Changes
+
+- accept/reject HTTP 성공 응답을 `200 OK` empty body로 고정했습니다.
+  - HTTP 응답에 `action`, `opponent`, `sessionStatus`를 넣지 않습니다.
+  - HTTP는 command ack만 담당하고, 최종 화면 전환 책임은 SSE로 넘겼습니다.
+  - 같은 matchId에서 SSE 최종 이벤트가 HTTP 응답보다 먼저 도착할 수 있으므로, 클라이언트는 `match_response_result`를 화면 전환 기준으로 우선 적용합니다.
+
+- `match_response_result` SSE 이벤트를 추가했습니다.
+  - 이벤트는 matchId 단위 최종 결과만 표현합니다.
+  - 상대의 개별 accept/reject 로그는 보내지 않습니다.
+  - payload는 `outcome`, `reason`, `action`, `opponent`, `game`으로 구성했습니다.
+  - 상대 정보에는 `userId`, `nickname`, `tier`, `tierScore`를 포함했습니다.
+  - `game`은 후속 게임 세션 생성 이슈 전까지 `null`로 유지합니다.
+
+- 최종 화면 전환 코드를 명확히 분리했습니다.
+  - `GO_TO_GAME_WAITING`: 양쪽 수락으로 게임 대기 화면 이동
+  - `GO_TO_MATCH_START`: 거절/timeout 유저가 start 버튼 화면으로 복귀
+  - `RETURN_TO_MATCHING`: 제한 시간 안에 수락했지만 상대 거절/timeout으로 기존 우선순위 큐에 복귀
+
+- 한 명이 먼저 reject해도 즉시 실패 이벤트를 보내지 않도록 설계했습니다.
+  - 상대의 10초 응답권을 보장해야 하기 때문입니다.
+  - reject한 유저도 최종 정산 전까지 `userStatus`를 유지해 중복 큐 진입을 막습니다.
+  - 최종 deadline 정산 이후에만 거절/timeout 유저의 `userStatus`를 삭제합니다.
+
+- 양쪽 accept만 즉시 최종 성공 처리합니다.
+  - `session=ACCEPTED`
+  - A/B `userStatus=ACCEPTED`
+  - timeout index cleanup
+  - `match_response_result` 발행
+  - 게임 세션 생성과 `gameId` 채우기는 후속 게임 이슈에서 처리합니다.
+
+- matching 모듈과 API notification 모듈의 책임을 분리했습니다.
+  - `smite-matching`: session/queue/userStatus 정산, matchId lock, timeout claim, 내부 결과 이벤트 발행
+  - `smite-api`: 내부 결과 이벤트를 유저별 SSE payload로 변환, 상대 프로필 조회, Redis Pub/Sub publish
+  - notification Pub/Sub: 멀티 인스턴스 fan-out 후 로컬 SSE connection이 있는 유저에게만 전송
+
+- RestDocs와 테스트를 갱신했습니다.
+  - accept/reject 성공 응답 `200 OK` empty body 문서화
+  - 주요 실패 응답 `ErrorResponse` 문서화
+  - `match_response_result` payload와 enum mapping 문서화
+  - `BOTH_ACCEPTED`, reject, timeout 조합별 `outcome/reason/action` 테스트 추가
+  - Pub/Sub publisher/subscriber/SSE sender 테스트 추가
+
+## 📝 Note
+
+- 이 이슈는 매칭 응답 결과 반환까지가 범위입니다.
+  - 게임 테이블 생성
+  - 게임 세션 생성
+  - `gameId` payload 채우기
+  - 게임 입장/준비 이벤트
+
+  위 항목은 후속 게임 이슈에서 처리합니다.
+
+- `match_response_result`는 Redis Pub/Sub 기반 best-effort SSE 이벤트입니다.
+  - 모든 API 인스턴스가 Pub/Sub 메시지를 수신합니다.
+  - 각 인스턴스는 자기 JVM 메모리에 대상 유저 SSE 연결이 있을 때만 전송합니다.
+  - 클라이언트는 `match_found` 수신 직후 SSE를 닫지 않고 최종 결과 이벤트까지 유지해야 합니다.
+
+- 메트릭은 기존 매칭 응답/timeout/SSE 지표 체계에 연결했습니다.
+  - `match_response_*`: accept/reject, timeout claim/reclaim/settlement/backlog 관측
+  - `sse_notification_*{event="match_response_result"}`: Pub/Sub publish/receive, local hit/miss, SSE send 결과 관측
+  - 매칭 응답 대시보드의 `Load Test Totals` 섹션에서 요청/timeout/SSE result 총량 추이를 그래프로 확인합니다.
+  - 매칭 응답 대시보드의 `JVM / 애플리케이션 리소스` 섹션에서 CPU, Heap/Non-Heap, GC, Thread, SSE active connection을 함께 확인합니다.
+
+- 검증 명령:
+
+```bash
+./gradlew :smite-api:test :smite-matching:test
+```
+
+결과: `BUILD SUCCESSFUL`
+
+## 📌 Related Issue
+
+- Closes #34
