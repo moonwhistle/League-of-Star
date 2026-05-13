@@ -298,9 +298,26 @@ flowchart TD
 
 - 매칭 성공 흐름과 gameRoom 생성 연결
   - 양쪽 accept 완료 시 game setup을 먼저 수행
-  - gameRoom 생성 성공 후에만 match session을 `ACCEPTED`로 저장
-  - 두 유저 Redis status를 `IN_GAME`으로 전환
+  - gameRoom 생성과 Redis 상태 전환이 모두 성공한 뒤에만 match session을 `ACCEPTED`, 두 유저 Redis status를 `IN_GAME`으로 확정
   - `match_response_result.game`에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
+
+```mermaid
+flowchart TD
+    A["양쪽 accept"] --> B["gameRoom 생성 시도"]
+    B --> C{"DB 저장 성공?"}
+
+    C -->|"실패"| D["GAME_SETUP_FAILED<br/>game=null"]
+
+    C -->|"성공"| E["gameRoomId 확보"]
+    E --> F["Redis match session ACCEPTED 저장"]
+    F --> G["Redis userA/userB IN_GAME 저장"]
+    G --> H{"Redis 상태 전환 성공?"}
+
+    H -->|"성공"| I["GO_TO_GAME_WAITING<br/>game payload 포함"]
+    H -->|"실패"| J["gameRoom/participants ABORTED 보상"]
+    J --> K["Redis status best-effort 정리"]
+    K --> L["GAME_SETUP_FAILED<br/>game=null"]
+```
 
 - 관심사 분리
   - `smite-core`: gameRoom 저장과 도메인 로직
@@ -314,6 +331,12 @@ flowchart TD
   - 매칭 큐 재삽입 없음
   - 실패 이벤트는 `GO_TO_MATCH_START`, `game=null`로 발행
   - 실패 metric 및 로그 추가
+
+- Redis 상태 전환 실패 보상 처리
+  - DB 저장 실패는 gameRoomId가 없으므로 abort 없이 `GAME_SETUP_FAILED`로 정리
+  - DB 저장 성공 후 Redis `ACCEPTED`/`IN_GAME` 전환이 실패하면 생성된 gameRoom과 participants를 `ABORTED`로 보상
+  - `GAME_SETUP_FAILED` 세션 저장이 실패해도 Redis status 제거, timeout cleanup, metric, 실패 이벤트 발행은 best-effort로 계속 시도
+  - 성공 SSE는 Redis 상태 전환까지 모두 완료된 뒤에만 발행
 
 - 테스트 및 문서 보강
   - core: gameRoom/participants/scenario 생성 단위 테스트 및 `@DataJpaTest`
