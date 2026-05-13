@@ -190,20 +190,20 @@ gameRoom 생성 성공
 - 이 경우 `GO_TO_GAME_WAITING` 성공 이벤트를 발행하면 안 되며, 큐 재삽입 없이 `GAME_SETUP_FAILED / GO_TO_MATCH_START / game=null`로 정리해야 한다.
 - Redis가 비즈니스 최종 진실은 아니지만, 성공 이벤트를 발행하기 전 마지막 상태 동기화 게이트다.
 
-- [ ] Redis 상태 전환 실패 보상용 gameRoom command 추가
-- [ ] `GameRoom`에 `ABORTED` 전이 메서드 추가
-- [ ] `ParticipantStatus.ABORTED` 추가
-- [ ] gameRoom 보상 처리 시 `game_rooms.status=ABORTED`로 변경
-- [ ] gameRoom 보상 처리 시 `game_participants.status=ABORTED`로 변경
-- [ ] gameRoom 생성 성공 후 Redis match session `ACCEPTED` 저장 실패 케이스 처리
-- [ ] gameRoom 생성 성공 후 Redis user status `IN_GAME` 전환 실패 케이스 처리
-- [ ] Redis 상태 전환 실패 시 두 유저 Redis status 제거를 best-effort로 시도
-- [ ] Redis 상태 전환 실패 시 match session을 `GAME_SETUP_FAILED`로 저장
-- [ ] Redis 상태 전환 실패 시 매칭 큐 재삽입 없음
-- [ ] Redis 상태 전환 실패 시 `GO_TO_GAME_WAITING` 발행 금지
-- [ ] Redis 상태 전환 실패 시 `GAME_SETUP_FAILED / GO_TO_MATCH_START / game=null` 이벤트 발행
-- [ ] Redis 상태 전환 실패 로그/메트릭 기록
-- [ ] 성공 이벤트는 match session `ACCEPTED` 저장과 두 유저 `IN_GAME` 전환이 모두 성공한 뒤에만 발행
+- [x] Redis 상태 전환 실패 보상용 gameRoom command 추가
+- [x] `GameRoom`에 `ABORTED` 전이 메서드 추가
+- [x] `ParticipantStatus.ABORTED` 추가
+- [x] gameRoom 보상 처리 시 `game_rooms.status=ABORTED`로 변경
+- [x] gameRoom 보상 처리 시 `game_participants.status=ABORTED`로 변경
+- [x] gameRoom 생성 성공 후 Redis match session `ACCEPTED` 저장 실패 케이스 처리
+- [x] gameRoom 생성 성공 후 Redis user status `IN_GAME` 전환 실패 케이스 처리
+- [x] Redis 상태 전환 실패 시 두 유저 Redis status 제거를 best-effort로 시도
+- [x] Redis 상태 전환 실패 시 match session을 `GAME_SETUP_FAILED`로 저장
+- [x] Redis 상태 전환 실패 시 매칭 큐 재삽입 없음
+- [x] Redis 상태 전환 실패 시 `GO_TO_GAME_WAITING` 발행 금지
+- [x] Redis 상태 전환 실패 시 `GAME_SETUP_FAILED / GO_TO_MATCH_START / game=null` 이벤트 발행
+- [x] Redis 상태 전환 실패 로그/메트릭 기록
+- [x] 성공 이벤트는 match session `ACCEPTED` 저장과 두 유저 `IN_GAME` 전환이 모두 성공한 뒤에만 발행
 
 결정 사항:
 
@@ -223,9 +223,9 @@ gameRoom 생성 성공
 - [x] gameRoom 생성 실패 시 두 유저 Redis status가 제거되는지 테스트
 - [x] gameRoom 생성 실패 시 큐에 재삽입하지 않는지 테스트
 - [x] gameRoom 생성 실패 이벤트가 `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`인지 테스트
-- [ ] Redis `IN_GAME` 전환 실패 시 `GAME_SETUP_FAILED` 이벤트를 발행하는지 테스트
-- [ ] Redis `IN_GAME` 전환 실패 시 큐에 재삽입하지 않는지 테스트
-- [ ] Redis `IN_GAME` 전환 실패 시 성공 이벤트를 발행하지 않는지 테스트
+- [x] Redis `IN_GAME` 전환 실패 시 `GAME_SETUP_FAILED` 이벤트를 발행하는지 테스트
+- [x] Redis `IN_GAME` 전환 실패 시 큐에 재삽입하지 않는지 테스트
+- [x] Redis `IN_GAME` 전환 실패 시 성공 이벤트를 발행하지 않는지 테스트
 - [x] 기존 reject/timeout 정산 테스트가 깨지지 않는지 확인
 
 테스트 기준:
@@ -261,6 +261,7 @@ gameRoom 생성 성공
 | :--- | :--- |
 | 2026-05-13 | Issue 36 작업 문서 생성. 양쪽 accept 후 gameRoom 생성, 성공 payload, 실패 시 `GAME_SETUP_FAILED / GO_TO_MATCH_START` 정책 정리 |
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 흐름과 Task 7 세부 작업 정리 |
+| 2026-05-13 | Task 7 구현 완료. Redis `ACCEPTED`/`IN_GAME` 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 및 `GAME_SETUP_FAILED` 이벤트 처리 반영 |
 
 ----
 ## PR

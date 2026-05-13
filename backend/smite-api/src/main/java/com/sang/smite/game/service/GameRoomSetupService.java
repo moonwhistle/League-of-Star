@@ -27,4 +27,8 @@ public class GameRoomSetupService {
                 GAME_WEB_SOCKET_URL_FORMAT.formatted(gameRoom.getId())
         );
     }
+
+    public void abortReadyGameRoom(Long gameRoomId) {
+        gameRoomCommandService.abortReadyRoom(gameRoomId);
+    }
 }

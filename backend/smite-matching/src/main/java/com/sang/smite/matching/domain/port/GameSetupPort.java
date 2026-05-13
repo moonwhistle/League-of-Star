@@ -8,4 +8,6 @@ import com.sang.smite.matching.domain.result.GameSetupResult;
 public interface GameSetupPort {
 
     GameSetupResult setup(Long firstUserId, Long secondUserId);
+
+    void abort(Long gameRoomId);
 }

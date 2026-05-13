@@ -192,12 +192,29 @@ public class MatchResponseResultService {
         }
 
         MatchSession completedSession = session.withStatus(MatchStatus.ACCEPTED);
-        sessionStore.save(completedSession, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
-        userStatusStore.updateStatus(session.userA(), MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
-        userStatusStore.updateStatus(session.userB(), MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        try {
+            sessionStore.save(completedSession, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
+            userStatusStore.updateStatus(session.userA(), MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+            userStatusStore.updateStatus(session.userB(), MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        } catch (RuntimeException e) {
+            abortGameSetup(session, gameSetupResult, e);
+            completeGameSetupFailedSession(session, e);
+            return;
+        }
         cleanupTimeoutIndex(session.matchId());
         matchResponseMetrics.incrementAcceptedCompletion();
         publishResultEvent(completedSession, gameSetupResult);
+    }
+
+    private void abortGameSetup(MatchSession session, GameSetupResult gameSetupResult, RuntimeException cause) {
+        log.warn("Failed to update Redis state after game room setup: matchId={}, gameRoomId={}",
+                session.matchId(), gameSetupResult.gameRoomId(), cause);
+        try {
+            gameSetupPort.abort(gameSetupResult.gameRoomId());
+        } catch (RuntimeException e) {
+            log.warn("Failed to abort game room after Redis state update failure: matchId={}, gameRoomId={}",
+                    session.matchId(), gameSetupResult.gameRoomId(), e);
+        }
     }
 
     /**
@@ -207,12 +224,28 @@ public class MatchResponseResultService {
         log.warn("Failed to setup game room after both accepted: matchId={}", session.matchId(), cause);
 
         MatchSession failedSession = session.withStatus(MatchStatus.GAME_SETUP_FAILED);
-        sessionStore.save(failedSession, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
-        userStatusStore.removeStatus(session.userA());
-        userStatusStore.removeStatus(session.userB());
+        saveGameSetupFailedSession(failedSession);
+        removeUserStatus(session.matchId(), session.userA());
+        removeUserStatus(session.matchId(), session.userB());
         cleanupTimeoutIndex(session.matchId());
         matchResponseMetrics.incrementGameSetupFailedCompletion();
         publishResultEvent(failedSession);
+    }
+
+    private void saveGameSetupFailedSession(MatchSession failedSession) {
+        try {
+            sessionStore.save(failedSession, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
+        } catch (RuntimeException e) {
+            log.warn("Failed to save game setup failed match session: matchId={}", failedSession.matchId(), e);
+        }
+    }
+
+    private void removeUserStatus(String matchId, Long userId) {
+        try {
+            userStatusStore.removeStatus(userId);
+        } catch (RuntimeException e) {
+            log.warn("Failed to remove user match status: matchId={}, userId={}", matchId, userId, e);
+        }
     }
 
     /**

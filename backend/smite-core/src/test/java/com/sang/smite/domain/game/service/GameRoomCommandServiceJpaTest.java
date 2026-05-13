@@ -57,4 +57,26 @@ class GameRoomCommandServiceJpaTest {
         assertThat(foundGameRoom.getScenarioData().steps().get(0).hp()).isEqualTo(GameRoom.DEFAULT_DRAGON_MAX_HP);
         assertThat(foundGameRoom.getScenarioData().steps().get(foundGameRoom.getDurationSeconds()).hp()).isZero();
     }
+
+    @Test
+    @DisplayName("abortReadyRoom - 게임룸과 참가자 ABORTED 상태를 DB에 저장한다")
+    void abortReadyRoom_SaveAbortedStatus() {
+        // given
+        GameRoom savedGameRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        gameRoomCommandService.abortReadyRoom(savedGameRoom.getId());
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
+        assertThat(foundGameRoom.getFinishedAt()).isNotNull();
+    }
 }

@@ -40,6 +40,12 @@ public class GameRoomCommandService {
         return gameRoomRepository.save(gameRoom);
     }
 
+    public void abortReadyRoom(Long gameRoomId) {
+        GameRoom gameRoom = gameRoomRepository.findById(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+        gameRoom.abortBeforeStart();
+    }
+
     private void validateParticipants(Long firstUserId, Long secondUserId) {
         if (firstUserId == null || secondUserId == null || firstUserId.equals(secondUserId)) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);

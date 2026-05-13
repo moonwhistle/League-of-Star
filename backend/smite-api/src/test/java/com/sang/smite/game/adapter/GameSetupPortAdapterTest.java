@@ -38,4 +38,14 @@ class GameSetupPortAdapterTest {
         assertThat(result.webSocketUrl()).isEqualTo(GAME_WEB_SOCKET_URL);
         verify(gameRoomSetupService).createReadyGameRoom(FIRST_USER_ID, SECOND_USER_ID);
     }
+
+    @Test
+    @DisplayName("abort - matching port의 보상 요청을 API gameRoom 중단으로 위임한다")
+    void abort() {
+        // when
+        adapter.abort(GAME_ROOM_ID);
+
+        // then
+        verify(gameRoomSetupService).abortReadyGameRoom(GAME_ROOM_ID);
+    }
 }

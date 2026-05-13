@@ -25,4 +25,9 @@ public class GameSetupPortAdapter implements GameSetupPort {
                 result.webSocketUrl()
         );
     }
+
+    @Override
+    public void abort(Long gameRoomId) {
+        gameRoomSetupService.abortReadyGameRoom(gameRoomId);
+    }
 }

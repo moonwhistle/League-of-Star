@@ -15,6 +15,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -98,5 +100,38 @@ class GameRoomCommandServiceTest {
         assertThatThrownBy(() -> gameRoomCommandService.createReadyRoom(null, SECOND_USER_ID))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
+    @DisplayName("abortReadyRoom - READY 게임룸과 참가자를 ABORTED로 전환한다")
+    void abortReadyRoom_Success() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        given(gameRoomRepository.findById(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        gameRoomCommandService.abortReadyRoom(100L);
+
+        // then
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
+        assertThat(gameRoom.getFinishedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("abortReadyRoom - 없는 게임룸이면 예외를 던진다")
+    void abortReadyRoom_NotFound_ThrowException() {
+        // given
+        given(gameRoomRepository.findById(100L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomCommandService.abortReadyRoom(100L))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }
 }

@@ -47,4 +47,14 @@ class GameRoomSetupServiceTest {
         assertThat(result.webSocketUrl()).isEqualTo(GAME_WEB_SOCKET_URL);
         verify(gameRoomCommandService).createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
     }
+
+    @Test
+    @DisplayName("abortReadyGameRoom - 생성된 READY 게임룸 중단을 core command에 위임한다")
+    void abortReadyGameRoom() {
+        // when
+        gameRoomSetupService.abortReadyGameRoom(GAME_ROOM_ID);
+
+        // then
+        verify(gameRoomCommandService).abortReadyRoom(GAME_ROOM_ID);
+    }
 }
