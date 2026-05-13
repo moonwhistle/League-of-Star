@@ -136,13 +136,22 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 
 ### 6. gameRoom 생성 실패 처리
 
-- [ ] gameRoom 생성 실패를 잡아 매칭 성공 이벤트와 분리
-- [ ] 두 유저 Redis status 제거
-- [ ] 매칭 큐 재삽입 없음
-- [ ] `GAME_SETUP_FAILED` reason으로 실패 이벤트 발행
-- [ ] action은 `GO_TO_MATCH_START`
-- [ ] `game=null`
-- [ ] 로그/메트릭 기록
+- [x] gameRoom 생성 실패를 잡아 매칭 성공 이벤트와 분리
+- [x] 두 유저 Redis status 제거
+- [x] 매칭 큐 재삽입 없음
+- [x] `GAME_SETUP_FAILED` reason으로 실패 이벤트 발행
+- [x] action은 `GO_TO_MATCH_START`
+- [x] `game=null`
+- [x] 로그/메트릭 기록
+
+결정 사항:
+
+- `GameSetupPort.setup()` 실패는 `MatchResponseResultService`에서 잡아 처리한다.
+- 실패 시 match session은 `GAME_SETUP_FAILED`로 저장한다.
+- 두 유저의 Redis user status는 제거한다.
+- gameRoom 생성 실패는 timeout/reject 실패와 다르게 수락 유저를 큐에 복귀시키지 않는다.
+- 실패 이벤트는 기존 `match_response_result` 경로로 발행하고, notification factory에서 `GAME_SETUP_FAILED / GO_TO_MATCH_START / game=null`로 변환한다.
+- accept HTTP 요청은 gameRoom 생성 실패 예외를 그대로 전파하지 않고, SSE 실패 이벤트로 최종 화면 전환을 안내한다.
 
 ### 7. 테스트
 
@@ -151,9 +160,9 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 - [ ] scenario가 저장되는지 테스트
 - [ ] 성공 이벤트에 `gameRoomId`, `videoUrl`, `webSocketUrl`이 포함되는지 테스트
 - [ ] 성공 후 두 유저 Redis status가 `IN_GAME`인지 테스트
-- [ ] gameRoom 생성 실패 시 두 유저 Redis status가 제거되는지 테스트
-- [ ] gameRoom 생성 실패 시 큐에 재삽입하지 않는지 테스트
-- [ ] gameRoom 생성 실패 이벤트가 `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`인지 테스트
+- [x] gameRoom 생성 실패 시 두 유저 Redis status가 제거되는지 테스트
+- [x] gameRoom 생성 실패 시 큐에 재삽입하지 않는지 테스트
+- [x] gameRoom 생성 실패 이벤트가 `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`인지 테스트
 - [ ] 기존 reject/timeout 정산 테스트가 깨지지 않는지 확인
 
 ### 8. 문서

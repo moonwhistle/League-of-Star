@@ -111,6 +111,40 @@ class MatchResponseResultServiceTest {
     }
 
     @Test
+    @DisplayName("양쪽 수락 후 게임룸 생성이 실패하면 큐 복귀 없이 GAME_SETUP_FAILED 이벤트를 발행한다")
+    void gameSetupFailureAfterBothAccepted() {
+        MatchSession session = foundSession().accept(1L);
+        when(sessionStore.findById("match-1")).thenReturn(Optional.of(session));
+        when(gameSetupPort.setup(1L, 2L)).thenThrow(new IllegalStateException("game setup failed"));
+
+        processor.acceptWithLock("match-1", 2L);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        MatchSession savedSession = sessionCaptor.getValue();
+        assertThat(savedSession.status()).isEqualTo(MatchStatus.GAME_SETUP_FAILED);
+        assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+
+        verify(userStatusStore).removeStatus(1L);
+        verify(userStatusStore).removeStatus(2L);
+        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.IN_GAME, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(matchStore, never()).add(any());
+        verify(timeoutStore).cleanup("match-1");
+        verify(matchResponseMetrics).incrementGameSetupFailedCompletion();
+        verify(matchResponseMetrics, never()).incrementAcceptedCompletion();
+
+        ArgumentCaptor<MatchResponseResultEvent> eventCaptor = ArgumentCaptor.forClass(MatchResponseResultEvent.class);
+        verify(settlementEventPublisher).publish(eventCaptor.capture());
+        MatchResponseResultEvent event = eventCaptor.getValue();
+        assertThat(event.sessionStatus()).isEqualTo(MatchStatus.GAME_SETUP_FAILED);
+        assertThat(event.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
+        assertThat(event.game()).isNull();
+    }
+
+    @Test
     @DisplayName("같은 유저의 중복 수락은 멱등하게 처리한다")
     void duplicatedAccept() {
         MatchSession session = foundSession().accept(1L);
