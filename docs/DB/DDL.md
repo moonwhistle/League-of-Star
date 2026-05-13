@@ -133,7 +133,8 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> InProgress : 매칭 수락 완료
+    [*] --> Ready : 매칭 수락 완료 / 게임방 생성
+    Ready --> InProgress : 게임 시작
     InProgress --> Finished : 정상 종료
     InProgress --> Aborted : 디스커넥트
     Finished --> [*]
@@ -142,7 +143,7 @@ stateDiagram-v2
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| 매칭 수락 | INSERT | status=IN_PROGRESS, scenario_data 생성, participants(READY) 추가 |
+| 매칭 수락 | INSERT | status=READY, scenario_data 생성, participants(READY) 추가 |
 | 게임 시작 | UPDATE | status=IN_PROGRESS, participants(PLAYING), game_start_time 기록 |
 | 게임 종료 | UPDATE | status=FINISHED, result/winner_id, participants(FINISHED), finished_at |
 | 디스커넥트 | UPDATE | status=ABORTED, 이탈자 패배/상대 승리 |
@@ -166,7 +167,7 @@ stateDiagram-v2
 - **불변(Immutable)**: 전적 기록은 수정하지 않음
 - **항상 2행 생성**: 각 참여자(Participant)의 관점에서 기록
 - **LP/Rank 스냅샷**: lp_before/after와 함께 rank_before/after를 **JSON 스냅샷**으로 저장하여 변동 이력 추적
-- **승급전 연동**: 승급전 경기인 경우 `promotion_series_id`를 기록하여 결과 정합성 보장
+- **승급전 연동**: 배치/승급전 경기인 경우 `rank_series_id`를 기록하여 결과 정합성 보장
 
 ---
 
@@ -274,8 +275,10 @@ CREATE TABLE user_rank_info (
 ```
 
 > **인덱스 설명**
-> - `idx_tier_score_lp`: 매칭 시 ± 3 디비전 범위 검색용
+> - `idx_tier_score_lp`: 티어 점수 기반 매칭/랭크 조회용
 > - `idx_tier_division_lp`: 리더보드 정렬용
+>
+> 현재 애플리케이션의 매칭 진입 경로는 `UserRankInfo.getTierScore()`가 embedded `Rank`에서 계산한 값을 사용합니다. 일반 티어는 Iron IV(1) ~ Diamond I(28) 점수로 매칭되며, Apex LP 근접 매칭과 배치 유저의 Silver IV ~ Gold IV 구간 보정은 아직 별도 구현되지 않았습니다.
 
 ---
 
@@ -325,7 +328,7 @@ CREATE TABLE rank_series (
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
 | `id` | BIGINT | PK, AUTO_INCREMENT | 게임 고유 ID |
-| `status` | VARCHAR(20) | NOT NULL | IN_PROGRESS / FINISHED / ABORTED |
+| `status` | VARCHAR(20) | NOT NULL | READY / IN_PROGRESS / FINISHED / ABORTED |
 | `result` | VARCHAR(20) | NULLABLE | PLAYER1_WIN / PLAYER2_WIN / DRAW |
 | `winner_id` | BIGINT | FK → users, NULLABLE | 승자 (무승부 시 NULL) |
 | `dragon_max_hp` | INT | NOT NULL, DEFAULT 10000 | 드래곤 초기 HP |
@@ -339,7 +342,7 @@ CREATE TABLE rank_series (
 ```sql
 CREATE TABLE game_rooms (
     id                 BIGINT      NOT NULL AUTO_INCREMENT,
-    status             VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS',
+    status             VARCHAR(20) NOT NULL DEFAULT 'READY',
     result             VARCHAR(20) NULL,
     winner_id          BIGINT      NULL,
     dragon_max_hp      INT         NOT NULL DEFAULT 10000,
@@ -463,6 +466,7 @@ CREATE TABLE game_records (
     PRIMARY KEY (id),
     UNIQUE KEY uk_game_room_user (game_room_id, user_id),
     INDEX idx_user_id_created (user_id, created_at DESC),
+    INDEX idx_user_id_result (user_id, result),
     CONSTRAINT fk_game_records_room      FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
     CONSTRAINT fk_game_records_user      FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT,
     CONSTRAINT fk_game_records_series    FOREIGN KEY (rank_series_id) REFERENCES rank_series (id) ON DELETE SET NULL
@@ -477,17 +481,27 @@ CREATE TABLE game_records (
 
 ## 4. Redis 저장 구조 (참고)
 
-MySQL이 아닌 **Redis에서 관리**하는 데이터:
+MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
+
+현재 구현된 Redis 구조:
 
 | 키 패턴 | 타입 | 용도 | TTL |
 |--------|------|------|-----|
-| `match:queue:{tierScore}` | Sorted Set | 매칭 큐 (score = 대기 시작 시각) | - |
-| `match:accept:{matchId}` | Hash | 매칭 수락 상태 | 15초 |
-| `game:session:{gameRoomId}` | Hash | 진행 중 게임 세션 | 60초 |
-| `user:session:{userId}` | String | JWT 세션 / 로그인 상태 | 24시간 |
-| `rtt:{userId}:{gameRoomId}` | List | RTT 측정값 (5개) | 60초 |
+| `matching:queue:{tierScore}` | Sorted Set | 티어별 매칭 큐. score = `entryTime`, member = `userId` | - |
+| `match:status:{userId}` | String | 유저 매칭 상태 (`MATCHING`, `FOUND`, `ACCEPTED`, `DECLINED`, `TIMEOUT`, `IN_GAME`) | 30분 |
+| `match:session:{matchId}` | Hash | 매칭 성사 후 수락/거절 세션. 세션 TTL은 cleanup 실패 대비 안전장치 | 60분 |
+| `match:response:timeout:pending` | Sorted Set | 아직 scheduler가 claim하지 않은 응답 timeout 후보. score = `deadlineMillis` | - |
+| `match:response:timeout:processing` | Sorted Set | scheduler가 claim해 처리 중인 timeout job. score = processing lease 만료 시각 | - |
+| `refreshToken:{userId}` | RedisHash | Refresh Token 저장. `token` 필드는 secondary index로 조회 | refresh token 만료 시간 |
 
-> 매칭 이력은 별도 저장하지 않음 — 매칭 성사 시 game_rooms에 기록되므로 별도 테이블 불필요
+> 매칭 응답 완료 전 상태는 Redis가 관리합니다. 양쪽 수락 후 게임 세션 생성과 `game_rooms` 기록은 후속 게임 흐름에서 처리합니다.
+
+후속 게임 흐름에서 사용할 예정인 Redis 구조:
+
+| 키 패턴 | 타입 | 용도 | TTL |
+|--------|------|------|-----|
+| `game:session:{gameRoomId}` | Hash | 진행 중 게임 세션 | 60초 |
+| `rtt:{userId}:{gameRoomId}` | List | RTT 측정값 (5개) | 60초 |
 
 ---
 
@@ -498,10 +512,11 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터:
 | 1 | `users` | 유저당 1행 | Mutable (Soft Delete) | 계정 정보 — 탈퇴 시 익명화 보존 |
 | 2 | `social_accounts` | 유저당 0~2행 | 생성/삭제 | 소셜 연동 |
 | 3 | `user_rank_info` | 유저당 1행 | Mutable | 현재 랭크 (매 게임마다 갱신) |
-| 4 | `promotion_series` | 승급전마다 1행 | 진행 중 Mutable → 완료 후 Immutable | 승급전 이력 |
+| 4 | `rank_series` | 배치/승급전마다 1행 | 진행 중 Mutable → 완료 후 Immutable | 배치/승급전 통합 시리즈 |
 | 5 | `game_rooms` | 게임당 1행 | 진행 중 Mutable → 종료 후 Immutable | 게임 메타데이터 + 시나리오 |
-| 6 | `game_actions` | 게임당 0~2행 | **Immutable** | 강타 판정 상세 기록 |
-| 7 | `game_records` | 게임당 2행 | **Immutable** | 전적 기록 (LP 변동 포함) |
+| 6 | `game_participants` | 게임당 2행 | 진행 중 Mutable → 종료 후 Immutable | 게임 참여자 상태 |
+| 7 | `game_actions` | 게임당 0~2행 | **Immutable** | 강타 판정 상세 기록 |
+| 8 | `game_records` | 게임당 2행 | **Immutable** | 전적 기록 (LP 변동 포함) |
 
 ---
 
@@ -513,3 +528,4 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터:
 | 2026-04-17 | Mermaid ER 파싱 오류 수정, 객체 생명주기 섹션 추가 |
 | 2026-04-17 | 모든 테이블에 created_at/updated_at 통일, promotion_series.wins 제거, ER 다이어그램 PK/FK만 표시로 축소 |
 | 2026-04-18 | Soft Delete 전환: users에 status/withdrawn_at 추가, 탈퇴 익명화 생명주기 반영, FK ON DELETE RESTRICT 명시, demotion_shield 승리 시 해제 추가 |
+| 2026-05-13 | 현재 구현 기준으로 rank_series 명칭, Redis 매칭 키, match_response timeout index, game_rooms READY 상태, 테이블 요약 정합성 수정 |
