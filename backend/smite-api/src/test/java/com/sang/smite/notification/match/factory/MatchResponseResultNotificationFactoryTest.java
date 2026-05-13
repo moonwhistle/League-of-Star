@@ -153,6 +153,36 @@ class MatchResponseResultNotificationFactoryTest {
         assertThat(userBMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_MATCH_START);
     }
 
+    @Test
+    @DisplayName("게임 준비 실패 결과는 양쪽 모두 start 화면 복귀 메시지로 생성한다")
+    void createGameSetupFailedResult() {
+        MatchResponseResultEvent event = new MatchResponseResultEvent(
+                "match-1",
+                1L,
+                2L,
+                10,
+                13,
+                MatchStatus.GAME_SETUP_FAILED,
+                MatchResponseStatus.ACCEPTED,
+                MatchResponseStatus.ACCEPTED
+        );
+        givenUser(1L, "userA", Tier.SILVER, Division.I);
+        givenUser(2L, "userB", Tier.GOLD, Division.IV);
+
+        MatchResponseResultPubSubMessage userAMessage = factory.createForUserA(event);
+        MatchResponseResultPubSubMessage userBMessage = factory.createForUserB(event);
+
+        assertThat(userAMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.FAILED);
+        assertThat(userAMessage.notification().reason()).isEqualTo(MatchResponseReason.GAME_SETUP_FAILED);
+        assertThat(userAMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_MATCH_START);
+        assertThat(userAMessage.notification().game()).isNull();
+
+        assertThat(userBMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.FAILED);
+        assertThat(userBMessage.notification().reason()).isEqualTo(MatchResponseReason.GAME_SETUP_FAILED);
+        assertThat(userBMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_MATCH_START);
+        assertThat(userBMessage.notification().game()).isNull();
+    }
+
     private void givenUser(Long userId, String nickname, Tier tier, Division division) {
         User user = User.builder()
                 .id(userId)

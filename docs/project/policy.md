@@ -32,7 +32,7 @@
 | **수락 제한 시간** | 10초 |
 | **양쪽 수락** | 게임방/시나리오 생성 성공 후 게임 대기 화면 진입 |
 | **한 쪽 거절 / 타임아웃** | 10초 응답 윈도우 안에 수락한 유저는 큐 **최우선 복귀**, 거절/타임아웃/미응답 유저는 **큐 이탈 (패널티 없음)** |
-| **게임방 생성 실패** | 양쪽 모두 기존 큐 진입 시각으로 매칭 큐 복귀 (패널티 없음) |
+| **게임방 생성 실패** | 양쪽 모두 start 버튼 화면으로 복귀 (자동 큐 복귀 없음, 패널티 없음) |
 
 - 매칭 거절에 대한 별도 패널티 없음 (자유롭게 거절 가능)
 - 한 유저가 먼저 거절해도 상대방의 수락/거절 모달은 10초 제한 시간이 끝날 때까지 유지한다.
@@ -45,7 +45,9 @@
   - 게임 대기 화면 이동, start 버튼 복귀, 매칭 대기 복귀 등 다음 화면 전이가 확정되면 클라이언트가 연결을 닫거나 유지 여부를 결정한다.
 - 양쪽 수락이 완료되어도 게임방/시나리오 생성이 성공하기 전에는 게임 대기 화면으로 이동시키지 않는다.
   - 게임방/시나리오 생성 성공 시 `match_response_result`는 `GO_TO_GAME_WAITING`과 함께 `gameRoomId`, `videoUrl`, `webSocketUrl`을 전달한다.
-  - 게임방/시나리오 생성 실패 시 `match_response_result`는 `FAILED / GAME_SETUP_FAILED / RETURN_TO_MATCHING`을 전달하고, 양쪽 모두 기존 큐 진입 시각으로 매칭 큐에 복귀한다.
+  - 게임방/시나리오 생성 실패 시 `match_response_result`는 `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`를 전달한다.
+  - 클라이언트는 `GAME_SETUP_FAILED` reason에 대응하는 안내 문구를 표시한 뒤 start 버튼 화면으로 복귀한다.
+  - 이 경우 두 유저는 매칭 큐에 자동 복귀하지 않는다.
 - accept/reject HTTP 응답은 사용자의 버튼 입력이 서버에 반영되었는지 알려주는 명령 응답이고, 매칭 성공/실패로 확정되는 최종 결과는 SSE 이벤트로 전달한다.
   - SSE는 상대방의 개별 응답 로그를 전달하지 않는다.
   - 클라이언트는 최종 결과의 `reason`과 `action`만 보고 화면을 전환한다.
@@ -65,7 +67,7 @@
 | `REJECTED + REJECTED` | deadline 시 `DECLINED`, 두 유저 모두 큐 이탈 |
 | `REJECTED + PENDING` | `PENDING` 유저는 `TIMEOUT`, 두 유저 모두 큐 이탈 |
 | `PENDING + PENDING` | 두 유저 모두 `TIMEOUT`, 두 유저 모두 큐 이탈 |
-| `ACCEPTED + ACCEPTED` 이후 gameRoom 생성 실패 | `GAME_SETUP_FAILED`, 두 유저 모두 기존 큐 진입 시각으로 복귀 |
+| `ACCEPTED + ACCEPTED` 이후 gameRoom 생성 실패 | `GAME_SETUP_FAILED`, 두 유저 모두 start 버튼 화면 복귀. 큐 자동 복귀 없음 |
 
 ---
 
@@ -402,4 +404,5 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-04-17 | 초안 작성 (매칭, 게임 진행, LP, 티어 & 승급, 배치, 계정 정책) |
 | 2026-04-17 | 매칭 거절 패널티 제거, 게임 시작 세팅 제거(D/F 둘 다 강타 발동으로 단순화), 게임 시간 7~15초 랜덤, 마우스 호버 조건 추가, 디스커넥트→패배 확정, 서버 권위 타임스탬프 방식 전환, 승급전 3판 2승 필수(무승부 불인정) |
 | 2026-04-27 | 통합 시리즈 아키텍처(RankSeries) 도입 및 배치/승급 정책 일원화 |
-| 2026-05-13 | 양쪽 수락 후 gameRoom/scenario 생성 성공 시에만 `GO_TO_GAME_WAITING` 발행, gameRoom 생성 실패 시 `GAME_SETUP_FAILED`로 양쪽 큐 복귀, 매칭 SSE와 게임 WebSocket 책임 경계 반영 |
+| 2026-05-13 | 양쪽 수락 후 gameRoom/scenario 생성 성공 시에만 `GO_TO_GAME_WAITING` 발행, gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 이벤트 발행, 매칭 SSE와 게임 WebSocket 책임 경계 반영 |
+| 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GO_TO_MATCH_START`와 `GAME_SETUP_FAILED` reason으로 start 화면 복귀하도록 정책 변경 |

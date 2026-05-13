@@ -54,10 +54,10 @@ public class MatchResponseResultNotificationFactory {
         MatchResponseResultNotification notification = new MatchResponseResultNotification(
                 event.matchId(),
                 outcomeOf(event.sessionStatus()),
-                reasonOf(myStatus, opponentStatus),
+                reasonOf(myStatus, opponentStatus, event.sessionStatus()),
                 actionOf(myStatus, opponentStatus, event.sessionStatus()),
                 opponentProfileProvider.getOpponent(opponentUserId, opponentTierScore),
-                gameOf(event.sessionStatus())
+                gameOf()
         );
         return new MatchResponseResultPubSubMessage(targetUserId, notification);
     }
@@ -69,7 +69,14 @@ public class MatchResponseResultNotificationFactory {
         return MatchResponseOutcome.FAILED;
     }
 
-    private MatchResponseReason reasonOf(MatchResponseStatus myStatus, MatchResponseStatus opponentStatus) {
+    private MatchResponseReason reasonOf(
+            MatchResponseStatus myStatus,
+            MatchResponseStatus opponentStatus,
+            MatchStatus sessionStatus
+    ) {
+        if (sessionStatus == MatchStatus.GAME_SETUP_FAILED) {
+            return MatchResponseReason.GAME_SETUP_FAILED;
+        }
         if (myStatus == MatchResponseStatus.ACCEPTED && opponentStatus == MatchResponseStatus.ACCEPTED) {
             return MatchResponseReason.BOTH_ACCEPTED;
         }
@@ -99,6 +106,9 @@ public class MatchResponseResultNotificationFactory {
         if (sessionStatus == MatchStatus.ACCEPTED) {
             return MatchResponseAction.GO_TO_GAME_WAITING;
         }
+        if (sessionStatus == MatchStatus.GAME_SETUP_FAILED) {
+            return MatchResponseAction.GO_TO_MATCH_START;
+        }
         if (myStatus == MatchResponseStatus.ACCEPTED
                 && (opponentStatus == MatchResponseStatus.REJECTED || opponentStatus == MatchResponseStatus.TIMEOUT)) {
             return MatchResponseAction.RETURN_TO_MATCHING;
@@ -106,11 +116,8 @@ public class MatchResponseResultNotificationFactory {
         return MatchResponseAction.GO_TO_MATCH_START;
     }
 
-    private MatchResponseResultNotification.Game gameOf(MatchStatus sessionStatus) {
+    private MatchResponseResultNotification.Game gameOf() {
         // 게임 세션 생성은 후속 이슈 범위라 현재 응답 결과 이벤트에서는 game payload를 채우지 않습니다.
-        if (sessionStatus == MatchStatus.ACCEPTED) {
-            return null;
-        }
         return null;
     }
 }

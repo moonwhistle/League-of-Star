@@ -32,7 +32,8 @@
   - 한 명이 먼저 거절해도 상대방 팝업은 10초 동안 유지되며, 제한 시간 안에 수락하면 큐 복귀 대상이 됨
 - **매칭 알림 채널**: SSE는 `match_found`와 최종 `match_response_result`까지만 담당
   - 게임방 생성 성공 시 `match_response_result.game`에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
-  - 게임방 생성 실패 시 양쪽 모두 기존 큐 진입 시각으로 복귀하고 `GAME_SETUP_FAILED` 결과 전달
+  - 게임방 생성 실패 시 `GAME_SETUP_FAILED` 결과를 전달하고 양쪽 모두 start 버튼 화면으로 복귀
+  - 게임방 생성 실패 시 매칭 큐에 자동 복귀하지 않음
   - 게임 대기 화면 진입 이후 준비/RTT/카운트다운/게임 시작/입력/종료는 WebSocket 담당
 
 ### 2.3 강타 싸움 게임
@@ -364,5 +365,6 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-04-17 | 초안 작성 및 전체 기획 확정 |
 | 2026-04-24 | 프론트엔드 기술 스택 고도화 (PixiJS, Web Worker 도입) |
 | 2026-04-27 | 통합 시리즈 아키텍처(RankSeries) 도입 및 도메인 정규화 |
-| 2026-05-13 | 매칭 SSE는 `match_response_result`까지, 게임 준비/RTT/카운트다운/SMITE/종료는 WebSocket으로 처리하는 흐름 반영. gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 복귀 정책 추가 |
+| 2026-05-13 | 매칭 SSE는 `match_response_result`까지, 게임 준비/RTT/카운트다운/SMITE/종료는 WebSocket으로 처리하는 흐름 반영. gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 정책 추가 |
 | 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화. PixiJS/Web Worker/OffscreenCanvas/STOMP/SockJS는 MVP 이후 검토로 이동 |
+| 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GAME_SETUP_FAILED` reason 기준으로 start 버튼 화면 복귀하도록 정책 조정 |

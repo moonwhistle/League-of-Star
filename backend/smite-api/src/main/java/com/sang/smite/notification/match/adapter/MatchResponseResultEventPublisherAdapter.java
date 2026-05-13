@@ -31,6 +31,7 @@ public class MatchResponseResultEventPublisherAdapter implements MatchResponseRe
     private boolean isPublishable(MatchResponseResultEvent event) {
         return event.sessionStatus() == MatchStatus.ACCEPTED
                 || event.sessionStatus() == MatchStatus.DECLINED
-                || event.sessionStatus() == MatchStatus.TIMEOUT;
+                || event.sessionStatus() == MatchStatus.TIMEOUT
+                || event.sessionStatus() == MatchStatus.GAME_SETUP_FAILED;
     }
 }

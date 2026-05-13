@@ -163,16 +163,17 @@ ACCEPTED + ACCEPTED
    game={gameRoomId, videoUrl, webSocketUrl}
 ```
 
-gameRoom 생성에 실패하면 두 유저 모두 잘못이 없으므로 기존 `entryTime`으로 매칭 큐에 복귀시킵니다.
+gameRoom 생성에 실패하면 두 유저를 매칭 큐에 자동 복귀시키지 않습니다.
+서버는 실패 이벤트를 보내고, 클라이언트는 `GAME_SETUP_FAILED` reason에 대응하는 안내 문구를 표시한 뒤 start 버튼 화면으로 복귀합니다.
 
 ```text
 gameRoom 생성 실패
--> match:status:{userA/userB} = MATCHING
--> matching:queue:{tierScore}에 기존 entryTime으로 재등록
+-> match:status:{userA/userB} 제거
+-> matching:queue 재삽입 없음
 -> match_response_result
    outcome=FAILED
    reason=GAME_SETUP_FAILED
-   action=RETURN_TO_MATCHING
+   action=GO_TO_MATCH_START
    game=null
 ```
 
@@ -304,4 +305,5 @@ return 0 -- 실패
 
 | 날짜 | 변경 내용 |
 | :--- | :--- |
-| 2026-05-13 | Redis를 매칭 큐/매칭 응답 상태의 source of truth로 한정하고, gameRoom 생성 성공 시 `IN_GAME` 전환 및 실패 시 `GAME_SETUP_FAILED` 큐 복귀 정책 추가 |
+| 2026-05-13 | Redis를 매칭 큐/매칭 응답 상태의 source of truth로 한정하고, gameRoom 생성 성공 시 `IN_GAME` 전환 및 실패 시 `GAME_SETUP_FAILED` 실패 정책 추가 |
+| 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 status 제거 후 `GO_TO_MATCH_START`로 종료하는 정책으로 변경 |

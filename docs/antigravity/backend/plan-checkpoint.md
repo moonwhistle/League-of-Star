@@ -24,8 +24,8 @@ flowchart TD
     Q --> R["game_actions 저장"]
     R --> S["game_records 생성<br/>rank 반영"]
 
-    H -->|"실패"| T["Redis match:status = MATCHING 복귀<br/>기존 entryTime으로 queue 복귀"]
-    T --> U["SSE match_response_result<br/>FAILED / GAME_SETUP_FAILED / RETURN_TO_MATCHING"]
+    H -->|"실패"| T["Redis match:status 제거<br/>queue 재삽입 없음"]
+    T --> U["SSE match_response_result<br/>FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START"]
 
     F -->|"reject/timeout 포함"| V["deadline까지 응답 윈도우 유지"]
     V --> W["Redis match:session = DECLINED/TIMEOUT"]
@@ -268,15 +268,17 @@ deadline 정산: REJECTED/TIMEOUT 유저만 존재
 권장 정책:
 
 - gameRoom 생성 실패 시 `GO_TO_GAME_WAITING`을 발행하지 않는다.
-- 두 유저 모두 잘못이 없으므로 기존 `entryTime`으로 매칭 큐에 복귀시킨다.
-- 두 유저의 `match:status:{userId}`는 `MATCHING`으로 되돌린다.
+- 두 유저를 매칭 큐에 자동 복귀시키지 않는다.
+- 두 유저의 `match:status:{userId}`는 제거한다.
 - `match:session:{matchId}`는 게임 세팅 실패로 최종 정산된 상태를 남긴다.
 - 클라이언트에는 `match_response_result` 실패 이벤트를 발행한다.
+- 클라이언트는 안내 메시지를 표시하고 start 버튼 화면으로 돌아간다.
 
 추가로 필요한 enum/API 변경:
 
 - `MatchResponseReason.GAME_SETUP_FAILED` 추가
-- 두 유저 모두 `outcome=FAILED`, `reason=GAME_SETUP_FAILED`, `action=RETURN_TO_MATCHING`
+- 두 유저 모두 `outcome=FAILED`, `reason=GAME_SETUP_FAILED`, `action=GO_TO_MATCH_START`
+- 별도 `message` 필드는 추가하지 않고, 클라이언트가 `GAME_SETUP_FAILED` reason 기준으로 안내 문구를 매핑한다.
 - 필요하면 `MatchStatus.GAME_SETUP_FAILED`를 추가해 `DECLINED`/`TIMEOUT`과 구분한다.
 
 이 실패 정책을 추가하지 않으면 gameRoom 생성 실패 시 유저가 Redis `ACCEPTED` 상태에 남아 재매칭도 게임 진입도 못 하는 상태가 될 수 있다.
@@ -324,7 +326,8 @@ Redis의 `IN_GAME`은 매칭 중복 진입을 막기 위한 유저 점유 상태
 - `gameRoomId`, `videoUrl`, `webSocketUrl` payload 추가
 - 기존 `GO_TO_GAME_WAITING` 액션 유지
 - gameRoom 생성 성공 시 두 유저 Redis 상태를 `IN_GAME`으로 전환
-- gameRoom 생성 실패 시 두 유저를 기존 `entryTime`으로 큐에 복귀시키고 `GAME_SETUP_FAILED` 이벤트 발행
+- gameRoom 생성 실패 시 두 유저 Redis 상태를 제거하고 `GAME_SETUP_FAILED` 이벤트 발행
+- gameRoom 생성 실패 시 매칭 큐에 자동 복귀시키지 않음
 - `GAME_SETUP_FAILED` reason/action factory mapping 추가
 - Issue 34의 `match_response_result` API/SSE 문서 갱신
 
@@ -334,10 +337,11 @@ gameRoom 생성 실패 mapping:
 | :--- | :--- |
 | `outcome` | `FAILED` |
 | `reason` | `GAME_SETUP_FAILED` |
-| `action` | `RETURN_TO_MATCHING` |
+| `action` | `GO_TO_MATCH_START` |
 | `game` | `null` |
 | 대상 | 양쪽 유저 모두 |
-| Redis 후처리 | 두 유저 `match:status=MATCHING`, 기존 `entryTime`으로 큐 복귀 |
+| Redis 후처리 | 두 유저 `match:status` 제거, queue 재삽입 없음 |
+| 안내 문구 | 클라이언트가 `GAME_SETUP_FAILED` reason 기준으로 표시 |
 
 제외:
 
@@ -354,7 +358,7 @@ gameRoom 생성 실패 mapping:
 - 클라이언트가 payload만으로 `/game/{gameRoomId}/waiting` 화면으로 이동 가능
 - MP4는 gameRoom 생성 과정에서 만들지 않고 static URL만 전달
 - gameRoom 생성 성공 후 `match:status:{userA/userB}=IN_GAME`
-- gameRoom 생성 실패 시 두 유저가 재매칭 가능하며 `ACCEPTED` 상태에 갇히지 않음
+- gameRoom 생성 실패 시 두 유저가 `ACCEPTED` 상태에 갇히지 않고 start 버튼 화면으로 복귀 가능
 
 ### Issue 37. MP4 static resource 제공
 
@@ -458,3 +462,4 @@ gameRoom 생성 실패 mapping:
 | 날짜 | 변경 내용 |
 | :--- | :--- |
 | 2026-05-13 | 매칭 성공 이후 게임 세션 구현 흐름 정리. `GO_TO_GAME_WAITING` 발행 시점, Redis 상태 전이, gameRoom 생성 실패 시 `GAME_SETUP_FAILED` mapping, Issue 36~41 분할안 확정 |
+| 2026-05-13 | gameRoom 생성 실패 정책을 큐 자동 복귀에서 안내 메시지 후 start 화면 복귀로 변경 |
