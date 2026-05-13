@@ -4,7 +4,7 @@ import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.rank.domain.UserRankInfo;
 import com.sang.smite.domain.rank.service.RankReadService;
-import com.sang.smite.matching.service.MatchService;
+import com.sang.smite.matching.command.MatchQueueCommandService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 class MatchQueueServiceTest {
 
     @Mock
-    private MatchService matchService;
+    private MatchQueueCommandService matchService;
 
     @Mock
     private RankReadService rankReadService;

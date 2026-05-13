@@ -1,4 +1,4 @@
-const totalUsers = Number(process.env.USERS || process.env.TOTAL_USERS || 10000);
+const totalUsers = Number(process.env.USERS || process.env.TOTAL_USERS || 5000);
 const joinTps = Number(process.env.JOIN_TPS || 50);
 const setupConcurrency = Number(process.env.SETUP_CONCURRENCY || 100);
 const connectWaitMillis = parseDuration(process.env.CONNECT_WAIT || '5s');

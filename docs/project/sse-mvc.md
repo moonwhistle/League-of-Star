@@ -28,8 +28,8 @@ sequenceDiagram
     participant Redis as Redis Pub/Sub
     participant Sub1 as MatchFoundPubSubSubscriber(api-1)
     participant Sub2 as MatchFoundPubSubSubscriber(api-2)
-    participant Dispatcher1 as MatchFoundNotificationDispatcher(api-1)
-    participant Dispatcher2 as MatchFoundNotificationDispatcher(api-2)
+    participant Sender1 as MatchFoundSseSender(api-1)
+    participant Sender2 as MatchFoundSseSender(api-2)
 
     UserA->>Api1: GET /api/v1/notifications/match/stream
     Api1->>Api1: JWT 인증 후 userA 식별
@@ -46,8 +46,8 @@ sequenceDiagram
         Api2-->>UserB: event: heartbeat
     end
 
-    UserA->>Queue: POST /api/v1/match/join-queue
-    UserB->>Queue: POST /api/v1/match/join-queue
+    UserA->>Queue: POST /api/v1/match/join
+    UserB->>Queue: POST /api/v1/match/join
     Queue->>Queue: Redis 대기열에 ticket 저장
 
     Engine->>Queue: 배치 스캔
@@ -62,19 +62,19 @@ sequenceDiagram
     Redis-->>Sub1: match_found 메시지 수신
     Redis-->>Sub2: match_found 메시지 수신
 
-    Sub1->>Dispatcher1: userA/userB dispatch
-    Dispatcher1->>Registry1: userA 연결 조회
-    Registry1-->>Dispatcher1: userA 연결 있음
-    Dispatcher1->>Registry1: userB 연결 조회
-    Registry1-->>Dispatcher1: userB 연결 없음
-    Dispatcher1-->>UserA: event: match_found
+    Sub1->>Sender1: userA/userB send
+    Sender1->>Registry1: userA 연결 조회
+    Registry1-->>Sender1: userA 연결 있음
+    Sender1->>Registry1: userB 연결 조회
+    Registry1-->>Sender1: userB 연결 없음
+    Sender1-->>UserA: event: match_found
 
-    Sub2->>Dispatcher2: userA/userB dispatch
-    Dispatcher2->>Registry2: userA 연결 조회
-    Registry2-->>Dispatcher2: userA 연결 없음
-    Dispatcher2->>Registry2: userB 연결 조회
-    Registry2-->>Dispatcher2: userB 연결 있음
-    Dispatcher2-->>UserB: event: match_found
+    Sub2->>Sender2: userA/userB send
+    Sender2->>Registry2: userA 연결 조회
+    Registry2-->>Sender2: userA 연결 없음
+    Sender2->>Registry2: userB 연결 조회
+    Registry2-->>Sender2: userB 연결 있음
+    Sender2-->>UserB: event: match_found
 ```
 
 ## 흐름 해석

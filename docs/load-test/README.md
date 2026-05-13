@@ -39,7 +39,7 @@ docker exec smite-redis redis-cli del match:response:timeout:processing
 
 매칭 엔진 자체 처리량과 큐 적체를 확인할 때 사용합니다.
 
-기본 기준은 이벤트 피크인 10,000명입니다.
+기본 기준은 컨테이너 OOM을 피하면서 정책을 검증할 수 있는 5,000명입니다.
 
 ```bash
 TARGET_TPS=50 DURATION=5m VUS=400 k6 run docs/load-test/join-queue-steady.js
@@ -48,7 +48,7 @@ TARGET_TPS=50 DURATION=5m VUS=400 k6 run docs/load-test/join-queue-steady.js
 순간 유입은 burst 스크립트를 사용합니다.
 
 ```bash
-TOTAL_USERS=10000 VUS=1000 k6 run docs/load-test/join-queue-burst.js
+TOTAL_USERS=5000 VUS=500 k6 run docs/load-test/join-queue-burst.js
 ```
 
 확인 지표:
@@ -64,8 +64,8 @@ TOTAL_USERS=10000 VUS=1000 k6 run docs/load-test/join-queue-burst.js
 SSE 연결 유지, heartbeat, `match_found` 전송률을 확인합니다.
 
 ```bash
-CONNECTIONS=10000 HOLD_DURATION=5m node docs/load-test/sse-notification-load.mjs
-MODE=match CONNECTIONS=10000 JOIN_TPS=50 HOLD_DURATION=5m node docs/load-test/sse-notification-load.mjs
+CONNECTIONS=5000 HOLD_DURATION=5m node docs/load-test/sse-notification-load.mjs
+MODE=match CONNECTIONS=5000 JOIN_TPS=50 HOLD_DURATION=5m node docs/load-test/sse-notification-load.mjs
 ```
 
 확인 지표:
@@ -79,7 +79,7 @@ MODE=match CONNECTIONS=10000 JOIN_TPS=50 HOLD_DURATION=5m node docs/load-test/ss
 
 `match_found` 이벤트에서 받은 `matchId` 기준으로 pair를 묶고, 시나리오별로 accept/reject/timeout을 재현합니다.
 
-기본 기준은 10,000명, `JOIN_TPS=50`입니다. 단일 시나리오는 필요할 때 `SCENARIO`만 바꿔 실행합니다.
+기본 기준은 5,000명, `JOIN_TPS=50`입니다. 단일 시나리오는 필요할 때 `SCENARIO`만 바꿔 실행합니다.
 
 ```bash
 SCENARIO=both_accept node docs/load-test/match-response-timeout-load.mjs
@@ -145,7 +145,7 @@ SCENARIO=mixed USERS=200 JOIN_TPS=20 node docs/load-test/match-response-timeout-
 
 | 옵션 | 기본값 | 설명 |
 | --- | --- | --- |
-| `USERS` | `10000` | 테스트 유저 수. 짝수여야 합니다. |
+| `USERS` | `5000` | 테스트 유저 수. 짝수여야 합니다. |
 | `JOIN_TPS` | `50` | joinQueue 유입 속도 |
 | `SCENARIO` | `mixed` | 실행할 응답 정책 시나리오 |
 | `RESPONSE_DELAY_MS` | `100` | 첫 응답과 두 번째 응답 사이 간격 |
@@ -169,7 +169,26 @@ sum(rate(match_response_timeout_queue_returned_users_total[1m]))
 histogram_quantile(0.95, sum(rate(match_response_timeout_processing_delay_seconds_bucket[5m])) by (le))
 ```
 
+부하테스트 결과 총량은 `ops/s` 패널보다 매칭 응답 대시보드의 `Load Test Totals` 섹션에서 확인합니다.
+해당 섹션은 구간별 `increase(...[$__rate_interval])` 그래프로 표시하며, legend의 `sum` 값으로 선택한 시간 범위의 총 처리량을 확인합니다.
+
+주요 비교 기준:
+
+```text
+one_accept_other_timeout:
+- accept success sum ~= handled pairs
+- timeout settlement success sum ~= handled pairs
+- returned users sum ~= handled pairs
+
+one_reject_other_silent:
+- reject success sum ~= handled pairs
+- timeout settlement success sum ~= handled pairs
+- returned users sum ~= 0
+```
+
 Grafana에서는 다음 대시보드를 봅니다.
 
 - 매칭 엔진: `docs/grafana/smite-match-queue-dashboard.json`
 - 매칭 응답/timeout: `docs/grafana/smite-match-response-dashboard.json`
+  - `Load Test Totals`: 부하테스트 총량 추이와 legend 합계
+  - `JVM / 애플리케이션 리소스`: CPU, Heap/Non-Heap, GC, Thread, SSE active connection

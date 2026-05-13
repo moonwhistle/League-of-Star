@@ -1,7 +1,7 @@
 package com.sang.smite.matching.scheduler;
 
 import com.sang.smite.matching.common.constant.MatchingConstants;
-import com.sang.smite.matching.service.MatchResponseTimeoutService;
+import com.sang.smite.matching.domain.service.MatchResponseTimeoutService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

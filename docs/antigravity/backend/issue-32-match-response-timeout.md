@@ -126,11 +126,11 @@ flowchart TD
     - member: matchId
 - [x] pending/processing 이동을 Lua script로 원자 처리
 - [x] processing에 남은 작업을 pending으로 복구하는 reclaim 정책 정의
-- [x] 세션 TTL 12초와 응답 제한 10초의 관계 정리
+- [x] 세션 TTL 60분과 응답 제한 10초의 관계 정리
 - [x] timeout 처리 완료/세션 완료 시 pending/processing index 제거 정책 정의
 - [x] timeout 관련 상수 위치 정리
   - 응답 제한 시간 10초
-  - session TTL 12초
+  - session TTL 60분
   - scheduler batch size
   - processing lease 시간
 - [x] 시간 계산은 테스트 가능하도록 현재 시각 주입 방식 검토
@@ -151,10 +151,10 @@ flowchart TD
   - lock은 accept/reject/timeout이 같은 session을 동시에 read-modify-write 하지 못하게 하는 보호 장치입니다.
 - 시간 정책은 기존 프로젝트 정책을 따릅니다.
   - 클라이언트 응답 윈도우: 10초
-  - Redis match session TTL: 12초
-  - TTL 12초는 10초 응답 윈도우에 네트워크/스케줄링 지연 버퍼를 더한 값입니다.
+  - Redis match session TTL: 60분
+  - TTL 60분은 cleanup 실패 대비 안전장치이며, 10초 응답 윈도우와 별도 정책입니다.
 - 상수는 `MatchingConstants`를 우선 확장합니다.
-  - 기존 `MATCH_SESSION_TTL_SECONDS = 12`는 유지합니다.
+  - `MATCH_SESSION_TTL_SECONDS = 3600`으로 둡니다.
   - timeout 응답 제한 시간, timeout ZSET key, Lua script path는 matching 모듈 공통 상수로 둡니다.
   - scheduler interval, batch size, processing lease time은 운영 조정 가능성이 있어 설정값 분리도 함께 검토합니다.
 - timeout deadline 계산은 테스트 가능해야 하므로 `Clock` 주입을 사용합니다.
@@ -250,7 +250,7 @@ flowchart TD
 - 검증 명령:
   - `:smite-matching:test`
 
-### 4. MatchResponseProcessor timeout 정산 구현
+### 4. MatchResponseResultService timeout 정산 구현
 
 - [x] `timeoutWithLock(matchId)` 추가
 - [x] accept/reject와 동일한 `match:session:lock:{matchId}` 사용
@@ -268,7 +268,7 @@ flowchart TD
 - `MatchSession`에 timeout 도메인 메서드를 추가했습니다.
   - `hasPendingResponse()`
   - `timeoutPendingUsers()`
-- `MatchResponseProcessor.timeoutWithLock(matchId)`를 추가했습니다.
+- `MatchResponseResultService.timeoutWithLock(matchId)`를 추가했습니다.
   - accept/reject와 동일한 `match:session:lock:{matchId}` 분산락을 사용합니다.
   - 세션이 없거나 이미 최종 상태이면 no-op 처리합니다.
   - `FOUND` 상태이고 `PENDING` 응답이 남아 있는 세션만 timeout 정산합니다.
@@ -279,7 +279,7 @@ flowchart TD
   - `REJECTED`/`TIMEOUT` 유저는 큐 이탈
 - 수락 유저 큐 복귀와 이탈 처리는 기존 실패 정산 helper를 재사용했습니다.
   - accept/reject 실패 정산과 timeout 실패 정산의 큐 정책이 갈라지지 않도록 유지합니다.
-- `MatchResponseProcessorTest`를 보강했습니다.
+- `MatchResponseResultServiceTest`를 보강했습니다.
   - `ACCEPTED + PENDING` timeout
   - `REJECTED + PENDING` timeout
   - `PENDING + PENDING` timeout
@@ -292,7 +292,7 @@ flowchart TD
 ### 5. accept/reject 완료 시 timeout index 정리
 
 - [x] 양쪽 accept로 `ACCEPTED` 된 경우 timeout index 제거
-- [x] accept/reject 조합으로 `DECLINED` 정산된 경우 timeout index 제거
+- [x] accept/reject 조합은 즉시 정산하지 않고 deadline 정산까지 timeout index 유지
 - [x] 한쪽만 응답해 `FOUND`가 유지되는 경우 timeout index 유지
 - [x] timeout scheduler가 이미 claim한 뒤라면 timeout 정산 쪽에서 lock 획득 후 no-op/ack 처리
 - [x] accept/reject 완료 후 timeout index cleanup 실패 시 API 성공은 유지
@@ -301,22 +301,21 @@ flowchart TD
 
 #### 구현 결과
 
-- `MatchResponseProcessor`에 `MatchTimeoutStore`를 주입했습니다.
+- `MatchResponseResultService`에 `MatchTimeoutStore`를 주입했습니다.
 - 최종 `ACCEPTED` 정산 시 timeout index를 cleanup합니다.
   - 양쪽 accept 완료 후 `timeoutStore.cleanup(matchId)` 호출
-- 최종 `DECLINED` 정산 시 timeout index를 cleanup합니다.
-  - reject 후 양쪽 응답 완료
-  - 상대 reject 이후 제한 시간 안에 accept하여 실패 정산 완료
+- accept/reject 조합 또는 양쪽 reject 조합은 즉시 cleanup하지 않습니다.
+  - 둘 다 수락이 아닌 실패 조합은 10초 deadline 정산 시점에 최종 결과를 확정합니다.
 - 한쪽만 응답해 세션이 `FOUND`로 유지되는 경우 timeout index는 유지합니다.
   - 남은 유저가 10초 응답 윈도우 안에 계속 응답할 수 있어야 하기 때문입니다.
 - cleanup 실패는 accept/reject 성공을 깨지 않습니다.
   - cleanup 예외는 warn 로그로 남기고 삼킵니다.
   - timeout scheduler가 나중에 해당 matchId를 claim하더라도 session 최종 상태를 보고 no-op/ack로 정리할 수 있습니다.
-- `MatchResponseProcessorTest`를 보강했습니다.
+- `MatchResponseResultServiceTest`를 보강했습니다.
   - 한쪽 accept만 반영된 경우 cleanup 미호출
   - 양쪽 accept 완료 시 cleanup 호출
   - 한쪽 reject만 반영된 경우 cleanup 미호출
-  - accept/reject 조합으로 최종 `DECLINED` 시 cleanup 호출
+  - accept/reject 조합은 deadline 전 cleanup 미호출
   - cleanup 실패가 accept 성공을 깨지 않는지 검증
 - 검증 명령:
   - `:smite-matching:test`
@@ -373,7 +372,7 @@ flowchart TD
 ### 7. 테스트 작성
 
 - [x] `MatchSession` timeout 상태 변경 domain unit test
-- [x] `MatchResponseProcessor` timeout service unit test
+- [x] `MatchResponseResultService` timeout service unit test
 - [x] A accept, B pending → timeout 시 A 큐 복귀, B timeout
 - [x] A reject, B pending → timeout 시 둘 다 큐 이탈
 - [x] A/B pending → timeout 시 둘 다 큐 이탈
@@ -390,7 +389,7 @@ flowchart TD
 
 - `MatchSessionTest`를 보강했습니다.
   - `timeoutPendingUsers()`가 미응답 참여자만 `TIMEOUT`으로 변경하는지 검증
-- `MatchResponseProcessorTest`를 보강했습니다.
+- `MatchResponseResultServiceTest`를 보강했습니다.
   - `ACCEPTED + PENDING` timeout 시 수락 유저 큐 복귀
   - `REJECTED + PENDING` timeout 시 두 유저 큐 이탈
   - `PENDING + PENDING` timeout 시 두 유저 timeout/큐 이탈
@@ -561,12 +560,12 @@ flowchart TD
   - `MatchControllerTest`
   - `MatchControllerRestDocsTest`
   - `MatchResponseServiceTest`
-  - `MatchFoundNotificationDispatcherTest`
+  - `MatchFoundSseSenderTest`
   - `MatchNotificationServiceTest`
   - `MatchFoundPubSubSubscriberTest`
   - `MatchFoundPubSubPublisherTest`
 - matching timeout 핵심 테스트 재실행 통과
-  - `MatchResponseProcessorTest`
+  - `MatchResponseResultServiceTest`
   - `MatchResponseCommandServiceTest`
   - `MatchResponseTimeoutServiceTest`
   - `MatchFoundServiceTest`
@@ -612,7 +611,7 @@ Redis key가 만료될 때 발생하는 keyspace notification을 받아 timeout�
 - 이벤트 전달 보장이 강하지 않습니다.
 - subscriber가 죽어 있으면 이벤트를 놓칠 수 있습니다.
 - key가 만료된 뒤에는 정산에 필요한 세션 데이터가 이미 사라졌을 수 있습니다.
-- 현재 세션 TTL은 12초이고 정책 timeout은 10초라 정확히 같은 개념이 아닙니다.
+- 현재 세션 TTL은 60분이고 정책 timeout은 10초라 정확히 같은 개념이 아닙니다.
 
 결론:
 
@@ -688,7 +687,7 @@ processing = 어떤 scheduler가 처리 중이라고 표시한 timeout 후보
 장점:
 
 - 현재 매칭 시스템이 이미 Redis를 중심으로 동작하므로 구조가 잘 맞습니다.
-- 10초 timeout deadline과 12초 session TTL을 분리해서 관리할 수 있습니다.
+- 10초 timeout deadline과 60분 session TTL을 분리해서 관리할 수 있습니다.
 - 서버가 timeout 정산을 책임집니다.
 - 멀티 인스턴스에서도 Lua claim으로 같은 timeout job을 한 서버만 가져가게 할 수 있습니다.
 - `matchId` lock으로 accept/reject/timeout이 같은 세션을 동시에 수정하지 못하게 막을 수 있습니다.
@@ -908,7 +907,7 @@ API-2 User API:  match-1 accept 요청
 
 ### Timeout Settlement
 
-- timeout 정산은 `MatchResponseProcessor.timeoutWithLock()`에서 처리합니다.
+- timeout 정산은 `MatchResponseResultService.timeoutWithLock()`에서 처리합니다.
 - `FOUND` 상태이고 `PENDING` 응답이 남은 세션만 timeout 정산 대상입니다.
 - 이미 `ACCEPTED`, `DECLINED`, `TIMEOUT`으로 종료된 세션은 no-op으로 처리합니다.
 - timeout 정산 결과는 내부 result 객체로 반환하여 scheduler service가 metric을 기록할 수 있게 했습니다.

@@ -1,7 +1,7 @@
 package com.sang.smite.matching.metrics;
 
 import com.sang.smite.matching.common.constant.MatchingConstants;
-import com.sang.smite.matching.repository.MatchStore;
+import com.sang.smite.matching.repository.MatchQueueStore;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  * <p>Gauge는 Prometheus가 scrape 할 때마다 티어별 Redis ZSET 크기만 조회합니다.
  * 별도 스케줄러는 필요하지 않습니다.
  *
- * <p><b>성능 참고:</b> 전체 티켓을 가져오지 않고 {@link MatchStore#countByTierScore(int)}만
+ * <p><b>성능 참고:</b> 전체 티켓을 가져오지 않고 {@link MatchQueueStore#countByTierScore(int)}만
  * 호출하여 모니터링이 매칭 엔진 스캔 비용에 영향을 주지 않도록 합니다.
  */
 @Slf4j
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 public class MatchQueueSizeGauge {
 
     private final MeterRegistry meterRegistry;
-    private final MatchStore matchStore;
+    private final MatchQueueStore matchStore;
 
     @PostConstruct
     public void registerGauges() {

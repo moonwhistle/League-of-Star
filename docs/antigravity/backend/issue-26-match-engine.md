@@ -78,9 +78,9 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
 - 매칭 성사 후 처리 흐름을 추가했습니다.
   - 두 유저 상태를 `MATCHING`에서 `FOUND`로 변경합니다.
   - `match:session:{matchId}` Redis Hash를 생성합니다.
-  - 클라이언트 수락 모달 기준 시간은 10초로 유지하고, Redis TTL은 네트워크/스케줄링 경계 버퍼를 포함해 12초로 설정했습니다.
-  - 서버는 TTL만 믿지 않고 `createdAt + 10초` 기준으로 수락 유효성을 판단합니다.
-  - `MatchFoundEvent`를 발행해 WebSocket 알림 등 후속 처리를 느슨하게 연결할 수 있게 했습니다.
+  - 클라이언트 수락 모달 기준 시간은 10초로 유지하고, Redis TTL은 cleanup 실패 대비 안전장치로 60분 설정했습니다.
+  - 응답 제한 시간은 timeout index의 deadline 기준으로 판단하고, Redis 세션 TTL은 cleanup 실패 대비 안전장치로만 사용합니다.
+  - `MatchFoundEvent`를 발행해 SSE 알림 등 후속 처리를 느슨하게 연결할 수 있게 했습니다.
 
 - 후처리 실패 정책은 V1에서 에러 로그 기록으로 제한했습니다.
   - `atomicPairRemove` 성공 후 상태 변경, 세션 저장, 이벤트 발행 중 예외가 발생하면 대상 유저 ID와 함께 에러 로그를 남깁니다.
@@ -326,11 +326,11 @@ V1은 steady 상황에서는 사용할 수 있지만, 10,000명 burst에서는 �
   - 매칭 성사 시 고유한 `matchId`를 생성하고 Redis Hash에 수락 세션을 저장
   - 필드: `matchId`, `userA`, `userB`, `status`, `createdAt`
   - 클라이언트에 노출되는 매칭 수락 제한 시간은 10초로 유지
-  - Redis 세션 TTL은 네트워크/스케줄링 경계 버퍼를 포함하여 12초로 설정
+  - Redis 세션 TTL은 cleanup 실패 대비 안전장치로 60분 설정
   - 서버는 세션 존재 여부만 믿지 않고 `createdAt + 10초` 기준으로 수락 유효성을 판정
   - 세션 상태는 양쪽 유저의 수락/거절/타임아웃 처리를 위한 단일 기준으로 사용
 - [x] **매칭 결과 발행 (Event/Message)**
-  - `MatchFoundEvent`를 발행하여 이후 로직(WebSocket 알림 등)과 느슨하게 결합될 수 있도록 연동 마련
+  - `MatchFoundEvent`를 발행하여 이후 로직(SSE 알림 등)과 느슨하게 결합될 수 있도록 연동 마련
   - 이벤트 payload에는 `matchId`, `userA`, `userB`, `acceptTimeoutSeconds`를 포함
 - [x] **후처리 실패 로그**
   - `atomicPairRemove` 성공 후 후처리 중 예외가 발생하면 매칭 대상 유저 ID와 함께 에러 로그를 남김
@@ -385,12 +385,12 @@ V1은 steady 상황에서는 사용할 수 있지만, 10,000명 burst에서는 �
 - [x] **`RedisMatchSessionStoreTest` 통합 테스트 작성**
   - `save()` 시 `match:session:{matchId}`가 Redis Hash 필드(`matchId`, `userA`, `userB`, `status`, `createdAt`)로 저장되는지 검증
   - `findById()`가 Redis Hash를 `MatchSession`으로 복원하는지 검증
-  - 세션 TTL이 12초로 적용되는지 검증
+  - 세션 TTL이 60분으로 적용되는지 검증
   - `delete()` 호출 시 세션이 제거되는지 검증
 
 - [x] **`MatchFoundServiceTest` 단위 테스트 작성**
   - 매칭 성사 시 두 유저 상태가 `FOUND`로 변경되는지 검증
-  - `MatchSessionStore.save()`가 TTL 12초로 호출되는지 검증
+  - `MatchSessionStore.save()`가 TTL 60분으로 호출되는지 검증
   - `MatchFoundEvent`가 `matchId`, `userA`, `userB`, `acceptTimeoutSeconds=10`을 포함해 발행되는지 검증
 
 - [x] **`MatchEngineMetricsTest` 단위 테스트 작성**

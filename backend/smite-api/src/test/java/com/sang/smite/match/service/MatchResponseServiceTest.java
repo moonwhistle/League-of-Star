@@ -1,6 +1,6 @@
 package com.sang.smite.match.service;
 
-import com.sang.smite.matching.service.MatchResponseCommandService;
+import com.sang.smite.matching.command.MatchResponseCommandService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

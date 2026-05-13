@@ -2,14 +2,14 @@ package com.sang.smite.match.service;
 
 import com.sang.smite.domain.rank.domain.UserRankInfo;
 import com.sang.smite.domain.rank.service.RankReadService;
-import com.sang.smite.matching.service.MatchService;
+import com.sang.smite.matching.command.MatchQueueCommandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
  * 매칭 진입/취소 흐름을 조율하는 api 레이어 서비스입니다.
  *
- * <p>smite-matching 모듈의 {@link MatchService}를 호출하기 전에
+ * <p>smite-matching 모듈의 {@link MatchQueueCommandService}를 호출하기 전에
  * 유저의 티어 점수를 조회하는 책임을 담당합니다.
  * JPA(smite-core)와 Redis 도메인 로직(smite-matching)의 경계를 이 클래스가 맡습니다.
  */
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MatchQueueService {
 
-    private final MatchService matchService;
+    private final MatchQueueCommandService matchService;
     private final RankReadService rankReadService;
 
     /**

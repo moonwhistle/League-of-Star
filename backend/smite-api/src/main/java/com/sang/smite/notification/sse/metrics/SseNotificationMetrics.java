@@ -1,0 +1,155 @@
+package com.sang.smite.notification.sse.metrics;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.util.function.Supplier;
+
+/**
+ * SSE 매칭 알림의 성능 지표 기록을 캡슐화합니다.
+ */
+@Component
+public class SseNotificationMetrics {
+
+    private final MeterRegistry meterRegistry;
+    /**
+     * Gauge는 대상 객체를 weak reference로 들고 있기 때문에,
+     * Supplier 참조를 강하게 유지하지 않으면 지표가 사라질 수 있습니다.
+     */
+    private Supplier<Number> activeConnectionGaugeSupplier;
+
+    public SseNotificationMetrics(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
+
+    public static SseNotificationMetrics noop() {
+        return new SseNotificationMetrics(new SimpleMeterRegistry());
+    }
+
+    public void registerActiveConnectionGauge(Supplier<Number> activeConnectionCount) {
+        this.activeConnectionGaugeSupplier = activeConnectionCount;
+        meterRegistry.gauge(
+                SseNotificationMetricNames.CONNECTIONS_ACTIVE,
+                activeConnectionGaugeSupplier,
+                supplier -> supplier.get().doubleValue()
+        );
+    }
+
+    public void incrementConnectionOpened() {
+        meterRegistry.counter(SseNotificationMetricNames.CONNECTIONS_OPENED).increment();
+    }
+
+    public void incrementConnectionClosed(String reason) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.CONNECTIONS_CLOSED,
+                SseNotificationMetricNames.TAG_REASON,
+                reason
+        ).increment();
+    }
+
+    public void recordConnectionDuration(Duration duration) {
+        Timer.builder(SseNotificationMetricNames.CONNECTION_DURATION)
+                .publishPercentileHistogram()
+                .register(meterRegistry)
+                .record(duration);
+    }
+
+    public Timer.Sample startSendTimer() {
+        return Timer.start(meterRegistry);
+    }
+
+    public void incrementSendAttempt(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.EVENTS_SEND_ATTEMPTS,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
+    public void recordSendSuccess(String eventName, Timer.Sample sample) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.EVENTS_SEND_SUCCESS,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+        recordSendDuration(eventName, SseNotificationMetricNames.RESULT_SUCCESS, sample);
+    }
+
+    public void recordSendFailure(String eventName, Timer.Sample sample) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.EVENTS_SEND_FAILURES,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+        recordSendDuration(eventName, SseNotificationMetricNames.RESULT_FAILURE, sample);
+    }
+
+    public void incrementPubSubPublishSuccess(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.PUBSUB_PUBLISH_SUCCESS,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
+    public void incrementPubSubPublishFailure(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.PUBSUB_PUBLISH_FAILURES,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
+    public void incrementPubSubMessageReceived(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.PUBSUB_MESSAGES_RECEIVED,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
+    public void incrementPubSubMessageFailure(String eventName, String reason) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.PUBSUB_MESSAGES_FAILURES,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName,
+                SseNotificationMetricNames.TAG_REASON,
+                reason
+        ).increment();
+    }
+
+    public void incrementDispatchLocalHit(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.DISPATCH_LOCAL_HITS,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
+    public void incrementDispatchLocalMiss(String eventName) {
+        meterRegistry.counter(
+                SseNotificationMetricNames.DISPATCH_LOCAL_MISSES,
+                SseNotificationMetricNames.TAG_EVENT,
+                eventName
+        ).increment();
+    }
+
+    public void incrementMatchFoundDispatchLocalHit() {
+        meterRegistry.counter(SseNotificationMetricNames.MATCH_FOUND_DISPATCH_LOCAL_HITS).increment();
+    }
+
+    public void incrementMatchFoundDispatchLocalMiss() {
+        meterRegistry.counter(SseNotificationMetricNames.MATCH_FOUND_DISPATCH_LOCAL_MISSES).increment();
+    }
+
+    private void recordSendDuration(String eventName, String result, Timer.Sample sample) {
+        sample.stop(Timer.builder(SseNotificationMetricNames.EVENT_SEND_DURATION)
+                .tag(SseNotificationMetricNames.TAG_EVENT, eventName)
+                .tag(SseNotificationMetricNames.TAG_RESULT, result)
+                .publishPercentileHistogram()
+                .register(meterRegistry));
+    }
+}

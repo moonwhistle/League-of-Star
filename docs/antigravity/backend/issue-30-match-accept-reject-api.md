@@ -68,8 +68,8 @@ timeout 정책:
 - Redis 세션은 Hash 구조입니다.
   - key: `match:session:{matchId}`
   - fields: `matchId`, `userA`, `userB`, `status`, `createdAt`
-  - TTL은 `MatchFoundService`에서 `12초`로 저장합니다.
-- 클라이언트 수락/거절 모달 정책은 10초이고, Redis 세션 TTL은 네트워크/스케줄링 여유를 두어 12초로 설정되어 있습니다.
+  - TTL은 `MatchFoundService`에서 `60분`로 저장합니다.
+- 클라이언트 수락/거절 모달 정책은 10초이고, Redis 세션 TTL은 cleanup 실패 대비 안전장치로 60분으로 설정되어 있습니다.
 - 유저별 매칭 상태는 별도 Redis bucket에 저장됩니다.
   - key prefix: `match:status:`
   - 실제 key: `match:status:{userId}`
@@ -99,7 +99,7 @@ timeout 정책:
 - 현재 `RedisMatchSessionStore`는 `save/find/delete`만 지원합니다.
   - 수락/거절은 동시 요청 가능성이 있으므로 단순 `findById -> save` 방식은 위험합니다.
   - 다음 작업에서 `matchId` 기준 Redis 분산락을 적용한 응답 처리 흐름을 설계해야 합니다.
-- 세션 TTL은 12초지만 유저 status TTL은 30분입니다.
+- 세션 TTL은 60분이지만 유저 status TTL은 30분입니다.
   - 세션이 만료된 뒤 유저 상태가 `FOUND`로 남는 상황을 어떻게 정리할지 정책이 필요합니다.
   - timeout은 reject와 같은 정리 흐름을 사용하되 상태는 `TIMEOUT`으로 분리합니다.
 
@@ -200,8 +200,8 @@ timeout 정책:
 - 컨트롤러는 `@AuthUser Long userId`와 `@PathVariable String matchId`만 받아 API 서비스에 위임합니다.
 - 기존 `join`, `leave`와 일관성을 맞춰 성공 응답은 `200 OK`로 결정했습니다.
 - 컴파일을 위해 API 레이어 위임 서비스인 `MatchResponseService`를 추가했습니다.
-  - 실제 세션 상태 변경, `matchId` 기준 Redis lock, timeout 처리는 후속 task에서 구현합니다.
-  - 현재 서비스 메서드는 비즈니스 로직 미구현 상태를 명확히 드러내도록 `UnsupportedOperationException`을 던집니다.
+  - 실제 세션 상태 변경, `matchId` 기준 Redis lock, timeout 정산은 matching 모듈에서 처리합니다.
+  - 현재 API 서비스는 matching command service로 위임합니다.
 - `MatchControllerTest`를 추가해 accept/reject 요청이 서비스로 위임되는지 검증했습니다.
 
 ### 5. API 모듈 Service 분리
@@ -322,17 +322,15 @@ FOUND
 FOUND
   -> 요청 유저만 status=REJECTED
   -> 상대가 아직 미응답이면 FOUND 유지
-  -> 양쪽 응답 완료 후 실패 정산 시 DECLINED
+  -> 양쪽 응답이 끝났더라도 둘 다 수락이 아니면 FOUND 유지 후 deadline 정산
 ACCEPTED -> 거절 불가
 DECLINED/TIMEOUT -> 이미 종료된 세션
 ```
 
 - 한 명이 거절해도 상대방의 10초 응답 윈도우는 유지합니다.
 - 거절 요청만으로 세션 status를 즉시 `DECLINED`로 변경하지 않습니다.
-- 거절한 유저는 매칭에서 제외합니다.
-  - user status 제거
-  - 대기열 재삽입 없음
-- 양쪽 응답이 모두 끝났을 때, 제한 시간 안에 수락한 유저는 기존 큐 진입 시간으로 대기열에 재삽입합니다.
+- 거절한 유저도 최종 `match_response_result` 전까지 정산 대기 상태를 유지합니다.
+- deadline 정산 시 제한 시간 안에 수락한 유저만 기존 큐 진입 시간으로 대기열에 재삽입합니다.
   - user status는 `MATCHING`으로 변경
   - ZSET score는 세션에 저장된 기존 `entryTime` 사용
   - 새 `now`를 쓰면 최우선 복귀 정책이 깨지므로 사용하지 않습니다.
@@ -497,8 +495,8 @@ public void accept(String matchId, Long userId) {
 ### 8. Redis lock 기반 동시성 처리 설계
 
 - [x] 신규 `@DistributedRedisLock` 적용 위치 확정
-  - `MatchResponseProcessor.acceptWithLock(matchId, userId)`
-  - `MatchResponseProcessor.rejectWithLock(matchId, userId)`
+  - `MatchResponseResultService.acceptWithLock(matchId, userId)`
+  - `MatchResponseResultService.rejectWithLock(matchId, userId)`
   - timeout 처리 메서드가 추가되면 동일하게 적용
 - [x] lock key 정책 정의
   - 예: `match:session:lock:{matchId}`
@@ -557,7 +555,7 @@ MatchResponseCommandService
   - RedisLockAcquisitionException을 MatchingException으로 변환
   - 외부에 노출되는 서비스 책임
 
-MatchResponseProcessor
+MatchResponseResultService
   - 실제 세션 상태 변경 담당
   - @DistributedRedisLock 적용
   - Redis Hash 세션과 유저 상태 저장소만 다룸
@@ -577,7 +575,7 @@ reject(matchId, userId)
   -> RedisLockAcquisitionException 발생 시 MatchingException(MATCH_RESPONSE_LOCK_FAILED)로 변환
 ```
 
-`MatchResponseProcessor`
+`MatchResponseResultService`
 
 ```text
 acceptWithLock(matchId, userId)
@@ -726,7 +724,7 @@ MatchSessionStore
   - delete
 ```
 
-상태 전이 판단은 store가 아니라 `MatchResponseProcessor`가 담당합니다.
+상태 전이 판단은 store가 아니라 `MatchResponseResultService`가 담당합니다.
 
 이유:
 
@@ -764,8 +762,8 @@ userBEntryTime
   - `IN_GAME` 전환은 게임 세션 생성 이슈에서 처리
 - [x] 거절 시 처리 정책 확인
   - 상대가 미응답이면 세션 status는 `FOUND` 유지
-  - 양쪽 응답이 모두 끝나면 세션 status는 `DECLINED`
-  - 거절한 유저는 큐 이탈
+  - 상대도 응답했더라도 둘 다 수락이 아니면 세션 status는 `FOUND` 유지 후 deadline 정산
+  - 거절한 유저는 최종 정산 전까지 대기 상태 유지
   - 제한 시간 안에 수락한 유저는 기존 `entryTime`으로 큐 최우선 복귀
   - 미응답 상대 유저의 수락/거절 모달은 10초 동안 유지
 - [x] timeout 시 처리 정책 확인
@@ -971,7 +969,7 @@ userB.entryTime -> userBEntryTime
   - 후보: `returnToQueue(MatchTicket ticket)`
   - 후보: `addToQueue(Long userId, int tierScore, long entryTime)`
 - [x] DRY 관점에서 Redis ZADD 구현은 기존 `add()` 하나로 유지
-- [x] `MatchResponseProcessor`에서는 세션 값으로 `MatchTicket`을 만들어 `matchStore.add(ticket)` 호출하는 방향 우선
+- [x] `MatchResponseResultService`에서는 세션 값으로 `MatchTicket`을 만들어 `matchStore.add(ticket)` 호출하는 방향 우선
 - [x] `RedisMatchStoreTest` 보강
   - 기존 `entryTime`으로 재삽입하면 score가 유지되는지 확인
 
@@ -992,7 +990,7 @@ matchStore.add(returnTicket);
 
 - Redis ZADD 구현을 중복하지 않습니다.
 - `returnToQueue()` 같은 별도 메서드는 현재 구현상 `add()`와 완전히 같은 일을 하므로 불필요합니다.
-- 정책적 의미는 `MatchResponseProcessor`의 메서드명과 흐름에서 드러내고, 저장소는 "티켓을 큐에 추가한다"는 물리적 책임만 유지합니다.
+- 정책적 의미는 `MatchResponseResultService`의 메서드명과 흐름에서 드러내고, 저장소는 "티켓을 큐에 추가한다"는 물리적 책임만 유지합니다.
 
 ### 13. 에러 코드 정의
 
@@ -1029,9 +1027,9 @@ matchStore.add(returnTicket);
 
 `MATCH_SESSION_NOT_FOUND`는 별도 코드로 만들지 않고 `MATCH_SESSION_EXPIRED`로 통합합니다. 수락/거절 API 관점에서 세션 없음은 대부분 TTL 만료 또는 이미 정리된 수락 세션이므로, 클라이언트에는 "수락 시간이 만료됨"으로 안내하는 편이 더 명확합니다.
 
-### 14. MatchResponseProcessor 구현
+### 14. MatchResponseResultService 구현
 
-- [x] `MatchResponseProcessor` 추가
+- [x] `MatchResponseResultService` 추가
   - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service`
   - `@DistributedRedisLock` 적용 대상
 - [x] `acceptWithLock(String matchId, Long userId)` 구현
@@ -1057,7 +1055,7 @@ matchStore.add(returnTicket);
 
 #### 구현 결과
 
-- `MatchResponseProcessor`를 추가했습니다.
+- `MatchResponseResultService`를 추가했습니다.
   - `acceptWithLock(matchId, userId)`
   - `rejectWithLock(matchId, userId)`
 - 두 메서드 모두 `@DistributedRedisLock`을 적용했습니다.
@@ -1087,7 +1085,7 @@ matchStore.add(returnTicket);
 ### 15. MatchResponseCommandService 연결
 
 - [x] 현재 `UnsupportedOperationException` 제거
-- [x] `MatchResponseProcessor` 위임
+- [x] `MatchResponseResultService` 위임
   - `accept(matchId, userId)`
   - `reject(matchId, userId)`
 - [x] `RedisLockAcquisitionException` 변환
@@ -1098,7 +1096,7 @@ matchStore.add(returnTicket);
 #### 구현 결과
 
 - `MatchResponseCommandService`의 임시 `UnsupportedOperationException`을 제거했습니다.
-- `accept()` / `reject()`는 각각 `MatchResponseProcessor.acceptWithLock()` / `rejectWithLock()`로 위임합니다.
+- `accept()` / `reject()`는 각각 `MatchResponseResultService.acceptWithLock()` / `rejectWithLock()`로 위임합니다.
 - `RedisLockAcquisitionException`은 API 경계로 그대로 노출하지 않고 `MatchingException(MATCH_RESPONSE_LOCK_FAILED)`로 변환합니다.
 - API 모듈 `MatchResponseService`는 기존 위임 구조를 유지했습니다.
 
@@ -1172,7 +1170,7 @@ matchStore.add(returnTicket);
 
 #### 구현 결과
 
-- `MatchResponseProcessorTest`로 매칭 응답 처리 정책을 검증했습니다.
+- `MatchResponseResultServiceTest`로 매칭 응답 처리 정책을 검증했습니다.
   - 수락 성공
   - 중복 수락 멱등 처리
   - 양쪽 수락 시 `ACCEPTED` 전환
@@ -1297,7 +1295,7 @@ matchStore.add(returnTicket);
 - 기존 SSE `match_found` 흐름은 `smite-api` notification 테스트가 함께 통과한 것으로 회귀 확인했습니다.
   - `MatchFoundPubSubPublishListenerTest`
   - `MatchFoundPubSubSubscriberTest`
-  - `MatchFoundNotificationDispatcherTest`
+  - `MatchFoundSseSenderTest`
   - `MatchNotificationControllerRestDocsTest`
 - join/leave 기존 API는 match controller/service 테스트가 함께 통과한 것으로 회귀 확인했습니다.
   - `MatchControllerRestDocsTest`
