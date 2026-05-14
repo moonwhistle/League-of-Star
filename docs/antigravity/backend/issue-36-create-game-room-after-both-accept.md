@@ -106,7 +106,7 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 - `GameRoomSetupService`는 `smite-api`의 game service에 둔다.
 - `smite-matching`은 gameRoom 생성, MP4 URL, WebSocket URL 조립을 알지 않는다.
 - 고정 MP4 URL은 `/assets/game/dragon-view.mp4`로 반환한다.
-- MP4 파일은 아직 프로젝트에 없지만, Spring Boot static resource 경로에 존재한다고 가정한다.
+- Spring Boot static resource 경로는 준비되어 있으며, 실제 MP4 파일은 로컬/배포 환경에서 배치한다.
 - game WebSocket URL은 `/ws/game/{gameRoomId}` 형식으로 반환한다.
 
 ### 4. 매칭 성공 흐름과 연결
@@ -346,7 +346,7 @@ flowchart TD
 
 ## 📝 Note
 
-- MP4 파일은 아직 프로젝트에 없으며, `/assets/game/dragon-view.mp4`가 static resource로 제공된다고 가정했습니다.
+- MP4 static resource 디렉토리는 준비되어 있으며, 실제 `dragon-view.mp4` 파일은 repo에 포함하지 않고 로컬/배포 환경에서 배치합니다.
 - WebSocket endpoint는 아직 구현하지 않았고, payload에는 `/ws/game/{gameRoomId}` 형식의 URL만 포함합니다.
 - `game` payload는 `GO_TO_GAME_WAITING`일 때만 필수이며, 실패 이벤트에서는 `game=null`입니다.
 - gameRoom 생성 실패 시 자동 매칭 복귀는 하지 않는 정책을 따릅니다.
