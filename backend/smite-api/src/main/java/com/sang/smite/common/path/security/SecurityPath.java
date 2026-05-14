@@ -15,6 +15,7 @@ public final class SecurityPath {
             "/api/v1/auth/**",
             "/actuator/**",
             "/docs/**",
+            "/assets/**",
             "/webjars/**",
             "/favicon.ico"
     };

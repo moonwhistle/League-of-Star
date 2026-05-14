@@ -105,10 +105,13 @@ flowchart TD
 
 ### Step 2. MP4 정적 서빙
 
-- [ ] MP4를 Spring Boot static resource로 이동
-- [ ] `/assets/game/dragon-view.mp4`로 접근 가능하게 구성
+- [x] Spring Boot static resource 디렉토리 준비
+- [x] `/assets/game/dragon-view.mp4` 접근을 위한 경로 구조 구성
+- [x] 실제 MP4 배치 경로 명시
+- [x] 실제 MP4 파일은 repo에 포함하지 않고 `.gitkeep`만 유지
 - [x] gameRoom마다 MP4를 따로 만들지 않음
 - [x] gameRoom 생성 시 payload에는 고정 `videoUrl`만 포함
+- [x] CDN/S3 static asset 분리는 MVP 이후로 유지
 
 ### Step 3. 게임 대기 WebSocket 연결
 
@@ -434,7 +437,7 @@ gameRoom 생성 실패 mapping:
 - gameRoom 생성 성공 후 `match:status:{userA/userB}=IN_GAME`
 - gameRoom 생성 실패 시 두 유저가 `ACCEPTED` 상태에 갇히지 않고 start 버튼 화면으로 복귀 가능
 
-### Issue 37. MP4 static resource 제공
+### Issue 38. MP4 static resource 제공
 
 목표:
 
@@ -443,13 +446,18 @@ gameRoom 생성 실패 mapping:
 범위:
 
 - Spring Boot static resource 위치 정리
+- `backend/smite-api/src/main/resources/static/assets/game/.gitkeep` 추가
+- 실제 MP4 배치 경로 명시
+- 실제 `dragon-view.mp4` 파일은 Git에 포함하지 않음
 - API 문서 또는 체크포인트 문서에 고정 `videoUrl` 명시
 - gameRoom별 MP4 생성/복제 없음
+- CDN/S3 static asset 분리는 MVP 이후 검토
 
 완료 기준:
 
-- 브라우저에서 `/assets/game/dragon-view.mp4` 접근 가능
+- 로컬/배포 환경에서 `dragon-view.mp4`를 배치하면 `/assets/game/dragon-view.mp4` 접근 가능
 - `match_response_result.game.videoUrl`이 같은 URL을 반환
+- 실제 MP4 파일 없이도 테스트 통과
 
 ### Issue 38. 게임 대기 WebSocket 연결
 
