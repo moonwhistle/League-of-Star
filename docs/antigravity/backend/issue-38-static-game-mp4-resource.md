@@ -34,7 +34,8 @@ resource path = backend/smite-api/src/main/resources/static/assets/game/dragon-v
 - [x] `GameRoomSetupServiceTest`에서 `videoUrl` 반환값 검증 유지
 - [x] `GameSetupPortAdapterTest`에서 `videoUrl` 매핑 검증 유지
 - [x] notification factory/dto 테스트에서 `game.videoUrl` 직렬화 검증 유지
-- [x] 필요 시 static resource 경로 존재 여부를 가벼운 테스트로 검증
+- [x] static resource 경로 존재 여부를 classpath resource 테스트로 검증
+- [x] `/assets/game/.gitkeep` HTTP 접근이 인증 없이 가능한지 MockMvc 테스트로 검증
 
 ### 4. 문서 정합성 반영
 
@@ -80,21 +81,26 @@ backend/smite-api/src/main/resources/static/assets/game/dragon-view.mp4
   - `backend/smite-api/src/main/resources/static/assets/game` 디렉토리 추가
   - 빈 디렉토리 유지를 위해 `.gitkeep` 추가
   - 실제 MP4 파일은 Git에 포함하지 않도록 `.gitignore`에 `*.mp4` 제외 규칙 추가
+  - Spring Security whitelist에 `/assets/**`를 추가해 static asset을 인증 없이 제공
 
 - MP4 제공 정책 정리
   - MVP에서는 gameRoom마다 MP4를 생성하거나 복제하지 않음
+  - MP4 제공을 위한 별도 API/controller를 만들지 않고 Spring Boot static resource serving을 사용
   - `GameRoomSetupService`는 고정 `videoUrl=/assets/game/dragon-view.mp4`만 반환
+  - 클라이언트는 `videoUrl`을 받은 뒤 브라우저의 일반 정적 파일 요청으로 MP4를 로드
   - 영상 파일 자체는 애플리케이션 코드 변경 없이 로컬/배포 환경에 배치 가능
 
 - 설계 선택 이유
   - MP4는 바이너리 파일이라 Git diff/review가 어렵고 repo 크기를 불필요하게 키울 수 있음
   - 이번 이슈의 검증 대상은 영상 내용이 아니라 static resource 경로와 URL 계약임
+  - 정적 파일 제공은 비즈니스 API가 아니므로 controller를 추가하지 않는 편이 책임 분리가 명확함
   - `.gitkeep`만 커밋해 경로 계약은 보존하고, 실제 파일 배치는 환경별 책임으로 분리함
   - CDN/S3 분리는 MVP 이후로 미루고, 현재는 Spring Boot static resource 경로만 확정함
 
 - 테스트/문서
   - 기존 `videoUrl` 반환/매핑/직렬화 테스트 유지 확인
   - static game asset 경로가 classpath resource에 포함되는지 가벼운 테스트 추가
+  - MockMvc로 `/assets/game/.gitkeep` HTTP 접근을 검증해 Spring MVC/Security 경로를 확인
   - `plan-checkpoint`와 issue 문서에 실제 MP4 배치 경로 및 repo 미포함 정책 반영
 
 ## 📝 Note
@@ -106,6 +112,7 @@ backend/smite-api/src/main/resources/static/assets/game/dragon-view.mp4
 ```
 
 - 로컬 테스트 시 위 경로에 파일을 두면 `/assets/game/dragon-view.mp4`로 접근할 수 있습니다.
+- `/assets/game/dragon-view.mp4`는 별도 API가 아니라 Spring Boot static resource handler가 처리합니다.
 - `dragon-view.mp4`는 `.gitignore` 대상이므로 커밋하지 않습니다.
 
 ## 📌 Related Issue
@@ -126,3 +133,4 @@ backend/smite-api/src/main/resources/static/assets/game/dragon-view.mp4
 | 2026-05-14 | MP4 URL 정책 확인. `videoUrl=/assets/game/dragon-view.mp4`, gameRoom별 생성/복제 없음, notification payload 고정 URL 매핑 확인 |
 | 2026-05-14 | 기존 `videoUrl` 테스트 유지 확인 및 static game asset classpath 경로 테스트 추가 |
 | 2026-05-14 | 문서 정합성 반영. plan-checkpoint Step 2, 실제 MP4 배치 경로, repo 미포함 정책, CDN/S3 후속 정책 갱신 |
+| 2026-05-14 | `/assets/**` 보안 허용 및 MockMvc 기반 static asset HTTP 접근 테스트 추가 |
