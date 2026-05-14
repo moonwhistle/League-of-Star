@@ -40,3 +40,7 @@ security.yml
 .env
 
 backend/smite-infra-redis/src/main/resources/application-redis.yml
+
+### Game static assets ###
+backend/smite-api/src/main/resources/static/assets/game/*.mp4
+!backend/smite-api/src/main/resources/static/assets/game/.gitkeep
