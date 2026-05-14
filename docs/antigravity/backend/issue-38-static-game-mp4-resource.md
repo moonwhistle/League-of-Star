@@ -25,16 +25,16 @@ resource path = backend/smite-api/src/main/resources/static/assets/game/dragon-v
 
 ### 2. MP4 URL 정책 확인
 
-- [ ] `GameRoomSetupService`의 `videoUrl`이 `/assets/game/dragon-view.mp4`인지 확인
-- [ ] gameRoom별 MP4 생성/복제 로직이 없는지 확인
-- [ ] `match_response_result.game.videoUrl`이 고정 URL로 내려가는지 확인
+- [x] `GameRoomSetupService`의 `videoUrl`이 `/assets/game/dragon-view.mp4`인지 확인
+- [x] gameRoom별 MP4 생성/복제 로직이 없는지 확인
+- [x] `match_response_result.game.videoUrl`이 고정 URL로 내려가는지 확인
 
 ### 3. 테스트 유지/보강
 
-- [ ] `GameRoomSetupServiceTest`에서 `videoUrl` 반환값 검증 유지
-- [ ] `GameSetupPortAdapterTest`에서 `videoUrl` 매핑 검증 유지
-- [ ] notification factory/dto 테스트에서 `game.videoUrl` 직렬화 검증 유지
-- [ ] 필요 시 static resource 경로 존재 여부를 가벼운 테스트로 검증
+- [x] `GameRoomSetupServiceTest`에서 `videoUrl` 반환값 검증 유지
+- [x] `GameSetupPortAdapterTest`에서 `videoUrl` 매핑 검증 유지
+- [x] notification factory/dto 테스트에서 `game.videoUrl` 직렬화 검증 유지
+- [x] 필요 시 static resource 경로 존재 여부를 가벼운 테스트로 검증
 
 ### 4. 문서 정합성 반영
 
@@ -71,3 +71,5 @@ backend/smite-api/src/main/resources/static/assets/game/dragon-view.mp4
 | :--- | :--- |
 | 2026-05-14 | Issue 38 작업 문서 생성. 공통 MP4 static resource 디렉토리, URL 정책, 테스트/문서 task 정리 |
 | 2026-05-14 | static resource 디렉토리와 `.gitkeep` 추가, MP4 파일 Git 제외 정책 반영 |
+| 2026-05-14 | MP4 URL 정책 확인. `videoUrl=/assets/game/dragon-view.mp4`, gameRoom별 생성/복제 없음, notification payload 고정 URL 매핑 확인 |
+| 2026-05-14 | 기존 `videoUrl` 테스트 유지 확인 및 static game asset classpath 경로 테스트 추가 |
