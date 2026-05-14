@@ -15,7 +15,7 @@ flowchart TD
     H -->|"성공"| I{"Redis ACCEPTED/IN_GAME<br/>상태 전환 성공?"}
     I -->|"성공"| J["timeout index cleanup"]
     J --> K["SSE match_response_result<br/>GO_TO_GAME_WAITING<br/>game={gameRoomId, videoUrl, webSocketUrl}"]
-    K --> L["클라이언트 /game/{gameRoomId}/waiting 이동<br/>매칭 SSE 종료 가능"]
+    K --> L["클라이언트 /game/{gameRoomId}/waiting 이동<br/>EventSource.close()"]
     L --> M["gameRoom WebSocket 연결"]
     M --> N["MP4 preload 후 CLIENT_READY"]
     N --> O["WebSocket RTT 5회 측정<br/>median 저장"]
@@ -63,7 +63,9 @@ flowchart TD
 - `GO_TO_GAME_WAITING`은 gameRoom/scenario 생성과 Redis `ACCEPTED`/`IN_GAME` 상태 전환이 모두 끝난 뒤 발행한다.
 - `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/SMITE/종료 처리는 WebSocket으로 담당한다.
 - 별도의 SSE `game_ready` 이벤트는 만들지 않는다.
-- 클라이언트는 `match_response_result.game` payload를 받은 뒤 매칭 SSE를 닫아도 된다.
+- `match_response_result`는 해당 matchId의 매칭 SSE 최종 이벤트다.
+- 클라이언트는 `match_response_result` 수신 후 매칭 SSE `EventSource.close()`를 호출한다.
+- `GO_TO_GAME_WAITING`이면 매칭 SSE를 닫은 뒤 gameRoom WebSocket으로 전환한다.
 
 ## 3. 사용자 시나리오 기준 흐름
 
@@ -77,7 +79,7 @@ flowchart TD
 8. HP 감소 scenario 생성 및 저장
 9. `match_response_result.game` payload에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
 10. 클라이언트는 `/game/{gameRoomId}/waiting` 이동
-11. 클라이언트는 매칭 SSE 연결 종료 가능
+11. 클라이언트는 `match_response_result` 수신 후 매칭 SSE `EventSource.close()` 호출
 12. 클라이언트가 gameRoom WebSocket 연결
 13. MP4 preload
 14. 클라이언트가 `CLIENT_READY` 전송
@@ -552,3 +554,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-13 | gameRoom 생성 실패 정책을 큐 자동 복귀에서 안내 메시지 후 start 화면 복귀로 변경 |
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 및 성공 SSE 발행 금지 정책 반영 |
 | 2026-05-13 | 게임 대기 WebSocket 미접속/READY timeout 정책과 GAME_START 전후 이탈 처리 분리 반영 |
+| 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |

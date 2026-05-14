@@ -35,6 +35,7 @@
   - 게임방 생성 실패 시 `GAME_SETUP_FAILED` 결과를 전달하고 양쪽 모두 start 버튼 화면으로 복귀
   - 게임방 생성 후 Redis 상태 전환 실패 시 생성된 게임방/참여자는 `ABORTED`로 보상 처리하고 동일하게 `GAME_SETUP_FAILED` 결과를 전달
   - 게임방 생성 실패 또는 Redis 상태 전환 실패 시 매칭 큐에 자동 복귀하지 않음
+  - 클라이언트는 `match_response_result` 수신 후 매칭 SSE `EventSource.close()`를 호출
   - 게임 대기 화면 진입 이후 준비/RTT/카운트다운/게임 시작/입력/종료는 WebSocket 담당
 
 ### 2.3 강타 싸움 게임
@@ -370,3 +371,4 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화. PixiJS/Web Worker/OffscreenCanvas/STOMP/SockJS는 MVP 이후 검토로 이동 |
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GAME_SETUP_FAILED` reason 기준으로 start 버튼 화면 복귀하도록 정책 조정 |
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책과 8~17초 게임 시간 반영 |
+| 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |

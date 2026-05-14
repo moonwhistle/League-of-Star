@@ -43,7 +43,9 @@
 - 최종 실패 정산은 수락 제한 시간이 만료된 deadline 시점에 수행한다. 단, 양쪽 모두 수락한 경우는 즉시 성공 처리한다.
 - 예: B가 3초에 거절하고 A가 6초에 수락하면, A는 제한 시간 안에 수락했으므로 기존 큐 진입 시각으로 최우선 복귀한다.
 - 매칭 알림 SSE 연결은 `match_found` 수신 직후 닫지 않고, 매칭 응답 최종 결과를 받을 때까지 유지한다.
-  - 게임 대기 화면 이동, start 버튼 복귀, 매칭 대기 복귀 등 다음 화면 전이가 확정되면 클라이언트가 연결을 닫거나 유지 여부를 결정한다.
+  - `match_response_result`는 해당 matchId의 매칭 SSE 최종 이벤트다.
+  - 클라이언트는 `match_response_result` 수신 후 매칭 SSE `EventSource.close()`를 호출한다.
+  - `GO_TO_GAME_WAITING`이면 매칭 SSE를 닫은 뒤 gameRoom WebSocket으로 전환한다.
 - 양쪽 수락이 완료되어도 게임방/시나리오 생성과 Redis 상태 전환이 모두 성공하기 전에는 게임 대기 화면으로 이동시키지 않는다.
   - 게임방/시나리오 생성 성공 후 Redis `match session=ACCEPTED`, 두 유저 `match:status=IN_GAME` 전환까지 완료되면 `match_response_result`는 `GO_TO_GAME_WAITING`과 함께 `gameRoomId`, `videoUrl`, `webSocketUrl`을 전달한다.
   - 게임방/시나리오 생성 실패 또는 Redis 상태 전환 실패 시 `match_response_result`는 `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`를 전달한다.
@@ -410,3 +412,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-13 | 양쪽 수락 후 gameRoom/scenario 생성 성공 시에만 `GO_TO_GAME_WAITING` 발행, gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 이벤트 발행, 매칭 SSE와 게임 WebSocket 책임 경계 반영 |
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GO_TO_MATCH_START`와 `GAME_SETUP_FAILED` reason으로 start 화면 복귀하도록 정책 변경 |
 | 2026-05-13 | 양쪽 수락 후 Redis 상태 전환까지 성공해야 `GO_TO_GAME_WAITING`을 발행하고, Redis 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책 추가 |
+| 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
