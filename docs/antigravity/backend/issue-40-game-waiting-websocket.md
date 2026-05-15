@@ -71,6 +71,7 @@ smite-api
   com.sang.smite.game.service
   com.sang.smite.game.config
   com.sang.smite.game.websocket
+  com.sang.smite.game.websocket.handler
   com.sang.smite.game.websocket.interceptor
   com.sang.smite.game.websocket.resolver
   com.sang.smite.game.websocket.dto
@@ -104,7 +105,7 @@ smite-matching
 ```text
 backend/smite-api/build.gradle
 backend/smite-api/src/main/java/com/sang/smite/game/config/GameWebSocketConfig.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/GameWaitingWebSocketHandler.java
+backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitingWebSocketHandler.java
 backend/smite-api/src/main/java/com/sang/smite/game/websocket/interceptor/GameWebSocketHandshakeInterceptor.java
 backend/smite-api/src/main/java/com/sang/smite/common/path/security/SecurityPath.java
 ```
@@ -186,15 +187,15 @@ backend/smite-core/src/main/java/com/sang/smite/domain/game/domain/GameRoom.java
 
 ### 5. WebSocket session registry 구현
 
-- [ ] gameRoomId/userId 기준 connection registry 추가
-- [ ] WebSocket session id로 roomId/userId 역조회가 가능하도록 관리
-- [ ] 동일 유저 중복 연결 시 기존 연결을 닫고 새 연결로 교체하는 정책 적용
-- [ ] 연결 성공 시 in-memory 참가자 입장 상태 저장
-- [ ] 연결 종료 시 in-memory 참가자 이탈 상태 반영
-- [ ] 양쪽 연결 여부 조회 기능 추가
-- [ ] `CLIENT_READY` 상태 저장 기능 추가
-- [ ] 양쪽 READY 여부 조회 기능 추가
-- [ ] registry는 DB 상태를 변경하지 않고 WebSocket 연결 상태만 관리
+- [x] gameRoomId/userId 기준 connection registry 추가
+- [x] WebSocket session id로 roomId/userId 역조회가 가능하도록 관리
+- [x] 동일 유저 중복 연결 시 기존 연결을 닫고 새 연결로 교체하는 정책 적용
+- [x] 연결 성공 시 in-memory 참가자 입장 상태 저장
+- [x] 연결 종료 시 in-memory 참가자 이탈 상태 반영
+- [x] 양쪽 연결 여부 조회 기능 추가
+- [x] `CLIENT_READY` 상태 저장 기능 추가
+- [x] 양쪽 READY 여부 조회 기능 추가
+- [x] registry는 DB 상태를 변경하지 않고 WebSocket 연결 상태만 관리
 
 추가 파일:
 
@@ -206,8 +207,41 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/session/GameRoomWe
 정책:
 
 - WebSocket connection은 서버 인스턴스 로컬 자원이므로 registry는 `smite-api`에 둔다.
-- MVP에서는 단일 인스턴스 기준 in-memory registry로 시작한다.
-- 다중 인스턴스 fan-out/redis registry는 MVP 이후 검토한다.
+- registry는 API 인스턴스 local memory 기반이므로, 멀티 인스턴스 환경에서는 같은 `gameRoomId`의 두 참가자가 같은 API 인스턴스로 라우팅되어야 한다.
+- MVP 멀티 인스턴스 정책은 `/ws/game/{gameRoomId}`의 `gameRoomId` 기반 sticky routing이다.
+- sticky 기준은 userId가 아니라 gameRoomId다. userId 기준 sticky는 같은 gameRoom의 두 유저가 서로 다른 인스턴스로 갈 수 있다.
+- Redis registry/pub-sub 기반 fan-out은 sticky routing이 어렵거나 서버 장애 복구/관전/다중 topic 확장이 필요할 때 후속으로 검토한다.
+
+멀티 인스턴스 문제와 해결:
+
+```text
+문제 상황:
+  User A -> API-1 / room 100
+  User B -> API-2 / room 100
+
+결과:
+  API-1 registry에는 A만 존재
+  API-2 registry에는 B만 존재
+  areBothConnected(room 100), areBothReady(room 100), room broadcast가 정확히 동작하지 않음
+
+MVP 해결:
+  /ws/game/100 요청은 항상 같은 API 인스턴스로 라우팅
+  gameRoomId=100 -> API-2
+
+결과:
+  API-2 registry에 A/B session이 함께 존재
+  in-memory registry로 연결/READY/broadcast 처리 가능
+```
+
+sticky routing과 pub/sub 트레이드오프:
+
+| 항목 | gameRoomId sticky routing | Redis registry/pub-sub |
+| :--- | :--- | :--- |
+| 구현 복잡도 | 낮음. 애플리케이션 registry 구조 유지 | 높음. 연결 상태 저장, 메시지 fan-out, 장애 처리를 별도 설계 |
+| 현재 코드 영향 | 작음. in-memory registry 유지 | 큼. registry/broadcast/message routing 구조 변경 필요 |
+| 라우팅 전제 | 같은 gameRoomId가 같은 API 인스턴스로 가야 함 | 인스턴스가 달라도 메시지 전달 가능 |
+| 장애 복구 | 해당 인스턴스 장애 시 연결 재수립 필요 | 설계에 따라 상태 복구와 재전송 전략 확장 가능 |
+| MVP 적합성 | 높음. 1:1 gameRoom과 단순 메시지에 적합 | 과함. 관전/로비/다중 topic/fan-out 단계에서 적합 |
 
 ### 6. WebSocket message model 정의
 
@@ -245,7 +279,7 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketM
 추가 파일:
 
 ```text
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/GameWaitingWebSocketHandler.java
+backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitingWebSocketHandler.java
 ```
 
 ### 8. GAME_START 이전 timeout 정책 문서화
@@ -325,3 +359,5 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/GameWaitingWebSock
 | 2026-05-15 | Task 3 의존 작업으로 Task 4 완료. core `GameRoomReadService`와 `GameRoom.hasParticipant` 추가 |
 | 2026-05-15 | Task 3 구조 개선. token query 추출을 `JwtTokenResolver`로 분리하고 WebSocket 패키지를 `interceptor`/`session` 기준으로 정리 |
 | 2026-05-15 | Task 3 구조 개선. WebSocket path의 gameRoomId 추출을 `GameWebSocketPathResolver`로 분리하고 path separator 상수화 |
+| 2026-05-15 | Task 5 완료. gameRoom/user/sessionId 기준 in-memory WebSocket session registry와 READY 상태 관리 추가 |
+| 2026-05-15 | Task 5 멀티 인스턴스 정책 추가. local registry 문제와 gameRoomId sticky routing 해결 방식, Redis pub/sub 트레이드오프 명시 |

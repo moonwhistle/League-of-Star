@@ -358,6 +358,13 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 - STOMP.js, SockJS fallback은 MVP에서 사용하지 않습니다.
   RTT 측정과 SMITE 입력 경로를 단순하고 일관되게 유지하기 위해 WebSocket 단일 경로를 사용합니다.
 
+### 9.4 WebSocket 멀티 인스턴스 라우팅
+
+- 게임 WebSocket session registry는 API 인스턴스 local memory 기반으로 시작합니다.
+- 멀티 인스턴스 배포에서는 `/ws/game/{gameRoomId}`의 `gameRoomId`를 affinity key로 사용해 같은 gameRoom의 두 참가자를 같은 API 인스턴스로 라우팅합니다.
+- userId 기준 sticky routing은 같은 gameRoom의 두 참가자가 서로 다른 인스턴스로 갈 수 있으므로 사용하지 않습니다.
+- Redis registry/pub-sub 기반 fan-out은 관전, 로비, 다중 topic, 서버 장애 복구 요구가 커질 때 후속 확장안으로 검토합니다.
+
 ---
 
 ## 10. 변경 이력
@@ -372,3 +379,4 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GAME_SETUP_FAILED` reason 기준으로 start 버튼 화면 복귀하도록 정책 조정 |
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책과 8~17초 게임 시간 반영 |
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
+| 2026-05-15 | 게임 WebSocket local registry의 멀티 인스턴스 전제로 `gameRoomId` 기반 sticky routing 정책 추가 |

@@ -168,6 +168,15 @@
 | **매크로 감지** | 게임 시작 후 비정상적으로 빠른 입력 (< 100ms) 감지 시 무효 처리 |
 | **요청 중복 차단** | 동일 게임에서 2회 이상 SMITE 요청 수신 시 첫 번째만 유효 |
 
+### 2.7 WebSocket 라우팅 정책
+
+- 게임 WebSocket 연결/READY 상태는 API 인스턴스 local memory registry에서 관리한다.
+- 멀티 인스턴스 환경에서는 같은 `gameRoomId`의 두 참가자가 같은 API 인스턴스로 연결되어야 한다.
+- WebSocket routing affinity 기준은 userId가 아니라 `gameRoomId`다.
+- `/ws/game/{gameRoomId}` 경로의 `gameRoomId` 기반 sticky routing을 사용한다.
+- 이 보장이 없으면 `areBothConnected`, `areBothReady`, gameRoom broadcast가 인스턴스별로 갈라져 정확히 동작하지 않는다.
+- Redis registry/pub-sub 기반 fan-out은 sticky routing으로 해결하기 어려운 확장 요구가 생길 때 후속으로 검토한다.
+
 ---
 
 ## 3. LP 정책
@@ -413,3 +422,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GO_TO_MATCH_START`와 `GAME_SETUP_FAILED` reason으로 start 화면 복귀하도록 정책 변경 |
 | 2026-05-13 | 양쪽 수락 후 Redis 상태 전환까지 성공해야 `GO_TO_GAME_WAITING`을 발행하고, Redis 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책 추가 |
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
+| 2026-05-15 | 게임 WebSocket local registry 사용 전제와 멀티 인스턴스 `gameRoomId` 기반 sticky routing 정책 추가 |

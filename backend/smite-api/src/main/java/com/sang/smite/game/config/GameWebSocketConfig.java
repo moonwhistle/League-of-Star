@@ -1,6 +1,6 @@
 package com.sang.smite.game.config;
 
-import com.sang.smite.game.websocket.GameWaitingWebSocketHandler;
+import com.sang.smite.game.websocket.handler.GameWaitingWebSocketHandler;
 import com.sang.smite.game.websocket.interceptor.GameWebSocketHandshakeInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
