@@ -30,26 +30,33 @@ public class GameRoomWebSocketSessionRegistry {
     /**
      * gameRoom 참가자의 WebSocket 연결을 등록한다. 같은 유저의 기존 연결은 새 연결로 교체한다.
      */
-    public synchronized void register(Long gameRoomId, Long userId, WebSocketSession webSocketSession) {
+    public void register(Long gameRoomId, Long userId, WebSocketSession webSocketSession) {
         Objects.requireNonNull(gameRoomId, "gameRoomId must not be null.");
         Objects.requireNonNull(userId, "userId must not be null.");
         Objects.requireNonNull(webSocketSession, "webSocketSession must not be null.");
 
-        removeIfAlreadyRegistered(webSocketSession.getId());
+        GameRoomWebSocketSession sessionToClose;
+        synchronized (this) {
+            removeIfAlreadyRegistered(webSocketSession.getId());
 
-        Map<Long, GameRoomWebSocketSession> roomSessions = sessionsByRoom.computeIfAbsent(
-                gameRoomId,
-                ignored -> new HashMap<>()
-        );
-        GameRoomWebSocketSession previousSession = roomSessions.remove(userId);
-        if (previousSession != null) {
-            sessionsById.remove(previousSession.getSessionId());
-            closeQuietly(previousSession.getWebSocketSession());
+            Map<Long, GameRoomWebSocketSession> roomSessions = sessionsByRoom.computeIfAbsent(
+                    gameRoomId,
+                    ignored -> new HashMap<>()
+            );
+            GameRoomWebSocketSession previousSession = roomSessions.remove(userId);
+            if (previousSession != null) {
+                sessionsById.remove(previousSession.getSessionId());
+            }
+
+            GameRoomWebSocketSession newSession = GameRoomWebSocketSession.of(gameRoomId, userId, webSocketSession);
+            roomSessions.put(userId, newSession);
+            sessionsById.put(newSession.getSessionId(), newSession);
+            sessionToClose = previousSession;
         }
 
-        GameRoomWebSocketSession newSession = GameRoomWebSocketSession.of(gameRoomId, userId, webSocketSession);
-        roomSessions.put(userId, newSession);
-        sessionsById.put(newSession.getSessionId(), newSession);
+        if (sessionToClose != null) {
+            closeQuietly(sessionToClose.getWebSocketSession());
+        }
     }
 
     /**
