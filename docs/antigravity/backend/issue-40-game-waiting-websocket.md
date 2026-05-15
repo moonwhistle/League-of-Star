@@ -71,9 +71,11 @@ smite-api
   com.sang.smite.game.service
   com.sang.smite.game.config
   com.sang.smite.game.websocket
-  com.sang.smite.game.websocket.auth
+  com.sang.smite.game.websocket.interceptor
+  com.sang.smite.game.websocket.resolver
   com.sang.smite.game.websocket.dto
   com.sang.smite.game.websocket.session
+  com.sang.smite.auth.infrastructure.jwt
   com.sang.smite.common.path.security
 
 smite-core
@@ -103,60 +105,72 @@ smite-matching
 backend/smite-api/build.gradle
 backend/smite-api/src/main/java/com/sang/smite/game/config/GameWebSocketConfig.java
 backend/smite-api/src/main/java/com/sang/smite/game/websocket/GameWaitingWebSocketHandler.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/auth/GameWebSocketHandshakeInterceptor.java
+backend/smite-api/src/main/java/com/sang/smite/game/websocket/interceptor/GameWebSocketHandshakeInterceptor.java
 backend/smite-api/src/main/java/com/sang/smite/common/path/security/SecurityPath.java
 ```
 
 구현 상태:
 
 - `/ws/game/{gameRoomId}` endpoint와 handler/interceptor wiring까지 추가한다.
-- 실제 JWT/participant 검증은 Task 3 범위이므로, 현재 handshake interceptor는 fail-closed로 모든 연결을 거부한다.
+- Task 3에서 handshake interceptor에 실제 JWT/participant 검증을 연결한다.
 - allowed origins는 현재 별도 CORS 정책이 없으므로 MVP 기준 `setAllowedOriginPatterns("*")`로 시작한다.
 
 ### 3. WebSocket handshake 인증/인가
 
-- [ ] `GameWebSocketHandshakeInterceptor` 추가
-- [ ] handshake query parameter `token` 추출
-- [ ] `JwtTokenProvider`로 JWT 검증
-- [ ] token에서 `userId` 추출
-- [ ] URI path에서 `gameRoomId` 추출
-- [ ] core `GameRoomReadService`로 gameRoom READY 상태와 participant 검증
-- [ ] 인증 실패 시 handshake 거부
-- [ ] gameRoom 미존재, READY 아님, participant 아님이면 handshake 거부
-- [ ] 성공 시 WebSocket session attributes에 `gameRoomId`, `userId` 저장
-- [ ] attributes key는 상수로 분리해서 handler와 공유
-- [ ] query parameter token 방식은 MVP 정책으로 문서화하고, 운영 보안 강화 시 cookie 또는 최초 메시지 인증 재검토
+- [x] `GameWebSocketHandshakeInterceptor` 추가
+- [x] handshake query parameter `token` 추출
+- [x] `JwtTokenProvider`로 JWT 검증
+- [x] token에서 `userId` 추출
+- [x] URI path에서 `gameRoomId` 추출
+- [x] core `GameRoomReadService`로 gameRoom READY 상태와 participant 검증
+- [x] 인증 실패 시 handshake 거부
+- [x] gameRoom 미존재, READY 아님, participant 아님이면 handshake 거부
+- [x] 성공 시 WebSocket session attributes에 `gameRoomId`, `userId` 저장
+- [x] attributes key는 상수로 분리해서 handler와 공유
+- [x] query parameter token 추출은 auth infra `JwtTokenResolver`로 분리
+- [x] path에서 gameRoomId 추출은 `GameWebSocketPathResolver`로 분리
+- [x] query parameter token 방식은 MVP 정책으로 문서화하고, 운영 보안 강화 시 cookie 또는 최초 메시지 인증 재검토
 
-추가 파일:
+추가/변경 파일:
 
 ```text
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/auth/GameWebSocketHandshakeInterceptor.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/auth/GameWebSocketSessionAttribute.java
+backend/smite-api/src/main/java/com/sang/smite/auth/infrastructure/jwt/JwtTokenResolver.java
+backend/smite-api/src/main/java/com/sang/smite/game/websocket/interceptor/GameWebSocketHandshakeInterceptor.java
+backend/smite-api/src/main/java/com/sang/smite/game/websocket/resolver/GameWebSocketPathResolver.java
+backend/smite-api/src/main/java/com/sang/smite/game/websocket/session/GameWebSocketSessionAttribute.java
+backend/smite-core/src/main/java/com/sang/smite/domain/game/service/GameRoomReadService.java
+backend/smite-core/src/main/java/com/sang/smite/domain/game/domain/GameRoom.java
 ```
 
 처리 흐름:
 
 ```text
 beforeHandshake
-  -> token query parameter 추출
+  -> JwtTokenResolver.resolveWebSocketToken(uri)
   -> JwtTokenProvider.validateToken(token)
   -> JwtTokenProvider.getUserId(token)
-  -> URI에서 gameRoomId 추출
+  -> GameWebSocketPathResolver.resolveGameRoomId(uri)
   -> GameRoomReadService.validateReadyParticipant(gameRoomId, userId)
   -> attributes.put(GAME_ROOM_ID, gameRoomId)
   -> attributes.put(USER_ID, userId)
   -> true 반환
 ```
 
+실패 처리:
+
+- token 누락 또는 JWT 검증 실패: handshake 거부, `401 Unauthorized`
+- gameRoomId path 형식 오류: handshake 거부, `400 Bad Request`
+- gameRoom 미존재, READY 아님, participant 아님: handshake 거부, `403 Forbidden`
+
 ### 4. gameRoom participant 검증 유스케이스
 
-- [ ] `GameRoomReadService` 추가
-- [ ] gameRoom 존재 여부 검증
-- [ ] gameRoom status가 `READY`인지 검증
-- [ ] 요청 userId가 participant인지 검증
-- [ ] 실패 시 core 예외로 표현
-- [ ] `GameRoom` 도메인에 participant 포함 여부 확인 메서드 추가 여부 검토
-- [ ] 기존 `CoreErrorCode.GAME_ROOM_NOT_FOUND`, `INVALID_GAME_STATE`, `INVALID_GAME_PARTICIPANTS`를 우선 재사용
+- [x] `GameRoomReadService` 추가
+- [x] gameRoom 존재 여부 검증
+- [x] gameRoom status가 `READY`인지 검증
+- [x] 요청 userId가 participant인지 검증
+- [x] 실패 시 core 예외로 표현
+- [x] `GameRoom` 도메인에 participant 포함 여부 확인 메서드 추가 여부 검토
+- [x] 기존 `CoreErrorCode.GAME_ROOM_NOT_FOUND`, `INVALID_GAME_STATE`, `INVALID_GAME_PARTICIPANTS`를 우선 재사용
 
 추가/변경 파일:
 
@@ -307,3 +321,7 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/GameWaitingWebSock
 | 2026-05-14 | 현재 패키지 구조 기준으로 WebSocket 설정, handshake 인증/인가, core read service, session registry, handler, 테스트 task 구체화 |
 | 2026-05-14 | Task 1 완료. 소스 기준 기존 WebSocket 설정 없음, API/game WebSocket adapter와 core gameRoom 검증 책임 경계 확정 |
 | 2026-05-14 | Task 2 완료. WebSocket 의존성, `/ws/game/{gameRoomId}` endpoint 설정, fail-closed handshake interceptor, `/ws/game/**` whitelist 추가 |
+| 2026-05-15 | Task 3 완료. handshake JWT 인증, gameRoom READY/participant 인가, WebSocket session attributes 저장, 실패 status code 분리 |
+| 2026-05-15 | Task 3 의존 작업으로 Task 4 완료. core `GameRoomReadService`와 `GameRoom.hasParticipant` 추가 |
+| 2026-05-15 | Task 3 구조 개선. token query 추출을 `JwtTokenResolver`로 분리하고 WebSocket 패키지를 `interceptor`/`session` 기준으로 정리 |
+| 2026-05-15 | Task 3 구조 개선. WebSocket path의 gameRoomId 추출을 `GameWebSocketPathResolver`로 분리하고 path separator 상수화 |
