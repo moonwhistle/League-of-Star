@@ -272,24 +272,33 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketM
 
 ### 7. 게임 대기 WebSocket handler 구현
 
-- [ ] `GameWaitingWebSocketHandler` 추가
-- [ ] `afterConnectionEstablished`에서 session attributes의 `gameRoomId`, `userId` 조회
-- [ ] session attributes가 없으면 연결 종료
-- [ ] registry에 roomId/userId/session 등록
-- [ ] 연결 성공 시 같은 room 참가자에게 `PLAYER_JOINED` 전송
-- [ ] `CLIENT_READY` 수신 시 ready 상태 반영
-- [ ] ready 상태 변경 시 `PLAYER_READY` 전송
-- [ ] 양쪽 READY여도 이번 이슈에서는 `GAME_START`를 보내지 않음
-- [ ] `afterConnectionClosed`에서 registry 제거
-- [ ] 같은 room 남은 참가자에게 `PLAYER_LEFT` 전송
-- [ ] handler 예외 발생 시 session 정리
-- [ ] JSON 파싱 실패 또는 알 수 없는 message type은 `ERROR` 전송 후 연결 유지 여부 결정
+- [x] `GameWaitingWebSocketHandler` 추가
+- [x] `afterConnectionEstablished`에서 session attributes의 `gameRoomId`, `userId` 조회
+- [x] session attributes가 없으면 연결 종료
+- [x] registry에 roomId/userId/session 등록
+- [x] 연결 성공 시 같은 room 참가자에게 `PLAYER_JOINED` 전송
+- [x] `CLIENT_READY` 수신 시 ready 상태 반영
+- [x] ready 상태 변경 시 `PLAYER_READY` 전송
+- [x] 양쪽 READY여도 이번 이슈에서는 `GAME_START`를 보내지 않음
+- [x] `afterConnectionClosed`에서 registry 제거
+- [x] 같은 room 남은 참가자에게 `PLAYER_LEFT` 전송
+- [x] handler 예외 발생 시 session 정리
+- [x] JSON 파싱 실패 또는 알 수 없는 message type은 `ERROR` 전송 후 연결 유지 여부 결정
 
 추가 파일:
 
 ```text
 backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitingWebSocketHandler.java
 ```
+
+구현 상태:
+
+- handler는 handshake interceptor가 저장한 session attributes의 `gameRoomId`, `userId`만 신뢰한다.
+- 연결 성공 시 registry에 session을 등록하고 `PLAYER_JOINED`를 room 참가자에게 broadcast한다.
+- `CLIENT_READY`만 유효한 client message로 처리한다.
+- `PLAYER_READY`, `PLAYER_LEFT`, `ERROR`는 server message로만 사용한다.
+- 양쪽 READY여도 `GAME_START`는 전송하지 않는다.
+- 연결 종료 또는 transport error 시 registry를 정리하고 남은 참가자에게 `PLAYER_LEFT`를 broadcast한다.
 
 ### 8. GAME_START 이전 timeout 정책 문서화
 
@@ -310,12 +319,12 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitin
 - [ ] handshake JWT 누락/잘못된 token 실패 테스트
 - [ ] participant가 아닌 유저 handshake 실패 테스트
 - [ ] READY gameRoom participant handshake 성공 테스트
-- [ ] connection registry 등록/제거 단위 테스트
-- [ ] 동일 유저 중복 연결 시 기존 session 교체 테스트
-- [ ] `CLIENT_READY` 수신 시 ready 상태 반영 테스트
-- [ ] 양쪽 READY 전에는 게임 시작 이벤트를 보내지 않는지 테스트
+- [x] connection registry 등록/제거 단위 테스트
+- [x] 동일 유저 중복 연결 시 기존 session 교체 테스트
+- [x] `CLIENT_READY` 수신 시 ready 상태 반영 테스트
+- [x] 양쪽 READY 전에는 게임 시작 이벤트를 보내지 않는지 테스트
 - [ ] core `GameRoomReadService` participant 검증 단위/JPA 테스트
-- [ ] session attributes에 저장된 roomId/userId만 사용하고 payload userId를 신뢰하지 않는지 테스트
+- [x] session attributes에 저장된 roomId/userId만 사용하고 payload userId를 신뢰하지 않는지 테스트
 
 테스트 기준:
 
@@ -371,3 +380,4 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitin
 | 2026-05-15 | Task 5 완료. gameRoom/user/sessionId 기준 in-memory WebSocket session registry와 READY 상태 관리 추가 |
 | 2026-05-15 | Task 5 멀티 인스턴스 정책 추가. local registry 문제와 gameRoomId sticky routing 해결 방식, Redis pub/sub 트레이드오프 명시 |
 | 2026-05-15 | Task 6 완료. WebSocket client/server envelope, message type, server message factory, invalid message type error 정의 |
+| 2026-05-15 | Task 7 완료. 게임 대기 WebSocket handler에서 연결 등록, CLIENT_READY, PLAYER_JOINED/READY/LEFT, ERROR 처리 구현 |
