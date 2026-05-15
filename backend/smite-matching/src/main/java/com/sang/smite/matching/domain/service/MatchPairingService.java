@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -55,7 +56,7 @@ public class MatchPairingService {
             List<MatchTicket> tickets = loadSortedTickets();
             matchEngineMetrics.recordScannedTickets(tickets.size());
 
-            if (tickets.size() < MIN_MATCHABLE_USER_COUNT) {
+            if (!hasEnoughTickets(tickets)) {
                 log.debug("[MatchEngineScheduler] 매칭 가능 인원 부족, 현재 인원: {}명", tickets.size());
                 return;
             }
@@ -75,6 +76,10 @@ public class MatchPairingService {
 
         log.debug("[MatchEngineScheduler] 대기열 스캔 완료, 현재 인원: {}명", tickets.size());
         return tickets;
+    }
+
+    private boolean hasEnoughTickets(List<MatchTicket> tickets) {
+        return tickets.size() >= MIN_MATCHABLE_USER_COUNT;
     }
 
     private int pairTickets(List<MatchTicket> tickets) {
@@ -103,28 +108,33 @@ public class MatchPairingService {
             long now,
             Set<Long> pairedUserIds
     ) {
+        List<MatchTicket> candidates = findMatchableCandidates(userA, tickets, candidateStartIndex, now, pairedUserIds);
+        for (MatchTicket userB : candidates) {
+            if (confirmPair(userA, userB, pairedUserIds)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private List<MatchTicket> findMatchableCandidates(
+            MatchTicket userA,
+            List<MatchTicket> tickets,
+            int candidateStartIndex,
+            long now,
+            Set<Long> pairedUserIds
+    ) {
+        List<MatchTicket> candidates = new ArrayList<>();
         for (int i = candidateStartIndex; i < tickets.size(); i++) {
             MatchTicket userB = tickets.get(i);
             if (pairedUserIds.contains(userB.userId()) || !isMatchable(userA, userB, now)) {
                 continue;
             }
 
-            matchEngineMetrics.incrementAtomicPairAttempts();
-            boolean success = matchStore.atomicPairRemove(
-                    userA.userId(), userA.tierScore(),
-                    userB.userId(), userB.tierScore()
-            );
-
-            if (success) {
-                markPaired(userA, userB, pairedUserIds);
-                handleMatchedPair(userA, userB);
-                return true;
-            }
-
-            matchEngineMetrics.incrementAtomicPairFailures();
+            candidates.add(userB);
         }
-
-        return false;
+        return candidates;
     }
 
     private boolean isMatchable(MatchTicket userA, MatchTicket userB, long now) {
@@ -133,6 +143,29 @@ public class MatchPairingService {
         int tierDiff = Math.abs(userA.tierScore() - userB.tierScore());
 
         return tierDiff <= allowedTierDiff;
+    }
+
+    private boolean confirmPair(MatchTicket userA, MatchTicket userB, Set<Long> pairedUserIds) {
+        matchEngineMetrics.incrementAtomicPairAttempts();
+        if (!removePairFromQueue(userA, userB)) {
+            matchEngineMetrics.incrementAtomicPairFailures();
+            return false;
+        }
+
+        completeMatchedPair(userA, userB, pairedUserIds);
+        return true;
+    }
+
+    private boolean removePairFromQueue(MatchTicket userA, MatchTicket userB) {
+        return matchStore.atomicPairRemove(
+                userA.userId(), userA.tierScore(),
+                userB.userId(), userB.tierScore()
+        );
+    }
+
+    private void completeMatchedPair(MatchTicket userA, MatchTicket userB, Set<Long> pairedUserIds) {
+        markPaired(userA, userB, pairedUserIds);
+        handleMatchedPair(userA, userB);
     }
 
     private void markPaired(MatchTicket userA, MatchTicket userB, Set<Long> pairedUserIds) {
