@@ -177,6 +177,19 @@
 - 이 보장이 없으면 `areBothConnected`, `areBothReady`, gameRoom broadcast가 인스턴스별로 갈라져 정확히 동작하지 않는다.
 - Redis registry/pub-sub 기반 fan-out은 sticky routing으로 해결하기 어려운 확장 요구가 생길 때 후속으로 검토한다.
 
+### 2.8 WebSocket session 상태 정책
+
+| 상태 | 의미 |
+|------|------|
+| `CONNECTED` | handshake 성공 후 API local memory registry에 WebSocket session 등록 완료 |
+| `READY` | 클라이언트가 `CLIENT_READY`를 보내 게임 대기 준비 완료 |
+| `DISCONNECTED` | WebSocket 연결 종료로 registry에서 제거 |
+| `REPLACED` | 같은 userId 재연결로 기존 session을 닫고 새 session으로 교체 |
+
+- WebSocket session 상태는 DB에 저장하지 않는다.
+- WebSocket session `READY`는 DB `game_participants.status=READY`와 다른 일시적 대기 상태다.
+- GAME_START 이전 timeout 또는 disconnect에 따른 gameRoom `ABORTED` 처리는 별도 timeout 정책에서 수행한다.
+
 ---
 
 ## 3. LP 정책
@@ -423,3 +436,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-13 | 양쪽 수락 후 Redis 상태 전환까지 성공해야 `GO_TO_GAME_WAITING`을 발행하고, Redis 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책 추가 |
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
 | 2026-05-15 | 게임 WebSocket local registry 사용 전제와 멀티 인스턴스 `gameRoomId` 기반 sticky routing 정책 추가 |
+| 2026-05-15 | WebSocket session `CONNECTED`, `READY`, `DISCONNECTED`, `REPLACED` 상태 정책 추가 |

@@ -365,6 +365,15 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 - userId 기준 sticky routing은 같은 gameRoom의 두 참가자가 서로 다른 인스턴스로 갈 수 있으므로 사용하지 않습니다.
 - Redis registry/pub-sub 기반 fan-out은 관전, 로비, 다중 topic, 서버 장애 복구 요구가 커질 때 후속 확장안으로 검토합니다.
 
+### 9.5 WebSocket session 상태
+
+- WebSocket session 상태는 API local memory registry에서만 관리합니다.
+- `CONNECTED`는 handshake 성공 후 session 등록 완료 상태입니다.
+- `READY`는 `CLIENT_READY` 수신 후 대기 준비 완료 상태입니다.
+- `DISCONNECTED`는 연결 종료로 registry에서 제거된 상태입니다.
+- `REPLACED`는 같은 userId 재연결로 기존 session을 닫고 새 session으로 교체한 상태입니다.
+- 이 상태는 DB `game_rooms`, `game_participants` 상태와 분리됩니다.
+
 ---
 
 ## 10. 변경 이력
@@ -380,3 +389,4 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책과 8~17초 게임 시간 반영 |
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
 | 2026-05-15 | 게임 WebSocket local registry의 멀티 인스턴스 전제로 `gameRoomId` 기반 sticky routing 정책 추가 |
+| 2026-05-15 | WebSocket session 상태를 API local memory registry 상태로 분리하여 명시 |

@@ -245,13 +245,13 @@ sticky routing과 pub/sub 트레이드오프:
 
 ### 6. WebSocket message model 정의
 
-- [ ] client message 공통 envelope 정의: `type`, `payload`
-- [ ] server message 공통 envelope 정의: `type`, `payload`
-- [ ] `CLIENT_READY` message 정의
-- [ ] `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `ERROR` server message 정의
-- [ ] 이번 이슈에서는 `GAME_START` message를 정의하거나 전송하지 않음
-- [ ] 잘못된 message type 처리 정책 정의
-- [ ] handler는 클라이언트가 보낸 `gameRoomId`, `userId` payload를 신뢰하지 않고 session attributes만 사용
+- [x] client message 공통 envelope 정의: `type`, `payload`
+- [x] server message 공통 envelope 정의: `type`, `payload`
+- [x] `CLIENT_READY` message 정의
+- [x] `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `ERROR` server message 정의
+- [x] 이번 이슈에서는 `GAME_START` message를 정의하거나 전송하지 않음
+- [x] 잘못된 message type 처리 정책 정의
+- [x] handler는 클라이언트가 보낸 `gameRoomId`, `userId` payload를 신뢰하지 않고 session attributes만 사용
 
 추가 파일:
 
@@ -260,6 +260,15 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketC
 backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketServerMessage.java
 backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketMessageType.java
 ```
+
+구현 상태:
+
+- client envelope는 `type`, `payload`를 가진다.
+- server envelope는 `type`, `payload`를 가진다.
+- `GameWebSocketMessageType`은 client/server 방향을 구분한다.
+- 서버 메시지는 `GameWebSocketServerMessage` factory로 생성한다.
+- 잘못된 client message type은 `ERROR / INVALID_MESSAGE_TYPE`으로 응답한다.
+- `GAME_START`는 이번 이슈 범위가 아니므로 message type에 포함하지 않는다.
 
 ### 7. 게임 대기 WebSocket handler 구현
 
@@ -361,3 +370,4 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitin
 | 2026-05-15 | Task 3 구조 개선. WebSocket path의 gameRoomId 추출을 `GameWebSocketPathResolver`로 분리하고 path separator 상수화 |
 | 2026-05-15 | Task 5 완료. gameRoom/user/sessionId 기준 in-memory WebSocket session registry와 READY 상태 관리 추가 |
 | 2026-05-15 | Task 5 멀티 인스턴스 정책 추가. local registry 문제와 gameRoomId sticky routing 해결 방식, Redis pub/sub 트레이드오프 명시 |
+| 2026-05-15 | Task 6 완료. WebSocket client/server envelope, message type, server message factory, invalid message type error 정의 |

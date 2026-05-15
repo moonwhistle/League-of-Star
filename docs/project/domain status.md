@@ -255,7 +255,40 @@ stateDiagram-v2
     ABORTED --> [*]
 ```
 
-## 4. Password Reset (비밀번호 재설정)
+## 4. Game WebSocket Session (게임 대기 WebSocket 연결 상태)
+
+게임 대기 WebSocket 연결 상태는 DB에 저장하지 않고 API 인스턴스 local memory registry에서 관리합니다.
+이 상태는 `game_rooms.status` 또는 `game_participants.status`와 구분되는 일시적 연결 상태입니다.
+
+```mermaid
+stateDiagram-v2
+    [*] --> HANDSHAKE_REQUESTED: /ws/game/{gameRoomId} 연결 요청
+    HANDSHAKE_REQUESTED --> REJECTED: JWT 또는 participant 검증 실패
+    HANDSHAKE_REQUESTED --> CONNECTED: handshake 성공
+    CONNECTED --> READY: CLIENT_READY 수신
+    CONNECTED --> DISCONNECTED: WebSocket 연결 종료
+    READY --> DISCONNECTED: WebSocket 연결 종료
+    CONNECTED --> REPLACED: 같은 userId 재연결
+    READY --> REPLACED: 같은 userId 재연결
+    REJECTED --> [*]
+    DISCONNECTED --> [*]: registry 제거
+    REPLACED --> [*]: 기존 session 닫기
+```
+
+| 상태 | 저장 위치 | 의미 |
+|------|-----------|------|
+| `HANDSHAKE_REQUESTED` | 저장 안 함 | WebSocket upgrade 요청을 수신하고 handshake 검증 중 |
+| `REJECTED` | 저장 안 함 | JWT 검증 실패, gameRoom 미존재, READY 아님, participant 아님으로 연결 거부 |
+| `CONNECTED` | API local memory registry | handshake 성공 후 gameRoom/user 단위 WebSocket session 등록 완료 |
+| `READY` | API local memory registry | 클라이언트가 `CLIENT_READY`를 보내 대기 준비 완료 |
+| `DISCONNECTED` | registry에서 제거 | WebSocket 연결 종료로 session 제거 |
+| `REPLACED` | registry에서 기존 session 제거 | 같은 userId가 같은 gameRoom에 재연결하여 기존 session을 새 session으로 교체 |
+
+- 멀티 인스턴스 환경에서는 같은 `gameRoomId`의 두 참가자가 같은 API 인스턴스로 라우팅되어야 합니다.
+- WebSocket session status는 일시적 연결 상태이므로 전적, LP, game record에 직접 반영하지 않습니다.
+- GAME_START 이전 timeout 또는 disconnect에 따른 gameRoom `ABORTED` 처리는 별도 timeout 정책에서 수행합니다.
+
+## 5. Password Reset (비밀번호 재설정)
 Redis에서 관리되는 비밀번호 재설정 토큰의 수명 주기입니다.
 
 ```mermaid
