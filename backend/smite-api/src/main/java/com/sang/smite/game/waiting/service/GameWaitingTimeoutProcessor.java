@@ -1,8 +1,6 @@
 package com.sang.smite.game.waiting.service;
 
-import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
-import com.sang.smite.domain.game.service.GameRoomReadService;
 import com.sang.smite.game.waiting.common.constant.GameWaitingConstants;
 import com.sang.smite.game.waiting.domain.GameWaitingState;
 import com.sang.smite.game.waiting.repository.GameWaitingStore;
@@ -20,7 +18,6 @@ import java.util.Optional;
 public class GameWaitingTimeoutProcessor {
 
     private final GameWaitingStore gameWaitingStore;
-    private final GameRoomReadService gameRoomReadService;
     private final GameRoomCommandService gameRoomCommandService;
 
     @DistributedRedisLock(key = "'" + GameWaitingConstants.WAITING_TIMEOUT_LOCK_KEY_PREFIX + "' + #gameRoomId")
@@ -36,13 +33,7 @@ public class GameWaitingTimeoutProcessor {
             return;
         }
 
-        GameStatus gameStatus = gameRoomReadService.getStatus(gameRoomId);
-        if (gameStatus != GameStatus.READY) {
-            gameWaitingStore.cleanup(gameRoomId);
-            return;
-        }
-
-        gameRoomCommandService.abortReadyRoom(gameRoomId);
+        gameRoomCommandService.abortReadyRoomIfReady(gameRoomId);
         gameWaitingStore.cleanup(gameRoomId);
     }
 }

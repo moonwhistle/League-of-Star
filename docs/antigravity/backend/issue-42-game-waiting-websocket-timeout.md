@@ -375,7 +375,7 @@ DB 최종 확인 이유:
   - DB gameRoom status != READY: cleanup
   - DB gameRoom status == READY이며 abort 성공: cleanup
 - DB gameRoom status 조회는 `GameRoomReadService.getStatus(gameRoomId)`로 수행한다.
-- READY gameRoom abort는 기존 `GameRoomCommandService.abortReadyRoom(gameRoomId)`를 사용한다.
+- READY gameRoom abort는 scheduler-safe 유스케이스인 `GameRoomCommandService.abortReadyRoomIfReady(gameRoomId)`를 사용한다.
 
 추가/변경 코드:
 
@@ -391,21 +391,49 @@ DB 최종 확인 이유:
 
 ### 6. gameRoom abort 처리 유스케이스 구현
 
-- [ ] core `GameRoomCommandService`에 waiting timeout abort 유스케이스를 추가하거나 기존 `abortReadyRoom`을 재사용한다.
-- [ ] `game_rooms.status = ABORTED`로 변경한다.
-- [ ] `game_rooms.finishedAt = now`로 기록한다.
-- [ ] `game_participants.status = ABORTED`로 변경한다.
-- [ ] 이미 `ABORTED`면 idempotent 하게 no-op 처리한다.
-- [ ] `READY`가 아닌 상태에서 abort 요청이 들어오면 안전하게 no-op 또는 예외 중 하나로 정책을 확정한다.
-- [ ] `game_actions`는 생성하지 않는다.
-- [ ] `game_records`는 생성하지 않는다.
-- [ ] LP, 배치, 승급전 반영 로직을 호출하지 않는다.
+- [x] core `GameRoomCommandService`에 waiting timeout abort 유스케이스를 추가하거나 기존 `abortReadyRoom`을 재사용한다.
+- [x] `game_rooms.status = ABORTED`로 변경한다.
+- [x] `game_rooms.finishedAt = now`로 기록한다.
+- [x] `game_participants.status = ABORTED`로 변경한다.
+- [x] 이미 `ABORTED`면 idempotent 하게 no-op 처리한다.
+- [x] `READY`가 아닌 상태에서 abort 요청이 들어오면 안전하게 no-op 또는 예외 중 하나로 정책을 확정한다.
+- [x] `game_actions`는 생성하지 않는다.
+- [x] `game_records`는 생성하지 않는다.
+- [x] LP, 배치, 승급전 반영 로직을 호출하지 않는다.
 
 권장 정책:
 
 - scheduler timeout abort는 idempotent 해야 한다.
 - `READY` 상태만 `ABORTED`로 전환한다.
 - 이미 `ABORTED`, `IN_PROGRESS`, `FINISHED`면 timeout abort는 no-op으로 처리하는 방향을 우선 검토한다.
+
+구현 결과:
+
+- 기존 strict abort 유스케이스 `GameRoomCommandService.abortReadyRoom(gameRoomId)`는 유지한다.
+  - gameRoom이 없으면 `GAME_ROOM_NOT_FOUND` 예외를 던진다.
+  - gameRoom이 `READY`가 아니면서 `ABORTED`도 아니면 `INVALID_GAME_STATE` 예외를 던진다.
+  - game setup 실패 보상처럼 "방금 만든 READY gameRoom을 반드시 중단해야 하는 흐름"에서 사용한다.
+- timeout scheduler용 safe abort 유스케이스 `GameRoomCommandService.abortReadyRoomIfReady(gameRoomId)`를 추가했다.
+  - gameRoom이 `READY`이면 `ABORTED`로 전환하고 `true`를 반환한다.
+  - gameRoom이 `ABORTED`, `IN_PROGRESS`, `FINISHED`이면 상태를 바꾸지 않고 `false`를 반환한다.
+  - gameRoom이 없으면 stale Redis timeout 대상으로 보고 `false`를 반환한다.
+- 도메인에는 `GameRoom.abortBeforeStartIfReady()`를 추가했다.
+  - `READY` 상태만 `ABORTED`로 전환한다.
+  - `finishedAt`을 기록한다.
+  - participants 상태를 `ABORTED`로 변경한다.
+  - `READY`가 아니면 no-op으로 `false`를 반환한다.
+- timeout processor는 `abortReadyRoomIfReady(gameRoomId)`를 사용한다.
+  - 이미 `IN_PROGRESS` 또는 `FINISHED`인 gameRoom이면 abort하지 않고 Redis waiting 상태만 cleanup한다.
+  - abort 처리 중 예외가 발생하면 cleanup하지 않고 pending을 유지해 다음 scheduler tick에서 재시도한다.
+- `game_actions`, `game_records`, LP, 배치/승급전 관련 service는 호출하지 않는다.
+
+추가/변경 코드:
+
+| 파일 | 역할 |
+|------|------|
+| `smite-core/domain/game/domain/GameRoom` | `abortBeforeStartIfReady()` safe transition 추가 |
+| `smite-core/domain/game/service/GameRoomCommandService` | `abortReadyRoomIfReady()` timeout-safe abort 유스케이스 추가 |
+| `smite-api/game/waiting/service/GameWaitingTimeoutProcessor` | timeout 정산에서 safe abort 유스케이스 사용 |
 
 ### 7. Redis match status 정리
 
@@ -521,7 +549,7 @@ GO_TO_GAME_WAITING 진입
 - [x] 둘 다 미접속 상태에서 deadline이 지나면 gameRoom이 `ABORTED` 되는지 테스트
 - [x] 둘 다 ready 상태이면 deadline이 지나도 abort하지 않는지 테스트
 - [x] DB gameRoom이 이미 `IN_PROGRESS` 또는 `FINISHED`이면 scheduler가 abort하지 않는지 테스트
-- [ ] timeout 시 participants가 `ABORTED` 되는지 테스트
+- [x] timeout 시 participants가 `ABORTED` 되는지 테스트
 - [ ] timeout 시 `game_records`가 생성되지 않는지 테스트
 - [ ] timeout 시 LP/RankSeries service가 호출되지 않는지 테스트
 - [ ] timeout 시 Redis `match:status:{userId}`가 제거되는지 테스트
@@ -621,3 +649,4 @@ timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 | 2026-05-18 | Task 3 완료. gameRoom 생성 성공 직후 Redis waiting HASH/ZSET 등록, 등록 실패 시 gameRoom abort 보상 및 기존 `GAME_SETUP_FAILED` 흐름 연동 구현 |
 | 2026-05-18 | Task 4 완료. `CLIENT_READY` 수신 시 Redis ready 상태 갱신, gameRoom 단위 lock 적용, 양쪽 READY 완료 시 waiting HASH/ZSET cleanup 구현 |
 | 2026-05-18 | Task 5 완료. 1초 주기 timeout scheduler, due ZSET 조회, gameRoom 단위 lock 정산, lock 실패/예외 시 pending 유지 재시도 정책 구현 |
+| 2026-05-18 | Task 6 완료. scheduler용 idempotent safe abort 유스케이스 추가, READY만 ABORTED 전환하고 READY 외 상태는 no-op 처리하도록 구현 |

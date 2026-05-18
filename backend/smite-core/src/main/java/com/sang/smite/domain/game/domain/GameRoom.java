@@ -126,14 +126,26 @@ public class GameRoom extends BaseEntity {
     }
 
     public void abortBeforeStart() {
-        if (this.status == GameStatus.ABORTED) {
+        if (abortBeforeStartIfReady()) {
             return;
         }
-        if (this.status != GameStatus.READY) {
+        if (this.status != GameStatus.ABORTED) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+    }
+
+    /**
+     * READY 상태인 GAME_START 이전 gameRoom만 ABORTED로 전환합니다.
+     *
+     * @return READY에서 ABORTED로 전환했으면 true, 이미 다른 상태이면 false
+     */
+    public boolean abortBeforeStartIfReady() {
+        if (this.status != GameStatus.READY) {
+            return false;
         }
         this.status = GameStatus.ABORTED;
         this.finishedAt = LocalDateTime.now();
         this.participants.forEach(p -> p.updateStatus(ParticipantStatus.ABORTED));
+        return true;
     }
 }

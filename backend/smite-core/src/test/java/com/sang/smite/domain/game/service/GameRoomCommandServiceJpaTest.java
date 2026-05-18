@@ -79,4 +79,26 @@ class GameRoomCommandServiceJpaTest {
                 .containsOnly(ParticipantStatus.ABORTED);
         assertThat(foundGameRoom.getFinishedAt()).isNotNull();
     }
+
+    @Test
+    @DisplayName("abortReadyRoomIfReady - READY 게임룸이면 ABORTED 상태를 DB에 저장하고 true를 반환한다")
+    void abortReadyRoomIfReady_SaveAbortedStatus() {
+        // given
+        GameRoom savedGameRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        boolean aborted = gameRoomCommandService.abortReadyRoomIfReady(savedGameRoom.getId());
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(aborted).isTrue();
+        assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
+    }
 }

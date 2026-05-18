@@ -1,8 +1,6 @@
 package com.sang.smite.game.waiting.service;
 
-import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
-import com.sang.smite.domain.game.service.GameRoomReadService;
 import com.sang.smite.game.waiting.domain.GameWaitingState;
 import com.sang.smite.game.waiting.repository.GameWaitingStore;
 import org.junit.jupiter.api.DisplayName;
@@ -30,9 +28,6 @@ class GameWaitingTimeoutProcessorTest {
     private GameWaitingStore gameWaitingStore;
 
     @Mock
-    private GameRoomReadService gameRoomReadService;
-
-    @Mock
     private GameRoomCommandService gameRoomCommandService;
 
     @Test
@@ -46,8 +41,7 @@ class GameWaitingTimeoutProcessorTest {
 
         // then
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
-        verify(gameRoomReadService, never()).getStatus(GAME_ROOM_ID);
-        verify(gameRoomCommandService, never()).abortReadyRoom(GAME_ROOM_ID);
+        verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
     }
 
     @Test
@@ -61,22 +55,21 @@ class GameWaitingTimeoutProcessorTest {
 
         // then
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
-        verify(gameRoomReadService, never()).getStatus(GAME_ROOM_ID);
-        verify(gameRoomCommandService, never()).abortReadyRoom(GAME_ROOM_ID);
+        verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
     }
 
     @Test
-    @DisplayName("DB gameRoom 상태가 READY가 아니면 cleanup만 수행한다")
+    @DisplayName("DB gameRoom이 READY가 아니어도 safe abort 후 cleanup한다")
     void processTimeout_GameRoomNotReady_Cleanup() {
         // given
         when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(true, false)));
-        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.IN_PROGRESS);
+        when(gameRoomCommandService.abortReadyRoomIfReady(GAME_ROOM_ID)).thenReturn(false);
 
         // when
         processor.processTimeoutWithLock(GAME_ROOM_ID);
 
         // then
-        verify(gameRoomCommandService, never()).abortReadyRoom(GAME_ROOM_ID);
+        verify(gameRoomCommandService).abortReadyRoomIfReady(GAME_ROOM_ID);
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
     }
 
@@ -85,13 +78,13 @@ class GameWaitingTimeoutProcessorTest {
     void processTimeout_ReadyGameRoomAbortAndCleanup() {
         // given
         when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(true, false)));
-        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.READY);
+        when(gameRoomCommandService.abortReadyRoomIfReady(GAME_ROOM_ID)).thenReturn(true);
 
         // when
         processor.processTimeoutWithLock(GAME_ROOM_ID);
 
         // then
-        verify(gameRoomCommandService).abortReadyRoom(GAME_ROOM_ID);
+        verify(gameRoomCommandService).abortReadyRoomIfReady(GAME_ROOM_ID);
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
     }
 
@@ -100,10 +93,9 @@ class GameWaitingTimeoutProcessorTest {
     void processTimeout_AbortFailure_DoNotCleanup() {
         // given
         when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(false, false)));
-        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.READY);
         org.mockito.Mockito.doThrow(new IllegalStateException("abort failed"))
                 .when(gameRoomCommandService)
-                .abortReadyRoom(GAME_ROOM_ID);
+                .abortReadyRoomIfReady(GAME_ROOM_ID);
 
         // when
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> processor.processTimeoutWithLock(GAME_ROOM_ID))
