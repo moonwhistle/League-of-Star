@@ -1,8 +1,11 @@
 package com.sang.smite.game.waiting.service;
 
+import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
+import com.sang.smite.domain.game.service.GameRoomReadService;
 import com.sang.smite.game.waiting.domain.GameWaitingState;
 import com.sang.smite.game.waiting.repository.GameWaitingStore;
+import com.sang.smite.matching.command.MatchUserStatusCommandService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +31,13 @@ class GameWaitingTimeoutProcessorTest {
     private GameWaitingStore gameWaitingStore;
 
     @Mock
+    private GameRoomReadService gameRoomReadService;
+
+    @Mock
     private GameRoomCommandService gameRoomCommandService;
+
+    @Mock
+    private MatchUserStatusCommandService matchUserStatusCommandService;
 
     @Test
     @DisplayName("waiting HASH가 없으면 timeout index cleanup만 수행한다")
@@ -42,6 +51,7 @@ class GameWaitingTimeoutProcessorTest {
         // then
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
         verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
+        verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
     }
 
     @Test
@@ -56,20 +66,22 @@ class GameWaitingTimeoutProcessorTest {
         // then
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
         verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
+        verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
     }
 
     @Test
-    @DisplayName("DB gameRoom이 READY가 아니어도 safe abort 후 cleanup한다")
-    void processTimeout_GameRoomNotReady_Cleanup() {
+    @DisplayName("DB gameRoom이 IN_PROGRESS이면 match status 제거 없이 cleanup한다")
+    void processTimeout_GameRoomInProgress_CleanupOnly() {
         // given
         when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(true, false)));
-        when(gameRoomCommandService.abortReadyRoomIfReady(GAME_ROOM_ID)).thenReturn(false);
+        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.IN_PROGRESS);
 
         // when
         processor.processTimeoutWithLock(GAME_ROOM_ID);
 
         // then
-        verify(gameRoomCommandService).abortReadyRoomIfReady(GAME_ROOM_ID);
+        verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
+        verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
     }
 
@@ -78,6 +90,7 @@ class GameWaitingTimeoutProcessorTest {
     void processTimeout_ReadyGameRoomAbortAndCleanup() {
         // given
         when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(true, false)));
+        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.READY);
         when(gameRoomCommandService.abortReadyRoomIfReady(GAME_ROOM_ID)).thenReturn(true);
 
         // when
@@ -85,6 +98,23 @@ class GameWaitingTimeoutProcessorTest {
 
         // then
         verify(gameRoomCommandService).abortReadyRoomIfReady(GAME_ROOM_ID);
+        verify(matchUserStatusCommandService).removeGameWaitingTimeoutStatuses(1L, 2L);
+        verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("이미 ABORTED 상태이면 match status 제거를 재시도하고 cleanup한다")
+    void processTimeout_AlreadyAborted_RemoveMatchStatusAndCleanup() {
+        // given
+        when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(false, false)));
+        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.ABORTED);
+
+        // when
+        processor.processTimeoutWithLock(GAME_ROOM_ID);
+
+        // then
+        verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
+        verify(matchUserStatusCommandService).removeGameWaitingTimeoutStatuses(1L, 2L);
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
     }
 
@@ -93,6 +123,7 @@ class GameWaitingTimeoutProcessorTest {
     void processTimeout_AbortFailure_DoNotCleanup() {
         // given
         when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(false, false)));
+        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.READY);
         org.mockito.Mockito.doThrow(new IllegalStateException("abort failed"))
                 .when(gameRoomCommandService)
                 .abortReadyRoomIfReady(GAME_ROOM_ID);
@@ -102,6 +133,43 @@ class GameWaitingTimeoutProcessorTest {
                 .isInstanceOf(IllegalStateException.class);
 
         // then
+        verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
+        verify(gameWaitingStore, never()).cleanup(GAME_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("match status 제거 중 예외가 발생하면 cleanup하지 않고 다음 tick 재시도를 위해 pending을 유지한다")
+    void processTimeout_RemoveMatchStatusFailure_DoNotCleanup() {
+        // given
+        when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(false, false)));
+        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.READY);
+        when(gameRoomCommandService.abortReadyRoomIfReady(GAME_ROOM_ID)).thenReturn(true);
+        org.mockito.Mockito.doThrow(new IllegalStateException("status cleanup failed"))
+                .when(matchUserStatusCommandService)
+                .removeGameWaitingTimeoutStatuses(1L, 2L);
+
+        // when
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> processor.processTimeoutWithLock(GAME_ROOM_ID))
+                .isInstanceOf(IllegalStateException.class);
+
+        // then
+        verify(gameRoomCommandService).abortReadyRoomIfReady(GAME_ROOM_ID);
+        verify(gameWaitingStore, never()).cleanup(GAME_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("READY 조회 후 safe abort가 false이면 match status 제거와 cleanup을 하지 않고 재시도한다")
+    void processTimeout_ReadyButAbortNoOp_DoNotCleanup() {
+        // given
+        when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(false, false)));
+        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.READY);
+        when(gameRoomCommandService.abortReadyRoomIfReady(GAME_ROOM_ID)).thenReturn(false);
+
+        // when
+        processor.processTimeoutWithLock(GAME_ROOM_ID);
+
+        // then
+        verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
         verify(gameWaitingStore, never()).cleanup(GAME_ROOM_ID);
     }
 

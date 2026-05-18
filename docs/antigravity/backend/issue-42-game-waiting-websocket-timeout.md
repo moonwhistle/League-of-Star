@@ -29,19 +29,21 @@ flowchart TD
     G -->|"yes"| H["Cleanup waiting timeout<br/>Proceed to RTT / countdown"]
     G -->|"no"| I["Timeout Scheduler<br/>detects expired gameRoom"]
 
-    I --> J{"DB gameRoom<br/>still READY?"}
-    J -->|"no"| K["Cleanup Redis<br/>No-op"]
-    J -->|"yes"| L["Abort gameRoom"]
+    I --> J{"DB gameRoom<br/>status?"}
+    J -->|"IN_PROGRESS / FINISHED"| K["Cleanup Redis waiting<br/>No abort"]
+    J -->|"READY"| L["Abort gameRoom"]
+    J -->|"ABORTED"| N["Remove match:status:{userId}"]
     L --> M["participants = ABORTED"]
     M --> N["Remove match:status:{userId}"]
-    N --> O["Publish GAME_WAITING_TIMEOUT"]
+    N --> O["Cleanup Redis waiting"]
+    O --> P["Publish GAME_WAITING_TIMEOUT"]
 
-    O --> P{"WebSocket connected?"}
-    P -->|"yes"| Q["Send GAME_WAITING_TIMEOUT<br/>Close socket"]
-    P -->|"no"| R["No push possible<br/>late handshake rejected"]
+    P --> Q{"WebSocket connected?"}
+    Q -->|"yes"| R["Send GAME_WAITING_TIMEOUT<br/>Close socket"]
+    Q -->|"no"| S["No push possible<br/>late handshake rejected"]
 
-    Q --> S["Client returns<br/>to match start"]
-    R --> S
+    R --> T["Client returns<br/>to match start"]
+    S --> T
 ```
 
 정상 대기 timeout 흐름:
@@ -55,8 +57,8 @@ gameRoom READY 생성
 -> 30초 안에 양쪽 ready 미완료
 -> gameRoom ABORTED
 -> participants ABORTED
--> Redis waiting 상태 정리
 -> Redis match:status:{userId} 제거
+-> Redis waiting 상태 정리
 -> 연결된 WebSocket session에 GAME_WAITING_TIMEOUT 전송 후 close
 -> 미접속 유저는 별도 push 없음
 ```
@@ -216,9 +218,11 @@ cleanup 정책:
 | 상황 | cleanup |
 |------|------|
 | 양쪽 `CLIENT_READY` 완료 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
-| timeout abort 완료 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
+| timeout abort 및 match status 제거 완료 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
 | scheduler가 due gameRoom을 봤지만 HASH 없음 | `game:waiting:timeout:pending`에서 gameRoomId 제거 |
-| scheduler가 due gameRoom을 봤지만 DB status가 `READY` 아님 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
+| scheduler가 due gameRoom을 봤지만 DB status가 `ABORTED` | `match:status:{userId}` 제거 후 `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
+| scheduler가 due gameRoom을 봤지만 DB status가 `IN_PROGRESS` 또는 `FINISHED` | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
+| scheduler가 `READY`를 조회했지만 safe abort가 no-op | cleanup하지 않고 pending 유지 후 다음 tick에서 재확인 |
 
 ### 3. gameRoom 생성 성공 시 waiting timeout 등록
 
@@ -372,8 +376,9 @@ DB 최종 확인 이유:
 - 명확한 no-op 또는 성공 처리일 때만 cleanup한다.
   - Redis HASH 없음: cleanup
   - Redis 기준 bothReady=true: cleanup
-  - DB gameRoom status != READY: cleanup
-  - DB gameRoom status == READY이며 abort 성공: cleanup
+  - DB gameRoom status가 `IN_PROGRESS` 또는 `FINISHED`: cleanup
+  - DB gameRoom status가 `ABORTED`: match status 제거 후 cleanup
+  - DB gameRoom status가 `READY`이며 abort와 match status 제거 성공: cleanup
 - DB gameRoom status 조회는 `GameRoomReadService.getStatus(gameRoomId)`로 수행한다.
 - READY gameRoom abort는 scheduler-safe 유스케이스인 `GameRoomCommandService.abortReadyRoomIfReady(gameRoomId)`를 사용한다.
 
@@ -437,11 +442,11 @@ DB 최종 확인 이유:
 
 ### 7. Redis match status 정리
 
-- [ ] timeout 대상 gameRoom의 두 참가자 userId를 확보한다.
-- [ ] Redis `match:status:{userAId}`를 제거한다.
-- [ ] Redis `match:status:{userBId}`를 제거한다.
-- [ ] 제거 실패는 로그로 남기고 나머지 정리를 계속할지 정책화한다.
-- [ ] 큐 자동 복귀는 하지 않는다.
+- [x] timeout 대상 gameRoom의 두 참가자 userId를 확보한다.
+- [x] Redis `match:status:{userAId}`를 제거한다.
+- [x] Redis `match:status:{userBId}`를 제거한다.
+- [x] 제거 실패는 waiting cleanup 없이 pending을 유지해 다음 scheduler tick에서 재시도한다.
+- [x] 큐 자동 복귀는 하지 않는다.
 
 정책:
 
@@ -449,6 +454,24 @@ DB 최종 확인 이유:
 - game waiting timeout으로 게임이 시작되지 못하면 두 유저가 다시 매칭을 시도할 수 있어야 한다.
 - 따라서 `match:status:{userId}`는 제거한다.
 - 제거는 큐 복귀가 아니다. 단지 다음 매칭 시도를 막는 상태 lock을 푸는 작업이다.
+
+구현 결과:
+
+- `match:status:{userId}` 소유권은 matching 모듈에 있으므로 `smite-api`가 Redis store를 직접 호출하지 않는다.
+- `smite-matching`에 `MatchUserStatusCommandService.removeGameWaitingTimeoutStatuses(userAId, userBId)`를 추가했다.
+- timeout processor는 Redis waiting HASH의 `userAId`, `userBId`를 사용해 두 유저의 match status를 제거한다.
+- DB gameRoom이 `READY`이면 `abortReadyRoomIfReady(gameRoomId)` 성공 후 match status를 제거하고 Redis waiting 상태를 cleanup한다.
+- DB gameRoom이 이미 `ABORTED`이면 이전 tick에서 abort 이후 실패한 케이스로 보고 match status 제거를 재시도한 뒤 cleanup한다.
+- DB gameRoom이 `IN_PROGRESS` 또는 `FINISHED`이면 이미 정상 진행/종료된 방으로 보고 match status 제거 없이 Redis waiting 상태만 cleanup한다.
+- `READY` 조회 후 safe abort가 `false`를 반환하면 다른 흐름의 상태 전이를 고려해 match status 제거와 cleanup을 하지 않고 다음 tick에서 재확인한다.
+- match status 제거 중 예외가 발생하면 Redis waiting 상태를 cleanup하지 않는다. pending을 유지해서 다음 scheduler tick에서 재시도한다.
+
+추가/변경 코드:
+
+| 파일 | 역할 |
+|------|------|
+| `smite-matching/matching/command/MatchUserStatusCommandService` | matching 모듈 command facade로 두 유저의 match status 제거 |
+| `smite-api/game/waiting/service/GameWaitingTimeoutProcessor` | timeout abort 이후 match status 제거와 waiting cleanup 순서 조정 |
 
 ### 8. timeout 이벤트 Pub/Sub 및 WebSocket 전송
 
@@ -552,7 +575,7 @@ GO_TO_GAME_WAITING 진입
 - [x] timeout 시 participants가 `ABORTED` 되는지 테스트
 - [ ] timeout 시 `game_records`가 생성되지 않는지 테스트
 - [ ] timeout 시 LP/RankSeries service가 호출되지 않는지 테스트
-- [ ] timeout 시 Redis `match:status:{userId}`가 제거되는지 테스트
+- [x] timeout 시 Redis `match:status:{userId}`가 제거되는지 테스트
 - [ ] timeout 이벤트 Pub/Sub 발행 테스트
 - [ ] local registry에 session이 있는 인스턴스만 `GAME_WAITING_TIMEOUT`을 보내는지 테스트
 - [ ] session이 없는 인스턴스는 timeout Pub/Sub 이벤트를 no-op 처리하는지 테스트
@@ -650,3 +673,4 @@ timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 | 2026-05-18 | Task 4 완료. `CLIENT_READY` 수신 시 Redis ready 상태 갱신, gameRoom 단위 lock 적용, 양쪽 READY 완료 시 waiting HASH/ZSET cleanup 구현 |
 | 2026-05-18 | Task 5 완료. 1초 주기 timeout scheduler, due ZSET 조회, gameRoom 단위 lock 정산, lock 실패/예외 시 pending 유지 재시도 정책 구현 |
 | 2026-05-18 | Task 6 완료. scheduler용 idempotent safe abort 유스케이스 추가, READY만 ABORTED 전환하고 READY 외 상태는 no-op 처리하도록 구현 |
+| 2026-05-18 | Task 7 완료. game waiting timeout abort 이후 두 유저의 Redis match status 제거, 실패 시 waiting pending 유지 재시도 정책 구현 |
