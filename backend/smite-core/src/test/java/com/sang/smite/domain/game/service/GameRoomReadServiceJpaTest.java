@@ -63,4 +63,22 @@ class GameRoomReadServiceJpaTest {
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
     }
+
+    @Test
+    @DisplayName("validateReadyParticipant - DB에 저장된 ABORTED 게임룸이면 예외를 던진다")
+    void validateReadyParticipant_PersistedAbortedGameRoom_ThrowException() {
+        // given
+        GameRoom gameRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        gameRoomCommandService.abortReadyRoomIfReady(gameRoom.getId());
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.validateReadyParticipant(gameRoom.getId(), FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
+    }
 }

@@ -168,6 +168,30 @@ class GameWebSocketHandshakeInterceptorTest {
         verify(response).setStatusCode(HttpStatus.FORBIDDEN);
     }
 
+    @Test
+    @DisplayName("beforeHandshake - late handshake 시 gameRoom이 ABORTED라 READY 검증에 실패하면 거부한다")
+    void beforeHandshake_AbortedGameRoom_Reject() {
+        // given
+        URI uri = URI.create("http://localhost/ws/game/100?token=" + TOKEN);
+        ServerHttpRequest request = request(uri);
+        Map<String, Object> attributes = new HashMap<>();
+        given(jwtTokenResolver.resolveWebSocketToken(uri)).willReturn(TOKEN);
+        given(jwtTokenProvider.validateToken(TOKEN)).willReturn(true);
+        given(jwtTokenProvider.getUserId(TOKEN)).willReturn(USER_ID);
+        given(gameWebSocketPathResolver.resolveGameRoomId(uri)).willReturn(GAME_ROOM_ID);
+        willThrow(new CoreException(CoreErrorCode.INVALID_GAME_STATE))
+                .given(gameRoomReadService)
+                .validateReadyParticipant(GAME_ROOM_ID, USER_ID);
+
+        // when
+        boolean result = interceptor.beforeHandshake(request, response, webSocketHandler, attributes);
+
+        // then
+        assertThat(result).isFalse();
+        assertThat(attributes).isEmpty();
+        verify(response).setStatusCode(HttpStatus.FORBIDDEN);
+    }
+
     private ServerHttpRequest request(URI uri) {
         ServerHttpRequest request = org.mockito.Mockito.mock(ServerHttpRequest.class);
         given(request.getURI()).willReturn(uri);

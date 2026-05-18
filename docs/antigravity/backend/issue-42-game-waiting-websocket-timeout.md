@@ -540,21 +540,22 @@ server message 예시:
 
 ### 9. 멀티 인스턴스 정합성
 
-- [ ] timeout 판정은 local registry를 사용하지 않는다.
-- [ ] timeout 판정은 Redis waiting ready 상태와 DB gameRoom status를 기준으로 한다.
-- [ ] WebSocket 이벤트 전송은 local registry를 사용한다.
-- [ ] sticky routing은 WebSocket room session을 같은 인스턴스에 모으기 위한 전제임을 유지한다.
-- [ ] scheduler는 어떤 인스턴스가 실행해도 같은 결과가 나오도록 만든다.
-- [ ] timeout 이벤트 Pub/Sub은 모든 인스턴스에 전파한다.
-- [ ] 실제 session을 가진 인스턴스만 이벤트 전송/close를 수행한다.
+- [x] timeout 판정은 local registry를 사용하지 않는다.
+- [x] timeout 판정은 Redis waiting ready 상태와 DB gameRoom status를 기준으로 한다.
+- [x] WebSocket 이벤트 전송은 local registry를 사용한다.
+- [x] sticky routing은 WebSocket room session을 같은 인스턴스에 모으기 위한 전제임을 유지한다.
+- [x] scheduler는 어떤 인스턴스가 실행해도 같은 결과가 나오도록 만든다.
+- [x] timeout 이벤트 Pub/Sub은 모든 인스턴스에 전파한다.
+- [x] 실제 session을 가진 인스턴스만 이벤트 전송/close를 수행한다.
 
 멀티 인스턴스 처리 구조:
 
 ```text
 API-1: scheduler가 timeout 확정
   -> DB gameRoom ABORTED
-  -> Redis waiting/match status cleanup
+  -> Redis match status cleanup
   -> Redis Pub/Sub GAME_WAITING_TIMEOUT 발행
+  -> Redis waiting cleanup
 
 API-1: timeout event 수신
   -> local registry에 room session 없으면 no-op
@@ -566,13 +567,34 @@ API-2: timeout event 수신
   -> registry cleanup
 ```
 
+구현 결과:
+
+- `GameWaitingTimeoutService`는 Redis ZSET due 목록만 조회하고, local WebSocket registry를 참조하지 않는다.
+- `GameWaitingTimeoutProcessor`는 Redis waiting HASH의 ready 상태와 DB gameRoom status로만 timeout을 확정한다.
+- 단일 gameRoom 정산은 `game:waiting:timeout:lock:{gameRoomId}` 기준 Redis lock 안에서 실행되어 여러 API 인스턴스 scheduler가 동시에 같은 gameRoom을 정산하지 않는다.
+- lock 획득 실패 시 해당 gameRoom만 skip하고 다음 tick에서 재시도한다.
+- timeout 확정 후 `game_waiting_timeout` Redis Pub/Sub channel로 이벤트를 발행한다.
+- 모든 API 인스턴스는 `game_waiting_timeout` channel을 구독한다.
+- 각 인스턴스는 Pub/Sub 수신 후 자기 local registry에서만 session을 찾는다.
+- 실제 session이 있는 인스턴스만 `GAME_WAITING_TIMEOUT` 전송, registry cleanup, WebSocket close를 수행한다.
+- session이 없는 인스턴스는 no-op 처리한다.
+- sticky routing 자체는 애플리케이션 코드가 아니라 배포/로드밸런서 설정 책임이다. 애플리케이션은 `/ws/game/{gameRoomId}` 연결이 같은 gameRoomId 기준으로 같은 인스턴스에 모인다는 전제에서 local registry를 운영한다.
+- timeout 정산은 sticky routing 성공 여부와 무관하게 Redis/DB 기준으로 동작한다. sticky routing은 이벤트 전송 대상 session을 한 인스턴스에 모으기 위한 최적화/전제다.
+
+검증 기준:
+
+- `GameWaitingTimeoutServiceTest`에서 lock 획득 실패와 개별 예외가 batch 전체를 중단하지 않는지 검증한다.
+- `GameWaitingTimeoutProcessorTest`에서 READY/ABORTED/IN_PROGRESS 상태별 정산과 Pub/Sub publish 실패 시 pending 유지 재시도를 검증한다.
+- `GameWaitingTimeoutPubSubSubscriberTest`에서 Pub/Sub 수신 시 WebSocket sender 위임을 검증한다.
+- `GameWaitingTimeoutWebSocketSenderTest`에서 local session이 있으면 timeout 전송/close/registry cleanup, local session이 없으면 no-op임을 검증한다.
+
 ### 10. 클라이언트 복구 정책 문서화
 
-- [ ] WebSocket 연결된 유저는 `GAME_WAITING_TIMEOUT` 수신 시 start 버튼 화면으로 복귀한다고 문서화한다.
-- [ ] WebSocket 미접속 유저는 실시간 이벤트를 받을 수 없다고 문서화한다.
-- [ ] 늦은 handshake 실패 시 start 버튼 화면으로 복귀한다고 문서화한다.
-- [ ] 클라이언트도 `GO_TO_GAME_WAITING` 진입 시 30초 자체 timer를 둘 수 있다고 문서화한다.
-- [ ] API polling은 필수 흐름이 아니라고 문서화한다.
+- [x] WebSocket 연결된 유저는 `GAME_WAITING_TIMEOUT` 수신 시 start 버튼 화면으로 복귀한다고 문서화한다.
+- [x] WebSocket 미접속 유저는 실시간 이벤트를 받을 수 없다고 문서화한다.
+- [x] 늦은 handshake 실패 시 start 버튼 화면으로 복귀한다고 문서화한다.
+- [x] 클라이언트도 `GO_TO_GAME_WAITING` 진입 시 30초 자체 timer를 둘 수 있다고 문서화한다.
+- [x] API polling은 필수 흐름이 아니라고 문서화한다.
 
 권장 클라이언트 처리:
 
@@ -589,6 +611,14 @@ GO_TO_GAME_WAITING 진입
   - 30초 timer 만료 전 GAME_START/다음 단계 이벤트 미수신
 ```
 
+구현 결과:
+
+- `docs/project/websocket client.md`에 `GAME_WAITING_TIMEOUT` 수신, handshake 실패, close/error, 자체 30초 timer 만료를 start 버튼 화면 복귀 트리거로 명시했다.
+- 미접속 유저는 WebSocket session이 없어 실시간 이벤트를 받을 수 없고, 늦은 handshake는 gameRoom `ABORTED` 상태 때문에 실패한다고 명시했다.
+- 클라이언트 자체 30초 timer는 서버 timeout 판정의 대체가 아니라 UI 복구 안전장치라고 명시했다.
+- API polling은 필수 흐름으로 두지 않는다고 명시했다.
+- 복귀 시 waiting 화면 상태, WebSocket 객체, 자체 timer를 정리하도록 체크리스트에 추가했다.
+
 ### 11. 테스트
 
 - [x] gameRoom 생성 후 Redis waiting HASH와 timeout ZSET이 저장되는지 테스트
@@ -600,15 +630,15 @@ GO_TO_GAME_WAITING 진입
 - [x] 둘 다 ready 상태이면 deadline이 지나도 abort하지 않는지 테스트
 - [x] DB gameRoom이 이미 `IN_PROGRESS` 또는 `FINISHED`이면 scheduler가 abort하지 않는지 테스트
 - [x] timeout 시 participants가 `ABORTED` 되는지 테스트
-- [ ] timeout 시 `game_records`가 생성되지 않는지 테스트
-- [ ] timeout 시 LP/RankSeries service가 호출되지 않는지 테스트
+- [x] timeout 시 `game_records`가 생성되지 않는지 테스트
+- [x] timeout 시 LP/RankSeries service가 호출되지 않는지 테스트
 - [x] timeout 시 Redis `match:status:{userId}`가 제거되는지 테스트
 - [x] timeout 이벤트 Pub/Sub 발행 테스트
 - [x] local registry에 session이 있는 인스턴스만 `GAME_WAITING_TIMEOUT`을 보내는지 테스트
 - [x] session이 없는 인스턴스는 timeout Pub/Sub 이벤트를 no-op 처리하는지 테스트
 - [x] timeout 이벤트 전송 후 WebSocket close와 registry cleanup이 수행되는지 테스트
 - [x] 미접속 유저에게 별도 전송 시도를 하지 않는지 테스트
-- [ ] late handshake 시 gameRoom `ABORTED`라 연결이 거절되는지 테스트
+- [x] late handshake 시 gameRoom `ABORTED`라 연결이 거절되는지 테스트
 
 테스트 기준:
 
@@ -616,6 +646,14 @@ GO_TO_GAME_WAITING 진입
 - scheduler/service는 mock 기반 단위 테스트로 성공/실패/no-op 분기를 검증한다.
 - WebSocket 이벤트 전송은 handler/registry 단위 테스트로 검증한다.
 - core abort 상태 전이는 도메인 단위 테스트와 JPA 테스트로 검증한다.
+
+구현 결과:
+
+- `GameRoomCommandServiceJpaTest`에 `abortReadyRoomIfReady` 이후 `game_records`, `rank_series`, `user_rank_info`가 생성되지 않는 검증을 추가했다.
+- timeout abort 유스케이스는 gameRoom/participants 상태만 `ABORTED`로 바꾸며 record/rank 계층 데이터를 만들지 않는다는 점을 JPA 레벨에서 확인했다.
+- `GameRoomReadServiceJpaTest`에 DB에 저장된 `ABORTED` gameRoom은 `validateReadyParticipant`에서 `INVALID_GAME_STATE`로 거절되는 검증을 추가했다.
+- `GameWebSocketHandshakeInterceptorTest`에 late handshake 시 gameRoom이 `ABORTED`라 `validateReadyParticipant`가 실패하면 handshake가 거부되는 케이스를 추가했다.
+- Step 11 완료 기준으로 관련 모듈 전체 테스트를 실행했다.
 
 ### 12. 문서
 
@@ -702,3 +740,6 @@ timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 | 2026-05-18 | Task 6 완료. scheduler용 idempotent safe abort 유스케이스 추가, READY만 ABORTED 전환하고 READY 외 상태는 no-op 처리하도록 구현 |
 | 2026-05-18 | Task 7 완료. game waiting timeout abort 이후 두 유저의 Redis match status 제거, 실패 시 waiting pending 유지 재시도 정책 구현 |
 | 2026-05-18 | Task 8 완료. Redis Pub/Sub 기반 GAME_WAITING_TIMEOUT 발행/구독, local WebSocket session 전송/close/registry cleanup 구현 |
+| 2026-05-18 | Task 9 완료. Redis/DB 기준 timeout 판정, gameRoom 단위 lock, Pub/Sub 전파, local session 보유 인스턴스만 전송하는 멀티 인스턴스 정합성 문서화 |
+| 2026-05-18 | Task 10 완료. `websocket client.md`에 timeout 수신, 미접속, late handshake, close/error, 자체 30초 timer 기반 클라이언트 복구 정책 문서화 |
+| 2026-05-18 | Task 11 완료. record/rank 미생성, late handshake 거절 테스트 추가 및 core/matching/api 전체 테스트 통과 |

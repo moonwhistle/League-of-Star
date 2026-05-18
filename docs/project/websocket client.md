@@ -4,8 +4,8 @@
 
 범위:
 
-- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `ERROR`
-- 제외: gameRoom `createdAt` 기준 30초 timeout 서버 정산 구현, RTT 측정, countdown, `GAME_START`, scenario 전달, SMITE 판정
+- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, 클라이언트 복구 정책, `ERROR`
+- 제외: RTT 측정, countdown, `GAME_START`, scenario 전달, SMITE 판정
 
 ## 1. 책임 경계
 
@@ -300,16 +300,10 @@ sequenceDiagram
 }
 ```
 
-현재 이슈의 처리 범위:
+현재 처리 범위:
 
 - registry에서 연결 상태 제거
 - 남은 참가자에게 `PLAYER_LEFT` 알림
-
-후속 이슈 범위:
-
-- gameRoom `createdAt` 기준 30초 안에 양쪽 WebSocket 연결 + `CLIENT_READY` 완료 실패 timeout 정산
-- gameRoom `ABORTED`
-- 연결된 유저에게 `GAME_WAITING_TIMEOUT` 전송 후 close
 
 주의:
 
@@ -360,13 +354,47 @@ sequenceDiagram
 }
 ```
 
-클라이언트 처리:
+클라이언트 복구 정책:
 
 - `GAME_WAITING_TIMEOUT`을 받으면 WebSocket을 닫고 start 버튼 화면으로 복귀합니다.
 - WebSocket에 미연결된 유저는 timeout 이벤트를 받을 수 없습니다.
 - 미연결 유저가 늦게 WebSocket handshake를 시도하면 gameRoom이 `ABORTED` 상태이므로 연결이 거절됩니다.
 - handshake 실패, WebSocket close/error, 클라이언트 자체 30초 timer 만료는 start 버튼 화면 복귀 트리거로 처리합니다.
 - API polling은 필수 흐름으로 두지 않습니다.
+- 큐 자동 복귀는 하지 않습니다. start 버튼 화면으로 돌아간 뒤 유저가 직접 다시 매칭을 시작합니다.
+
+복귀 트리거:
+
+| 트리거 | 발생 조건 | 클라이언트 처리 |
+|------|------|------|
+| `GAME_WAITING_TIMEOUT` | 서버가 gameRoom `createdAt + 30초` 기준 timeout을 확정했고 현재 WebSocket session이 열려 있음 | timeout 안내 후 WebSocket 정리, start 버튼 화면 복귀 |
+| handshake 실패 | 늦은 접속, 잘못된 token, participant 아님, gameRoom이 이미 `ABORTED`/`IN_PROGRESS` 등 `READY` 아님 | start 버튼 화면 복귀 |
+| WebSocket close/error | 대기 중 연결이 닫히거나 transport error 발생 | start 버튼 화면 복귀 |
+| 자체 30초 timer 만료 | `GO_TO_GAME_WAITING` 진입 후 30초 안에 다음 단계로 진행하지 못함 | start 버튼 화면 복귀 |
+
+자체 30초 timer 기준:
+
+- timer는 `GO_TO_GAME_WAITING` 수신 후 waiting 화면에 진입할 때 시작합니다.
+- 서버 timeout 기준은 gameRoom `createdAt + 30초`입니다.
+- 클라이언트 timer는 서버 판정의 대체 수단이 아니라, 미접속/네트워크 실패/이벤트 미수신 상황에서 화면을 복구하기 위한 UI 안전장치입니다.
+- timer 만료 전에 `GAME_WAITING_TIMEOUT`, handshake 실패, close/error 중 하나가 먼저 발생하면 그 이벤트를 기준으로 복귀합니다.
+
+권장 처리 순서:
+
+```text
+GO_TO_GAME_WAITING 수신
+-> 매칭 SSE EventSource.close()
+-> waiting 화면 진입
+-> 30초 자체 timer 시작
+-> WebSocket handshake 시도
+-> MP4 preload 완료 후 CLIENT_READY 전송
+
+다음 중 하나 발생 시 start 버튼 화면 복귀:
+  - GAME_WAITING_TIMEOUT 수신
+  - handshake 실패
+  - WebSocket close/error
+  - 자체 30초 timer 만료 전 GAME_START/다음 단계 이벤트 미수신
+```
 
 ## 10. 잘못된 메시지 처리
 
@@ -445,6 +473,7 @@ stateDiagram-v2
 - WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `ERROR`를 처리합니다.
 - MP4 preload 완료 후 `CLIENT_READY`를 한 번 전송합니다.
 - `GAME_WAITING_TIMEOUT`, handshake 실패, close/error, 자체 30초 timer 만료 시 start 버튼 화면으로 복귀합니다.
+- 복귀 시 기존 waiting 화면 상태, WebSocket 객체, 자체 timer를 정리합니다.
 - `bothReady=true`를 `GAME_START`로 오해하지 않습니다.
 - `GAME_START`, RTT, countdown, SMITE는 후속 WebSocket 단계에서 별도로 처리합니다.
 
