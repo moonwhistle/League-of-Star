@@ -5,6 +5,9 @@ import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.domain.vo.ParticipantStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
+import com.sang.smite.domain.rank.repository.RankSeriesRepository;
+import com.sang.smite.domain.rank.repository.UserRankInfoRepository;
+import com.sang.smite.domain.record.repository.GameRecordRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +33,15 @@ class GameRoomCommandServiceJpaTest {
 
     @Autowired
     private GameRoomRepository gameRoomRepository;
+
+    @Autowired
+    private GameRecordRepository gameRecordRepository;
+
+    @Autowired
+    private RankSeriesRepository rankSeriesRepository;
+
+    @Autowired
+    private UserRankInfoRepository userRankInfoRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -78,5 +90,47 @@ class GameRoomCommandServiceJpaTest {
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.ABORTED);
         assertThat(foundGameRoom.getFinishedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("abortReadyRoomIfReady - READY 게임룸이면 ABORTED 상태를 DB에 저장하고 true를 반환한다")
+    void abortReadyRoomIfReady_SaveAbortedStatus() {
+        // given
+        GameRoom savedGameRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        boolean aborted = gameRoomCommandService.abortReadyRoomIfReady(savedGameRoom.getId());
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(aborted).isTrue();
+        assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
+    }
+
+    @Test
+    @DisplayName("abortReadyRoomIfReady - GAME_START 이전 abort는 game record와 rank 데이터를 생성하지 않는다")
+    void abortReadyRoomIfReady_DoesNotCreateRecordAndRankData() {
+        // given
+        GameRoom savedGameRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        boolean aborted = gameRoomCommandService.abortReadyRoomIfReady(savedGameRoom.getId());
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        assertThat(aborted).isTrue();
+        assertThat(gameRecordRepository.count()).isZero();
+        assertThat(rankSeriesRepository.count()).isZero();
+        assertThat(userRankInfoRepository.count()).isZero();
     }
 }

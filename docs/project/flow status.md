@@ -4,8 +4,9 @@
 
 범위:
 
-- 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, WebSocket `CONNECTED`
-- 제외: `CLIENT_READY`, RTT, countdown, `GAME_START`, SMITE, game record/LP 반영
+- 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, `CLIENT_READY`, game waiting timeout, `GAME_WAITING_TIMEOUT`
+- 제외: RTT, countdown, `GAME_START`, SMITE, game record/LP 반영
+- 게임 대기 WebSocket timeout 기준: gameRoom `createdAt`부터 **30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 모두 완료되어야 함**
 
 ## 1. Overall Flow
 
@@ -68,6 +69,12 @@ flowchart LR
         WS_REJECT["Handshake rejected<br/>WebSocket not connected"]
         WS_CONNECTED["WebSocketSession<br/>attributes: gameRoomId, userId"]
         WS_REGISTRY["GameRoomWebSocketSessionRegistry<br/>A/B = CONNECTED<br/>local memory"]
+        WAITING_READY["Redis game:waiting:{gameRoomId}<br/>userAReady/userBReady"]
+        WAITING_CLEANUP["Redis waiting cleanup<br/>HASH/ZSET 제거"]
+        WAITING_TIMEOUT["Timeout Scheduler<br/>createdAt + 30s<br/>Redis ready + DB READY 확인"]
+        GAME_WAITING_ABORT["DB game_rooms = ABORTED<br/>DB game_participants = ABORTED<br/>match:status 제거"]
+        WS_TIMEOUT_EVENT["Redis Pub/Sub<br/>game_waiting_timeout"]
+        WS_TIMEOUT_SEND["Local session 보유 인스턴스만<br/>GAME_WAITING_TIMEOUT 전송 후 close"]
     end
 
     START --> US_MATCHING
@@ -122,6 +129,12 @@ flowchart LR
     WS_AUTH -->|fail| WS_REJECT
     WS_AUTH -->|success| WS_CONNECTED
     WS_CONNECTED --> WS_REGISTRY
+    WS_REGISTRY --> WAITING_READY
+    WAITING_READY -->|양쪽 READY 완료| WAITING_CLEANUP
+    WAITING_READY -->|30초 안에 미완료| WAITING_TIMEOUT
+    WAITING_TIMEOUT --> GAME_WAITING_ABORT
+    GAME_WAITING_ABORT --> WS_TIMEOUT_EVENT
+    WS_TIMEOUT_EVENT --> WS_TIMEOUT_SEND
 ```
 
 ## 2. Scenario Summary
@@ -144,15 +157,21 @@ flowchart LR
 | handshake 요청 | `HANDSHAKE_REQUESTED` | 저장 안 함 |
 | handshake 실패 | `REJECTED` | 저장 안 함 |
 | handshake 성공 | `CONNECTED` | API local memory `GameRoomWebSocketSessionRegistry` |
+| `CLIENT_READY` 수신 | `READY` | Redis `game:waiting:{gameRoomId}` + API local memory `GameRoomWebSocketSessionRegistry` |
+| 30초 안에 양쪽 `READY` 미완료 | `ABORTED` | DB `game_rooms`, `game_participants`; Redis `game_waiting_timeout` Pub/Sub |
 
 주의:
 
 - WebSocket `CONNECTED`는 DB `game_participants.status=READY`와 다릅니다.
-- `CLIENT_READY` 이후 상태는 이 문서 범위 밖이며, 다음 WebSocket 대기/RTT 단계에서 다룹니다.
+- gameRoom `createdAt`부터 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료해야 RTT/countdown 단계로 넘어갑니다.
 - 멀티 인스턴스에서는 같은 `gameRoomId`가 같은 API 인스턴스로 라우팅되어야 WebSocket registry가 정상 동작합니다.
+- timeout 판정은 local registry가 아니라 Redis waiting ready 상태와 DB gameRoom status를 기준으로 합니다.
+- timeout 이벤트는 Redis Pub/Sub으로 모든 API 인스턴스에 전파하고, 실제 local session을 가진 인스턴스만 WebSocket 전송/close를 수행합니다.
 
 ## 변경 이력
 
 | 날짜 | 변경 내용 |
 |------|----------|
 | 2026-05-15 | 매칭 시작부터 WebSocket 연결까지 시나리오별 status 흐름을 하나의 Mermaid 다이어그램으로 정리 |
+| 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정하고 `CLIENT_READY` 완료 조건 명시 |
+| 2026-05-19 | Redis waiting ready 상태, timeout scheduler, Pub/Sub, local session 보유 인스턴스 전송 흐름 반영 |

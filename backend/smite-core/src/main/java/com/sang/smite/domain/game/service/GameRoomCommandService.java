@@ -40,10 +40,28 @@ public class GameRoomCommandService {
         return gameRoomRepository.save(gameRoom);
     }
 
+    /**
+     * READY gameRoom을 중단합니다.
+     *
+     * <p>gameRoom이 없거나 READY/ABORTED 외 상태이면 예외를 던지는 strict abort입니다.</p>
+     */
     public void abortReadyRoom(Long gameRoomId) {
         GameRoom gameRoom = gameRoomRepository.findById(gameRoomId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
         gameRoom.abortBeforeStart();
+    }
+
+    /**
+     * READY 상태인 경우에만 gameRoom 중단을 시도합니다.
+     *
+     * <p>scheduler/retry 흐름에서 사용하는 safe abort입니다.</p>
+     *
+     * @return READY에서 ABORTED로 전환했으면 true, 대상이 없거나 이미 다른 상태이면 false
+     */
+    public boolean abortReadyRoomIfReady(Long gameRoomId) {
+        return gameRoomRepository.findById(gameRoomId)
+                .map(GameRoom::abortBeforeStartIfReady)
+                .orElse(false);
     }
 
     private void validateParticipants(Long firstUserId, Long secondUserId) {

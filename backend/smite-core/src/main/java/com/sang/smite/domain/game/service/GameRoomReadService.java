@@ -27,4 +27,10 @@ public class GameRoomReadService {
             throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
         }
     }
+
+    public GameStatus getStatus(Long gameRoomId) {
+        return gameRoomRepository.findById(gameRoomId)
+                .map(GameRoom::getStatus)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
 }

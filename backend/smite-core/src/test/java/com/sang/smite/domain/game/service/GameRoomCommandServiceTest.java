@@ -134,4 +134,60 @@ class GameRoomCommandServiceTest {
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }
+
+    @Test
+    @DisplayName("abortReadyRoomIfReady - READY 게임룸이면 ABORTED로 전환하고 true를 반환한다")
+    void abortReadyRoomIfReady_Ready() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        given(gameRoomRepository.findById(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        boolean aborted = gameRoomCommandService.abortReadyRoomIfReady(100L);
+
+        // then
+        assertThat(aborted).isTrue();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
+    }
+
+    @Test
+    @DisplayName("abortReadyRoomIfReady - READY가 아니면 상태를 바꾸지 않고 false를 반환한다")
+    void abortReadyRoomIfReady_NotReady() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(java.time.LocalDateTime.now());
+        given(gameRoomRepository.findById(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        boolean aborted = gameRoomCommandService.abortReadyRoomIfReady(100L);
+
+        // then
+        assertThat(aborted).isFalse();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.IN_PROGRESS);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.PLAYING);
+    }
+
+    @Test
+    @DisplayName("abortReadyRoomIfReady - 없는 게임룸이면 false를 반환한다")
+    void abortReadyRoomIfReady_NotFound() {
+        // given
+        given(gameRoomRepository.findById(100L)).willReturn(Optional.empty());
+
+        // when
+        boolean aborted = gameRoomCommandService.abortReadyRoomIfReady(100L);
+
+        // then
+        assertThat(aborted).isFalse();
+    }
 }

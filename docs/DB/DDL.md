@@ -134,7 +134,7 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> Ready : 매칭 수락 완료 / 게임방 생성
-    Ready --> Aborted : GAME_START 이전 미접속/READY timeout
+    Ready --> Aborted : createdAt 기준 30초 안에<br/>WebSocket 연결 + CLIENT_READY 미완료
     Ready --> InProgress : 게임 시작
     InProgress --> InProgress : GAME_START 이후 disconnect<br/>서버 timer/scheduler 진행
     InProgress --> Finished : 서버 timer/scheduler 기준 정상 종료
@@ -146,7 +146,7 @@ stateDiagram-v2
 |------|------|------|
 | 매칭 수락 | INSERT | status=READY, scenario_data 생성, participants(READY) 추가 |
 | 게임 시작 | UPDATE | status=IN_PROGRESS, participants(PLAYING), game_start_time 기록 |
-| GAME_START 이전 timeout | UPDATE | status=ABORTED, participants(ABORTED 또는 DISCONNECTED), game_records/LP 미반영 |
+| GAME_START 이전 timeout | UPDATE | gameRoom `createdAt` 기준 30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 완료되지 않으면 status=ABORTED, participants(ABORTED), game_records/LP 미반영 |
 | GAME_START 이후 disconnect | UPDATE 없음 또는 participant 상태만 DISCONNECTED. gameRoom은 IN_PROGRESS 유지 |
 | 게임 종료 | UPDATE | 서버 timer/scheduler가 scenario와 game_actions 기준으로 status=FINISHED, result/winner_id, participants(FINISHED), finished_at |
 
@@ -490,13 +490,17 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 | 키 패턴 | 타입 | 용도 | TTL |
 |--------|------|------|-----|
 | `matching:queue:{tierScore}` | Sorted Set | 티어별 매칭 큐. score = `entryTime`, member = `userId` | - |
-| `match:status:{userId}` | String | 유저 매칭 상태 (`MATCHING`, `FOUND`, `ACCEPTED`, `DECLINED`, `TIMEOUT`, `IN_GAME`) | 30분 |
+| `match:status:{userId}` | String | 유저 매칭 상태 (`MATCHING`, `FOUND`, `ACCEPTED`, `DECLINED`, `TIMEOUT`, `GAME_SETUP_FAILED`, `IN_GAME`) | 30분 |
 | `match:session:{matchId}` | Hash | 매칭 성사 후 수락/거절 세션. 세션 TTL은 cleanup 실패 대비 안전장치 | 60분 |
 | `match:response:timeout:pending` | Sorted Set | 아직 scheduler가 claim하지 않은 응답 timeout 후보. score = `deadlineMillis` | - |
 | `match:response:timeout:processing` | Sorted Set | scheduler가 claim해 처리 중인 timeout job. score = processing lease 만료 시각 | - |
 | `refreshToken:{userId}` | RedisHash | Refresh Token 저장. `token` 필드는 secondary index로 조회 | refresh token 만료 시간 |
+| `game:waiting:timeout:pending` | Sorted Set | game waiting timeout 후보. score = `deadlineAtMillis`, member = `gameRoomId` | - |
+| `game:waiting:{gameRoomId}` | Hash | gameRoom waiting ready 상태. `userAId`, `userBId`, `userAReady`, `userBReady`, `createdAtMillis`, `deadlineAtMillis` | 60초 |
+| `game:waiting:timeout:lock:{gameRoomId}` | Redis Lock | 멀티 인스턴스 scheduler 중복 timeout 정산 방지 | 작업 lease |
+| `game_waiting_timeout` | Pub/Sub Channel | timeout 확정 후 모든 API 인스턴스에 WebSocket 전송 이벤트 전파 | - |
 
-> 매칭 응답 완료 전 상태는 Redis가 관리합니다. 양쪽 수락 후 게임 세션 생성과 `game_rooms` 기록은 후속 게임 흐름에서 처리합니다.
+> 매칭 응답 완료 전 상태는 Redis가 관리합니다. 양쪽 수락 후 gameRoom `READY` 생성이 완료되면 game waiting timeout 상태도 Redis에 등록합니다.
 
 후속 게임 흐름에서 사용할 예정인 Redis 구조:
 
@@ -532,3 +536,5 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 | 2026-04-18 | Soft Delete 전환: users에 status/withdrawn_at 추가, 탈퇴 익명화 생명주기 반영, FK ON DELETE RESTRICT 명시, demotion_shield 승리 시 해제 추가 |
 | 2026-05-13 | 현재 구현 기준으로 rank_series 명칭, Redis 매칭 키, match_response timeout index, game_rooms READY 상태, 테이블 요약 정합성 수정 |
 | 2026-05-18 | GAME_START 이전 timeout은 ABORTED 및 record/LP 미반영, GAME_START 이후 disconnect는 서버 timer/scheduler 기준 FINISHED로 종료하도록 game_rooms 생명주기 수정 |
+| 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
+| 2026-05-19 | game waiting timeout Redis ZSET/HASH/lock/PubSub 구조와 participants `ABORTED` 정리 정책 반영 |

@@ -3,6 +3,7 @@ package com.sang.smite.domain.game.service;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,32 @@ class GameRoomReadServiceTest {
         assertThatThrownBy(() -> gameRoomReadService.validateReadyParticipant(GAME_ROOM_ID, UNKNOWN_USER_ID))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
+    @DisplayName("getStatus - gameRoom 상태를 반환한다")
+    void getStatus() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when
+        GameStatus status = gameRoomReadService.getStatus(GAME_ROOM_ID);
+
+        // then
+        assertThat(status).isEqualTo(GameStatus.READY);
+    }
+
+    @Test
+    @DisplayName("getStatus - gameRoom이 없으면 예외를 던진다")
+    void getStatus_NotFound_ThrowException() {
+        // given
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.getStatus(GAME_ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }
 
     private GameRoom createReadyGameRoom() {

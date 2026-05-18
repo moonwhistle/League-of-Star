@@ -41,6 +41,22 @@ class GameWebSocketServerMessageTest {
     }
 
     @Test
+    @DisplayName("gameWaitingTimeout - GAME_WAITING_TIMEOUT 메시지를 생성한다")
+    void gameWaitingTimeout() throws Exception {
+        GameWebSocketServerMessage result = GameWebSocketServerMessage.gameWaitingTimeout(
+                100L,
+                "WAITING_TIMEOUT",
+                "GO_TO_MATCH_START"
+        );
+
+        JsonNode json = objectMapper.valueToTree(result);
+        assertThat(json.get("type").asText()).isEqualTo(GameWebSocketMessageType.GAME_WAITING_TIMEOUT.name());
+        assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
+        assertThat(json.get("payload").get("reason").asText()).isEqualTo("WAITING_TIMEOUT");
+        assertThat(json.get("payload").get("action").asText()).isEqualTo("GO_TO_MATCH_START");
+    }
+
+    @Test
     @DisplayName("invalidMessageType - ERROR 메시지를 생성한다")
     void invalidMessageType() throws Exception {
         GameWebSocketServerMessage result = GameWebSocketServerMessage.invalidMessageType();

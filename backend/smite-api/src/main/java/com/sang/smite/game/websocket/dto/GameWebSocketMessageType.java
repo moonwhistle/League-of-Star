@@ -14,6 +14,7 @@ public enum GameWebSocketMessageType {
     PLAYER_JOINED(Direction.SERVER),
     PLAYER_READY(Direction.SERVER),
     PLAYER_LEFT(Direction.SERVER),
+    GAME_WAITING_TIMEOUT(Direction.SERVER),
     ERROR(Direction.SERVER);
 
     private final Direction direction;

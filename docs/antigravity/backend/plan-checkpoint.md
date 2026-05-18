@@ -129,17 +129,17 @@ flowchart TD
 
 ### Step 4. 게임 대기 timeout 정산
 
-- [ ] `GO_TO_GAME_WAITING` 이후 waiting deadline 저장
-- [ ] WebSocket 미접속 timeout 감지
-- [ ] `CLIENT_READY` 미수신 timeout 감지
-- [ ] RTT 단계 진입 전 대기 실패 감지
-- [ ] timeout 시 gameRoom 상태를 `ABORTED`로 전환
-- [ ] timeout 시 game_participants 상태를 `ABORTED` 또는 `DISCONNECTED`로 전환
-- [ ] timeout 시 Redis `match:status:{userId}` 제거
-- [ ] timeout 시 game_records 생성하지 않음
-- [ ] timeout 시 LP/배치/승급전 반영하지 않음
-- [ ] timeout 시 클라이언트 start 버튼 화면 복귀 이벤트/응답 정책 확정
-- [ ] timeout scheduler/worker 중복 처리 방지 정책 정의
+- [x] gameRoom 생성 성공 후 `createdAt + 30초` waiting deadline 저장
+- [x] WebSocket 미접속 timeout 감지
+- [x] `CLIENT_READY` 미수신 timeout 감지
+- [x] RTT 단계 진입 전 대기 실패 감지
+- [x] timeout 시 gameRoom 상태를 `ABORTED`로 전환
+- [x] timeout 시 game_participants 상태를 `ABORTED`로 전환
+- [x] timeout 시 Redis `match:status:{userId}` 제거
+- [x] timeout 시 game_records 생성하지 않음
+- [x] timeout 시 LP/배치/승급전 반영하지 않음
+- [x] timeout 시 클라이언트 start 버튼 화면 복귀 이벤트/응답 정책 확정
+- [x] timeout scheduler/worker 중복 처리 방지 정책 정의
 
 ### Step 5. RTT 측정과 카운트다운
 
@@ -349,7 +349,7 @@ gameRoom 생성 이후의 상태 기준은 다음처럼 분리한다.
 | 게임 대기 진입 확정 후 | `IN_GAME` | `READY` | `READY` |
 | gameRoom 생성 후 Redis 상태 전환 실패 | 제거 | `ABORTED` | `ABORTED` |
 | WebSocket 연결/READY 대기 | `IN_GAME` | `READY` | `READY` |
-| WebSocket 미접속/READY timeout | 제거 | `ABORTED` | `ABORTED` 또는 `DISCONNECTED` |
+| WebSocket 미접속/READY timeout | 제거 | `ABORTED` | `ABORTED` |
 | GAME_START | `IN_GAME` | `IN_PROGRESS` | `PLAYING` |
 | 정상 종료 | 제거 | `FINISHED` | `FINISHED` |
 | GAME_START 이후 disconnect | `IN_GAME` 또는 종료 시 제거 | `IN_PROGRESS` 유지 후 `FINISHED` | `DISCONNECTED` 또는 결과에 따라 `FINISHED` |
@@ -361,12 +361,12 @@ Redis의 `IN_GAME`은 매칭 중복 진입을 막기 위한 유저 점유 상태
 
 `GO_TO_GAME_WAITING` 이후 URL 자체에 TTL을 두지는 않는다.
 `/ws/game/{gameRoomId}`는 라우팅 주소로 유지하고, gameRoom `READY` 상태에서 WebSocket 접속과 `CLIENT_READY` 응답 제한 시간을 둔다.
-waiting timeout은 클라이언트 수신 시각이 아니라 서버가 gameRoom `READY`를 확정하고 `GO_TO_GAME_WAITING` 발행을 시작한 시각을 기준으로 계산한다.
+waiting timeout은 클라이언트 수신 시각이나 `GO_TO_GAME_WAITING` 발행 시각이 아니라 DB gameRoom `createdAt` 기준 30초로 계산한다.
 
 ```text
-GO_TO_GAME_WAITING
--> gameRoom.status = READY
--> waiting deadline 시작
+gameRoom.status = READY
+-> waiting deadline = gameRoom.createdAt + 30초
+-> GO_TO_GAME_WAITING
 -> 두 유저 WebSocket connect
 -> MP4 preload 후 CLIENT_READY
 -> 양쪽 READY + RTT 정상
@@ -378,7 +378,9 @@ GO_TO_GAME_WAITING
 ```text
 WebSocket 미접속 또는 CLIENT_READY 미수신
 -> gameRoom.status = ABORTED
--> game_participants.status = ABORTED 또는 DISCONNECTED
+-> game_participants.status = ABORTED
+-> match:status:{userId} 제거
+-> GAME_WAITING_TIMEOUT Pub/Sub 발행
 -> game_records 생성 없음
 -> LP 반영 없음
 -> 클라이언트는 start 버튼 화면 복귀
@@ -516,12 +518,12 @@ gameRoom 생성 실패 mapping:
 
 범위:
 
-- `GO_TO_GAME_WAITING` 이후 waiting deadline 저장
+- gameRoom 생성 성공 후 `createdAt + 30초` waiting deadline 저장
 - WebSocket 미접속 timeout 감지
 - `CLIENT_READY` 미수신 timeout 감지
 - RTT 단계 진입 전 대기 실패 감지
 - timeout 시 gameRoom `ABORTED`
-- timeout 시 game_participants `ABORTED` 또는 `DISCONNECTED`
+- timeout 시 game_participants `ABORTED`
 - timeout 시 Redis `match:status:{userId}` 제거
 - timeout 시 game_records 생성 금지
 - timeout 시 LP/배치/승급전 반영 금지
@@ -627,3 +629,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-13 | 게임 대기 WebSocket 미접속/READY timeout 정책과 GAME_START 전후 이탈 처리 분리 반영 |
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
 | 2026-05-18 | 게임 대기 timeout 정산을 Step 4 / Issue 39로 분리하고, GAME_START 이후 WebSocket 연결 유무와 무관하게 gameRoom 종료를 보장하는 서버 timer/scheduler step을 Issue 42로 정리 |
+| 2026-05-19 | Step 4 게임 대기 timeout 정산 구현 완료 상태, gameRoom `createdAt + 30초`, participants `ABORTED`, Pub/Sub 복귀 이벤트 정책 반영 |

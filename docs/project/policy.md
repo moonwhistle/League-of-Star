@@ -112,13 +112,17 @@
 
 | 시점 | 처리 |
 |------|------|
-| **GO_TO_GAME_WAITING 후 ~ GAME_START 전** | WebSocket 미접속, `CLIENT_READY` 미수신, RTT 단계 진입 전 대기 실패 시 gameRoom `ABORTED`. `game_records` 생성 없음, LP/배치/승급전 반영 없음 |
+| **GO_TO_GAME_WAITING 후 ~ GAME_START 전** | gameRoom `createdAt`부터 **30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY` 전송을 완료하지 못하면** gameRoom `ABORTED`. `game_records` 생성 없음, LP/배치/승급전 반영 없음 |
 | **GAME_START 이후 이탈** | disconnect 자체로 gameRoom을 `ABORTED` 처리하지 않음. 서버는 기존 gameStartTime, HP scenario, 수신된 SMITE 액션 기준으로 판을 끝까지 판정 |
 | **GAME_START 이후 상대만 이탈** | 상대가 이탈해도 내 자동 승리가 아님. 내가 유효한 SMITE로 처치하면 승리, 처치하지 못하고 자연사하면 무승부 |
 | **GAME_START 이후 양쪽 이탈** | 이미 수신된 액션이 없으면 자연사 기준 무승부. 이미 수신된 유효 액션이 있으면 해당 액션 기준으로 판정 |
 
 - `GAME_START` 이전 timeout은 아직 유효한 판이 시작되지 않은 실패이므로 두 플레이어 모두 점수 변동이 없다.
-- waiting timeout은 클라이언트 수신 시각이 아니라 서버가 gameRoom `READY`를 확정하고 `GO_TO_GAME_WAITING` 발행을 시작한 시각을 기준으로 계산한다.
+- waiting timeout은 **30초**이며, 클라이언트 수신 시각이나 SSE 수신 시각이 아니라 DB에 저장된 gameRoom `createdAt`을 기준으로 계산한다.
+- 30초 안에 두 참가자가 모두 WebSocket에 연결되고 `CLIENT_READY`까지 보내야 다음 RTT/countdown 단계로 넘어갈 수 있다.
+- WebSocket 미연결 유저는 API local registry에 session이 없으므로 WebSocket 상태를 저장하지 않는다. gameRoom과 participant는 timeout 전까지 DB상 `READY`를 유지한다.
+- WebSocket 미연결 유저에게는 실시간 WebSocket 이벤트를 보낼 수 없다. timeout 후 늦게 WebSocket handshake를 시도하면 gameRoom이 이미 `ABORTED`이므로 연결을 거부하고, 클라이언트는 start 버튼 화면으로 복귀한다.
+- WebSocket에 연결되어 있던 유저에게만 `GAME_WAITING_TIMEOUT` 이벤트를 전송한 뒤 연결을 닫는다.
 - `GAME_START` 이전 timeout 후 두 유저는 start 버튼 화면으로 복귀한다. 큐 자동 복귀는 하지 않는다.
 - `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
 - `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
@@ -194,7 +198,7 @@
 
 - WebSocket session 상태는 DB에 저장하지 않는다.
 - WebSocket session `READY`는 DB `game_participants.status=READY`와 다른 일시적 대기 상태다.
-- GAME_START 이전 WebSocket 미접속, READY timeout, 연결 종료에 따른 gameRoom `ABORTED` 처리는 별도 timeout 정책에서 수행한다.
+- GAME_START 이전 WebSocket 미접속, READY timeout, 연결 종료에 따른 gameRoom `ABORTED` 처리는 gameRoom `createdAt` 기준 30초 timeout 정책에서 수행한다.
 
 ---
 
@@ -448,3 +452,5 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-15 | 게임 WebSocket local registry 사용 전제와 멀티 인스턴스 `gameRoomId` 기반 sticky routing 정책 추가 |
 | 2026-05-15 | WebSocket session `CONNECTED`, `READY`, `DISCONNECTED`, `REPLACED` 상태 정책 추가 |
 | 2026-05-18 | GAME_START 이전 timeout은 `ABORTED` 및 record/LP 미반영, GAME_START 이후 disconnect는 중단 없이 정상 판정 흐름으로 처리하도록 정책 조정 |
+| 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
+| 2026-05-18 | 게임 대기 WebSocket 미연결 유저는 timeout 전까지 저장 상태 없음, timeout 후 이벤트 수신 불가 및 late handshake 거절 정책 명시 |
