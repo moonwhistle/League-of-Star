@@ -309,7 +309,13 @@ sequenceDiagram
 
 - GAME_START 이전 미접속/READY timeout
 - gameRoom `ABORTED`
-- start 화면 또는 큐 복귀 정책
+- start 버튼 화면 복귀
+
+주의:
+
+- 위 `PLAYER_LEFT`는 게임 대기 WebSocket의 연결 상태 알림입니다.
+- `GAME_START` 이전에는 timeout 정책에 따라 `ABORTED` 대상이 될 수 있습니다.
+- `GAME_START` 이후에는 WebSocket 연결이 끊겨도 gameRoom을 즉시 중단하지 않고 서버 timer/scheduler가 종료 판정을 완료합니다.
 
 ## 9. 잘못된 메시지 처리
 

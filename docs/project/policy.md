@@ -108,17 +108,23 @@
 | 한 명만 강타 사용 + 킬 실패 | **무승부** (자연사) |
 | 둘 다 강타 미사용 | **무승부** (자연사) |
 
-### 2.4 디스커넥트 처리
+### 2.4 게임 대기 timeout 및 디스커넥트 처리
 
 | 시점 | 처리 |
 |------|------|
-| **매칭 수락 후 ~ 게임 시작 전** | 이탈자 → **패배 처리**, 상대방 → 큐 복귀 |
-| **게임 진행 중 이탈** | 이탈자 → **패배 처리**, 상대방 → **승리 처리** |
-| **양쪽 동시 이탈** | 양쪽 모두 **패배 처리** |
+| **GO_TO_GAME_WAITING 후 ~ GAME_START 전** | WebSocket 미접속, `CLIENT_READY` 미수신, RTT 단계 진입 전 대기 실패 시 gameRoom `ABORTED`. `game_records` 생성 없음, LP/배치/승급전 반영 없음 |
+| **GAME_START 이후 이탈** | disconnect 자체로 gameRoom을 `ABORTED` 처리하지 않음. 서버는 기존 gameStartTime, HP scenario, 수신된 SMITE 액션 기준으로 판을 끝까지 판정 |
+| **GAME_START 이후 상대만 이탈** | 상대가 이탈해도 내 자동 승리가 아님. 내가 유효한 SMITE로 처치하면 승리, 처치하지 못하고 자연사하면 무승부 |
+| **GAME_START 이후 양쪽 이탈** | 이미 수신된 액션이 없으면 자연사 기준 무승부. 이미 수신된 유효 액션이 있으면 해당 액션 기준으로 판정 |
 
-- 디스커넥트 판정: **5초간 서버와 WebSocket 연결 끊김** 시 이탈로 판정 (`DISCONNECTED` 상태로 전환)
-- 일시적 네트워크 불안정은 자동 재연결 시도 (5초 이내)
-- 상대방 디스커넥트 시: **승리 결과 화면 표시** → 홈 화면으로 복귀 가능
+- `GAME_START` 이전 timeout은 아직 유효한 판이 시작되지 않은 실패이므로 두 플레이어 모두 점수 변동이 없다.
+- waiting timeout은 클라이언트 수신 시각이 아니라 서버가 gameRoom `READY`를 확정하고 `GO_TO_GAME_WAITING` 발행을 시작한 시각을 기준으로 계산한다.
+- `GAME_START` 이전 timeout 후 두 유저는 start 버튼 화면으로 복귀한다. 큐 자동 복귀는 하지 않는다.
+- `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
+- `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
+- 서버 timer/scheduler는 HP scenario의 종료 시각 또는 몬스터 사망 시각까지 진행한 뒤 최종 판정을 수행한다.
+- `GAME_START` 이후 결과가 승/패로 확정되면 일반 게임 결과처럼 record와 LP를 반영한다.
+- `GAME_START` 이후 결과가 무승부면 record는 무승부로 저장하고 LP는 변동하지 않는다.
 
 ### 2.5 서버 권위 타임스탬프 (공정성 핵심)
 
@@ -188,7 +194,7 @@
 
 - WebSocket session 상태는 DB에 저장하지 않는다.
 - WebSocket session `READY`는 DB `game_participants.status=READY`와 다른 일시적 대기 상태다.
-- GAME_START 이전 timeout 또는 disconnect에 따른 gameRoom `ABORTED` 처리는 별도 timeout 정책에서 수행한다.
+- GAME_START 이전 WebSocket 미접속, READY timeout, 연결 종료에 따른 gameRoom `ABORTED` 처리는 별도 timeout 정책에서 수행한다.
 
 ---
 
@@ -273,13 +279,16 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | **승급전 진입** | 현재 LP 동결 (시리즈 결과 전까지 LP 변동 없음) |
 | **승급전 성공** | `RankSeries.status=SUCCESS` 시 다음 디비전 LP 0에서 시작 |
 | **승급전 실패** | `RankSeries.status=FAILED` 시 현재 디비전 LP 75로 세팅 |
-| **시리즈 중 디스커넥트** | 해당 판 **패배 처리** (시리즈 카운트에 반영) |
+| **GAME_START 이전 timeout/abort** | 유효한 판이 아니므로 시리즈 카운트에 반영하지 않음 |
+| **GAME_START 이후 disconnect** | disconnect 자체가 아니라 최종 승/패/무승부 결과를 시리즈 카운트에 반영 |
 
 ### 3.6 특수 상황 LP 처리
 
 | 상황 | 처리 |
 |------|------|
-| **디스커넥트 패배** | 일반 패배와 동일한 LP 차감 |
+| **GAME_START 이전 timeout/abort** | 유효한 판이 아니므로 LP 변동 없음 |
+| **GAME_START 이후 최종 판정 패배** | 일반 패배와 동일한 LP 차감 |
+| **GAME_START 이후 최종 판정 무승부** | 무승부와 동일하게 LP 변동 없음 |
 
 ---
 
@@ -383,7 +392,8 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 
 - 배치 기간 중에는 **LP 변동/승급전이 발생하지 않음**
 - 10판의 승/패 결과가 확정되면 즉시 티어 배정
-- 배치 중 디스커넥트는 **해당 판 패배 처리**
+- 배치 중 `GAME_START` 이전 timeout/abort는 배치 판수에 반영하지 않는다.
+- 배치 중 `GAME_START` 이후 disconnect는 최종 승/패/무승부 결과를 배치 판수에 반영한다.
 
 ---
 
@@ -429,7 +439,7 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 날짜 | 변경 내용 |
 |------|----------|
 | 2026-04-17 | 초안 작성 (매칭, 게임 진행, LP, 티어 & 승급, 배치, 계정 정책) |
-| 2026-04-17 | 매칭 거절 패널티 제거, 게임 시작 세팅 제거(D/F 둘 다 강타 발동으로 단순화), 게임 시간 랜덤, 마우스 호버 조건 추가, 디스커넥트→패배 확정, 서버 권위 타임스탬프 방식 전환, 승급전 3판 2승 필수(무승부 불인정) |
+| 2026-04-17 | 매칭 거절 패널티 제거, 게임 시작 세팅 제거(D/F 둘 다 강타 발동으로 단순화), 게임 시간 랜덤, 마우스 호버 조건 추가, 서버 권위 타임스탬프 방식 전환, 승급전 3판 2승 필수(무승부 불인정) |
 | 2026-04-27 | 통합 시리즈 아키텍처(RankSeries) 도입 및 배치/승급 정책 일원화 |
 | 2026-05-13 | 양쪽 수락 후 gameRoom/scenario 생성 성공 시에만 `GO_TO_GAME_WAITING` 발행, gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 이벤트 발행, 매칭 SSE와 게임 WebSocket 책임 경계 반영 |
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GO_TO_MATCH_START`와 `GAME_SETUP_FAILED` reason으로 start 화면 복귀하도록 정책 변경 |
@@ -437,3 +447,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
 | 2026-05-15 | 게임 WebSocket local registry 사용 전제와 멀티 인스턴스 `gameRoomId` 기반 sticky routing 정책 추가 |
 | 2026-05-15 | WebSocket session `CONNECTED`, `READY`, `DISCONNECTED`, `REPLACED` 상태 정책 추가 |
+| 2026-05-18 | GAME_START 이전 timeout은 `ABORTED` 및 record/LP 미반영, GAME_START 이후 disconnect는 중단 없이 정상 판정 흐름으로 처리하도록 정책 조정 |

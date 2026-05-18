@@ -302,17 +302,57 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitin
 
 ### 8. GAME_START 이전 timeout 정책 문서화
 
-- [ ] `GO_TO_GAME_WAITING` 이후 waiting deadline 기준 정의
-- [ ] WebSocket 미접속 timeout 후속 이슈 범위로 분리
-- [ ] `CLIENT_READY` 미수신 timeout 후속 이슈 범위로 분리
-- [ ] GAME_START 이전 timeout은 gameRoom `ABORTED` 정책으로 처리한다고 문서화
-- [ ] GAME_START 이전 timeout은 game record/LP 미반영이라고 문서화
-- [ ] GAME_START 이후 disconnect 정책과 분리
+- [x] `GO_TO_GAME_WAITING` 이후 waiting deadline 기준 정의
+- [x] WebSocket 미접속 timeout 후속 이슈 범위로 분리
+- [x] `CLIENT_READY` 미수신 timeout 후속 이슈 범위로 분리
+- [x] GAME_START 이전 timeout은 gameRoom `ABORTED` 정책으로 처리한다고 문서화
+- [x] GAME_START 이전 timeout은 game record/LP 미반영이라고 문서화
+- [x] GAME_START 이후 disconnect 정책과 분리
 
 주의:
 
 - 이번 이슈에서는 timeout scheduler/worker와 abort 실행을 구현하지 않는다.
 - timeout 실행 처리는 별도 후속 이슈에서 구현한다.
+
+정책:
+
+- `GO_TO_GAME_WAITING` 이후 gameRoom은 `READY` 상태로 대기한다.
+- waiting deadline은 서버가 gameRoom `READY`를 확정하고 `GO_TO_GAME_WAITING` 발행을 시작한 서버 시각을 기준으로 계산한다.
+- timeout duration 값은 후속 timeout 구현 이슈에서 확정한다.
+- waiting deadline 안에 두 참가자가 WebSocket에 접속하고 `CLIENT_READY`를 보내야 다음 RTT/countdown 단계로 넘어갈 수 있다.
+- WebSocket 미접속, 연결 후 `CLIENT_READY` 미수신, RTT 단계 진입 전 대기 실패는 모두 `GAME_START` 이전 timeout으로 본다.
+- `GAME_START` 이전 timeout은 실제 판이 시작되지 않은 실패이므로 gameRoom을 `ABORTED`로 정리한다.
+- `GAME_START` 이전 timeout은 `game_records`를 생성하지 않고 LP/배치/승급전 결과도 반영하지 않는다.
+- 두 플레이어 모두 점수 변동 없이 start 버튼 화면으로 복귀한다. 큐 자동 복귀는 하지 않는다.
+
+상태 전이:
+
+```text
+GO_TO_GAME_WAITING
+-> gameRoom.status = READY
+-> waiting deadline 시작
+-> WebSocket connect 대기
+-> CLIENT_READY 대기
+
+timeout 발생
+-> gameRoom.status = ABORTED
+-> game_participants.status = ABORTED 또는 DISCONNECTED
+-> match:status:{userId} 제거
+-> game_records 생성 없음
+-> LP/배치/승급전 반영 없음
+-> 클라이언트 start 버튼 화면 복귀
+```
+
+`GAME_START` 이후 disconnect는 위 timeout 정책과 분리한다.
+
+- `GAME_START` 이후에는 이미 유효한 판이 시작된 상태이므로 disconnect만으로 gameRoom을 `ABORTED` 처리하지 않는다.
+- disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
+- `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
+- 서버 timer/scheduler는 HP scenario의 종료 시각 또는 몬스터 사망 시각까지 진행한 뒤 최종 판정을 수행한다.
+- 서버는 기존 gameStartTime, HP scenario, 서버 수신 액션 기준으로 게임을 끝까지 판정한다.
+- 상대가 유효한 SMITE로 처치에 성공하면 서버 최종 판정 결과대로 승/패를 기록한다.
+- 상대가 처치하지 못하고 드래곤이 자연사하면 무승부로 기록하고 LP는 변동하지 않는다.
+- 양쪽 모두 disconnect해도 이미 수신된 액션이 없으면 자연사 기준 무승부로 본다.
 
 ### 9. 테스트
 
@@ -338,8 +378,8 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitin
 - [ ] 매칭 SSE와 game WebSocket 책임 경계 재확인
 - [ ] `match_response_result` 이후 클라이언트 `EventSource.close()` 책임 명시 유지
 - [ ] WebSocket endpoint와 message type 정리
-- [ ] GAME_START 이전 timeout 실행 처리는 후속 이슈라고 명시
-- [ ] GAME_START 이전 timeout은 record/LP 미반영 정책이라고 명시
+- [x] GAME_START 이전 timeout 실행 처리는 후속 이슈라고 명시
+- [x] GAME_START 이전 timeout은 record/LP 미반영 정책이라고 명시
 
 ## ✅ 완료 기준
 
@@ -381,3 +421,4 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitin
 | 2026-05-15 | Task 5 멀티 인스턴스 정책 추가. local registry 문제와 gameRoomId sticky routing 해결 방식, Redis pub/sub 트레이드오프 명시 |
 | 2026-05-15 | Task 6 완료. WebSocket client/server envelope, message type, server message factory, invalid message type error 정의 |
 | 2026-05-15 | Task 7 완료. 게임 대기 WebSocket handler에서 연결 등록, CLIENT_READY, PLAYER_JOINED/READY/LEFT, ERROR 처리 구현 |
+| 2026-05-18 | Task 8 완료. GAME_START 이전 timeout은 ABORTED 및 record/LP 미반영, GAME_START 이후 disconnect는 정상 판정 흐름 유지로 정책화 |

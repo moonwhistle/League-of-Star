@@ -240,20 +240,28 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> READY: 게임 세션 생성 완료
+    READY --> ABORTED: GAME_START 이전 미접속/READY timeout
     READY --> IN_PROGRESS: 유저 접속 및 시작 신호
     
     state IN_PROGRESS {
         [*] --> WAITING_ACTION: 강타 대기
         WAITING_ACTION --> SMITED: 강타 실행 (Smite Action)
+        WAITING_ACTION --> WAITING_ACTION: GAME_START 이후 disconnect<br/>서버 timer/scheduler가 clock 유지
     }
     
     SMITED --> FINISHED: 판정 완료 (Winner Decided)
+    IN_PROGRESS --> FINISHED: 자연사 또는 제한 시간 종료
     FINISHED --> RECORDED: 전적 기록 완료
     RECORDED --> [*]
 
-    IN_PROGRESS --> ABORTED: 유저 탈주/연결 끊김 (DISCONNECTED)
     ABORTED --> [*]
 ```
+
+- `GAME_START` 이전 timeout은 유효한 판이 아니므로 `ABORTED` 처리하고 record/LP를 반영하지 않습니다.
+- `GAME_START` 이후 disconnect는 gameRoom을 `ABORTED`로 만들지 않습니다.
+- disconnect 유저는 이후 추가 입력을 할 수 없지만, 이미 서버가 수신한 액션은 유지합니다.
+- WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료합니다.
+- 서버는 HP scenario와 수신 액션 기준으로 승/패/무승부를 판정하고, 그 결과만 record/LP에 반영합니다.
 
 ## 4. Game WebSocket Session (게임 대기 WebSocket 연결 상태)
 
@@ -286,7 +294,8 @@ stateDiagram-v2
 
 - 멀티 인스턴스 환경에서는 같은 `gameRoomId`의 두 참가자가 같은 API 인스턴스로 라우팅되어야 합니다.
 - WebSocket session status는 일시적 연결 상태이므로 전적, LP, game record에 직접 반영하지 않습니다.
-- GAME_START 이전 timeout 또는 disconnect에 따른 gameRoom `ABORTED` 처리는 별도 timeout 정책에서 수행합니다.
+- GAME_START 이전 WebSocket 미접속, READY timeout, 연결 종료에 따른 gameRoom `ABORTED` 처리는 별도 timeout 정책에서 수행합니다.
+- GAME_START 이후 disconnect는 session registry에서 제거되지만, gameRoom은 정상 판정 흐름을 유지합니다.
 
 ## 5. Password Reset (비밀번호 재설정)
 Redis에서 관리되는 비밀번호 재설정 토큰의 수명 주기입니다.
