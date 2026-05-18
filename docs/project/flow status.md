@@ -5,7 +5,8 @@
 범위:
 
 - 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, WebSocket `CONNECTED`
-- 제외: `CLIENT_READY`, RTT, countdown, `GAME_START`, SMITE, game record/LP 반영
+- 제외: RTT, countdown, `GAME_START`, SMITE, game record/LP 반영
+- 게임 대기 WebSocket timeout 기준: gameRoom `createdAt`부터 **30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 모두 완료되어야 함**
 
 ## 1. Overall Flow
 
@@ -144,11 +145,13 @@ flowchart LR
 | handshake 요청 | `HANDSHAKE_REQUESTED` | 저장 안 함 |
 | handshake 실패 | `REJECTED` | 저장 안 함 |
 | handshake 성공 | `CONNECTED` | API local memory `GameRoomWebSocketSessionRegistry` |
+| `CLIENT_READY` 수신 | `READY` | API local memory `GameRoomWebSocketSessionRegistry` |
+| 30초 안에 양쪽 `READY` 미완료 | `ABORTED` | DB `game_rooms`, `game_participants` |
 
 주의:
 
 - WebSocket `CONNECTED`는 DB `game_participants.status=READY`와 다릅니다.
-- `CLIENT_READY` 이후 상태는 이 문서 범위 밖이며, 다음 WebSocket 대기/RTT 단계에서 다룹니다.
+- gameRoom `createdAt`부터 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료해야 RTT/countdown 단계로 넘어갑니다.
 - 멀티 인스턴스에서는 같은 `gameRoomId`가 같은 API 인스턴스로 라우팅되어야 WebSocket registry가 정상 동작합니다.
 
 ## 변경 이력
@@ -156,3 +159,4 @@ flowchart LR
 | 날짜 | 변경 내용 |
 |------|----------|
 | 2026-05-15 | 매칭 시작부터 WebSocket 연결까지 시나리오별 status 흐름을 하나의 Mermaid 다이어그램으로 정리 |
+| 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정하고 `CLIENT_READY` 완료 조건 명시 |

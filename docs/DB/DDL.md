@@ -134,7 +134,7 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> Ready : 매칭 수락 완료 / 게임방 생성
-    Ready --> Aborted : GAME_START 이전 미접속/READY timeout
+    Ready --> Aborted : createdAt 기준 30초 안에<br/>WebSocket 연결 + CLIENT_READY 미완료
     Ready --> InProgress : 게임 시작
     InProgress --> InProgress : GAME_START 이후 disconnect<br/>서버 timer/scheduler 진행
     InProgress --> Finished : 서버 timer/scheduler 기준 정상 종료
@@ -146,7 +146,7 @@ stateDiagram-v2
 |------|------|------|
 | 매칭 수락 | INSERT | status=READY, scenario_data 생성, participants(READY) 추가 |
 | 게임 시작 | UPDATE | status=IN_PROGRESS, participants(PLAYING), game_start_time 기록 |
-| GAME_START 이전 timeout | UPDATE | status=ABORTED, participants(ABORTED 또는 DISCONNECTED), game_records/LP 미반영 |
+| GAME_START 이전 timeout | UPDATE | gameRoom `createdAt` 기준 30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 완료되지 않으면 status=ABORTED, participants(ABORTED 또는 DISCONNECTED), game_records/LP 미반영 |
 | GAME_START 이후 disconnect | UPDATE 없음 또는 participant 상태만 DISCONNECTED. gameRoom은 IN_PROGRESS 유지 |
 | 게임 종료 | UPDATE | 서버 timer/scheduler가 scenario와 game_actions 기준으로 status=FINISHED, result/winner_id, participants(FINISHED), finished_at |
 
@@ -532,3 +532,4 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 | 2026-04-18 | Soft Delete 전환: users에 status/withdrawn_at 추가, 탈퇴 익명화 생명주기 반영, FK ON DELETE RESTRICT 명시, demotion_shield 승리 시 해제 추가 |
 | 2026-05-13 | 현재 구현 기준으로 rank_series 명칭, Redis 매칭 키, match_response timeout index, game_rooms READY 상태, 테이블 요약 정합성 수정 |
 | 2026-05-18 | GAME_START 이전 timeout은 ABORTED 및 record/LP 미반영, GAME_START 이후 disconnect는 서버 timer/scheduler 기준 FINISHED로 종료하도록 game_rooms 생명주기 수정 |
+| 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |

@@ -42,7 +42,7 @@
 - 두 플레이어가 **동일한 드래곤의 HP 바**를 실시간으로 공유
 - 드래곤 HP가 **불규칙하게 감소** (서버에서 사전 생성한 시나리오 기반)
 - MP4 배경은 gameRoom별로 만들지 않고 공통 static resource를 사용
-- `GAME_START` 이전 WebSocket 미접속/READY timeout은 gameRoom `ABORTED`로 처리하고 전적/LP를 반영하지 않음
+- `GAME_START` 이전 WebSocket 미접속/READY timeout은 **gameRoom `createdAt` 기준 30초**로 판단하며, 30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 완료되지 않으면 gameRoom `ABORTED`로 처리하고 전적/LP를 반영하지 않음
 - `GAME_START` 이후 disconnect는 게임을 중단하지 않고 서버 timer/scheduler, 시나리오, 수신 액션 기준으로 끝까지 판정
 - WebSocket 연결이 모두 끊겨도 서버 timer/scheduler가 gameRoom 종료 작업을 완료
 - 드래곤 위에 **마우스를 올린 상태**에서 **D 또는 F 키**를 눌러 강타 발동
@@ -394,3 +394,4 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-05-15 | 게임 WebSocket local registry의 멀티 인스턴스 전제로 `gameRoomId` 기반 sticky routing 정책 추가 |
 | 2026-05-15 | WebSocket session 상태를 API local memory registry 상태로 분리하여 명시 |
 | 2026-05-18 | GAME_START 이전 timeout은 `ABORTED` 및 전적/LP 미반영, GAME_START 이후 disconnect는 정상 판정 흐름 유지로 정책 조정 |
+| 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
