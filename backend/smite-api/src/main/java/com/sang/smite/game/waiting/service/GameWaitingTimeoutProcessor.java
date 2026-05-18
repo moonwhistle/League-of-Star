@@ -5,6 +5,7 @@ import com.sang.smite.domain.game.service.GameRoomCommandService;
 import com.sang.smite.domain.game.service.GameRoomReadService;
 import com.sang.smite.game.waiting.common.constant.GameWaitingConstants;
 import com.sang.smite.game.waiting.domain.GameWaitingState;
+import com.sang.smite.game.waiting.pubsub.GameWaitingTimeoutPubSubPublisher;
 import com.sang.smite.game.waiting.repository.GameWaitingStore;
 import com.sang.smite.matching.command.MatchUserStatusCommandService;
 import com.sang.smite.redis.lock.annotation.DistributedRedisLock;
@@ -24,6 +25,7 @@ public class GameWaitingTimeoutProcessor {
     private final GameRoomReadService gameRoomReadService;
     private final GameRoomCommandService gameRoomCommandService;
     private final MatchUserStatusCommandService matchUserStatusCommandService;
+    private final GameWaitingTimeoutPubSubPublisher timeoutPubSubPublisher;
 
     @DistributedRedisLock(key = "'" + GameWaitingConstants.WAITING_TIMEOUT_LOCK_KEY_PREFIX + "' + #gameRoomId")
     public void processTimeoutWithLock(Long gameRoomId) {
@@ -46,12 +48,14 @@ public class GameWaitingTimeoutProcessor {
                 return;
             }
             removeMatchStatuses(state);
+            publishTimeout(gameRoomId);
             gameWaitingStore.cleanup(gameRoomId);
             return;
         }
 
         if (gameStatus == GameStatus.ABORTED) {
             removeMatchStatuses(state);
+            publishTimeout(gameRoomId);
             gameWaitingStore.cleanup(gameRoomId);
             return;
         }
@@ -61,5 +65,9 @@ public class GameWaitingTimeoutProcessor {
 
     private void removeMatchStatuses(GameWaitingState state) {
         matchUserStatusCommandService.removeGameWaitingTimeoutStatuses(state.userAId(), state.userBId());
+    }
+
+    private void publishTimeout(Long gameRoomId) {
+        timeoutPubSubPublisher.publishTimeout(gameRoomId);
     }
 }

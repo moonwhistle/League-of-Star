@@ -1,5 +1,6 @@
 package com.sang.smite.matching.command;
 
+import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,13 @@ public class MatchUserStatusCommandService {
      * GAME_START 이전 game waiting timeout으로 정리된 유저들의 match status를 제거합니다.
      */
     public void removeGameWaitingTimeoutStatuses(Long userAId, Long userBId) {
-        userStatusStore.removeStatus(userAId);
-        userStatusStore.removeStatus(userBId);
+        removeIfInGame(userAId);
+        removeIfInGame(userBId);
+    }
+
+    private void removeIfInGame(Long userId) {
+        userStatusStore.getStatus(userId)
+                .filter(status -> status == MatchStatus.IN_GAME)
+                .ifPresent(ignored -> userStatusStore.removeStatus(userId));
     }
 }

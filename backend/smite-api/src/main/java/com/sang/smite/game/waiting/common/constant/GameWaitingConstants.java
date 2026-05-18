@@ -12,6 +12,9 @@ public final class GameWaitingConstants {
     public static final String WAITING_TIMEOUT_PENDING_KEY = "game:waiting:timeout:pending";
     public static final String WAITING_KEY_PREFIX = "game:waiting:";
     public static final String WAITING_TIMEOUT_LOCK_KEY_PREFIX = "game:waiting:timeout:lock:";
+    public static final String WAITING_TIMEOUT_CHANNEL = "game_waiting_timeout";
+    public static final String WAITING_TIMEOUT_REASON = "WAITING_TIMEOUT";
+    public static final String WAITING_TIMEOUT_ACTION = "GO_TO_MATCH_START";
 
     public static final String USER_A_ID_FIELD = "userAId";
     public static final String USER_B_ID_FIELD = "userBId";

@@ -4,6 +4,7 @@ import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
 import com.sang.smite.domain.game.service.GameRoomReadService;
 import com.sang.smite.game.waiting.domain.GameWaitingState;
+import com.sang.smite.game.waiting.pubsub.GameWaitingTimeoutPubSubPublisher;
 import com.sang.smite.game.waiting.repository.GameWaitingStore;
 import com.sang.smite.matching.command.MatchUserStatusCommandService;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,6 +41,9 @@ class GameWaitingTimeoutProcessorTest {
     @Mock
     private MatchUserStatusCommandService matchUserStatusCommandService;
 
+    @Mock
+    private GameWaitingTimeoutPubSubPublisher timeoutPubSubPublisher;
+
     @Test
     @DisplayName("waiting HASH가 없으면 timeout index cleanup만 수행한다")
     void processTimeout_WaitingStateNotFound_Cleanup() {
@@ -52,6 +57,7 @@ class GameWaitingTimeoutProcessorTest {
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
         verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
         verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
+        verify(timeoutPubSubPublisher, never()).publishTimeout(GAME_ROOM_ID);
     }
 
     @Test
@@ -67,6 +73,7 @@ class GameWaitingTimeoutProcessorTest {
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
         verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
         verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
+        verify(timeoutPubSubPublisher, never()).publishTimeout(GAME_ROOM_ID);
     }
 
     @Test
@@ -82,6 +89,7 @@ class GameWaitingTimeoutProcessorTest {
         // then
         verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
         verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
+        verify(timeoutPubSubPublisher, never()).publishTimeout(GAME_ROOM_ID);
         verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
     }
 
@@ -99,7 +107,10 @@ class GameWaitingTimeoutProcessorTest {
         // then
         verify(gameRoomCommandService).abortReadyRoomIfReady(GAME_ROOM_ID);
         verify(matchUserStatusCommandService).removeGameWaitingTimeoutStatuses(1L, 2L);
-        verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
+        org.mockito.InOrder inOrder = inOrder(matchUserStatusCommandService, timeoutPubSubPublisher, gameWaitingStore);
+        inOrder.verify(matchUserStatusCommandService).removeGameWaitingTimeoutStatuses(1L, 2L);
+        inOrder.verify(timeoutPubSubPublisher).publishTimeout(GAME_ROOM_ID);
+        inOrder.verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
     }
 
     @Test
@@ -115,7 +126,10 @@ class GameWaitingTimeoutProcessorTest {
         // then
         verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
         verify(matchUserStatusCommandService).removeGameWaitingTimeoutStatuses(1L, 2L);
-        verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
+        org.mockito.InOrder inOrder = inOrder(matchUserStatusCommandService, timeoutPubSubPublisher, gameWaitingStore);
+        inOrder.verify(matchUserStatusCommandService).removeGameWaitingTimeoutStatuses(1L, 2L);
+        inOrder.verify(timeoutPubSubPublisher).publishTimeout(GAME_ROOM_ID);
+        inOrder.verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
     }
 
     @Test
@@ -134,6 +148,7 @@ class GameWaitingTimeoutProcessorTest {
 
         // then
         verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
+        verify(timeoutPubSubPublisher, never()).publishTimeout(GAME_ROOM_ID);
         verify(gameWaitingStore, never()).cleanup(GAME_ROOM_ID);
     }
 
@@ -154,6 +169,27 @@ class GameWaitingTimeoutProcessorTest {
 
         // then
         verify(gameRoomCommandService).abortReadyRoomIfReady(GAME_ROOM_ID);
+        verify(timeoutPubSubPublisher, never()).publishTimeout(GAME_ROOM_ID);
+        verify(gameWaitingStore, never()).cleanup(GAME_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("timeout 이벤트 publish 중 예외가 발생하면 cleanup하지 않고 다음 tick 재시도를 위해 pending을 유지한다")
+    void processTimeout_PublishFailure_DoNotCleanup() {
+        // given
+        when(gameWaitingStore.findWaitingState(GAME_ROOM_ID)).thenReturn(Optional.of(waitingState(false, false)));
+        when(gameRoomReadService.getStatus(GAME_ROOM_ID)).thenReturn(GameStatus.READY);
+        when(gameRoomCommandService.abortReadyRoomIfReady(GAME_ROOM_ID)).thenReturn(true);
+        org.mockito.Mockito.doThrow(new IllegalStateException("publish failed"))
+                .when(timeoutPubSubPublisher)
+                .publishTimeout(GAME_ROOM_ID);
+
+        // when
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> processor.processTimeoutWithLock(GAME_ROOM_ID))
+                .isInstanceOf(IllegalStateException.class);
+
+        // then
+        verify(matchUserStatusCommandService).removeGameWaitingTimeoutStatuses(1L, 2L);
         verify(gameWaitingStore, never()).cleanup(GAME_ROOM_ID);
     }
 
@@ -170,6 +206,7 @@ class GameWaitingTimeoutProcessorTest {
 
         // then
         verify(matchUserStatusCommandService, never()).removeGameWaitingTimeoutStatuses(1L, 2L);
+        verify(timeoutPubSubPublisher, never()).publishTimeout(GAME_ROOM_ID);
         verify(gameWaitingStore, never()).cleanup(GAME_ROOM_ID);
     }
 

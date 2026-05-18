@@ -35,8 +35,8 @@ flowchart TD
     J -->|"ABORTED"| N["Remove match:status:{userId}"]
     L --> M["participants = ABORTED"]
     M --> N["Remove match:status:{userId}"]
-    N --> O["Cleanup Redis waiting"]
-    O --> P["Publish GAME_WAITING_TIMEOUT"]
+    N --> O["Publish GAME_WAITING_TIMEOUT"]
+    O --> P["Cleanup Redis waiting"]
 
     P --> Q{"WebSocket connected?"}
     Q -->|"yes"| R["Send GAME_WAITING_TIMEOUT<br/>Close socket"]
@@ -58,6 +58,7 @@ gameRoom READY 생성
 -> gameRoom ABORTED
 -> participants ABORTED
 -> Redis match:status:{userId} 제거
+-> GAME_WAITING_TIMEOUT Pub/Sub 발행
 -> Redis waiting 상태 정리
 -> 연결된 WebSocket session에 GAME_WAITING_TIMEOUT 전송 후 close
 -> 미접속 유저는 별도 push 없음
@@ -218,7 +219,7 @@ cleanup 정책:
 | 상황 | cleanup |
 |------|------|
 | 양쪽 `CLIENT_READY` 완료 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
-| timeout abort 및 match status 제거 완료 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
+| timeout abort, match status 제거, timeout 이벤트 publish 완료 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
 | scheduler가 due gameRoom을 봤지만 HASH 없음 | `game:waiting:timeout:pending`에서 gameRoomId 제거 |
 | scheduler가 due gameRoom을 봤지만 DB status가 `ABORTED` | `match:status:{userId}` 제거 후 `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
 | scheduler가 due gameRoom을 봤지만 DB status가 `IN_PROGRESS` 또는 `FINISHED` | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
@@ -377,8 +378,8 @@ DB 최종 확인 이유:
   - Redis HASH 없음: cleanup
   - Redis 기준 bothReady=true: cleanup
   - DB gameRoom status가 `IN_PROGRESS` 또는 `FINISHED`: cleanup
-  - DB gameRoom status가 `ABORTED`: match status 제거 후 cleanup
-  - DB gameRoom status가 `READY`이며 abort와 match status 제거 성공: cleanup
+  - DB gameRoom status가 `ABORTED`: match status 제거와 timeout 이벤트 publish 후 cleanup
+  - DB gameRoom status가 `READY`이며 abort, match status 제거, timeout 이벤트 publish 성공: cleanup
 - DB gameRoom status 조회는 `GameRoomReadService.getStatus(gameRoomId)`로 수행한다.
 - READY gameRoom abort는 scheduler-safe 유스케이스인 `GameRoomCommandService.abortReadyRoomIfReady(gameRoomId)`를 사용한다.
 
@@ -460,8 +461,9 @@ DB 최종 확인 이유:
 - `match:status:{userId}` 소유권은 matching 모듈에 있으므로 `smite-api`가 Redis store를 직접 호출하지 않는다.
 - `smite-matching`에 `MatchUserStatusCommandService.removeGameWaitingTimeoutStatuses(userAId, userBId)`를 추가했다.
 - timeout processor는 Redis waiting HASH의 `userAId`, `userBId`를 사용해 두 유저의 match status를 제거한다.
-- DB gameRoom이 `READY`이면 `abortReadyRoomIfReady(gameRoomId)` 성공 후 match status를 제거하고 Redis waiting 상태를 cleanup한다.
-- DB gameRoom이 이미 `ABORTED`이면 이전 tick에서 abort 이후 실패한 케이스로 보고 match status 제거를 재시도한 뒤 cleanup한다.
+- match status 제거는 현재 값이 `IN_GAME`인 경우에만 수행한다. 재시도 중 유저가 이미 새 매칭을 시작해 `MATCHING` 상태가 된 경우에는 제거하지 않는다.
+- DB gameRoom이 `READY`이면 `abortReadyRoomIfReady(gameRoomId)` 성공 후 match status 제거와 timeout 이벤트 publish를 완료하고 Redis waiting 상태를 cleanup한다.
+- DB gameRoom이 이미 `ABORTED`이면 이전 tick에서 abort 이후 실패한 케이스로 보고 match status 제거와 timeout 이벤트 publish를 재시도한 뒤 cleanup한다.
 - DB gameRoom이 `IN_PROGRESS` 또는 `FINISHED`이면 이미 정상 진행/종료된 방으로 보고 match status 제거 없이 Redis waiting 상태만 cleanup한다.
 - `READY` 조회 후 safe abort가 `false`를 반환하면 다른 흐름의 상태 전이를 고려해 match status 제거와 cleanup을 하지 않고 다음 tick에서 재확인한다.
 - match status 제거 중 예외가 발생하면 Redis waiting 상태를 cleanup하지 않는다. pending을 유지해서 다음 scheduler tick에서 재시도한다.
@@ -475,20 +477,20 @@ DB 최종 확인 이유:
 
 ### 8. timeout 이벤트 Pub/Sub 및 WebSocket 전송
 
-- [ ] game waiting timeout용 server message type을 추가한다.
-  - [ ] `GAME_WAITING_TIMEOUT`
-- [ ] timeout payload를 정의한다.
-  - [ ] `gameRoomId`
-  - [ ] `reason = WAITING_TIMEOUT`
-  - [ ] `action = GO_TO_MATCH_START`
-- [ ] timeout 확정 후 Redis Pub/Sub 이벤트를 발행한다.
-- [ ] 모든 API 인스턴스가 timeout Pub/Sub 이벤트를 구독한다.
-- [ ] 이벤트를 받은 인스턴스는 local registry에서 해당 gameRoom의 열린 WebSocket session을 찾는다.
-- [ ] 연결된 session에만 `GAME_WAITING_TIMEOUT`을 전송한다.
-- [ ] timeout 이벤트 전송 후 WebSocket session을 close한다.
-- [ ] registry에서 해당 gameRoom session을 제거한다.
-- [ ] session이 없는 인스턴스는 no-op 처리한다.
-- [ ] 미접속 유저에게는 별도 이벤트를 보내지 않는다.
+- [x] game waiting timeout용 server message type을 추가한다.
+  - [x] `GAME_WAITING_TIMEOUT`
+- [x] timeout payload를 정의한다.
+  - [x] `gameRoomId`
+  - [x] `reason = WAITING_TIMEOUT`
+  - [x] `action = GO_TO_MATCH_START`
+- [x] timeout 확정 후 Redis Pub/Sub 이벤트를 발행한다.
+- [x] 모든 API 인스턴스가 timeout Pub/Sub 이벤트를 구독한다.
+- [x] 이벤트를 받은 인스턴스는 local registry에서 해당 gameRoom의 열린 WebSocket session을 찾는다.
+- [x] 연결된 session에만 `GAME_WAITING_TIMEOUT`을 전송한다.
+- [x] timeout 이벤트 전송 후 WebSocket session을 close한다.
+- [x] registry에서 해당 gameRoom session을 제거한다.
+- [x] session이 없는 인스턴스는 no-op 처리한다.
+- [x] 미접속 유저에게는 별도 이벤트를 보내지 않는다.
 
 server message 예시:
 
@@ -510,6 +512,31 @@ server message 예시:
 - 미접속 유저가 뒤늦게 WebSocket handshake를 시도하면 gameRoom이 `ABORTED`라 연결이 거절된다.
 - 프론트는 handshake 실패, WebSocket close/error, 자체 30초 timer 중 하나로 start 버튼 화면 복귀를 처리한다.
 - API polling은 필수로 두지 않는다.
+
+구현 결과:
+
+- WebSocket server message type에 `GAME_WAITING_TIMEOUT`을 추가했다.
+- timeout message payload는 `gameRoomId`, `reason`, `action`만 사용한다.
+- timeout processor는 DB abort와 match status 제거가 끝난 뒤 `game_waiting_timeout` Redis channel로 이벤트를 publish한다.
+- publish 실패 시 Redis waiting 상태를 cleanup하지 않는다. 다음 scheduler tick에서 `ABORTED` 상태 경로로 재시도한다.
+- 모든 API 인스턴스는 `game_waiting_timeout` channel을 구독한다.
+- subscriber는 Pub/Sub 메시지를 decode한 뒤 현재 인스턴스의 local `GameRoomWebSocketSessionRegistry`에서 해당 gameRoom session을 찾는다.
+- local session이 있으면 `GAME_WAITING_TIMEOUT` 전송, registry unregister, WebSocket close를 수행한다.
+- local session이 없으면 아무 작업도 하지 않는다.
+- timeout으로 닫는 session은 registry를 먼저 정리한 뒤 close해서 `PLAYER_LEFT` broadcast가 추가로 나가지 않게 한다.
+
+추가/변경 코드:
+
+| 파일 | 역할 |
+|------|------|
+| `smite-api/game/waiting/pubsub/GameWaitingTimeoutPubSubPublisher` | timeout 확정 이벤트 Redis Pub/Sub publish |
+| `smite-api/game/waiting/pubsub/GameWaitingTimeoutPubSubSubscriber` | Pub/Sub 메시지 수신 후 WebSocket sender 위임 |
+| `smite-api/game/waiting/pubsub/GameWaitingTimeoutPubSubConfig` | `game_waiting_timeout` channel listener 등록 |
+| `smite-api/game/waiting/pubsub/dto/GameWaitingTimeoutPubSubMessage` | timeout Pub/Sub payload |
+| `smite-api/game/waiting/pubsub/util/GameWaitingTimeoutPubSubMessageCodec` | Pub/Sub payload JSON encode/decode |
+| `smite-api/game/websocket/service/GameWaitingTimeoutWebSocketSender` | local session에 timeout 메시지 전송 후 close/registry cleanup |
+| `smite-api/game/websocket/dto/GameWebSocketMessageType` | `GAME_WAITING_TIMEOUT` server message type 추가 |
+| `smite-api/game/websocket/dto/GameWebSocketServerMessage` | `GAME_WAITING_TIMEOUT` payload factory 추가 |
 
 ### 9. 멀티 인스턴스 정합성
 
@@ -576,11 +603,11 @@ GO_TO_GAME_WAITING 진입
 - [ ] timeout 시 `game_records`가 생성되지 않는지 테스트
 - [ ] timeout 시 LP/RankSeries service가 호출되지 않는지 테스트
 - [x] timeout 시 Redis `match:status:{userId}`가 제거되는지 테스트
-- [ ] timeout 이벤트 Pub/Sub 발행 테스트
-- [ ] local registry에 session이 있는 인스턴스만 `GAME_WAITING_TIMEOUT`을 보내는지 테스트
-- [ ] session이 없는 인스턴스는 timeout Pub/Sub 이벤트를 no-op 처리하는지 테스트
-- [ ] timeout 이벤트 전송 후 WebSocket close와 registry cleanup이 수행되는지 테스트
-- [ ] 미접속 유저에게 별도 전송 시도를 하지 않는지 테스트
+- [x] timeout 이벤트 Pub/Sub 발행 테스트
+- [x] local registry에 session이 있는 인스턴스만 `GAME_WAITING_TIMEOUT`을 보내는지 테스트
+- [x] session이 없는 인스턴스는 timeout Pub/Sub 이벤트를 no-op 처리하는지 테스트
+- [x] timeout 이벤트 전송 후 WebSocket close와 registry cleanup이 수행되는지 테스트
+- [x] 미접속 유저에게 별도 전송 시도를 하지 않는지 테스트
 - [ ] late handshake 시 gameRoom `ABORTED`라 연결이 거절되는지 테스트
 
 테스트 기준:
@@ -674,3 +701,4 @@ timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 | 2026-05-18 | Task 5 완료. 1초 주기 timeout scheduler, due ZSET 조회, gameRoom 단위 lock 정산, lock 실패/예외 시 pending 유지 재시도 정책 구현 |
 | 2026-05-18 | Task 6 완료. scheduler용 idempotent safe abort 유스케이스 추가, READY만 ABORTED 전환하고 READY 외 상태는 no-op 처리하도록 구현 |
 | 2026-05-18 | Task 7 완료. game waiting timeout abort 이후 두 유저의 Redis match status 제거, 실패 시 waiting pending 유지 재시도 정책 구현 |
+| 2026-05-18 | Task 8 완료. Redis Pub/Sub 기반 GAME_WAITING_TIMEOUT 발행/구독, local WebSocket session 전송/close/registry cleanup 구현 |
