@@ -121,13 +121,13 @@ gameRoom READY 생성
 
 ### 2. Redis waiting timeout 저장 구조 설계
 
-- [ ] Redis key naming을 확정한다.
-- [ ] gameRoom timeout deadline index를 ZSET으로 둔다.
-- [ ] gameRoom별 waiting 상태를 HASH로 둔다.
-- [ ] Redis HASH TTL은 60초로 둔다.
-- [ ] timeout 완료 또는 양쪽 READY 완료 시 Redis waiting key와 ZSET index를 정리한다.
-- [ ] scheduler 지연 또는 정리 실패가 있어도 TTL로 eventually cleanup 되도록 한다.
-- [ ] Redis 저장소는 최소 필드만 가진다.
+- [x] Redis key naming을 확정한다.
+- [x] gameRoom timeout deadline index를 ZSET으로 둔다.
+- [x] gameRoom별 waiting 상태를 HASH로 둔다.
+- [x] Redis HASH TTL은 60초로 둔다.
+- [x] timeout 완료 또는 양쪽 READY 완료 시 Redis waiting key와 ZSET index를 정리한다.
+- [x] scheduler 지연 또는 정리 실패가 있어도 TTL로 eventually cleanup 되도록 한다.
+- [x] Redis 저장소는 최소 필드만 가진다.
 
 제안 구조:
 
@@ -144,6 +144,10 @@ HASH game:waiting:{gameRoomId}
   createdAtMillis = 1716000000000
   deadlineAtMillis = 1716000030000
   TTL = 60초
+
+LOCK game:waiting:timeout:lock:{gameRoomId}
+  purpose = scheduler 중복 timeout 정산 방지
+  lease = 짧은 작업 lease
 ```
 
 필드 선택 이유:
@@ -153,24 +157,117 @@ HASH game:waiting:{gameRoomId}
 - 실제 WebSocket session 객체와 전송 가능 여부는 API local registry가 관리한다.
 - `createdAtMillis`, `deadlineAtMillis`는 디버깅과 metric 기록에 사용한다.
 - ZSET score는 scheduler가 due gameRoom을 빠르게 찾기 위한 deadline index다.
+- `game:waiting:timeout:lock:{gameRoomId}`는 멀티 인스턴스 scheduler가 같은 gameRoom timeout을 동시에 정산하지 않도록 하는 작업 lock이다.
+- 이번 이슈의 Redis waiting 상태에는 processing ZSET을 두지 않는다. timeout 정산은 gameRoom `READY -> ABORTED` 전이가 idempotent해야 하며, 작업 실패 시 pending ZSET과 HASH TTL로 재처리/cleanup 여지를 둔다.
+
+구현 결과:
+
+- Redis key는 game 대기 도메인임을 드러내도록 `game:waiting:*` prefix로 통일한다.
+- timeout 후보 index는 단일 ZSET `game:waiting:timeout:pending`으로 둔다.
+  - member: `gameRoomId`
+  - score: `deadlineAtMillis`
+- gameRoom별 상태는 HASH `game:waiting:{gameRoomId}`로 둔다.
+- HASH field는 최소 6개만 사용한다.
+  - `userAId`
+  - `userBId`
+  - `userAReady`
+  - `userBReady`
+  - `createdAtMillis`
+  - `deadlineAtMillis`
+- ready field는 문자열 `"true"` / `"false"`로 저장하는 방향을 우선한다.
+- HASH TTL은 60초로 둔다.
+  - timeout 정책값 30초와 별도다.
+  - timeout 정책값과 TTL을 모두 30초로 맞추면 scheduler가 deadline 직후 실행될 때 HASH가 먼저 만료될 수 있다.
+  - HASH가 먼저 사라지면 `양쪽 READY 완료 후 cleanup 일부 실패`와 `아직 READY 미완료인데 TTL 만료`를 구분하기 어렵다.
+  - 따라서 TTL은 timeout 판정에 필요한 상태를 deadline 이후에도 잠깐 보존하는 안전장치로 두며, 60초로 확정한다.
+- ZSET index는 TTL이 없으므로 양쪽 READY 완료, timeout 완료, HASH 없음 감지 시 명시적으로 제거한다.
+- 멀티 인스턴스 scheduler 중복 정산 방지를 위해 `game:waiting:timeout:lock:{gameRoomId}` lock key를 사용한다.
+- 실제 WebSocket session 전송 가능 여부는 Redis에 저장하지 않고 API local registry로 판단한다.
+
+패키지/모듈 분리 검토:
+
+| 모듈/패키지 | 배치 대상 | 이유 |
+|------|------|------|
+| `smite-core` `domain.game` | gameRoom `READY -> ABORTED` 도메인 전이, participant 상태 변경 | core는 JPA/domain만 알고 Redis/WebSocket을 몰라야 함 |
+| `smite-api` `game.websocket` | WebSocket handler, DTO, session registry | 기존 Issue 40 구조와 동일하게 API transport 계층 책임 |
+| `smite-api` `game.waiting` | waiting timeout service/scheduler, Redis waiting store, timeout Pub/Sub sender/subscriber | gameRoom waiting은 matching 큐가 아니라 game 대기방 orchestration 책임 |
+| `smite-matching` `command` | 필요 시 match status 제거용 command facade | `match:status:{userId}`의 소유권은 matching 모듈에 있으므로 직접 store 접근보다 command 경유가 적절 |
+| `smite-infra-redis` | 공통 Redisson config/lock만 유지 | 특정 game waiting key 구현을 공통 infra에 섞지 않음 |
+
+컨벤션 확인:
+
+- `smite-core`에는 Spring WebSocket/Redis 의존을 추가하지 않는다.
+- API WebSocket handler는 DB repository를 직접 호출하지 않고 service를 통해 처리한다.
+- Redis waiting 구현체는 구체 기술이 드러나는 `RedisGameWaitingStore` 같은 이름을 사용한다.
+- 저장소 port는 `GameWaitingStore`처럼 `I` 접두사 없이 둔다.
+- scheduler는 trigger만 담당하고, 실제 정산 흐름은 service로 분리한다.
+- 상수는 magic string으로 흩뿌리지 않고 waiting 전용 constants에 모은다.
+
+확정 Redis 구조:
+
+| Redis key | Type | 필드/값 | TTL | 용도 |
+|------|------|------|------|------|
+| `game:waiting:timeout:pending` | ZSET | member=`gameRoomId`, score=`deadlineAtMillis` | 없음 | timeout scheduler due gameRoom 조회 |
+| `game:waiting:{gameRoomId}` | HASH | `userAId`, `userBId`, `userAReady`, `userBReady`, `createdAtMillis`, `deadlineAtMillis` | 60초 | gameRoom waiting ready 상태 판정 |
+| `game:waiting:timeout:lock:{gameRoomId}` | Lock | Redisson lock | 작업 lease | 멀티 인스턴스 중복 timeout 정산 방지 |
+
+cleanup 정책:
+
+| 상황 | cleanup |
+|------|------|
+| 양쪽 `CLIENT_READY` 완료 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
+| timeout abort 완료 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
+| scheduler가 due gameRoom을 봤지만 HASH 없음 | `game:waiting:timeout:pending`에서 gameRoomId 제거 |
+| scheduler가 due gameRoom을 봤지만 DB status가 `READY` 아님 | `game:waiting:{gameRoomId}` 삭제, `game:waiting:timeout:pending`에서 gameRoomId 제거 |
 
 ### 3. gameRoom 생성 성공 시 waiting timeout 등록
 
-- [ ] 양쪽 accept 후 gameRoom 생성이 성공한 시점을 확인한다.
-- [ ] gameRoom 저장 후 `createdAt`을 기준으로 `deadlineAtMillis = createdAt + 30초`를 계산한다.
-- [ ] gameRoom participant 두 명의 userId를 조회한다.
-- [ ] Redis `game:waiting:{gameRoomId}` HASH를 저장한다.
-- [ ] Redis `game:waiting:timeout:pending` ZSET에 deadline을 등록한다.
-- [ ] Redis waiting 등록 실패 시 처리 정책을 결정한다.
-  - [ ] 성공 이벤트 발행 전 실패라면 `GAME_SETUP_FAILED`로 정리할지 검토
-  - [ ] 이미 `GO_TO_GAME_WAITING` 발행 이후 실패 가능한 지점이 없도록 호출 순서 정리
-- [ ] 기존 `match_response_result.game` payload 발행 흐름과 순서를 확인한다.
+- [x] 양쪽 accept 후 gameRoom 생성이 성공한 시점을 확인한다.
+- [x] gameRoom 저장 후 `createdAt`을 기준으로 `deadlineAtMillis = createdAt + 30초`를 계산한다.
+- [x] gameRoom participant 두 명의 userId를 조회한다.
+- [x] Redis `game:waiting:{gameRoomId}` HASH를 저장한다.
+- [x] Redis `game:waiting:timeout:pending` ZSET에 deadline을 등록한다.
+- [x] Redis waiting 등록 실패 시 처리 정책을 결정한다.
+  - [x] 성공 이벤트 발행 전 실패라면 `GAME_SETUP_FAILED`로 정리할지 검토
+  - [x] 이미 `GO_TO_GAME_WAITING` 발행 이후 실패 가능한 지점이 없도록 호출 순서 정리
+- [x] 기존 `match_response_result.game` payload 발행 흐름과 순서를 확인한다.
 
 주의:
 
 - waiting timeout 등록은 `GO_TO_GAME_WAITING` 이후 클라이언트를 게임 대기 화면으로 보낼 수 있는 상태를 만드는 작업이다.
 - Redis waiting 등록이 실패했는데 클라이언트를 게임 대기 화면으로 보내면 timeout 정산이 불가능해질 수 있다.
 - 따라서 성공 이벤트 발행 전 waiting timeout 등록을 완료하는 방향을 우선 검토한다.
+
+구현 결과:
+
+- `GameRoomSetupService.createReadyGameRoom()`에서 `GameRoomCommandService.createReadyRoom()` 성공 직후 waiting timeout을 등록한다.
+- Redis 등록은 `GameWaitingStore.registerWaitingTimeout()` port를 통해 수행한다.
+- 구현체는 `RedisGameWaitingStore`이며 `StringRedisTemplate`으로 HASH/ZSET을 저장한다.
+- Redis HASH key는 `game:waiting:{gameRoomId}`다.
+- Redis ZSET key는 `game:waiting:timeout:pending`이다.
+- HASH field는 다음 6개로 저장한다.
+  - `userAId`
+  - `userBId`
+  - `userAReady=false`
+  - `userBReady=false`
+  - `createdAtMillis`
+  - `deadlineAtMillis`
+- `deadlineAtMillis`는 `gameRoom.createdAt + 30초` 기준으로 계산한다.
+- HASH TTL은 60초로 설정한다.
+- Redis waiting 등록 실패 시 `GameRoomSetupService`가 생성된 READY gameRoom을 `abortReadyRoom(gameRoomId)`로 보상 처리하고 예외를 다시 던진다.
+- `MatchResponseResultService.completeAcceptedSession()`은 `gameSetupPort.setup()` 실패를 잡아 기존 `GAME_SETUP_FAILED` 흐름으로 정리한다.
+- `GO_TO_GAME_WAITING` payload를 포함한 match response result event는 `gameSetupPort.setup()` 성공, match session/user status 저장 성공 이후에만 발행된다.
+- 따라서 Redis waiting 등록 실패 상태에서 클라이언트가 게임 대기 화면으로 이동하지 않는다.
+
+추가된 코드:
+
+| 파일 | 역할 |
+|------|------|
+| `smite-api/game/waiting/common/constant/GameWaitingConstants` | waiting timeout 정책값, Redis key/field 상수 |
+| `smite-api/game/waiting/domain/GameWaitingTimeoutRegistration` | timeout 등록 요청 모델 |
+| `smite-api/game/waiting/repository/GameWaitingStore` | waiting 상태 저장 port |
+| `smite-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | Redis HASH/ZSET 등록 구현 |
+| `smite-api/game/service/GameRoomSetupService` | gameRoom 생성 직후 waiting timeout 등록 및 실패 시 abort 보상 |
 
 ### 4. WebSocket handshake/READY와 Redis waiting 상태 연동
 
@@ -350,8 +447,8 @@ GO_TO_GAME_WAITING 진입
 
 ### 11. 테스트
 
-- [ ] gameRoom 생성 후 Redis waiting HASH와 timeout ZSET이 저장되는지 테스트
-- [ ] Redis waiting HASH TTL이 설정되는지 테스트
+- [x] gameRoom 생성 후 Redis waiting HASH와 timeout ZSET이 저장되는지 테스트
+- [x] Redis waiting HASH TTL이 설정되는지 테스트
 - [ ] `CLIENT_READY` 수신 시 해당 유저 ready 값이 true로 바뀌는지 테스트
 - [ ] 양쪽 ready 완료 시 timeout ZSET이 cleanup 되는지 테스트
 - [ ] 한 명만 ready 상태에서 deadline이 지나면 gameRoom이 `ABORTED` 되는지 테스트
@@ -454,3 +551,5 @@ timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 | :--- | :--- |
 | 2026-05-18 | Issue 42 작업 문서 생성. gameRoom `createdAt` 기준 30초 waiting timeout, Redis 최소 상태, 멀티 인스턴스 Pub/Sub 전송, 미접속 유저 처리 정책 정리 |
 | 2026-05-18 | Task 1 완료. timeout 조건, ABORTED 정리 범위, Redis match status 제거, 연결/미접속 유저 응답 방식, 모듈 책임 경계 확정 |
+| 2026-05-18 | Task 2 완료. `game:waiting:*` Redis key, ZSET/HASH 최소 필드, HASH TTL 60초, gameRoom 단위 timeout lock, cleanup 정책 확정 |
+| 2026-05-18 | Task 3 완료. gameRoom 생성 성공 직후 Redis waiting HASH/ZSET 등록, 등록 실패 시 gameRoom abort 보상 및 기존 `GAME_SETUP_FAILED` 흐름 연동 구현 |
