@@ -29,6 +29,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "game_rooms")
@@ -88,6 +89,11 @@ public class GameRoom extends BaseEntity {
                 .status(ParticipantStatus.READY)
                 .build();
         this.participants.add(participant);
+    }
+
+    public boolean hasParticipant(Long userId) {
+        return this.participants.stream()
+                .anyMatch(participant -> Objects.equals(participant.getUserId(), userId));
     }
 
     public void start(LocalDateTime startTime) {

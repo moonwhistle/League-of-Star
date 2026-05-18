@@ -35,12 +35,16 @@
   - 게임방 생성 실패 시 `GAME_SETUP_FAILED` 결과를 전달하고 양쪽 모두 start 버튼 화면으로 복귀
   - 게임방 생성 후 Redis 상태 전환 실패 시 생성된 게임방/참여자는 `ABORTED`로 보상 처리하고 동일하게 `GAME_SETUP_FAILED` 결과를 전달
   - 게임방 생성 실패 또는 Redis 상태 전환 실패 시 매칭 큐에 자동 복귀하지 않음
+  - 클라이언트는 `match_response_result` 수신 후 매칭 SSE `EventSource.close()`를 호출
   - 게임 대기 화면 진입 이후 준비/RTT/카운트다운/게임 시작/입력/종료는 WebSocket 담당
 
 ### 2.3 강타 싸움 게임
 - 두 플레이어가 **동일한 드래곤의 HP 바**를 실시간으로 공유
 - 드래곤 HP가 **불규칙하게 감소** (서버에서 사전 생성한 시나리오 기반)
 - MP4 배경은 gameRoom별로 만들지 않고 공통 static resource를 사용
+- `GAME_START` 이전 WebSocket 미접속/READY timeout은 gameRoom `ABORTED`로 처리하고 전적/LP를 반영하지 않음
+- `GAME_START` 이후 disconnect는 게임을 중단하지 않고 서버 timer/scheduler, 시나리오, 수신 액션 기준으로 끝까지 판정
+- WebSocket 연결이 모두 끊겨도 서버 timer/scheduler가 gameRoom 종료 작업을 완료
 - 드래곤 위에 **마우스를 올린 상태**에서 **D 또는 F 키**를 눌러 강타 발동
 - 각 플레이어는 **단 한 번** 강타 사용 가능
 - 드래곤 HP가 0에 도달하면 **즉시 게임 종료**
@@ -357,6 +361,22 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 - STOMP.js, SockJS fallback은 MVP에서 사용하지 않습니다.
   RTT 측정과 SMITE 입력 경로를 단순하고 일관되게 유지하기 위해 WebSocket 단일 경로를 사용합니다.
 
+### 9.4 WebSocket 멀티 인스턴스 라우팅
+
+- 게임 WebSocket session registry는 API 인스턴스 local memory 기반으로 시작합니다.
+- 멀티 인스턴스 배포에서는 `/ws/game/{gameRoomId}`의 `gameRoomId`를 affinity key로 사용해 같은 gameRoom의 두 참가자를 같은 API 인스턴스로 라우팅합니다.
+- userId 기준 sticky routing은 같은 gameRoom의 두 참가자가 서로 다른 인스턴스로 갈 수 있으므로 사용하지 않습니다.
+- Redis registry/pub-sub 기반 fan-out은 관전, 로비, 다중 topic, 서버 장애 복구 요구가 커질 때 후속 확장안으로 검토합니다.
+
+### 9.5 WebSocket session 상태
+
+- WebSocket session 상태는 API local memory registry에서만 관리합니다.
+- `CONNECTED`는 handshake 성공 후 session 등록 완료 상태입니다.
+- `READY`는 `CLIENT_READY` 수신 후 대기 준비 완료 상태입니다.
+- `DISCONNECTED`는 연결 종료로 registry에서 제거된 상태입니다.
+- `REPLACED`는 같은 userId 재연결로 기존 session을 닫고 새 session으로 교체한 상태입니다.
+- 이 상태는 DB `game_rooms`, `game_participants` 상태와 분리됩니다.
+
 ---
 
 ## 10. 변경 이력
@@ -370,3 +390,7 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화. PixiJS/Web Worker/OffscreenCanvas/STOMP/SockJS는 MVP 이후 검토로 이동 |
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GAME_SETUP_FAILED` reason 기준으로 start 버튼 화면 복귀하도록 정책 조정 |
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책과 8~17초 게임 시간 반영 |
+| 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
+| 2026-05-15 | 게임 WebSocket local registry의 멀티 인스턴스 전제로 `gameRoomId` 기반 sticky routing 정책 추가 |
+| 2026-05-15 | WebSocket session 상태를 API local memory registry 상태로 분리하여 명시 |
+| 2026-05-18 | GAME_START 이전 timeout은 `ABORTED` 및 전적/LP 미반영, GAME_START 이후 disconnect는 정상 판정 흐름 유지로 정책 조정 |
