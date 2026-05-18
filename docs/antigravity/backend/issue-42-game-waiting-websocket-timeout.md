@@ -271,13 +271,13 @@ cleanup 정책:
 
 ### 4. WebSocket handshake/READY와 Redis waiting 상태 연동
 
-- [ ] handshake 성공 시 Redis에 `CONNECTED`를 기록하지 않는다.
-- [ ] `CLIENT_READY` 수신 시 Redis waiting HASH의 해당 유저 ready 값을 `true`로 갱신한다.
-- [ ] `CLIENT_READY`를 보낸 userId가 gameRoom의 userA/userB 중 누구인지 확인한다.
-- [ ] 이미 timeout 또는 abort된 gameRoom이면 `CLIENT_READY` 처리를 거부하거나 no-op 처리한다.
-- [ ] 양쪽 ready가 모두 true가 되면 waiting timeout index를 정리한다.
-- [ ] 양쪽 ready가 모두 true이면 다음 RTT/countdown 단계로 넘어갈 수 있는 상태로 둔다.
-- [ ] `PLAYER_READY` broadcast는 기존 local registry 기반 흐름을 유지한다.
+- [x] handshake 성공 시 Redis에 `CONNECTED`를 기록하지 않는다.
+- [x] `CLIENT_READY` 수신 시 Redis waiting HASH의 해당 유저 ready 값을 `true`로 갱신한다.
+- [x] `CLIENT_READY`를 보낸 userId가 gameRoom의 userA/userB 중 누구인지 확인한다.
+- [x] 이미 timeout 또는 abort된 gameRoom이면 `CLIENT_READY` 처리를 거부하거나 no-op 처리한다.
+- [x] 양쪽 ready가 모두 true가 되면 waiting timeout index를 정리한다.
+- [x] 양쪽 ready가 모두 true이면 다음 RTT/countdown 단계로 넘어갈 수 있는 상태로 둔다.
+- [x] `PLAYER_READY` broadcast는 기존 local registry 기반 흐름을 유지한다.
 
 처리 흐름:
 
@@ -295,6 +295,35 @@ CLIENT_READY 수신
 
 - 클라이언트 payload의 userId/gameRoomId는 신뢰하지 않는다.
 - 기존 Issue 40 정책처럼 handshake session attributes만 신뢰한다.
+
+구현 결과:
+
+- handshake 성공 시 Redis에는 아무 상태도 추가하지 않는다.
+- WebSocket session local registry에는 기존처럼 연결 session만 등록한다.
+- `CLIENT_READY` 수신 시 `GameWaitingReadyService.markReady(gameRoomId, userId)`를 호출한다.
+- `GameWaitingReadyService.markReady()`는 `game:waiting:timeout:lock:{gameRoomId}` 기준 Redis lock 안에서 실행한다.
+  - timeout scheduler와 READY cleanup이 같은 gameRoom waiting 상태를 동시에 정리하지 않도록 하기 위함이다.
+  - matching 응답 timeout의 `match:session:lock:{matchId}`와는 별개 lock이다.
+- `RedisGameWaitingStore.markReady()`는 `game:waiting:{gameRoomId}` HASH를 읽고, session attribute의 userId가 `userAId` 또는 `userBId`와 일치하는지 확인한다.
+- 일치하는 유저의 ready field만 `true`로 변경한다.
+  - `userAId` 일치 시 `userAReady=true`
+  - `userBId` 일치 시 `userBReady=true`
+- 양쪽 ready가 모두 `true`가 되면 다음 Redis waiting 상태를 정리한다.
+  - `game:waiting:{gameRoomId}` 삭제
+  - `game:waiting:timeout:pending`에서 gameRoomId 제거
+- Redis waiting HASH가 없거나 userId가 참가자와 일치하지 않으면 `CLIENT_READY`를 rejected로 보고 WebSocket session을 close한다.
+- `PLAYER_READY` broadcast의 userId는 클라이언트 payload가 아니라 session attribute의 userId를 사용한다.
+- `PLAYER_READY.payload.bothReady`는 Redis waiting 상태 갱신 결과를 기준으로 내려준다.
+
+추가/변경 코드:
+
+| 파일 | 역할 |
+|------|------|
+| `smite-api/game/waiting/domain/GameWaitingReadyResult` | Redis ready 반영 결과 |
+| `smite-api/game/waiting/service/GameWaitingReadyService` | `CLIENT_READY` Redis 반영 및 gameRoom 단위 lock 적용 |
+| `smite-api/game/waiting/repository/GameWaitingStore` | `markReady`, `cleanup` port 추가 |
+| `smite-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | ready field 갱신, both ready 시 HASH/ZSET cleanup |
+| `smite-api/game/websocket/handler/GameWaitingWebSocketHandler` | `CLIENT_READY` 수신 시 Redis waiting 상태 연동 |
 
 ### 5. timeout scheduler 구현
 
@@ -449,8 +478,8 @@ GO_TO_GAME_WAITING 진입
 
 - [x] gameRoom 생성 후 Redis waiting HASH와 timeout ZSET이 저장되는지 테스트
 - [x] Redis waiting HASH TTL이 설정되는지 테스트
-- [ ] `CLIENT_READY` 수신 시 해당 유저 ready 값이 true로 바뀌는지 테스트
-- [ ] 양쪽 ready 완료 시 timeout ZSET이 cleanup 되는지 테스트
+- [x] `CLIENT_READY` 수신 시 해당 유저 ready 값이 true로 바뀌는지 테스트
+- [x] 양쪽 ready 완료 시 timeout ZSET이 cleanup 되는지 테스트
 - [ ] 한 명만 ready 상태에서 deadline이 지나면 gameRoom이 `ABORTED` 되는지 테스트
 - [ ] 둘 다 미접속 상태에서 deadline이 지나면 gameRoom이 `ABORTED` 되는지 테스트
 - [ ] 둘 다 ready 상태이면 deadline이 지나도 abort하지 않는지 테스트
@@ -553,3 +582,4 @@ timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 | 2026-05-18 | Task 1 완료. timeout 조건, ABORTED 정리 범위, Redis match status 제거, 연결/미접속 유저 응답 방식, 모듈 책임 경계 확정 |
 | 2026-05-18 | Task 2 완료. `game:waiting:*` Redis key, ZSET/HASH 최소 필드, HASH TTL 60초, gameRoom 단위 timeout lock, cleanup 정책 확정 |
 | 2026-05-18 | Task 3 완료. gameRoom 생성 성공 직후 Redis waiting HASH/ZSET 등록, 등록 실패 시 gameRoom abort 보상 및 기존 `GAME_SETUP_FAILED` 흐름 연동 구현 |
+| 2026-05-18 | Task 4 완료. `CLIENT_READY` 수신 시 Redis ready 상태 갱신, gameRoom 단위 lock 적용, 양쪽 READY 완료 시 waiting HASH/ZSET cleanup 구현 |

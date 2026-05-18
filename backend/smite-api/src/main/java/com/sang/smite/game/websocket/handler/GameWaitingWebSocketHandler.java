@@ -7,6 +7,8 @@ import com.sang.smite.game.websocket.dto.GameWebSocketServerMessage;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSession;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSessionRegistry;
 import com.sang.smite.game.websocket.session.GameWebSocketSessionAttribute;
+import com.sang.smite.game.waiting.domain.GameWaitingReadyResult;
+import com.sang.smite.game.waiting.service.GameWaitingReadyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,6 +29,7 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper objectMapper;
     private final GameRoomWebSocketSessionRegistry sessionRegistry;
+    private final GameWaitingReadyService gameWaitingReadyService;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -88,10 +91,18 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
     private void handleClientReady(GameRoomWebSocketSession currentSession) throws IOException {
         Long gameRoomId = currentSession.getGameRoomId();
         Long userId = currentSession.getUserId();
-        sessionRegistry.markReady(gameRoomId, userId);
+        GameWaitingReadyResult readyResult = gameWaitingReadyService.markReady(gameRoomId, userId);
+        if (!readyResult.accepted()) {
+            WebSocketSession webSocketSession = currentSession.getWebSocketSession();
+            sessionRegistry.unregister(webSocketSession.getId());
+            if (webSocketSession.isOpen()) {
+                webSocketSession.close(CloseStatus.POLICY_VIOLATION);
+            }
+            return;
+        }
 
-        boolean bothReady = sessionRegistry.areBothReady(gameRoomId);
-        broadcast(gameRoomId, GameWebSocketServerMessage.playerReady(userId, bothReady));
+        sessionRegistry.markReady(gameRoomId, userId);
+        broadcast(gameRoomId, GameWebSocketServerMessage.playerReady(userId, readyResult.bothReady()));
     }
 
     private void cleanupSession(WebSocketSession session) {

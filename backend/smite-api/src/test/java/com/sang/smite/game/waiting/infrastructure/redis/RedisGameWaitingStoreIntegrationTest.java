@@ -1,6 +1,7 @@
 package com.sang.smite.game.waiting.infrastructure.redis;
 
 import com.sang.smite.game.waiting.common.constant.GameWaitingConstants;
+import com.sang.smite.game.waiting.domain.GameWaitingReadyResult;
 import com.sang.smite.game.waiting.domain.GameWaitingTimeoutRegistration;
 import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.AfterEach;
@@ -88,6 +89,33 @@ class RedisGameWaitingStoreIntegrationTest extends AbstractRedisTest {
                 GameWaitingConstants.WAITING_TIMEOUT_PENDING_KEY,
                 String.valueOf(GAME_ROOM_ID)
         )).isEqualTo((double) deadlineAtMillis);
+    }
+
+    @Test
+    @DisplayName("markReady - 실제 Redis HASH ready 값을 갱신하고 양쪽 READY 완료 시 cleanup한다")
+    void markReady() {
+        // given
+        store.registerWaitingTimeout(new GameWaitingTimeoutRegistration(
+                GAME_ROOM_ID,
+                USER_A_ID,
+                USER_B_ID,
+                CREATED_AT
+        ));
+
+        // when
+        GameWaitingReadyResult firstResult = store.markReady(GAME_ROOM_ID, USER_A_ID);
+        GameWaitingReadyResult secondResult = store.markReady(GAME_ROOM_ID, USER_B_ID);
+
+        // then
+        assertThat(firstResult.accepted()).isTrue();
+        assertThat(firstResult.bothReady()).isFalse();
+        assertThat(secondResult.accepted()).isTrue();
+        assertThat(secondResult.bothReady()).isTrue();
+        assertThat(stringRedisTemplate.hasKey(WAITING_KEY)).isFalse();
+        assertThat(stringRedisTemplate.opsForZSet().score(
+                GameWaitingConstants.WAITING_TIMEOUT_PENDING_KEY,
+                String.valueOf(GAME_ROOM_ID)
+        )).isNull();
     }
 
     private long toEpochMillis(LocalDateTime dateTime) {

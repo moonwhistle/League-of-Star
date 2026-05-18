@@ -6,6 +6,8 @@ import com.sang.smite.game.websocket.dto.GameWebSocketMessageType;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSession;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSessionRegistry;
 import com.sang.smite.game.websocket.session.GameWebSocketSessionAttribute;
+import com.sang.smite.game.waiting.domain.GameWaitingReadyResult;
+import com.sang.smite.game.waiting.service.GameWaitingReadyService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -32,7 +34,12 @@ class GameWaitingWebSocketHandlerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final GameRoomWebSocketSessionRegistry sessionRegistry = new GameRoomWebSocketSessionRegistry();
-    private final GameWaitingWebSocketHandler handler = new GameWaitingWebSocketHandler(objectMapper, sessionRegistry);
+    private final GameWaitingReadyService gameWaitingReadyService = mock(GameWaitingReadyService.class);
+    private final GameWaitingWebSocketHandler handler = new GameWaitingWebSocketHandler(
+            objectMapper,
+            sessionRegistry,
+            gameWaitingReadyService
+    );
 
     @Test
     @DisplayName("afterConnectionEstablished - session attributes 기준으로 registry 등록 후 PLAYER_JOINED를 전송한다")
@@ -73,6 +80,8 @@ class GameWaitingWebSocketHandlerTest {
         handler.afterConnectionEstablished(firstSession);
         handler.afterConnectionEstablished(secondSession);
         clearInvocations(firstSession, secondSession);
+        when(gameWaitingReadyService.markReady(GAME_ROOM_ID, FIRST_USER_ID))
+                .thenReturn(GameWaitingReadyResult.accepted(false));
 
         // when
         handler.handleTextMessage(firstSession, new TextMessage("{\"type\":\"CLIENT_READY\",\"payload\":{}}"));
@@ -95,8 +104,12 @@ class GameWaitingWebSocketHandlerTest {
         WebSocketSession secondSession = session(SECOND_SESSION_ID, SECOND_USER_ID);
         handler.afterConnectionEstablished(firstSession);
         handler.afterConnectionEstablished(secondSession);
+        when(gameWaitingReadyService.markReady(GAME_ROOM_ID, FIRST_USER_ID))
+                .thenReturn(GameWaitingReadyResult.accepted(false));
         handler.handleTextMessage(firstSession, new TextMessage("{\"type\":\"CLIENT_READY\",\"payload\":{}}"));
         clearInvocations(firstSession, secondSession);
+        when(gameWaitingReadyService.markReady(GAME_ROOM_ID, SECOND_USER_ID))
+                .thenReturn(GameWaitingReadyResult.accepted(true));
 
         // when
         handler.handleTextMessage(secondSession, new TextMessage("{\"type\":\"CLIENT_READY\",\"payload\":{}}"));
@@ -134,6 +147,8 @@ class GameWaitingWebSocketHandlerTest {
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
         handler.afterConnectionEstablished(session);
         clearInvocations(session);
+        when(gameWaitingReadyService.markReady(GAME_ROOM_ID, FIRST_USER_ID))
+                .thenReturn(GameWaitingReadyResult.accepted(false));
 
         // when
         handler.handleTextMessage(
@@ -149,6 +164,24 @@ class GameWaitingWebSocketHandlerTest {
                 .get()
                 .matches(GameRoomWebSocketSession::isReady);
         assertThat(sessionRegistry.findByRoomAndUser(999L, 999L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - Redis waiting 상태가 없으면 READY 처리 없이 연결을 종료한다")
+    void handleTextMessage_WaitingStateRejected_Close() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameWaitingReadyService.markReady(GAME_ROOM_ID, FIRST_USER_ID))
+                .thenReturn(GameWaitingReadyResult.rejected());
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"CLIENT_READY\",\"payload\":{}}"));
+
+        // then
+        assertThat(sessionRegistry.findBySessionId(FIRST_SESSION_ID)).isEmpty();
+        verify(session).close(CloseStatus.POLICY_VIOLATION);
     }
 
     @Test
