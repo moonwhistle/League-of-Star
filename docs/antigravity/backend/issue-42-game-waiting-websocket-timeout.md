@@ -657,12 +657,21 @@ GO_TO_GAME_WAITING 진입
 
 ### 12. 문서
 
-- [ ] `docs/project/policy.md`의 30초 createdAt 기준 정책과 구현 결과를 맞춘다.
-- [ ] `docs/project/domain status.md`의 gameRoom READY -> ABORTED 전이를 구현 결과와 맞춘다.
-- [ ] `docs/project/flow status.md`에 timeout 이벤트/cleanup 흐름을 반영한다.
-- [ ] `docs/project/websocket client.md`에 `GAME_WAITING_TIMEOUT` 메시지와 미접속 유저 처리 정책을 추가한다.
-- [ ] `docs/DB/DDL.md`의 gameRoom lifecycle 설명과 정합성을 확인한다.
-- [ ] 필요 시 `docs/antigravity/backend/plan-checkpoint.md` Step 4 상태를 갱신한다.
+- [x] `docs/project/policy.md`의 30초 createdAt 기준 정책과 구현 결과를 맞춘다.
+- [x] `docs/project/domain status.md`의 gameRoom READY -> ABORTED 전이를 구현 결과와 맞춘다.
+- [x] `docs/project/flow status.md`에 timeout 이벤트/cleanup 흐름을 반영한다.
+- [x] `docs/project/websocket client.md`에 `GAME_WAITING_TIMEOUT` 메시지와 미접속 유저 처리 정책을 추가한다.
+- [x] `docs/DB/DDL.md`의 gameRoom lifecycle 설명과 정합성을 확인한다.
+- [x] 필요 시 `docs/antigravity/backend/plan-checkpoint.md` Step 4 상태를 갱신한다.
+
+구현 결과:
+
+- `policy.md`는 gameRoom `createdAt + 30초`, `GAME_WAITING_TIMEOUT`, 미접속 유저 late handshake 거절 정책과 정합함을 확인했다.
+- `domain status.md`는 `READY -> ABORTED`, WebSocket 미연결/READY timeout, 미접속 유저 이벤트 수신 불가 상태를 현재 구현과 맞게 유지했다.
+- `flow status.md`에 Redis waiting ready 상태, timeout scheduler, match status cleanup, Pub/Sub, local session 보유 인스턴스 전송 흐름을 반영했다.
+- `websocket client.md`에 Step 10에서 `GAME_WAITING_TIMEOUT`, 미접속 유저, late handshake, 자체 30초 timer 복구 정책을 반영했다.
+- `DDL.md`에 GAME_START 이전 timeout 시 participants `ABORTED` 정책과 Redis waiting/PubSub 구조를 반영했다.
+- `plan-checkpoint.md` Step 4를 완료 상태로 갱신하고 waiting deadline 기준을 gameRoom `createdAt + 30초`로 정정했다.
 
 ## ✅ 완료 기준
 
@@ -723,9 +732,241 @@ Redis TTL = cleanup 누락 방지용 안전장치
 Redis TTL 60초는 timeout을 60초로 늘린다는 의미가 아니다.
 timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 
-## 📌 Related Issue
+----
+## PR
+## 📌 Summary
 
+게임 대기 화면 진입 후 gameRoom `createdAt + 30초` 안에 두 참가자가 모두 WebSocket 연결과 `CLIENT_READY` 전송을 완료하지 못하면, 서버가 gameRoom을 `ABORTED`로 정산하고 연결된 클라이언트만 `GAME_WAITING_TIMEOUT`으로 start 버튼 화면에 복귀시키는 흐름을 구현했습니다.
+
+```mermaid
+flowchart TD
+    A["Both Accepted"] --> B["gameRoom READY 생성"]
+    B --> C["Redis waiting 등록<br/>deadline = createdAt + 30s"]
+    C --> D["GO_TO_GAME_WAITING"]
+    D --> E["WebSocket handshake"]
+    E --> F["CLIENT_READY"]
+    F --> G{"Both READY<br/>within 30s?"}
+    G -->|"yes"| H["Redis waiting cleanup<br/>RTT/countdown 진입 가능"]
+    G -->|"no"| I["Timeout Scheduler"]
+    I --> J["DB READY 최종 확인"]
+    J --> K["gameRoom/participants ABORTED"]
+    K --> L["match:status 제거"]
+    L --> M["GAME_WAITING_TIMEOUT Pub/Sub"]
+    M --> N["local session 보유 인스턴스만<br/>WebSocket 전송/close"]
+```
+
+핵심 정책은 다음과 같습니다.
+
+| 정책 | 내용 |
+| :--- | :--- |
+| timeout 기준 | gameRoom `createdAt + 30초` |
+| 통과 조건 | 두 참가자 모두 `CLIENT_READY` 완료 |
+| timeout 결과 | `game_rooms=ABORTED`, `game_participants=ABORTED` |
+| record/rank | `game_records`, LP, RankSeries 반영 없음 |
+| 클라이언트 응답 | 연결된 WebSocket session에만 `GAME_WAITING_TIMEOUT` 전송 |
+| 미접속 유저 | push 없음. late handshake는 `ABORTED` 상태 때문에 거절 |
+| 큐 복귀 | 자동 복귀 없음. `match:status`만 제거해 직접 재시도 가능 |
+
+## 📚 Changes
+
+### 1. Waiting Timeout 저장 구조
+
+gameRoom 생성이 성공한 직후 Redis에 waiting timeout 상태를 등록합니다.
+
+```mermaid
+flowchart TD
+    A["GameRoomSetupService.createReadyGameRoom"] --> B["GameRoomCommandService.createReadyRoom"]
+    B --> C["gameRoom READY 저장<br/>participants READY"]
+    C --> D["GameWaitingStore.registerWaitingTimeout"]
+    D --> E["HASH game:waiting:{gameRoomId}"]
+    D --> F["ZSET game:waiting:timeout:pending"]
+    E --> G["userAId/userBId<br/>userAReady=false<br/>userBReady=false<br/>createdAtMillis/deadlineAtMillis"]
+    F --> H["member = gameRoomId<br/>score = deadlineAtMillis"]
+```
+
+등록 순서는 `DB gameRoom 생성 -> Redis waiting 등록 -> GO_TO_GAME_WAITING 발행`이 되도록 구성했습니다. Redis waiting 등록이 실패하면 timeout 정산이 불가능한 상태로 클라이언트를 waiting 화면에 보내게 되므로, 등록 실패 시 생성된 READY gameRoom을 `ABORTED`로 보상 처리하고 기존 `GAME_SETUP_FAILED` 흐름으로 격리합니다.
+
+### 2. CLIENT_READY 처리 흐름
+
+`CONNECTED`는 timeout 통과 조건으로 보지 않고, Redis waiting HASH의 `userAReady/userBReady`만 최종 판정 상태로 사용했습니다.
+
+```mermaid
+flowchart TD
+    A["GameWaitingWebSocketHandler.handleTextMessage"] --> B["session attributes 조회<br/>gameRoomId/userId"]
+    B --> C["GameWaitingReadyService.markReady"]
+    C --> D["game:waiting:timeout:lock:{gameRoomId}"]
+    D --> E["RedisGameWaitingStore.markReady"]
+    E --> F{"userA/userB 일치?"}
+    F -->|"no"| G["rejected<br/>WebSocket close"]
+    F -->|"yes"| H["해당 ready field = true"]
+    H --> I{"bothReady?"}
+    I -->|"yes"| J["waiting HASH/ZSET cleanup"]
+    I -->|"no"| K["pending 유지"]
+    J --> L["PLAYER_READY broadcast"]
+    K --> L
+```
+
+ready 갱신과 timeout scheduler가 같은 Redis waiting 상태를 동시에 정리할 수 있으므로, 둘 다 동일한 gameRoom 단위 lock을 사용합니다. 이 lock은 matching 응답 timeout의 `matchId` lock과 별개이며, game waiting 상태의 중복 정산과 cleanup 경쟁을 막기 위한 lock입니다.
+
+### 3. Scheduler/Processor 메서드 흐름
+
+timeout 정산은 batch trigger와 단일 gameRoom processor를 분리했습니다.
+
+```mermaid
+sequenceDiagram
+    participant S as GameWaitingTimeoutScheduler
+    participant TS as GameWaitingTimeoutService
+    participant Store as GameWaitingStore
+    participant P as GameWaitingTimeoutProcessor
+    participant DB as GameRoomCommand/ReadService
+    participant M as MatchUserStatusCommandService
+    participant Pub as GameWaitingTimeoutPubSubPublisher
+
+    S->>TS: processTimeouts()
+    TS->>Store: findDueTimeouts(nowMillis, batchSize)
+    loop due gameRoomId
+        TS->>P: processTimeoutWithLock(gameRoomId)
+        P->>Store: findWaitingState(gameRoomId)
+        alt waiting HASH missing
+            P->>Store: cleanup(gameRoomId)
+        else bothReady
+            P->>Store: cleanup(gameRoomId)
+        else not bothReady
+            P->>DB: getStatus(gameRoomId)
+            alt DB status READY
+                P->>DB: abortReadyRoomIfReady(gameRoomId)
+                P->>M: removeGameWaitingTimeoutStatuses(userAId, userBId)
+                P->>Pub: publishTimeout(gameRoomId)
+                P->>Store: cleanup(gameRoomId)
+            else DB status ABORTED
+                P->>M: removeGameWaitingTimeoutStatuses(userAId, userBId)
+                P->>Pub: publishTimeout(gameRoomId)
+                P->>Store: cleanup(gameRoomId)
+            else IN_PROGRESS or FINISHED
+                P->>Store: cleanup(gameRoomId)
+            end
+        end
+    end
+```
+
+이 순서로 작성한 이유는 다음과 같습니다.
+
+| 순서 | 이유 |
+| :--- | :--- |
+| Redis due 조회 먼저 | scheduler가 DB full scan 없이 timeout 후보만 빠르게 찾기 위해 ZSET score를 사용 |
+| gameRoom lock 획득 | 여러 API 인스턴스 scheduler가 같은 gameRoom을 동시에 정산하지 못하게 하기 위함 |
+| Redis waiting state 확인 | `CLIENT_READY` 완료 여부는 Redis waiting HASH가 authoritative state |
+| DB status 최종 확인 | Redis due 조회 후 다른 흐름에서 `IN_PROGRESS`로 넘어간 gameRoom을 잘못 abort하지 않기 위함 |
+| `abortReadyRoomIfReady` 사용 | scheduler/retry 환경에서 READY만 ABORTED로 바꾸고 나머지는 no-op 처리하기 위함 |
+| match status 제거 후 Pub/Sub | timeout 확정 이후 유저가 다시 매칭을 직접 시작할 수 있게 하고, 연결된 session에 복귀 이벤트를 전달하기 위함 |
+| 마지막 cleanup | match status 제거나 Pub/Sub publish 실패 시 pending을 유지해 다음 tick에서 재시도하기 위함 |
+
+### 4. 상태 전환
+
+gameRoom과 WebSocket session 상태는 저장 위치와 의미가 다릅니다. timeout 판정은 local WebSocket registry가 아니라 Redis waiting ready 상태와 DB gameRoom 상태를 기준으로 합니다.
+
+```mermaid
+stateDiagram-v2
+    [*] --> READY: gameRoom 생성 성공
+    READY --> ABORTED: createdAt + 30초까지<br/>양쪽 CLIENT_READY 미완료
+    READY --> IN_PROGRESS: 양쪽 CLIENT_READY 이후<br/>RTT/countdown/GAME_START
+    IN_PROGRESS --> FINISHED: 게임 정상 종료
+    ABORTED --> [*]
+    FINISHED --> [*]
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> NOT_CONNECTED: GO_TO_GAME_WAITING
+    NOT_CONNECTED --> CONNECTED: WebSocket handshake success
+    CONNECTED --> READY: CLIENT_READY
+    NOT_CONNECTED --> WAITING_TIMEOUT: createdAt + 30초 만료
+    CONNECTED --> WAITING_TIMEOUT: room 양쪽 READY 미완료
+    READY --> WAITING_TIMEOUT: room 양쪽 READY 미완료
+    READY --> NEXT_STEP: room 양쪽 READY 완료
+    WAITING_TIMEOUT --> MATCH_START: GAME_WAITING_TIMEOUT 또는 자체 timer
+    CONNECTED --> MATCH_START: close/error
+    NOT_CONNECTED --> MATCH_START: late handshake reject
+```
+
+### 5. Pub/Sub 도입 이유
+
+sticky session은 같은 gameRoom의 WebSocket session을 특정 API 인스턴스 local registry에 모으기 위한 전제입니다. 하지만 timeout scheduler는 모든 API 인스턴스에서 실행될 수 있고, Redis lock을 획득한 인스턴스가 실제 WebSocket session을 가진 인스턴스와 같다는 보장이 없습니다.
+
+```mermaid
+flowchart TD
+    subgraph API1["API-1"]
+        A1["Scheduler<br/>timeout lock 획득"]
+        A2["DB/Redis timeout 정산"]
+        A3["local registry<br/>session 없음"]
+    end
+
+    subgraph API2["API-2"]
+        B1["sticky routing으로<br/>gameRoom session 보유"]
+        B2["local registry<br/>session 있음"]
+        B3["GAME_WAITING_TIMEOUT 전송<br/>WebSocket close"]
+    end
+
+    R["Redis Pub/Sub<br/>game_waiting_timeout"]
+
+    A1 --> A2
+    A2 --> R
+    R --> A3
+    R --> B2
+    B2 --> B3
+```
+
+Pub/Sub을 사용한 근거는 다음과 같습니다.
+
+| 선택지 | 판단 |
+| :--- | :--- |
+| local registry만 사용 | scheduler가 session이 없는 인스턴스에서 timeout을 확정하면 WebSocket 전송 불가 |
+| API polling | waiting 화면에 별도 polling 루프가 필요하고 WebSocket 이벤트와 복구 경로가 중복됨 |
+| Redis Pub/Sub | timeout 확정 이벤트를 모든 API 인스턴스에 전파하고, 실제 session 보유 인스턴스만 전송 가능 |
+
+따라서 timeout 판정은 Redis/DB로 일관되게 처리하고, 이벤트 전달만 Pub/Sub으로 fan-out했습니다. Pub/Sub 메시지는 durable queue가 아니므로 publish 실패 시 waiting cleanup을 하지 않고 pending을 유지해 다음 scheduler tick에서 재시도합니다.
+
+### 6. Redis/DB Cleanup 정책
+
+```mermaid
+flowchart TD
+    A["due gameRoom"] --> B{"waiting HASH exists?"}
+    B -->|"no"| C["ZSET cleanup"]
+    B -->|"yes"| D{"bothReady?"}
+    D -->|"yes"| E["HASH/ZSET cleanup<br/>abort 없음"]
+    D -->|"no"| F{"DB status"}
+    F -->|"READY"| G["ABORTED 전환"]
+    F -->|"ABORTED"| H["match status 제거 재시도"]
+    F -->|"IN_PROGRESS / FINISHED"| I["waiting cleanup only"]
+    G --> J["match status 제거"]
+    H --> K["Pub/Sub publish"]
+    J --> K
+    K --> L{"publish success?"}
+    L -->|"yes"| M["waiting cleanup"]
+    L -->|"no"| N["pending 유지<br/>next tick retry"]
+```
+
+`match:status:{userId}` 제거는 현재 값이 `IN_GAME`인 경우에만 수행합니다. timeout 정산이 재시도되는 동안 유저가 이미 새 매칭을 시작해 `MATCHING` 상태가 된 경우, 새 상태를 지우지 않기 위한 보강입니다.
+
+### 7. 테스트/문서
+
+- Redis waiting HASH/ZSET 등록, TTL, ready 갱신, bothReady cleanup을 검증했습니다.
+- scheduler lock 실패/개별 예외 격리, READY/ABORTED/IN_PROGRESS 분기, Pub/Sub publish 실패 시 pending 유지 재시도를 검증했습니다.
+- `abortReadyRoomIfReady` 이후 `game_records`, `rank_series`, `user_rank_info`가 생성되지 않음을 JPA 테스트로 검증했습니다.
+- late handshake 시 `ABORTED` gameRoom이 `validateReadyParticipant`에서 거절되는 흐름을 core/API 테스트로 검증했습니다.
+- `policy.md`, `domain status.md`, `flow status.md`, `websocket client.md`, `DDL.md`, `plan-checkpoint.md`를 구현 결과와 동기화했습니다.
+
+## 📝 Note
+
+- 이번 PR의 timeout은 `GAME_START` 이전 대기 실패만 다룹니다. `GAME_START` 이후 disconnect와 종료 판정은 별도 game 진행 흐름에서 처리합니다.
+- `CONNECTED`는 Redis timeout 통과 조건으로 저장하지 않습니다. 실제 통과 조건은 양쪽 `CLIENT_READY` 완료입니다.
+- Redis waiting HASH TTL 60초는 timeout 정책값이 아니라 cleanup 누락 방지용 안전장치입니다. timeout 판정은 항상 gameRoom `createdAt + 30초` 기준입니다.
+- sticky routing은 WebSocket session을 같은 인스턴스에 모으기 위한 배포/로드밸런서 전제이고, timeout 판정 자체는 sticky routing에 의존하지 않습니다.
+
+## 📌 Related Issue
 - Closes #42
+
+-----
 
 ## 변경 이력
 
@@ -743,3 +984,4 @@ timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 | 2026-05-18 | Task 9 완료. Redis/DB 기준 timeout 판정, gameRoom 단위 lock, Pub/Sub 전파, local session 보유 인스턴스만 전송하는 멀티 인스턴스 정합성 문서화 |
 | 2026-05-18 | Task 10 완료. `websocket client.md`에 timeout 수신, 미접속, late handshake, close/error, 자체 30초 timer 기반 클라이언트 복구 정책 문서화 |
 | 2026-05-18 | Task 11 완료. record/rank 미생성, late handshake 거절 테스트 추가 및 core/matching/api 전체 테스트 통과 |
+| 2026-05-19 | Task 12 완료. 정책/domain/flow/websocket/DDL/plan-checkpoint 문서를 Issue 42 구현 결과와 동기화 |
