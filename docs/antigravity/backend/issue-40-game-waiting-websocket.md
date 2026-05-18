@@ -356,14 +356,14 @@ timeout 발생
 
 ### 9. 테스트
 
-- [ ] handshake JWT 누락/잘못된 token 실패 테스트
-- [ ] participant가 아닌 유저 handshake 실패 테스트
-- [ ] READY gameRoom participant handshake 성공 테스트
+- [x] handshake JWT 누락/잘못된 token 실패 테스트
+- [x] participant가 아닌 유저 handshake 실패 테스트
+- [x] READY gameRoom participant handshake 성공 테스트
 - [x] connection registry 등록/제거 단위 테스트
 - [x] 동일 유저 중복 연결 시 기존 session 교체 테스트
 - [x] `CLIENT_READY` 수신 시 ready 상태 반영 테스트
 - [x] 양쪽 READY 전에는 게임 시작 이벤트를 보내지 않는지 테스트
-- [ ] core `GameRoomReadService` participant 검증 단위/JPA 테스트
+- [x] core `GameRoomReadService` participant 검증 단위/JPA 테스트
 - [x] session attributes에 저장된 roomId/userId만 사용하고 payload userId를 신뢰하지 않는지 테스트
 
 테스트 기준:
@@ -422,3 +422,4 @@ timeout 발생
 | 2026-05-15 | Task 6 완료. WebSocket client/server envelope, message type, server message factory, invalid message type error 정의 |
 | 2026-05-15 | Task 7 완료. 게임 대기 WebSocket handler에서 연결 등록, CLIENT_READY, PLAYER_JOINED/READY/LEFT, ERROR 처리 구현 |
 | 2026-05-18 | Task 8 완료. GAME_START 이전 timeout은 ABORTED 및 record/LP 미반영, GAME_START 이후 disconnect는 정상 판정 흐름 유지로 정책화 |
+| 2026-05-18 | Task 9 완료. WebSocket handshake/handler/registry/message와 core GameRoomReadService 단위/JPA 테스트 검증 |
