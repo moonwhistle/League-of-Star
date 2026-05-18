@@ -327,17 +327,17 @@ CLIENT_READY 수신
 
 ### 5. timeout scheduler 구현
 
-- [ ] `GameWaitingTimeoutScheduler`를 추가한다.
-- [ ] scheduler fixed delay를 정의한다.
-  - [ ] MVP 기준 1초 주기 검토
-- [ ] Redis `game:waiting:timeout:pending` ZSET에서 due gameRoomId를 조회한다.
-- [ ] due gameRoomId별 timeout 처리를 시도한다.
-- [ ] Redis HASH가 없으면 ZSET index를 cleanup한다.
-- [ ] Redis HASH 기준 양쪽 ready가 모두 true면 ZSET index를 cleanup하고 no-op 처리한다.
-- [ ] 양쪽 ready가 모두 true가 아니면 DB gameRoom 상태를 최종 확인한다.
-- [ ] DB gameRoom이 `READY`가 아니면 Redis waiting 상태와 ZSET index를 cleanup한다.
-- [ ] DB gameRoom이 `READY`면 timeout abort 처리를 수행한다.
-- [ ] 개별 gameRoom 처리 실패가 batch 전체를 중단하지 않도록 한다.
+- [x] `GameWaitingTimeoutScheduler`를 추가한다.
+- [x] scheduler fixed delay를 정의한다.
+  - [x] MVP 기준 1초 주기 검토
+- [x] Redis `game:waiting:timeout:pending` ZSET에서 due gameRoomId를 조회한다.
+- [x] due gameRoomId별 timeout 처리를 시도한다.
+- [x] Redis HASH가 없으면 ZSET index를 cleanup한다.
+- [x] Redis HASH 기준 양쪽 ready가 모두 true면 ZSET index를 cleanup하고 no-op 처리한다.
+- [x] 양쪽 ready가 모두 true가 아니면 DB gameRoom 상태를 최종 확인한다.
+- [x] DB gameRoom이 `READY`가 아니면 Redis waiting 상태와 ZSET index를 cleanup한다.
+- [x] DB gameRoom이 `READY`면 timeout abort 처리를 수행한다.
+- [x] 개별 gameRoom 처리 실패가 batch 전체를 중단하지 않도록 한다.
 
 최종 timeout 판정:
 
@@ -351,6 +351,43 @@ DB 최종 확인 이유:
 
 - scheduler가 Redis due 상태를 본 직후 다른 흐름에서 gameRoom이 다음 단계로 넘어갈 수 있다.
 - 최종 abort 전에는 반드시 DB의 `READY` 상태를 확인해야 오판을 막을 수 있다.
+
+구현 결과:
+
+- `GameWaitingTimeoutScheduler`를 추가했다.
+  - fixed delay: 1초
+  - scheduler는 `GameWaitingTimeoutService.processTimeouts()`만 호출한다.
+- `GameWaitingTimeoutService`는 현재 시각 기준 due gameRoomId 목록을 조회하고, gameRoomId별 timeout 처리를 순회한다.
+- due 조회는 Redis ZSET `game:waiting:timeout:pending`에서 `score <= nowMillis` 기준으로 수행한다.
+- batch size는 100으로 둔다.
+- 단일 gameRoom 정산은 `GameWaitingTimeoutProcessor.processTimeoutWithLock(gameRoomId)`가 담당한다.
+- `GameWaitingTimeoutProcessor.processTimeoutWithLock()`는 `game:waiting:timeout:lock:{gameRoomId}` lock 안에서 실행한다.
+- lock 획득 실패 시 해당 gameRoom은 이번 tick에서 skip한다.
+  - HASH 삭제하지 않는다.
+  - ZSET 삭제하지 않는다.
+  - DB abort 하지 않는다.
+  - 다음 gameRoom 처리는 계속한다.
+- 개별 gameRoom 처리 중 예외가 발생하면 로그만 남기고 다음 gameRoom 처리를 계속한다.
+  - 처리 중 예외가 난 gameRoom의 pending ZSET/HASH는 유지해서 다음 scheduler tick에서 재시도한다.
+- 명확한 no-op 또는 성공 처리일 때만 cleanup한다.
+  - Redis HASH 없음: cleanup
+  - Redis 기준 bothReady=true: cleanup
+  - DB gameRoom status != READY: cleanup
+  - DB gameRoom status == READY이며 abort 성공: cleanup
+- DB gameRoom status 조회는 `GameRoomReadService.getStatus(gameRoomId)`로 수행한다.
+- READY gameRoom abort는 기존 `GameRoomCommandService.abortReadyRoom(gameRoomId)`를 사용한다.
+
+추가/변경 코드:
+
+| 파일 | 역할 |
+|------|------|
+| `smite-api/game/waiting/scheduler/GameWaitingTimeoutScheduler` | 1초 주기 timeout batch trigger |
+| `smite-api/game/waiting/service/GameWaitingTimeoutService` | due gameRoomId 조회 및 batch 순회, lock 실패/예외 격리 |
+| `smite-api/game/waiting/service/GameWaitingTimeoutProcessor` | 단일 gameRoom timeout 정산, gameRoom 단위 lock 적용 |
+| `smite-api/game/waiting/domain/GameWaitingState` | Redis waiting HASH 상태 모델 |
+| `smite-api/game/waiting/repository/GameWaitingStore` | due 조회, waiting state 조회 port 추가 |
+| `smite-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | ZSET due 조회, HASH state 조회 구현 |
+| `smite-core/domain/game/service/GameRoomReadService` | gameRoom status 조회 메서드 추가 |
 
 ### 6. gameRoom abort 처리 유스케이스 구현
 
@@ -480,10 +517,10 @@ GO_TO_GAME_WAITING 진입
 - [x] Redis waiting HASH TTL이 설정되는지 테스트
 - [x] `CLIENT_READY` 수신 시 해당 유저 ready 값이 true로 바뀌는지 테스트
 - [x] 양쪽 ready 완료 시 timeout ZSET이 cleanup 되는지 테스트
-- [ ] 한 명만 ready 상태에서 deadline이 지나면 gameRoom이 `ABORTED` 되는지 테스트
-- [ ] 둘 다 미접속 상태에서 deadline이 지나면 gameRoom이 `ABORTED` 되는지 테스트
-- [ ] 둘 다 ready 상태이면 deadline이 지나도 abort하지 않는지 테스트
-- [ ] DB gameRoom이 이미 `IN_PROGRESS` 또는 `FINISHED`이면 scheduler가 abort하지 않는지 테스트
+- [x] 한 명만 ready 상태에서 deadline이 지나면 gameRoom이 `ABORTED` 되는지 테스트
+- [x] 둘 다 미접속 상태에서 deadline이 지나면 gameRoom이 `ABORTED` 되는지 테스트
+- [x] 둘 다 ready 상태이면 deadline이 지나도 abort하지 않는지 테스트
+- [x] DB gameRoom이 이미 `IN_PROGRESS` 또는 `FINISHED`이면 scheduler가 abort하지 않는지 테스트
 - [ ] timeout 시 participants가 `ABORTED` 되는지 테스트
 - [ ] timeout 시 `game_records`가 생성되지 않는지 테스트
 - [ ] timeout 시 LP/RankSeries service가 호출되지 않는지 테스트
@@ -583,3 +620,4 @@ timeout은 항상 gameRoom `createdAt + 30초` 기준으로 판단한다.
 | 2026-05-18 | Task 2 완료. `game:waiting:*` Redis key, ZSET/HASH 최소 필드, HASH TTL 60초, gameRoom 단위 timeout lock, cleanup 정책 확정 |
 | 2026-05-18 | Task 3 완료. gameRoom 생성 성공 직후 Redis waiting HASH/ZSET 등록, 등록 실패 시 gameRoom abort 보상 및 기존 `GAME_SETUP_FAILED` 흐름 연동 구현 |
 | 2026-05-18 | Task 4 완료. `CLIENT_READY` 수신 시 Redis ready 상태 갱신, gameRoom 단위 lock 적용, 양쪽 READY 완료 시 waiting HASH/ZSET cleanup 구현 |
+| 2026-05-18 | Task 5 완료. 1초 주기 timeout scheduler, due ZSET 조회, gameRoom 단위 lock 정산, lock 실패/예외 시 pending 유지 재시도 정책 구현 |

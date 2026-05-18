@@ -2,6 +2,7 @@ package com.sang.smite.game.waiting.infrastructure.redis;
 
 import com.sang.smite.game.waiting.common.constant.GameWaitingConstants;
 import com.sang.smite.game.waiting.domain.GameWaitingReadyResult;
+import com.sang.smite.game.waiting.domain.GameWaitingState;
 import com.sang.smite.game.waiting.domain.GameWaitingTimeoutRegistration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,9 @@ import org.springframework.data.redis.core.ZSetOperations;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -159,6 +162,61 @@ class RedisGameWaitingStoreTest {
         assertThat(result.accepted()).isFalse();
         verify(hashOperations, never()).put(WAITING_KEY, GameWaitingConstants.USER_A_READY_FIELD, "true");
         verify(hashOperations, never()).put(WAITING_KEY, GameWaitingConstants.USER_B_READY_FIELD, "true");
+    }
+
+    @Test
+    @DisplayName("findDueTimeouts - deadline이 지난 gameRoomId를 batch size만큼 조회한다")
+    void findDueTimeouts() {
+        // given
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOperations);
+        when(zSetOperations.rangeByScore(
+                GameWaitingConstants.WAITING_TIMEOUT_PENDING_KEY,
+                0,
+                10_000L,
+                0,
+                2
+        )).thenReturn(java.util.Set.of("100", "101"));
+
+        // when
+        List<Long> dueGameRoomIds = store.findDueTimeouts(10_000L, 2);
+
+        // then
+        assertThat(dueGameRoomIds).containsExactlyInAnyOrder(100L, 101L);
+    }
+
+    @Test
+    @DisplayName("findWaitingState - Redis HASH를 GameWaitingState로 변환한다")
+    void findWaitingState() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(WAITING_KEY)).thenReturn(waitingState("true", "false"));
+
+        // when
+        Optional<GameWaitingState> waitingState = store.findWaitingState(GAME_ROOM_ID);
+
+        // then
+        assertThat(waitingState).isPresent();
+        assertThat(waitingState.get().gameRoomId()).isEqualTo(GAME_ROOM_ID);
+        assertThat(waitingState.get().userAId()).isEqualTo(USER_A_ID);
+        assertThat(waitingState.get().userBId()).isEqualTo(USER_B_ID);
+        assertThat(waitingState.get().userAReady()).isTrue();
+        assertThat(waitingState.get().userBReady()).isFalse();
+        assertThat(waitingState.get().createdAtMillis()).isEqualTo(1L);
+        assertThat(waitingState.get().deadlineAtMillis()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("findWaitingState - Redis HASH가 없으면 Optional.empty를 반환한다")
+    void findWaitingState_NotFound() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(WAITING_KEY)).thenReturn(Map.of());
+
+        // when
+        Optional<GameWaitingState> waitingState = store.findWaitingState(GAME_ROOM_ID);
+
+        // then
+        assertThat(waitingState).isEmpty();
     }
 
     private long toEpochMillis(LocalDateTime dateTime) {

@@ -2,6 +2,7 @@ package com.sang.smite.game.waiting.infrastructure.redis;
 
 import com.sang.smite.game.waiting.common.constant.GameWaitingConstants;
 import com.sang.smite.game.waiting.domain.GameWaitingReadyResult;
+import com.sang.smite.game.waiting.domain.GameWaitingState;
 import com.sang.smite.game.waiting.domain.GameWaitingTimeoutRegistration;
 import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -116,6 +118,32 @@ class RedisGameWaitingStoreIntegrationTest extends AbstractRedisTest {
                 GameWaitingConstants.WAITING_TIMEOUT_PENDING_KEY,
                 String.valueOf(GAME_ROOM_ID)
         )).isNull();
+    }
+
+    @Test
+    @DisplayName("findDueTimeouts/findWaitingState - 실제 Redis에서 due timeout과 waiting state를 조회한다")
+    void findDueTimeoutsAndWaitingState() {
+        // given
+        store.registerWaitingTimeout(new GameWaitingTimeoutRegistration(
+                GAME_ROOM_ID,
+                USER_A_ID,
+                USER_B_ID,
+                CREATED_AT
+        ));
+        long deadlineAtMillis = toEpochMillis(CREATED_AT.plusSeconds(GameWaitingConstants.WAITING_TIMEOUT_SECONDS));
+
+        // when
+        java.util.List<Long> beforeDeadline = store.findDueTimeouts(deadlineAtMillis - 1, 10);
+        java.util.List<Long> afterDeadline = store.findDueTimeouts(deadlineAtMillis, 10);
+        Optional<GameWaitingState> waitingState = store.findWaitingState(GAME_ROOM_ID);
+
+        // then
+        assertThat(beforeDeadline).isEmpty();
+        assertThat(afterDeadline).containsExactly(GAME_ROOM_ID);
+        assertThat(waitingState).isPresent();
+        assertThat(waitingState.get().gameRoomId()).isEqualTo(GAME_ROOM_ID);
+        assertThat(waitingState.get().bothReady()).isFalse();
+        assertThat(waitingState.get().deadlineAtMillis()).isEqualTo(deadlineAtMillis);
     }
 
     private long toEpochMillis(LocalDateTime dateTime) {

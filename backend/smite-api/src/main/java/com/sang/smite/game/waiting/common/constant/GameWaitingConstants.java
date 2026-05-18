@@ -22,4 +22,6 @@ public final class GameWaitingConstants {
 
     public static final long WAITING_TIMEOUT_SECONDS = 30L;
     public static final long WAITING_STATE_TTL_SECONDS = 60L;
+    public static final String WAITING_TIMEOUT_SCHEDULER_FIXED_DELAY_MS = "1000";
+    public static final int WAITING_TIMEOUT_CANDIDATE_BATCH_SIZE = 100;
 }
