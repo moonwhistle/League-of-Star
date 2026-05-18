@@ -117,19 +117,31 @@ flowchart TD
 
 ### Step 3. 게임 대기 WebSocket 연결
 
-- [ ] gameRoomId별 WebSocket 채널 추가
-- [ ] WebSocket 인증 및 gameRoom 참가자 검증
-- [ ] 두 참가자의 입장/이탈 상태 관리
-- [ ] 클라이언트 `CLIENT_READY` 수신
-- [ ] MP4 preload 완료 여부는 클라이언트가 `CLIENT_READY`로 보고
+- [x] gameRoomId별 WebSocket 채널 추가
+- [x] WebSocket 인증 및 gameRoom 참가자 검증
+- [x] 두 참가자의 입장/이탈 상태 관리
+- [x] 클라이언트 `CLIENT_READY` 수신
+- [x] MP4 preload 완료 여부는 클라이언트가 `CLIENT_READY`로 보고
 - [x] `GO_TO_GAME_WAITING` 이후 WebSocket 미접속 timeout 정책 정의
 - [x] `CLIENT_READY` 미수신 timeout 정책 정의
-- [ ] WebSocket 미접속/READY timeout 시 gameRoom 상태를 `ABORTED`로 전환
-- [ ] WebSocket 미접속/READY timeout 시 game record/LP는 반영하지 않음
 - [x] GAME_START 이전 이탈과 GAME_START 이후 disconnect 정책 분리
 - [x] 매칭 SSE와 게임 WebSocket의 책임 경계 문서화
 
-### Step 4. RTT 측정과 카운트다운
+### Step 4. 게임 대기 timeout 정산
+
+- [ ] `GO_TO_GAME_WAITING` 이후 waiting deadline 저장
+- [ ] WebSocket 미접속 timeout 감지
+- [ ] `CLIENT_READY` 미수신 timeout 감지
+- [ ] RTT 단계 진입 전 대기 실패 감지
+- [ ] timeout 시 gameRoom 상태를 `ABORTED`로 전환
+- [ ] timeout 시 game_participants 상태를 `ABORTED` 또는 `DISCONNECTED`로 전환
+- [ ] timeout 시 Redis `match:status:{userId}` 제거
+- [ ] timeout 시 game_records 생성하지 않음
+- [ ] timeout 시 LP/배치/승급전 반영하지 않음
+- [ ] timeout 시 클라이언트 start 버튼 화면 복귀 이벤트/응답 정책 확정
+- [ ] timeout scheduler/worker 중복 처리 방지 정책 정의
+
+### Step 5. RTT 측정과 카운트다운
 
 - [ ] WebSocket ping-pong으로 각 유저별 RTT 5회 측정
 - [ ] median RTT 저장
@@ -138,14 +150,14 @@ flowchart TD
 - [ ] `COUNTDOWN` 이벤트 전송
 - [ ] RTT 실패/초과/상대 이탈 시 gameRoom 상태 전이 정책 정의
 
-### Step 5. GAME_START와 HP 시나리오 전달
+### Step 6. GAME_START와 HP 시나리오 전달
 
 - [ ] WebSocket `GAME_START` 직전에만 scenario를 클라이언트에 전달
 - [ ] 클라이언트는 `startAt` 기준으로 HP bar overlay 계산
 - [x] MP4는 배경으로만 사용
 - [ ] `GAME_START` 시 서버 기준 game end timer/scheduler 등록
 
-### Step 6. SMITE 입력과 서버 판정
+### Step 7. SMITE 입력과 서버 판정
 
 - [ ] 클라이언트는 WebSocket으로 `SMITE` 명령만 전송
 - [ ] 서버는 `serverReceiveTime` 기록
@@ -155,7 +167,7 @@ flowchart TD
 - [ ] 중복 SMITE 차단
 - [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리해 보정 기준을 일관되게 유지
 
-### Step 7. 서버 timer/scheduler 기반 게임 종료 보장
+### Step 8. 서버 timer/scheduler 기반 게임 종료 보장
 
 - [ ] WebSocket 연결 유무와 무관하게 gameRoom 종료 timer/scheduler 실행
 - [ ] HP scenario의 몬스터 사망 시각 또는 게임 제한 시간 기준 종료 job 등록
@@ -163,7 +175,7 @@ flowchart TD
 - [ ] 이미 FINISHED/ABORTED 된 gameRoom은 종료 job이 no-op 처리
 - [ ] GAME_START 이후 양쪽 WebSocket이 끊겨도 서버가 승패/무승부 판정을 완료
 
-### Step 8. 게임 종료와 기록
+### Step 9. 게임 종료와 기록
 
 - [ ] 승패/무승부 확정
 - [ ] `game_rooms` 상태 FINISHED
@@ -479,27 +491,51 @@ gameRoom 생성 실패 mapping:
 
 목표:
 
-- gameRoom별 WebSocket 채널을 열고 참가자 입장/준비 상태를 관리한다.
+- gameRoom별 WebSocket 채널을 열고 참가자 연결/READY 상태를 관리한다.
 
 범위:
 
 - WebSocket endpoint 추가
 - gameRoom 참가자 인증/인가
-- `CLIENT_JOIN`, `CLIENT_READY`, `PLAYER_LEFT` 수준의 대기 상태 처리
+- `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `ERROR` 수준의 대기 상태 처리
 - 양쪽 READY 전까지 게임 시작하지 않음
-- `GO_TO_GAME_WAITING` 이후 WebSocket 미접속 timeout 처리
-- `CLIENT_READY` 미수신 timeout 처리
-- GAME_START 이전 timeout은 gameRoom `ABORTED`, game record/LP 미반영
-- GAME_START 이후 disconnect는 gameRoom을 중단하지 않고 서버 timer/scheduler와 scenario/action 기준 정상 판정으로 분리
+- GAME_START 이전 timeout과 GAME_START 이후 disconnect 정책 문서화
 
 완료 기준:
 
 - 두 참가자가 같은 gameRoom WebSocket에 연결 가능
 - 참가자가 아닌 유저는 연결 또는 구독 거부
 - 양쪽 READY 상태를 서버가 식별 가능
-- WebSocket 미접속/READY timeout 시 게임이 시작되지 않고 gameRoom이 `ABORTED` 처리됨
+- 양쪽 READY 상태가 되어도 이번 이슈에서는 GAME_START를 전송하지 않음
 
-### Issue 39. RTT 측정과 GAME_START
+### Issue 39. 게임 대기 timeout 정산
+
+목표:
+
+- GAME_START 이전 WebSocket 미접속/READY timeout을 감지하고 gameRoom을 안전하게 중단한다.
+
+범위:
+
+- `GO_TO_GAME_WAITING` 이후 waiting deadline 저장
+- WebSocket 미접속 timeout 감지
+- `CLIENT_READY` 미수신 timeout 감지
+- RTT 단계 진입 전 대기 실패 감지
+- timeout 시 gameRoom `ABORTED`
+- timeout 시 game_participants `ABORTED` 또는 `DISCONNECTED`
+- timeout 시 Redis `match:status:{userId}` 제거
+- timeout 시 game_records 생성 금지
+- timeout 시 LP/배치/승급전 반영 금지
+- timeout 시 클라이언트 start 버튼 화면 복귀 이벤트/응답 정책 확정
+- timeout scheduler/worker 중복 처리 방지
+
+완료 기준:
+
+- WebSocket 미접속/READY timeout 시 게임이 시작되지 않음
+- timeout 된 gameRoom은 `ABORTED`로 정리됨
+- timeout 된 게임은 record/LP/배치/승급전에 반영되지 않음
+- 두 유저는 큐 자동 복귀 없이 start 버튼 화면으로 복귀함
+
+### Issue 40. RTT 측정과 GAME_START
 
 목표:
 
@@ -519,7 +555,7 @@ gameRoom 생성 실패 mapping:
 - 클라이언트는 `startAt` 기준으로 MP4 재생과 HP overlay 계산 가능
 - RTT 실패/초과 시 gameRoom이 시작되지 않음
 
-### Issue 40. SMITE 서버 판정과 action 저장
+### Issue 41. SMITE 서버 판정과 action 저장
 
 목표:
 
@@ -540,7 +576,7 @@ gameRoom 생성 실패 mapping:
 - 같은 유저의 두 번째 SMITE는 거부 또는 무시
 - 판정 결과가 서버 로그와 DB에 남음
 
-### Issue 41. 서버 timer/scheduler 기반 gameRoom 종료
+### Issue 42. 서버 timer/scheduler 기반 gameRoom 종료
 
 목표:
 
@@ -561,7 +597,7 @@ gameRoom 생성 실패 mapping:
 - scenario 종료 시점 또는 몬스터 사망 시점에 최종 결과가 확정됨
 - 종료 job 중복 실행 시에도 상태가 중복 변경되지 않음
 
-### Issue 42. 게임 종료와 record/rank 연결
+### Issue 43. 게임 종료와 record/rank 연결
 
 목표:
 
@@ -585,9 +621,9 @@ gameRoom 생성 실패 mapping:
 
 | 날짜 | 변경 내용 |
 | :--- | :--- |
-| 2026-05-13 | 매칭 성공 이후 게임 세션 구현 흐름 정리. `GO_TO_GAME_WAITING` 발행 시점, Redis 상태 전이, gameRoom 생성 실패 시 `GAME_SETUP_FAILED` mapping, Issue 36~42 분할안 확정 |
+| 2026-05-13 | 매칭 성공 이후 게임 세션 구현 흐름 정리. `GO_TO_GAME_WAITING` 발행 시점, Redis 상태 전이, gameRoom 생성 실패 시 `GAME_SETUP_FAILED` mapping, Issue 36~43 분할안 확정 |
 | 2026-05-13 | gameRoom 생성 실패 정책을 큐 자동 복귀에서 안내 메시지 후 start 화면 복귀로 변경 |
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 및 성공 SSE 발행 금지 정책 반영 |
 | 2026-05-13 | 게임 대기 WebSocket 미접속/READY timeout 정책과 GAME_START 전후 이탈 처리 분리 반영 |
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
-| 2026-05-18 | GAME_START 이후 WebSocket 연결 유무와 무관하게 gameRoom 종료를 보장하는 서버 timer/scheduler step과 후속 Issue 41 추가 |
+| 2026-05-18 | 게임 대기 timeout 정산을 Step 4 / Issue 39로 분리하고, GAME_START 이후 WebSocket 연결 유무와 무관하게 gameRoom 종료를 보장하는 서버 timer/scheduler step을 Issue 42로 정리 |

@@ -374,10 +374,10 @@ timeout 발생
 
 ### 10. 문서
 
-- [ ] `plan-checkpoint` Step 3 체크 상태 갱신
-- [ ] 매칭 SSE와 game WebSocket 책임 경계 재확인
-- [ ] `match_response_result` 이후 클라이언트 `EventSource.close()` 책임 명시 유지
-- [ ] WebSocket endpoint와 message type 정리
+- [x] `plan-checkpoint` Step 3 체크 상태 갱신
+- [x] 매칭 SSE와 game WebSocket 책임 경계 재확인
+- [x] `match_response_result` 이후 클라이언트 `EventSource.close()` 책임 명시 유지
+- [x] WebSocket endpoint와 message type 정리
 - [x] GAME_START 이전 timeout 실행 처리는 후속 이슈라고 명시
 - [x] GAME_START 이전 timeout은 record/LP 미반영 정책이라고 명시
 
@@ -390,6 +390,53 @@ timeout 발생
 - 양쪽 READY 전에는 게임 시작 단계로 넘어가지 않는다.
 - GAME_START 이전 timeout 실행 처리는 후속 이슈 범위로 문서화되어 있다.
 - `game_records`와 LP는 이 이슈에서 반영하지 않는다.
+
+## 📌 Summary
+
+`GO_TO_GAME_WAITING` 이후 게임 대기 화면에서 사용할 gameRoom WebSocket 기반을 구현했습니다.
+클라이언트는 매칭 SSE `match_response_result` 수신 후 `EventSource.close()`를 호출하고, `/ws/game/{gameRoomId}?token=...`로 연결합니다.
+서버는 handshake 단계에서 JWT와 gameRoom participant를 검증하고, 연결/READY 상태를 gameRoom 단위로 관리합니다.
+
+```mermaid
+flowchart TD
+    A["SSE match_response_result<br/>GO_TO_GAME_WAITING"] --> B["Client EventSource.close()"]
+    B --> C["WebSocket handshake<br/>/ws/game/{gameRoomId}?token=..."]
+    C --> D{"JWT valid?"}
+    D -->|"no"| E["Reject handshake"]
+    D -->|"yes"| F{"READY gameRoom participant?"}
+    F -->|"no"| E
+    F -->|"yes"| G["Store session attributes<br/>gameRoomId, userId"]
+    G --> H["Register local session<br/>gameRoomId + userId"]
+    H --> I["Broadcast PLAYER_JOINED"]
+    I --> J["Client MP4 preload"]
+    J --> K["CLIENT_READY"]
+    K --> L["Broadcast PLAYER_READY"]
+    L --> M["Wait for RTT/GAME_START<br/>later issue"]
+```
+
+## 📚 Changes
+
+- native WebSocket endpoint `/ws/game/{gameRoomId}`를 추가했습니다.
+  - MVP 게임 대기방은 1:1 room, READY, 입장/이탈 수준의 단순 명령형 통신이므로 STOMP/SockJS 대신 native WebSocket을 선택했습니다.
+  - `/ws/game/**`는 HTTP security whitelist에 두고, 실제 인증/인가는 handshake interceptor에서 처리하도록 책임을 분리했습니다.
+- handshake 인증/인가 흐름을 분리했습니다.
+  - query parameter `token`은 `JwtTokenResolver`가 추출합니다.
+  - path의 `gameRoomId`는 `GameWebSocketPathResolver`가 해석합니다.
+  - core `GameRoomReadService`가 READY 상태와 participant 여부를 검증합니다.
+- WebSocket session registry를 추가했습니다.
+  - API 인스턴스 local memory에서 `gameRoomId + userId + sessionId` 기준으로 연결을 관리합니다.
+  - 동일 유저 중복 연결 시 기존 session을 교체합니다.
+  - 멀티 인스턴스에서는 `gameRoomId` sticky routing을 전제로 문서화했습니다.
+- WebSocket message model과 handler를 추가했습니다.
+  - client message는 `CLIENT_READY`만 허용합니다.
+  - server message는 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `ERROR`를 사용합니다.
+  - handler는 client payload의 `userId/gameRoomId`를 신뢰하지 않고 handshake session attributes만 사용합니다.
+- GAME_START 전후 정책을 정리했습니다.
+  - GAME_START 이전 미접속/READY timeout은 후속 이슈에서 `ABORTED`, record/LP 미반영으로 처리합니다.
+  - GAME_START 이후 disconnect는 gameRoom을 중단하지 않고 서버 timer/scheduler와 scenario/action 기준으로 정상 판정합니다.
+- 테스트와 문서를 보강했습니다.
+  - handshake, path/token resolver, session registry, message model, handler, core read service 단위/JPA 테스트를 추가/검증했습니다.
+  - `plan-checkpoint`, `policy`, `overallplan`, `domain status`, `websocket client`, `DDL` 문서와 정합성을 맞췄습니다.
 
 ## 📝 Note
 
@@ -423,3 +470,4 @@ timeout 발생
 | 2026-05-15 | Task 7 완료. 게임 대기 WebSocket handler에서 연결 등록, CLIENT_READY, PLAYER_JOINED/READY/LEFT, ERROR 처리 구현 |
 | 2026-05-18 | Task 8 완료. GAME_START 이전 timeout은 ABORTED 및 record/LP 미반영, GAME_START 이후 disconnect는 정상 판정 흐름 유지로 정책화 |
 | 2026-05-18 | Task 9 완료. WebSocket handshake/handler/registry/message와 core GameRoomReadService 단위/JPA 테스트 검증 |
+| 2026-05-18 | Task 10 완료. plan-checkpoint Step 3 구현 상태, SSE/WebSocket 책임 경계, EventSource.close 책임, endpoint/message 문서 정합성 확인 |
