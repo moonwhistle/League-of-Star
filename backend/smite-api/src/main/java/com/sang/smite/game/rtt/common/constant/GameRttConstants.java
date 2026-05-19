@@ -19,6 +19,7 @@ public final class GameRttConstants {
     public static final int RTT_PING_TIMEOUT_MILLIS = 2_500;
     public static final int RTT_MEASUREMENT_TIMEOUT_SECONDS = 15;
     public static final int RTT_STATE_TTL_SECONDS = 300;
+    public static final String RTT_TIMEOUT_SCHEDULER_FIXED_DELAY_MS = "500";
 
     private GameRttConstants() {
     }

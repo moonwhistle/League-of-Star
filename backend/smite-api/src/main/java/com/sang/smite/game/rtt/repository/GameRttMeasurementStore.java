@@ -7,4 +7,6 @@ public interface GameRttMeasurementStore {
     boolean initializeIfAbsent(Long gameRoomId, Long userAId, Long userBId);
 
     GameRttPongResult appendSample(Long gameRoomId, Long userId, long rttMillis);
+
+    boolean markFailed(Long gameRoomId, Long userId);
 }

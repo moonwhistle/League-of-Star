@@ -45,4 +45,21 @@ class GameRttPingTrackerTest {
         assertThat(tracker.consumeSentAt(GAME_ROOM_ID, USER_ID, 1)).hasValue(10L);
         assertThat(tracker.consumeSentAt(GAME_ROOM_ID, USER_ID, 1)).isEmpty();
     }
+
+    @Test
+    @DisplayName("consumeTimedOutSentAts - timeout 기준을 지난 ping만 소비한다")
+    void consumeTimedOutSentAts() {
+        // given
+        tracker.recordSentAt(GAME_ROOM_ID, USER_ID, 1, 10L);
+        tracker.recordSentAt(GAME_ROOM_ID, USER_ID, 2, 90L);
+
+        // when
+        var timedOutPings = tracker.consumeTimedOutSentAts(120L, 50L);
+
+        // then
+        assertThat(timedOutPings).hasSize(1);
+        assertThat(timedOutPings.get(0).seq()).isEqualTo(1);
+        assertThat(tracker.findSentAt(GAME_ROOM_ID, USER_ID, 1)).isEmpty();
+        assertThat(tracker.findSentAt(GAME_ROOM_ID, USER_ID, 2)).hasValue(90L);
+    }
 }

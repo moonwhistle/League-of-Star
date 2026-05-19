@@ -172,12 +172,21 @@ local memory / 동시성 기준:
 
 ### 6. RTT 실패 처리
 
-- [ ] `RTT_PONG` 2500ms 응답 제한 시간 초과 시 `FAILED` 처리한다.
-- [ ] RTT 측정 중 WebSocket close/error 발생 시 `RTT_FAILED`로 처리한다.
-- [ ] RTT 측정 중 예외가 발생하면 `RTT_FAILED`로 처리한다.
-- [ ] 실패 reason은 최소로 유지한다.
-  - [ ] `RTT_FAILED`: 응답 누락, close/error, 측정 중 예외
-  - [ ] `RTT_TOO_HIGH`: median RTT 2000ms 초과
+- [x] `RTT_PONG` 2500ms 응답 제한 시간 초과 시 `FAILED` 처리한다.
+- [x] RTT 측정 중 WebSocket close/error 발생 시 `RTT_FAILED`로 처리한다.
+- [x] RTT 측정 중 예외가 발생하면 `RTT_FAILED`로 처리한다.
+- [x] 실패 reason은 최소로 유지한다.
+  - [x] `RTT_FAILED`: 응답 누락, close/error, 측정 중 예외
+  - [x] `RTT_TOO_HIGH`: median RTT 2000ms 초과
+
+구현 결과:
+
+- `GameRttPingTracker`가 local memory의 pending ping 전송 시각을 timeout 기준으로 consume한다.
+- `GameRttTimeoutScheduler`는 500ms 주기로 timeout된 pending ping을 조회하고 해당 유저의 Redis RTT status를 `FAILED`로 전환한다.
+- WebSocket close/error가 발생하면 session의 gameRoomId/userId 기준으로 Redis RTT status를 `FAILED`로 전환한다. RTT 상태가 없거나 이미 완료된 경우 no-op 처리한다.
+- `RTT_PONG` 처리 중 예외가 발생하면 해당 유저 Redis RTT status를 `FAILED`로 전환하고 로그를 남긴다.
+- Redis RTT HASH에는 reason field를 두지 않는다. `RTT_FAILED`, `RTT_TOO_HIGH`는 이후 실패 이벤트/로그 구분용 정책 값이다.
+- 이번 단계는 RTT status를 `FAILED`로 확정하는 단계다. gameRoom/participants `ABORTED`, match status 제거, RTT Redis cleanup, `GAME_START_FAILED` 전송은 Step 7~8에서 연결한다.
 
 ### 7. GAME_START 이전 abort 처리
 
@@ -210,8 +219,8 @@ local memory / 동시성 기준:
 - [x] RTT samples 5개 수집 후 median 계산을 검증한다.
 - [x] median RTT 2000ms 이하이면 `PASSED`로 저장되는지 검증한다.
 - [x] median RTT 2000ms 초과이면 `FAILED`로 저장되는지 검증한다.
-- [ ] `RTT_PONG` timeout 시 `RTT_FAILED` 처리되는지 검증한다.
-- [ ] WebSocket close/error가 RTT 측정 중이면 `RTT_FAILED` 처리되는지 검증한다.
+- [x] `RTT_PONG` timeout 시 `RTT_FAILED` 처리되는지 검증한다.
+- [x] WebSocket close/error가 RTT 측정 중이면 `RTT_FAILED` 처리되는지 검증한다.
 - [ ] RTT 실패 시 gameRoom/participants `ABORTED`, record/LP 미반영을 검증한다.
 - [ ] 양쪽 `PASSED` 시 Step 6과 SMITE 판정에서 조회 가능한 Redis 상태가 남는지 검증한다.
 - [ ] RTT 실패/초과 시 Redis RTT 상태가 cleanup되는지 검증한다.

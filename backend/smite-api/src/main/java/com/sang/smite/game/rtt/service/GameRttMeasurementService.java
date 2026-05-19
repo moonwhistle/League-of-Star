@@ -1,6 +1,8 @@
 package com.sang.smite.game.rtt.service;
 
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.game.rtt.common.constant.GameRttConstants;
+import com.sang.smite.game.rtt.domain.GameRttPendingPing;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,36 @@ public class GameRttMeasurementService {
 
     public GameRttPongResult recordPong(Long gameRoomId, Long userId, int seq) {
         return recordPong(gameRoomId, userId, seq, System.nanoTime());
+    }
+
+    public boolean failMeasurement(Long gameRoomId, Long userId) {
+        return gameRttMeasurementStore.markFailed(gameRoomId, userId);
+    }
+
+    public int failTimedOutPings() {
+        long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(GameRttConstants.RTT_PING_TIMEOUT_MILLIS);
+        return failTimedOutPings(System.nanoTime(), timeoutNanos);
+    }
+
+    int failTimedOutPings(long nowNanos, long timeoutNanos) {
+        List<GameRttPendingPing> timedOutPings = gameRttPingTracker.consumeTimedOutSentAts(nowNanos, timeoutNanos);
+        int failedCount = 0;
+        for (GameRttPendingPing timedOutPing : timedOutPings) {
+            try {
+                if (failMeasurement(timedOutPing.gameRoomId(), timedOutPing.userId())) {
+                    failedCount++;
+                }
+            } catch (RuntimeException e) {
+                gameRttPingTracker.recordSentAt(
+                        timedOutPing.gameRoomId(),
+                        timedOutPing.userId(),
+                        timedOutPing.seq(),
+                        timedOutPing.sentAtNanos()
+                );
+                throw e;
+            }
+        }
+        return failedCount;
     }
 
     GameRttPongResult recordPong(Long gameRoomId, Long userId, int seq, long receivedAtNanos) {

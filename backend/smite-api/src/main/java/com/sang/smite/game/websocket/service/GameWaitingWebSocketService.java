@@ -50,20 +50,25 @@ public class GameWaitingWebSocketService {
         }
     }
 
-    public void handleRttPong(GameRoomWebSocketSession currentSession, GameWebSocketClientMessage clientMessage)
-            throws IOException {
+    public void handleRttPong(GameRoomWebSocketSession currentSession, GameWebSocketClientMessage clientMessage) {
         OptionalInt seq = clientMessage.rttSeq();
         if (seq.isEmpty()) {
             return;
         }
 
-        GameRttPongResult pongResult = gameRttMeasurementService.recordPong(
-                currentSession.getGameRoomId(),
-                currentSession.getUserId(),
-                seq.getAsInt()
-        );
-        if (pongResult.needsNextPing()) {
-            sendRttPing(currentSession, pongResult.nextSeq());
+        try {
+            GameRttPongResult pongResult = gameRttMeasurementService.recordPong(
+                    currentSession.getGameRoomId(),
+                    currentSession.getUserId(),
+                    seq.getAsInt()
+            );
+            if (pongResult.needsNextPing()) {
+                sendRttPing(currentSession, pongResult.nextSeq());
+            }
+        } catch (Exception e) {
+            gameRttMeasurementService.failMeasurement(currentSession.getGameRoomId(), currentSession.getUserId());
+            log.warn("Failed to process RTT_PONG. gameRoomId={}, userId={}",
+                    currentSession.getGameRoomId(), currentSession.getUserId(), e);
         }
     }
 
@@ -73,6 +78,7 @@ public class GameWaitingWebSocketService {
     }
 
     private void cleanupSession(GameRoomWebSocketSession currentSession) {
+        gameRttMeasurementService.failMeasurement(currentSession.getGameRoomId(), currentSession.getUserId());
         sessionRegistry.unregister(currentSession.getSessionId());
         try {
             messageSender.broadcast(

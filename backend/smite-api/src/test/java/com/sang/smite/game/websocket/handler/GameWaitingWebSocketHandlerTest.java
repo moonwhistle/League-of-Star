@@ -290,6 +290,7 @@ class GameWaitingWebSocketHandlerTest {
         JsonNode message = lastSentMessage(secondSession);
         assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.PLAYER_LEFT.name());
         assertThat(message.get("payload").get("userId").asLong()).isEqualTo(FIRST_USER_ID);
+        verify(gameRttMeasurementService).failMeasurement(GAME_ROOM_ID, FIRST_USER_ID);
     }
 
     private WebSocketSession session(String sessionId, Long userId) {

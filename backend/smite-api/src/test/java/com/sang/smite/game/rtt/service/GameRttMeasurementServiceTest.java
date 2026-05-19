@@ -1,5 +1,6 @@
 package com.sang.smite.game.rtt.service;
 
+import com.sang.smite.game.rtt.domain.GameRttPendingPing;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +15,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -93,5 +95,56 @@ class GameRttMeasurementServiceTest {
         // then
         assertThat(result.accepted()).isFalse();
         verify(gameRttMeasurementStore, never()).appendSample(eq(GAME_ROOM_ID), eq(1L), anyLong());
+    }
+
+    @Test
+    @DisplayName("failMeasurement - 해당 유저의 RTT 상태를 FAILED로 전환한다")
+    void failMeasurement() {
+        // given
+        when(gameRttMeasurementStore.markFailed(GAME_ROOM_ID, 1L)).thenReturn(true);
+
+        // when
+        boolean failed = service.failMeasurement(GAME_ROOM_ID, 1L);
+
+        // then
+        assertThat(failed).isTrue();
+        verify(gameRttMeasurementStore).markFailed(GAME_ROOM_ID, 1L);
+    }
+
+    @Test
+    @DisplayName("failTimedOutPings - timeout된 ping의 유저 RTT 상태를 FAILED로 전환한다")
+    void failTimedOutPings() {
+        // given
+        when(gameRttPingTracker.consumeTimedOutSentAts(100L, 50L))
+                .thenReturn(List.of(new GameRttPendingPing(
+                        GAME_ROOM_ID,
+                        1L,
+                        1,
+                        10L
+                )));
+        when(gameRttMeasurementStore.markFailed(GAME_ROOM_ID, 1L)).thenReturn(true);
+
+        // when
+        int failedCount = service.failTimedOutPings(100L, 50L);
+
+        // then
+        assertThat(failedCount).isEqualTo(1);
+        verify(gameRttMeasurementStore).markFailed(GAME_ROOM_ID, 1L);
+    }
+
+    @Test
+    @DisplayName("failTimedOutPings - Redis 실패 전환 중 예외가 나면 sentAt을 복구한다")
+    void failTimedOutPings_MarkFailedException_RestoreSentAt() {
+        // given
+        GameRttPendingPing pendingPing = new GameRttPendingPing(GAME_ROOM_ID, 1L, 1, 10L);
+        when(gameRttPingTracker.consumeTimedOutSentAts(100L, 50L)).thenReturn(List.of(pendingPing));
+        doThrow(new RuntimeException("redis failed")).when(gameRttMeasurementStore).markFailed(GAME_ROOM_ID, 1L);
+
+        // when
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.failTimedOutPings(100L, 50L))
+                .isInstanceOf(RuntimeException.class);
+
+        // then
+        verify(gameRttPingTracker).recordSentAt(GAME_ROOM_ID, 1L, 1, 10L);
     }
 }

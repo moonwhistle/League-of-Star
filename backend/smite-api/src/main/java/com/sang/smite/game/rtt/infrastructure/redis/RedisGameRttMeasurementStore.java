@@ -75,6 +75,23 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
         return GameRttPongResult.completed(passed, samples.size());
     }
 
+    @Override
+    public boolean markFailed(Long gameRoomId, Long userId) {
+        String rttKey = rttKey(gameRoomId);
+        Map<Object, Object> rttState = stringRedisTemplate.opsForHash().entries(rttKey);
+        if (rttState.isEmpty()) {
+            return false;
+        }
+
+        UserRttFields fields = resolveUserFields(rttState, userId);
+        if (fields == null || status(rttState, fields.statusField()) != GameRttStatus.PENDING) {
+            return false;
+        }
+
+        stringRedisTemplate.opsForHash().put(rttKey, fields.statusField(), GameRttStatus.FAILED.name());
+        return true;
+    }
+
     private String rttKey(Long gameRoomId) {
         return GameRttConstants.RTT_KEY_PREFIX + gameRoomId;
     }
@@ -99,7 +116,11 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
     }
 
     private GameRttStatus status(Map<Object, Object> rttState, String statusField) {
-        return GameRttStatus.valueOf((String) rttState.get(statusField));
+        Object statusValue = rttState.get(statusField);
+        if (!(statusValue instanceof String value)) {
+            return null;
+        }
+        return GameRttStatus.valueOf(value);
     }
 
     private List<Long> samples(Map<Object, Object> rttState, String samplesField) {

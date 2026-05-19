@@ -156,6 +156,36 @@ class RedisGameRttMeasurementStoreTest {
         verify(hashOperations, never()).put(eq(RTT_KEY), eq(GameRttConstants.USER_A_SAMPLES_FIELD), eq("30"));
     }
 
+    @Test
+    @DisplayName("markFailed - PENDING 유저의 RTT 상태를 FAILED로 전환한다")
+    void markFailed() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(rttState("", GameRttStatus.PENDING));
+
+        // when
+        boolean failed = store.markFailed(GAME_ROOM_ID, USER_A_ID);
+
+        // then
+        assertThat(failed).isTrue();
+        verify(hashOperations).put(RTT_KEY, GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.FAILED.name());
+    }
+
+    @Test
+    @DisplayName("markFailed - 이미 완료된 유저는 no-op 처리한다")
+    void markFailed_NotPending() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(rttState("", GameRttStatus.PASSED));
+
+        // when
+        boolean failed = store.markFailed(GAME_ROOM_ID, USER_A_ID);
+
+        // then
+        assertThat(failed).isFalse();
+        verify(hashOperations, never()).put(RTT_KEY, GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.FAILED.name());
+    }
+
     private Map<Object, Object> rttState(String userASamples, GameRttStatus userAStatus) {
         Map<Object, Object> state = new HashMap<>();
         state.put(GameRttConstants.USER_A_ID_FIELD, String.valueOf(USER_A_ID));
