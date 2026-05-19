@@ -558,3 +558,4 @@ game:rtt:{gameRoomId}
 | 2026-05-18 | GAME_START 이전 timeout은 ABORTED 및 record/LP 미반영, GAME_START 이후 disconnect는 서버 timer/scheduler 기준 FINISHED로 종료하도록 game_rooms 생명주기 수정 |
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
 | 2026-05-19 | game waiting timeout Redis ZSET/HASH/lock/PubSub 구조와 participants `ABORTED` 정리 정책 반영 |
+| 2026-05-19 | RTT 측정 Redis `game:rtt:{gameRoomId}` HASH 구조, 300초 TTL, 성공 median 유지 및 실패 cleanup 정책 반영 |

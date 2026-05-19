@@ -38,7 +38,7 @@ flowchart TD
 
 각 유저별 RTT를 5회 측정하고 median RTT를 저장한다. median RTT가 2000ms를 초과하거나 RTT 응답 누락, WebSocket close/error, 측정 중 예외가 발생하면 게임 시작을 차단한다.
 
-RTT 측정은 무한 대기하지 않는다. 각 `RTT_PING`은 2500ms 안에 `RTT_PONG`을 받아야 하며, gameRoom 전체 RTT 측정은 최대 15초 안에 끝나야 한다. WebSocket close/error는 별도 `PEER_LEFT` 상태를 만들지 않고 `RTT_FAILED`로 단순 처리한다.
+RTT 측정은 무한 대기하지 않는다. 각 `RTT_PING`은 2500ms 안에 `RTT_PONG`을 받아야 하며, 5회 측정 구조상 gameRoom 전체 RTT 측정은 최대 15초 안에 끝나야 한다. WebSocket close/error는 별도 `PEER_LEFT` 상태를 만들지 않고 `RTT_FAILED`로 단순 처리한다.
 
 RTT 실패는 아직 `GAME_START` 이전 실패이므로 gameRoom을 `ABORTED`로 정리하고, `game_records`, LP, 배치/승급전에는 반영하지 않는다. 연결된 WebSocket session에는 `GAME_START_FAILED`를 전송한 뒤 close하고, 클라이언트는 start 버튼 화면으로 복귀한다.
 
@@ -54,7 +54,7 @@ RTT가 성공한 경우 Redis RTT 상태는 즉시 삭제하지 않는다. 저�
 - [x] RTT 판정값은 평균이 아니라 median으로 정의한다.
 - [x] median RTT 허용 기준을 2000ms 이하로 정의한다.
 - [x] 각 `RTT_PING` 응답 제한 시간은 2500ms로 정의한다.
-- [x] gameRoom 전체 RTT 측정 제한 시간은 15초로 정의한다.
+- [x] gameRoom 전체 RTT 측정 제한 시간은 5회 측정과 per-ping 2500ms timeout 기준 최대 15초로 정의한다.
 - [x] `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 단순 처리한다.
 - [x] median RTT 2000ms 초과는 `RTT_TOO_HIGH`로 처리한다.
 - [x] RTT 실패/초과는 `GAME_START` 이전 실패로 보고 gameRoom `ABORTED` 처리한다고 명시한다.
@@ -134,7 +134,7 @@ TTL/cleanup 정책:
 - [x] 각 유저에게 첫 `RTT_PING seq=1`을 전송한다.
 - [x] ping 전송 시각은 Redis가 아니라 local session memory에 보관한다.
 - [x] sticky session 전제에서 같은 gameRoom의 RTT 측정이 같은 API 인스턴스에서 진행되도록 한다.
-- [ ] `RTT_PONG` 수신 후 다음 `RTT_PING`을 이어 보내는 5회 반복은 Step 5에서 처리한다.
+- [x] `RTT_PONG` 수신 후 다음 `RTT_PING`을 이어 보내는 5회 반복은 Step 5에서 처리한다.
 
 구현 결과:
 
@@ -142,7 +142,7 @@ TTL/cleanup 정책:
 - `RedisGameRttMeasurementStore`가 `game:rtt:{gameRoomId}` HASH를 없을 때만 생성하고 TTL 300초를 설정한다.
 - `GameRttPingTracker`가 `gameRoomId/userId/seq` 기준 ping 전송 시각을 API 인스턴스 local memory에 기록한다.
 - `GameWaitingWebSocketHandler`는 `CLIENT_READY` 처리 후 Redis waiting 기준 `bothReady=true`이고 local registry 기준 두 세션이 모두 READY일 때 첫 `RTT_PING seq=1`을 양쪽에 전송한다.
-- `RTT_PONG`은 메시지 타입으로 허용하되, 실제 RTT sample 계산과 다음 ping 전송은 Step 5에서 연결한다.
+- `RTT_PONG`은 session attributes 기준으로 처리하고, 완료 전이면 다음 `RTT_PING`을 이어 보낸다.
 
 local memory / 동시성 기준:
 
@@ -274,7 +274,7 @@ local memory / 동시성 기준:
 - 양쪽 `CLIENT_READY` 완료 이후 RTT 측정이 시작된다.
 - 각 유저별 RTT 5회 측정값으로 median RTT를 계산한다.
 - 각 `RTT_PING`은 2500ms 안에 `RTT_PONG` 응답을 받아야 한다.
-- gameRoom 전체 RTT 측정은 15초 안에 완료되거나 실패 처리된다.
+- gameRoom 전체 RTT 측정은 5회 측정과 per-ping 2500ms timeout 기준 최대 15초 안에 완료되거나 실패 처리된다.
 - 양쪽 median RTT가 2000ms 이하이면 Redis RTT 상태가 `PASSED`로 저장된다.
 - RTT 응답 누락, close/error, 측정 중 예외는 `RTT_FAILED`로 처리된다.
 - median RTT 2000ms 초과는 `RTT_TOO_HIGH`로 처리된다.

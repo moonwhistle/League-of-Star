@@ -190,7 +190,7 @@ flowchart LR
 - gameRoom `createdAt`부터 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료해야 RTT 측정 단계로 넘어갑니다.
 - RTT 측정은 양쪽 `CLIENT_READY` 이후 `GAME_START` 이전에 수행합니다.
 - 각 유저별 RTT는 5회 측정하고 median 값을 사용합니다.
-- 각 `RTT_PING`은 2500ms 안에 응답해야 하며, gameRoom 전체 RTT 측정은 15초 안에 완료되어야 합니다.
+- 각 `RTT_PING`은 2500ms 안에 응답해야 하며, 5회 측정 구조상 gameRoom 전체 RTT 측정은 최대 15초 안에 완료되어야 합니다.
 - median RTT 2000ms 초과는 `RTT_TOO_HIGH`, 응답 누락/close/error/측정 중 예외는 `RTT_FAILED`로 처리합니다.
 - RTT 실패/초과는 `GAME_START` 이전 실패이므로 gameRoom/participants를 `ABORTED`로 정리하고 record/LP를 반영하지 않습니다.
 - 멀티 인스턴스에서는 같은 `gameRoomId`가 같은 API 인스턴스로 라우팅되어야 WebSocket registry가 정상 동작합니다.

@@ -163,7 +163,7 @@
 | **사용 값** | 중간값 (Median) — 극단값 제거 |
 | **RTT 상한** | median RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도) |
 | **개별 응답 제한** | 각 `RTT_PING`은 2500ms 안에 `RTT_PONG`을 받아야 함 |
-| **전체 측정 제한** | gameRoom RTT 측정은 최대 15초 안에 완료되어야 함 |
+| **전체 측정 제한** | 5회 측정과 per-ping 2500ms timeout 기준 gameRoom RTT 측정은 최대 15초 안에 완료되어야 함 |
 | **실패 기준** | `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED` |
 | **초과 기준** | 5회 측정은 완료했지만 median RTT가 2000ms를 초과하면 `RTT_TOO_HIGH` |
 | **성공 상태 보존** | median RTT는 이후 SMITE 보정에 필요하므로 게임 판정 완료 전까지 Redis에 유지 |

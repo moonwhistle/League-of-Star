@@ -432,7 +432,7 @@ RTT 정책:
 | 판정값 | median RTT |
 | 정상 기준 | median RTT 2000ms 이하 |
 | 개별 응답 제한 | `RTT_PING`마다 2500ms 안에 `RTT_PONG` 응답 |
-| 전체 제한 | gameRoom RTT 측정은 15초 안에 완료 |
+| 전체 제한 | 5회 측정과 per-ping 2500ms timeout 기준 gameRoom RTT 측정은 최대 15초 안에 완료 |
 | 실패 처리 | 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED` |
 | 초과 처리 | median RTT 2000ms 초과는 `RTT_TOO_HIGH` |
 

@@ -144,14 +144,14 @@ flowchart TD
 
 ### Step 5. RTT 측정
 
-- [ ] WebSocket ping-pong으로 각 유저별 RTT 5회 측정
-- [ ] median RTT 저장
-- [ ] median RTT 2000ms 초과 시 게임 시작 차단
-- [ ] 각 `RTT_PING`은 2500ms 안에 `RTT_PONG` 응답을 받아야 함
-- [ ] gameRoom 전체 RTT 측정은 15초 안에 완료되어야 함
-- [ ] `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 게임 시작 차단
-- [ ] 양쪽 RTT 정상 여부를 Step 6에서 조회할 수 있게 저장
-- [ ] RTT 실패/초과 시 gameRoom `ABORTED`, record/LP 미반영, `GAME_START_FAILED` 전송 정책 정의
+- [x] WebSocket ping-pong으로 각 유저별 RTT 5회 측정
+- [x] median RTT 저장
+- [x] median RTT 2000ms 초과 시 게임 시작 차단
+- [x] 각 `RTT_PING`은 2500ms 안에 `RTT_PONG` 응답을 받아야 함
+- [x] gameRoom 전체 RTT 측정은 5회 측정과 per-ping 2500ms timeout 기준 최대 15초 안에 완료되어야 함
+- [x] `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 게임 시작 차단
+- [x] 양쪽 RTT 정상 여부를 Step 6에서 조회할 수 있게 저장
+- [x] RTT 실패/초과 시 gameRoom `ABORTED`, record/LP 미반영, `GAME_START_FAILED` 전송 정책 정의
 
 ### Step 6. GAME_START와 HP 시나리오 전달
 
@@ -557,7 +557,7 @@ gameRoom 생성 실패 mapping:
 - median RTT 저장
 - median RTT 2000ms 초과 시 시작 차단
 - 각 `RTT_PING` 응답 제한 2500ms
-- gameRoom 전체 RTT 측정 제한 15초
+- gameRoom 전체 RTT 측정 제한은 5회 측정과 per-ping 2500ms timeout 기준 최대 15초
 - `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외 시 시작 차단
 - 양쪽 RTT 정상 여부 저장
 - RTT 실패/초과 시 gameRoom `ABORTED`, record/LP 미반영, `GAME_START_FAILED` 정책 정의
