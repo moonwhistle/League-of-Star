@@ -186,18 +186,30 @@ local memory / 동시성 기준:
 - WebSocket close/error가 발생하면 session의 gameRoomId/userId 기준으로 Redis RTT status를 `FAILED`로 전환한다. RTT 상태가 없거나 이미 완료된 경우 no-op 처리한다.
 - `RTT_PONG` 처리 중 예외가 발생하면 해당 유저 Redis RTT status를 `FAILED`로 전환하고 로그를 남긴다.
 - Redis RTT HASH에는 reason field를 두지 않는다. `RTT_FAILED`, `RTT_TOO_HIGH`는 이후 실패 이벤트/로그 구분용 정책 값이다.
-- 이번 단계는 RTT status를 `FAILED`로 확정하는 단계다. gameRoom/participants `ABORTED`, match status 제거, RTT Redis cleanup, `GAME_START_FAILED` 전송은 Step 7~8에서 연결한다.
+- RTT status가 `FAILED`로 확정되면 Step 7의 GAME_START 이전 abort 정산으로 이어진다. `GAME_START_FAILED` 전송은 Step 8에서 연결한다.
 
 ### 7. GAME_START 이전 abort 처리
 
-- [ ] RTT 실패/초과 시 gameRoom 상태를 `ABORTED`로 전환한다.
-- [ ] RTT 실패/초과 시 game_participants 상태를 `ABORTED`로 전환한다.
-- [ ] RTT 실패/초과 시 `game_records`를 생성하지 않는다.
-- [ ] RTT 실패/초과 시 LP/배치/승급전 결과를 반영하지 않는다.
-- [ ] RTT 실패/초과 시 Redis `match:status:{userId}`를 제거한다.
-- [ ] RTT 실패/초과 시 Redis RTT 상태를 cleanup한다.
+- [x] RTT 실패/초과 시 gameRoom 상태를 `ABORTED`로 전환한다.
+- [x] RTT 실패/초과 시 game_participants 상태를 `ABORTED`로 전환한다.
+- [x] RTT 실패/초과 시 `game_records`를 생성하지 않는다.
+- [x] RTT 실패/초과 시 LP/배치/승급전 결과를 반영하지 않는다.
+- [x] RTT 실패/초과 시 Redis `match:status:{userId}`를 제거한다.
+- [x] RTT 실패/초과 시 Redis RTT 상태를 cleanup한다.
 - [ ] RTT 성공 시 Redis RTT 상태는 game 판정 완료 전까지 유지한다.
 - [ ] 게임 종료 후 Redis RTT 상태를 cleanup한다.
+
+구현 결과:
+
+- `GameRttFailureProcessor`가 Redis RTT 상태에 `FAILED` 유저가 있는 gameRoom만 실패 정산한다.
+- gameRoom이 `READY`이면 `abortReadyRoomIfReady`로 safe abort를 수행한다. 이때 core domain의 `abortBeforeStartIfReady`가 gameRoom을 `ABORTED`로 바꾸고 participants도 `ABORTED`로 전환한다.
+- gameRoom이 이미 `ABORTED`이면 abort는 다시 하지 않고 match status 제거와 RTT cleanup만 재시도한다.
+- gameRoom이 이미 `IN_PROGRESS` 등 READY 이후 상태이면 잘못 abort하지 않고 RTT local memory / Redis 상태만 정리한다.
+- match status 제거는 `removeGameStartFailureStatuses`를 사용한다. 현재 값이 `IN_GAME`인 유저만 제거하므로, 실패 정산 재시도 중 유저가 새 매칭을 시작한 경우 새 `MATCHING` 상태를 지우지 않는다.
+- RTT 실패/초과는 아직 `GAME_START` 이전이므로 game record, LP, 배치/승급전 흐름을 호출하지 않는다.
+- 실패 정산은 gameRoomId 기준 Redis lock으로 감싸 중복 abort/cleanup을 방지한다.
+- 실패 reason은 Redis RTT HASH에 저장하지 않고, timeout/close/error/예외는 `RTT_FAILED`, median 초과는 `RTT_TOO_HIGH`로 실패 정산 processor에 전달한다. 이 값은 Step 8의 `GAME_START_FAILED` 이벤트 전송에 사용한다.
+- `GAME_START_FAILED` WebSocket 이벤트 전송과 session close는 Step 8에서 연결한다.
 
 ### 8. 실패 이벤트 전송
 
@@ -221,9 +233,9 @@ local memory / 동시성 기준:
 - [x] median RTT 2000ms 초과이면 `FAILED`로 저장되는지 검증한다.
 - [x] `RTT_PONG` timeout 시 `RTT_FAILED` 처리되는지 검증한다.
 - [x] WebSocket close/error가 RTT 측정 중이면 `RTT_FAILED` 처리되는지 검증한다.
-- [ ] RTT 실패 시 gameRoom/participants `ABORTED`, record/LP 미반영을 검증한다.
+- [x] RTT 실패 시 gameRoom/participants `ABORTED`, record/LP 미반영을 검증한다.
 - [ ] 양쪽 `PASSED` 시 Step 6과 SMITE 판정에서 조회 가능한 Redis 상태가 남는지 검증한다.
-- [ ] RTT 실패/초과 시 Redis RTT 상태가 cleanup되는지 검증한다.
+- [x] RTT 실패/초과 시 Redis RTT 상태가 cleanup되는지 검증한다.
 
 ### 11. 문서
 

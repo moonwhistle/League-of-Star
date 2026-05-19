@@ -2,6 +2,7 @@ package com.sang.smite.game.rtt.infrastructure.redis;
 
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
+import com.sang.smite.game.rtt.domain.GameRttState;
 import com.sang.smite.game.rtt.domain.GameRttStatus;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Repository
@@ -92,6 +94,27 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
         return true;
     }
 
+    @Override
+    public Optional<GameRttState> findState(Long gameRoomId) {
+        Map<Object, Object> rttState = stringRedisTemplate.opsForHash().entries(rttKey(gameRoomId));
+        if (rttState.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new GameRttState(
+                gameRoomId,
+                getLong(rttState, GameRttConstants.USER_A_ID_FIELD),
+                getLong(rttState, GameRttConstants.USER_B_ID_FIELD),
+                status(rttState, GameRttConstants.USER_A_STATUS_FIELD),
+                status(rttState, GameRttConstants.USER_B_STATUS_FIELD)
+        ));
+    }
+
+    @Override
+    public void cleanup(Long gameRoomId) {
+        stringRedisTemplate.delete(rttKey(gameRoomId));
+    }
+
     private String rttKey(Long gameRoomId) {
         return GameRttConstants.RTT_KEY_PREFIX + gameRoomId;
     }
@@ -134,6 +157,10 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
             samples.add(Long.valueOf(sample));
         }
         return samples;
+    }
+
+    private Long getLong(Map<Object, Object> rttState, String fieldName) {
+        return Long.valueOf((String) rttState.get(fieldName));
     }
 
     private String samplesValue(List<Long> samples) {

@@ -1,6 +1,7 @@
 package com.sang.smite.game.rtt.service;
 
 import com.sang.smite.game.rtt.domain.GameRttPendingPing;
+import com.sang.smite.game.rtt.domain.GameRttFailureReason;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
 import org.junit.jupiter.api.DisplayName;
@@ -25,9 +26,11 @@ class GameRttMeasurementServiceTest {
 
     private final GameRttMeasurementStore gameRttMeasurementStore = mock(GameRttMeasurementStore.class);
     private final GameRttPingTracker gameRttPingTracker = mock(GameRttPingTracker.class);
+    private final GameRttFailureProcessor gameRttFailureProcessor = mock(GameRttFailureProcessor.class);
     private final GameRttMeasurementService service = new GameRttMeasurementService(
             gameRttMeasurementStore,
-            gameRttPingTracker
+            gameRttPingTracker,
+            gameRttFailureProcessor
     );
 
     @Test
@@ -84,6 +87,25 @@ class GameRttMeasurementServiceTest {
     }
 
     @Test
+    @DisplayName("recordPong - median 초과로 FAILED가 완료되면 실패 정산 processor를 호출한다")
+    void recordPong_CompletedFailed_ProcessFailure() {
+        // given
+        long sentAtNanos = 10L;
+        long receivedAtNanos = sentAtNanos + TimeUnit.MILLISECONDS.toNanos(2_100);
+        when(gameRttPingTracker.consumeSentAt(GAME_ROOM_ID, 1L, 5)).thenReturn(OptionalLong.of(sentAtNanos));
+        when(gameRttMeasurementStore.appendSample(GAME_ROOM_ID, 1L, 2_100L))
+                .thenReturn(GameRttPongResult.completed(false, 5));
+
+        // when
+        GameRttPongResult result = service.recordPong(GAME_ROOM_ID, 1L, 5, receivedAtNanos);
+
+        // then
+        assertThat(result.completed()).isTrue();
+        assertThat(result.passed()).isFalse();
+        verify(gameRttFailureProcessor).processFailureWithLock(GAME_ROOM_ID, GameRttFailureReason.RTT_TOO_HIGH);
+    }
+
+    @Test
     @DisplayName("recordPong - sentAt이 없으면 Redis sample을 저장하지 않는다")
     void recordPong_SentAtNotFound() {
         // given
@@ -109,6 +131,21 @@ class GameRttMeasurementServiceTest {
         // then
         assertThat(failed).isTrue();
         verify(gameRttMeasurementStore).markFailed(GAME_ROOM_ID, 1L);
+        verify(gameRttFailureProcessor).processFailureWithLock(GAME_ROOM_ID, GameRttFailureReason.RTT_FAILED);
+    }
+
+    @Test
+    @DisplayName("failMeasurement - 이미 FAILED여도 실패 정산 processor를 호출한다")
+    void failMeasurement_AlreadyFailed_ProcessFailure() {
+        // given
+        when(gameRttMeasurementStore.markFailed(GAME_ROOM_ID, 1L)).thenReturn(false);
+
+        // when
+        boolean failed = service.failMeasurement(GAME_ROOM_ID, 1L);
+
+        // then
+        assertThat(failed).isFalse();
+        verify(gameRttFailureProcessor).processFailureWithLock(GAME_ROOM_ID, GameRttFailureReason.RTT_FAILED);
     }
 
     @Test

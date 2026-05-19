@@ -2,6 +2,7 @@ package com.sang.smite.game.rtt.service;
 
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
+import com.sang.smite.game.rtt.domain.GameRttFailureReason;
 import com.sang.smite.game.rtt.domain.GameRttPendingPing;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
@@ -20,6 +21,7 @@ public class GameRttMeasurementService {
 
     private final GameRttMeasurementStore gameRttMeasurementStore;
     private final GameRttPingTracker gameRttPingTracker;
+    private final GameRttFailureProcessor gameRttFailureProcessor;
 
     public boolean startMeasurement(Long gameRoomId, List<Long> userIds) {
         List<Long> sortedUserIds = userIds.stream()
@@ -47,7 +49,9 @@ public class GameRttMeasurementService {
     }
 
     public boolean failMeasurement(Long gameRoomId, Long userId) {
-        return gameRttMeasurementStore.markFailed(gameRoomId, userId);
+        boolean failed = gameRttMeasurementStore.markFailed(gameRoomId, userId);
+        gameRttFailureProcessor.processFailureWithLock(gameRoomId, GameRttFailureReason.RTT_FAILED);
+        return failed;
     }
 
     public int failTimedOutPings() {
@@ -84,6 +88,10 @@ public class GameRttMeasurementService {
 
         long elapsedNanos = Math.max(0, receivedAtNanos - sentAtNanos.getAsLong());
         long rttMillis = TimeUnit.NANOSECONDS.toMillis(elapsedNanos);
-        return gameRttMeasurementStore.appendSample(gameRoomId, userId, rttMillis);
+        GameRttPongResult pongResult = gameRttMeasurementStore.appendSample(gameRoomId, userId, rttMillis);
+        if (pongResult.completed() && !pongResult.passed()) {
+            gameRttFailureProcessor.processFailureWithLock(gameRoomId, GameRttFailureReason.RTT_TOO_HIGH);
+        }
+        return pongResult;
     }
 }

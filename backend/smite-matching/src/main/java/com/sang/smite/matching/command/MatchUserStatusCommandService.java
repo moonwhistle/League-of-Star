@@ -18,6 +18,13 @@ public class MatchUserStatusCommandService {
      * GAME_START 이전 game waiting timeout으로 정리된 유저들의 match status를 제거합니다.
      */
     public void removeGameWaitingTimeoutStatuses(Long userAId, Long userBId) {
+        removeGameStartFailureStatuses(userAId, userBId);
+    }
+
+    /**
+     * GAME_START 이전 실패로 정리된 유저들의 match status를 제거합니다.
+     */
+    public void removeGameStartFailureStatuses(Long userAId, Long userBId) {
         removeIfInGame(userAId);
         removeIfInGame(userBId);
     }

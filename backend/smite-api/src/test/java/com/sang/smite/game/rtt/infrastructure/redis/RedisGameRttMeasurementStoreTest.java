@@ -186,6 +186,35 @@ class RedisGameRttMeasurementStoreTest {
         verify(hashOperations, never()).put(RTT_KEY, GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.FAILED.name());
     }
 
+    @Test
+    @DisplayName("findState - Redis HASH를 RTT state로 변환한다")
+    void findState() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(rttState("", GameRttStatus.FAILED));
+
+        // when
+        var state = store.findState(GAME_ROOM_ID);
+
+        // then
+        assertThat(state).isPresent();
+        assertThat(state.get().gameRoomId()).isEqualTo(GAME_ROOM_ID);
+        assertThat(state.get().userAId()).isEqualTo(USER_A_ID);
+        assertThat(state.get().userBId()).isEqualTo(USER_B_ID);
+        assertThat(state.get().userAStatus()).isEqualTo(GameRttStatus.FAILED);
+        assertThat(state.get().userBStatus()).isEqualTo(GameRttStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("cleanup - RTT HASH를 삭제한다")
+    void cleanup() {
+        // when
+        store.cleanup(GAME_ROOM_ID);
+
+        // then
+        verify(stringRedisTemplate).delete(RTT_KEY);
+    }
+
     private Map<Object, Object> rttState(String userASamples, GameRttStatus userAStatus) {
         Map<Object, Object> state = new HashMap<>();
         state.put(GameRttConstants.USER_A_ID_FIELD, String.valueOf(USER_A_ID));
