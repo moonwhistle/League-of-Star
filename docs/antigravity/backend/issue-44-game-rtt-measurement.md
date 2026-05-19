@@ -113,11 +113,19 @@ TTL/cleanup 정책:
 
 ### 3. RTT WebSocket 메시지 정의
 
-- [ ] 서버 메시지 `RTT_PING`을 정의한다.
-- [ ] 클라이언트 메시지 `RTT_PONG`을 정의한다.
-- [ ] `RTT_PING` / `RTT_PONG` payload에 `seq`를 포함한다.
-- [ ] 클라이언트 payload의 userId/gameRoomId는 신뢰하지 않고 WebSocket session attributes 기준으로 처리한다.
-- [ ] 기존 `CLIENT_READY`, `PLAYER_READY`, `GAME_WAITING_TIMEOUT` 흐름과 충돌하지 않게 message type을 분리한다.
+- [x] 서버 메시지 `RTT_PING`을 정의한다.
+- [x] 클라이언트 메시지 `RTT_PONG`을 정의한다.
+- [x] `RTT_PING` / `RTT_PONG` payload에 `seq`를 포함한다.
+- [x] 클라이언트 payload의 userId/gameRoomId는 신뢰하지 않고 WebSocket session attributes 기준으로 처리한다.
+- [x] 기존 `CLIENT_READY`, `PLAYER_READY`, `GAME_WAITING_TIMEOUT` 흐름과 충돌하지 않게 message type을 분리한다.
+
+구현 결과:
+
+- `GameWebSocketMessageType`에 client message `RTT_PONG`과 server message `RTT_PING`을 추가했다.
+- `GameWebSocketServerMessage.rttPing(seq)` factory와 `RttPingPayload(seq)`를 추가했다.
+- `GameWebSocketClientMessage`에 `isRttPong()`, `rttSeq()` helper를 추가했다.
+- `RTT_PONG` payload에 `userId`, `gameRoomId`가 포함되어도 서버는 이를 신뢰하지 않고, 실제 처리 단계에서는 WebSocket session attributes의 gameRoomId/userId를 기준으로 삼는다.
+- 이번 단계는 메시지 정의만 담당한다. `RTT_PING` 전송 시작과 `RTT_PONG` 처리 흐름은 Step 4~5에서 연결한다.
 
 ### 4. RTT 측정 시작 흐름 구현
 

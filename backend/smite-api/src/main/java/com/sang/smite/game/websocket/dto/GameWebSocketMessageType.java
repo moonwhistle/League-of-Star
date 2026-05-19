@@ -11,9 +11,11 @@ import lombok.RequiredArgsConstructor;
 public enum GameWebSocketMessageType {
 
     CLIENT_READY(Direction.CLIENT),
+    RTT_PONG(Direction.CLIENT),
     PLAYER_JOINED(Direction.SERVER),
     PLAYER_READY(Direction.SERVER),
     PLAYER_LEFT(Direction.SERVER),
+    RTT_PING(Direction.SERVER),
     GAME_WAITING_TIMEOUT(Direction.SERVER),
     ERROR(Direction.SERVER);
 

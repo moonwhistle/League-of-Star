@@ -31,6 +31,13 @@ public record GameWebSocketServerMessage(
         );
     }
 
+    public static GameWebSocketServerMessage rttPing(int seq) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.RTT_PING,
+                new RttPingPayload(seq)
+        );
+    }
+
     public static GameWebSocketServerMessage gameWaitingTimeout(Long gameRoomId, String reason, String action) {
         return new GameWebSocketServerMessage(
                 GameWebSocketMessageType.GAME_WAITING_TIMEOUT,
@@ -56,6 +63,9 @@ public record GameWebSocketServerMessage(
     }
 
     public record GameWaitingTimeoutPayload(Long gameRoomId, String reason, String action) {
+    }
+
+    public record RttPingPayload(int seq) {
     }
 
     public record ErrorPayload(String code, String reason) {

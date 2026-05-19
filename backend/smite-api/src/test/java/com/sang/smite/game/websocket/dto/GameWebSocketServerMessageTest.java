@@ -41,6 +41,16 @@ class GameWebSocketServerMessageTest {
     }
 
     @Test
+    @DisplayName("rttPing - RTT_PING 메시지를 생성한다")
+    void rttPing() throws Exception {
+        GameWebSocketServerMessage result = GameWebSocketServerMessage.rttPing(3);
+
+        JsonNode json = objectMapper.valueToTree(result);
+        assertThat(json.get("type").asText()).isEqualTo(GameWebSocketMessageType.RTT_PING.name());
+        assertThat(json.get("payload").get("seq").asInt()).isEqualTo(3);
+    }
+
+    @Test
     @DisplayName("gameWaitingTimeout - GAME_WAITING_TIMEOUT 메시지를 생성한다")
     void gameWaitingTimeout() throws Exception {
         GameWebSocketServerMessage result = GameWebSocketServerMessage.gameWaitingTimeout(
