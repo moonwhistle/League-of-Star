@@ -119,9 +119,11 @@ HP: ████░██████░░█░░████░░█░░�
 
 ### 3.4 RTT 보정
 
-- 게임 시작 세팅 화면에서 5회 Ping-Pong 측정, **중간값(Median)** 사용
+- 게임 대기 WebSocket에서 각 유저별 5회 Ping-Pong 측정, **중간값(Median)** 사용
 - 서버는 `smite_time = (server_receive_time - game_start_time) - RTT/2` 방식으로 보정
-- RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도)
+- median RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도)
+- 각 `RTT_PING`은 2500ms 안에 응답해야 하며, gameRoom 전체 RTT 측정은 15초 안에 완료되어야 함
+- `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 처리
 
 ---
 

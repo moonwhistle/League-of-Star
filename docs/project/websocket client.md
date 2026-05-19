@@ -4,8 +4,8 @@
 
 범위:
 
-- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, 클라이언트 복구 정책, `ERROR`
-- 제외: RTT 측정, countdown, `GAME_START`, scenario 전달, SMITE 판정
+- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, 클라이언트 복구 정책, `ERROR`
+- 제외: countdown, `GAME_START`, scenario 전달, SMITE 판정
 
 ## 1. 책임 경계
 
@@ -67,6 +67,10 @@ sequenceDiagram
     B->>W: CLIENT_READY
     W-->>A: PLAYER_READY
     W-->>B: PLAYER_READY
+    W-->>A: RTT_PING seq=1..5
+    W-->>B: RTT_PING seq=1..5
+    A->>W: RTT_PONG seq=1..5
+    B->>W: RTT_PONG seq=1..5
 ```
 
 ## 3. match_response_result 처리
@@ -215,7 +219,7 @@ sequenceDiagram
 
 - gameRoom 참가자의 접속 상태를 UI에 반영합니다.
 - 이 메시지는 게임 시작 신호가 아닙니다.
-- `GAME_START`는 후속 RTT/countdown 단계에서 별도 메시지로 처리합니다.
+- `GAME_START`는 RTT 통과 이후 Step 6에서 별도 메시지로 처리합니다.
 
 ## 7. MP4 preload와 CLIENT_READY
 
@@ -270,8 +274,8 @@ sequenceDiagram
 주의:
 
 - `bothReady=true`는 게임 시작 가능 상태일 뿐, `GAME_START` 메시지가 아닙니다.
-- 현재 이슈에서는 양쪽 READY가 되어도 `GAME_START`를 보내지 않습니다.
-- RTT 측정, countdown, `GAME_START`는 후속 이슈에서 연결합니다.
+- 양쪽 READY가 되면 서버는 RTT 측정 단계로 넘어갑니다.
+- countdown, `GAME_START`는 RTT 통과 이후 Step 6에서 연결합니다.
 
 ## 8. 연결 종료와 PLAYER_LEFT
 
@@ -396,7 +400,63 @@ GO_TO_GAME_WAITING 수신
   - 자체 30초 timer 만료 전 GAME_START/다음 단계 이벤트 미수신
 ```
 
-## 10. 잘못된 메시지 처리
+## 10. RTT 측정과 GAME_START_FAILED
+
+양쪽 `CLIENT_READY`가 완료되면 서버는 `GAME_START` 전에 RTT를 측정합니다.
+
+클라이언트는 `RTT_PING`을 받으면 같은 `seq`로 즉시 `RTT_PONG`을 반환해야 합니다.
+
+```json
+{
+  "type": "RTT_PING",
+  "payload": {
+    "seq": 1
+  }
+}
+```
+
+```json
+{
+  "type": "RTT_PONG",
+  "payload": {
+    "seq": 1
+  }
+}
+```
+
+RTT 정책:
+
+| 항목 | 기준 |
+|------|------|
+| 측정 횟수 | 유저별 5회 |
+| 판정값 | median RTT |
+| 정상 기준 | median RTT 2000ms 이하 |
+| 개별 응답 제한 | `RTT_PING`마다 2500ms 안에 `RTT_PONG` 응답 |
+| 전체 제한 | gameRoom RTT 측정은 15초 안에 완료 |
+| 실패 처리 | 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED` |
+| 초과 처리 | median RTT 2000ms 초과는 `RTT_TOO_HIGH` |
+
+RTT 실패/초과 시 서버는 `GAME_START_FAILED`를 전송하고 연결을 닫습니다.
+
+```json
+{
+  "type": "GAME_START_FAILED",
+  "payload": {
+    "gameRoomId": 100,
+    "reason": "RTT_FAILED",
+    "action": "GO_TO_MATCH_START"
+  }
+}
+```
+
+클라이언트 처리:
+
+- `RTT_PING`을 받으면 payload의 `seq`를 그대로 담아 `RTT_PONG`을 즉시 보냅니다.
+- `GAME_START_FAILED`를 받으면 reason과 관계없이 WebSocket을 정리하고 start 버튼 화면으로 복귀합니다.
+- `RTT_FAILED`, `RTT_TOO_HIGH`는 안내/로그 구분용이며 화면 이동 정책은 동일합니다.
+- RTT 성공 후에도 `COUNTDOWN`, `GAME_START`, scenario는 후속 단계에서 별도로 수신합니다.
+
+## 11. 잘못된 메시지 처리
 
 클라이언트가 JSON 파싱이 불가능한 메시지나 server-only type을 보내면 백엔드는 `ERROR`를 응답합니다.
 
@@ -426,6 +486,7 @@ sequenceDiagram
 | type | 설명 |
 |------|------|
 | `CLIENT_READY` | MP4 preload 등 대기 준비 완료 |
+| `RTT_PONG` | 서버 `RTT_PING`에 대한 RTT 측정 응답. payload의 `seq`를 그대로 반환 |
 
 현재 server message로만 사용하는 type:
 
@@ -435,9 +496,11 @@ sequenceDiagram
 | `PLAYER_READY` | gameRoom 참가자 READY 상태 변경 |
 | `PLAYER_LEFT` | gameRoom 참가자 WebSocket 연결 종료 |
 | `GAME_WAITING_TIMEOUT` | gameRoom `createdAt` 기준 30초 안에 양쪽 READY가 완료되지 않아 start 버튼 화면으로 복귀해야 함 |
+| `RTT_PING` | 서버가 RTT 측정을 위해 보내는 ping. 클라이언트는 같은 `seq`로 `RTT_PONG` 응답 |
+| `GAME_START_FAILED` | RTT 실패/초과로 GAME_START 전에 gameRoom이 `ABORTED` 되어 start 버튼 화면으로 복귀해야 함 |
 | `ERROR` | 잘못된 메시지 또는 처리 불가 |
 
-## 11. 클라이언트 UI 상태
+## 12. 클라이언트 UI 상태
 
 ```mermaid
 stateDiagram-v2
@@ -453,6 +516,9 @@ stateDiagram-v2
     ReadySent --> WaitingOtherPlayer: PLAYER_READY bothReady=false
     ReadySent --> BothReady: PLAYER_READY bothReady=true
     WaitingOtherPlayer --> BothReady: PLAYER_READY bothReady=true
+    BothReady --> RttMeasuring: RTT_PING / RTT_PONG
+    RttMeasuring --> GameStartReady: RTT passed
+    RttMeasuring --> MatchStart: GAME_START_FAILED
     WebSocketConnecting --> MatchStart: late handshake fail<br/>gameRoom ABORTED
     WaitingPage --> MatchStart: client 30s timer expired
     WaitingConnected --> MatchStart: GAME_WAITING_TIMEOUT
@@ -462,7 +528,7 @@ stateDiagram-v2
     ReadySent --> WaitingDisconnected: close/error
     WaitingOtherPlayer --> WaitingDisconnected: close/error
     WaitingDisconnected --> MatchStart: waiting failed
-    BothReady --> [*]
+    GameStartReady --> [*]: wait for countdown/GAME_START
 ```
 
 클라이언트 구현 체크리스트:
@@ -470,12 +536,14 @@ stateDiagram-v2
 - `match_response_result` 수신 후 매칭 SSE를 닫습니다.
 - `GO_TO_GAME_WAITING`일 때만 게임 대기 화면으로 이동합니다.
 - `game.webSocketUrl`에 access token query parameter를 붙여 WebSocket에 연결합니다.
-- WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `ERROR`를 처리합니다.
+- WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `ERROR`를 처리합니다.
 - MP4 preload 완료 후 `CLIENT_READY`를 한 번 전송합니다.
 - `GAME_WAITING_TIMEOUT`, handshake 실패, close/error, 자체 30초 timer 만료 시 start 버튼 화면으로 복귀합니다.
+- RTT 단계의 `GAME_START_FAILED` 수신 시 start 버튼 화면으로 복귀합니다.
 - 복귀 시 기존 waiting 화면 상태, WebSocket 객체, 자체 timer를 정리합니다.
 - `bothReady=true`를 `GAME_START`로 오해하지 않습니다.
-- `GAME_START`, RTT, countdown, SMITE는 후속 WebSocket 단계에서 별도로 처리합니다.
+- RTT 성공을 `GAME_START`로 오해하지 않습니다.
+- `GAME_START`, countdown, SMITE는 후속 WebSocket 단계에서 별도로 처리합니다.
 
 ## 변경 이력
 
@@ -483,3 +551,4 @@ stateDiagram-v2
 |------|----------|
 | 2026-05-15 | 양쪽 수락 이후 매칭 SSE 종료, 게임 대기 WebSocket handshake, PLAYER_JOINED, CLIENT_READY, PLAYER_READY, PLAYER_LEFT 흐름 정리 |
 | 2026-05-18 | gameRoom `createdAt` 기준 30초 waiting timeout, 미연결 유저 이벤트 수신 불가, `GAME_WAITING_TIMEOUT` 클라이언트 복귀 흐름 추가 |
+| 2026-05-19 | RTT_PING/RTT_PONG, 5회 median RTT, 2500ms per-ping timeout, 15초 전체 제한, GAME_START_FAILED 복귀 정책 추가 |

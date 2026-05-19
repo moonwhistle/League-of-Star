@@ -112,14 +112,18 @@
 
 | 시점 | 처리 |
 |------|------|
-| **GO_TO_GAME_WAITING 후 ~ GAME_START 전** | gameRoom `createdAt`부터 **30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY` 전송을 완료하지 못하면** gameRoom `ABORTED`. `game_records` 생성 없음, LP/배치/승급전 반영 없음 |
+| **GO_TO_GAME_WAITING 후 ~ CLIENT_READY 전** | gameRoom `createdAt`부터 **30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY` 전송을 완료하지 못하면** gameRoom `ABORTED`. `game_records` 생성 없음, LP/배치/승급전 반영 없음 |
+| **CLIENT_READY 완료 후 ~ GAME_START 전 RTT 측정** | 각 유저별 RTT 5회 측정. median RTT 2000ms 초과, `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 gameRoom `ABORTED`. `game_records` 생성 없음, LP/배치/승급전 반영 없음 |
 | **GAME_START 이후 이탈** | disconnect 자체로 gameRoom을 `ABORTED` 처리하지 않음. 서버는 기존 gameStartTime, HP scenario, 수신된 SMITE 액션 기준으로 판을 끝까지 판정 |
 | **GAME_START 이후 상대만 이탈** | 상대가 이탈해도 내 자동 승리가 아님. 내가 유효한 SMITE로 처치하면 승리, 처치하지 못하고 자연사하면 무승부 |
 | **GAME_START 이후 양쪽 이탈** | 이미 수신된 액션이 없으면 자연사 기준 무승부. 이미 수신된 유효 액션이 있으면 해당 액션 기준으로 판정 |
 
 - `GAME_START` 이전 timeout은 아직 유효한 판이 시작되지 않은 실패이므로 두 플레이어 모두 점수 변동이 없다.
 - waiting timeout은 **30초**이며, 클라이언트 수신 시각이나 SSE 수신 시각이 아니라 DB에 저장된 gameRoom `createdAt`을 기준으로 계산한다.
-- 30초 안에 두 참가자가 모두 WebSocket에 연결되고 `CLIENT_READY`까지 보내야 다음 RTT/countdown 단계로 넘어갈 수 있다.
+- 30초 안에 두 참가자가 모두 WebSocket에 연결되고 `CLIENT_READY`까지 보내야 다음 RTT 측정 단계로 넘어갈 수 있다.
+- RTT 측정은 `CLIENT_READY` 이후, `GAME_START` 이전 단계다. 따라서 RTT 실패/초과는 아직 유효한 판이 시작되지 않은 실패로 보고 `ABORTED` 처리한다.
+- RTT 실패/초과 후 두 유저는 start 버튼 화면으로 복귀한다. 큐 자동 복귀는 하지 않는다.
+- WebSocket에 연결되어 있던 유저에게만 `GAME_START_FAILED` 이벤트를 전송한 뒤 연결을 닫는다.
 - WebSocket 미연결 유저는 API local registry에 session이 없으므로 WebSocket 상태를 저장하지 않는다. gameRoom과 participant는 timeout 전까지 DB상 `READY`를 유지한다.
 - WebSocket 미연결 유저에게는 실시간 WebSocket 이벤트를 보낼 수 없다. timeout 후 늦게 WebSocket handshake를 시도하면 gameRoom이 이미 `ABORTED`이므로 연결을 거부하고, 클라이언트는 start 버튼 화면으로 복귀한다.
 - WebSocket에 연결되어 있던 유저에게만 `GAME_WAITING_TIMEOUT` 이벤트를 전송한 뒤 연결을 닫는다.
@@ -157,7 +161,12 @@
 | **측정 시점** | 게임 대기 WebSocket 연결 후 게임 시작 직전 |
 | **측정 횟수** | 5회 Ping-Pong |
 | **사용 값** | 중간값 (Median) — 극단값 제거 |
-| **RTT 상한** | 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도) |
+| **RTT 상한** | median RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도) |
+| **개별 응답 제한** | 각 `RTT_PING`은 2500ms 안에 `RTT_PONG`을 받아야 함 |
+| **전체 측정 제한** | gameRoom RTT 측정은 최대 15초 안에 완료되어야 함 |
+| **실패 기준** | `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED` |
+| **초과 기준** | 5회 측정은 완료했지만 median RTT가 2000ms를 초과하면 `RTT_TOO_HIGH` |
+| **성공 상태 보존** | median RTT는 이후 SMITE 보정에 필요하므로 게임 판정 완료 전까지 Redis에 유지 |
 
 #### 동시 판정 처리 (Tie-Breaking)
 
@@ -454,3 +463,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-18 | GAME_START 이전 timeout은 `ABORTED` 및 record/LP 미반영, GAME_START 이후 disconnect는 중단 없이 정상 판정 흐름으로 처리하도록 정책 조정 |
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
 | 2026-05-18 | 게임 대기 WebSocket 미연결 유저는 timeout 전까지 저장 상태 없음, timeout 후 이벤트 수신 불가 및 late handshake 거절 정책 명시 |
+| 2026-05-19 | RTT 5회 median 측정, 2500ms per-ping timeout, 15초 전체 제한, RTT 실패/초과 시 GAME_START 이전 `ABORTED` 정책 추가 |

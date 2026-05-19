@@ -485,7 +485,7 @@ CREATE TABLE game_records (
 
 MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 
-현재 구현된 Redis 구조:
+현재 구현 및 확정 설계된 Redis 구조:
 
 | 키 패턴 | 타입 | 용도 | TTL |
 |--------|------|------|-----|
@@ -499,15 +499,35 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 | `game:waiting:{gameRoomId}` | Hash | gameRoom waiting ready 상태. `userAId`, `userBId`, `userAReady`, `userBReady`, `createdAtMillis`, `deadlineAtMillis` | 60초 |
 | `game:waiting:timeout:lock:{gameRoomId}` | Redis Lock | 멀티 인스턴스 scheduler 중복 timeout 정산 방지 | 작업 lease |
 | `game_waiting_timeout` | Pub/Sub Channel | timeout 확정 후 모든 API 인스턴스에 WebSocket 전송 이벤트 전파 | - |
+| `game:rtt:{gameRoomId}` | Hash | `GAME_START` 이전 RTT 측정 결과. `userAId`, `userBId`, `userASamples`, `userBSamples`, `userAMedianRttMs`, `userBMedianRttMs`, `userAStatus`, `userBStatus` | 300초 |
 
 > 매칭 응답 완료 전 상태는 Redis가 관리합니다. 양쪽 수락 후 gameRoom `READY` 생성이 완료되면 game waiting timeout 상태도 Redis에 등록합니다.
+
+RTT 측정 HASH는 단순화를 위해 gameRoom 단위 key 하나만 사용합니다.
+
+```text
+game:rtt:{gameRoomId}
+  userAId = 1
+  userBId = 2
+  userASamples = "34,36,35,38,41"
+  userBSamples = "45,44,49,46,48"
+  userAMedianRttMs = 36
+  userBMedianRttMs = 46
+  userAStatus = PASSED
+  userBStatus = PASSED
+```
+
+- status는 `PENDING`, `PASSED`, `FAILED`만 사용합니다.
+- `RTT_FAILED`, `RTT_TOO_HIGH` reason은 이벤트/로그 용도이며 Redis RTT HASH에는 별도 reason field를 두지 않습니다.
+- RTT 성공 시 median RTT는 SMITE 판정 보정에 필요하므로 게임 종료 전까지 유지합니다.
+- RTT 실패/초과 또는 게임 정상 종료 시 `game:rtt:{gameRoomId}`를 cleanup합니다.
+- TTL 300초는 cleanup 누락 방지용 안전장치이며, 게임 진행/판정 시간을 충분히 감싸기 위한 값입니다.
 
 후속 게임 흐름에서 사용할 예정인 Redis 구조:
 
 | 키 패턴 | 타입 | 용도 | TTL |
 |--------|------|------|-----|
 | `game:session:{gameRoomId}` | Hash | 진행 중 게임 세션 | 60초 |
-| `rtt:{userId}:{gameRoomId}` | List | RTT 측정값 (5개) | 60초 |
 
 ---
 
