@@ -5,6 +5,7 @@ import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttFailureReason;
 import com.sang.smite.game.rtt.domain.GameRttPendingPing;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
+import com.sang.smite.game.rtt.domain.GameRttStartReadyState;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 
@@ -52,6 +54,10 @@ public class GameRttMeasurementService {
         boolean failed = gameRttMeasurementStore.markFailed(gameRoomId, userId);
         gameRttFailureProcessor.processFailureWithLock(gameRoomId, GameRttFailureReason.RTT_FAILED);
         return failed;
+    }
+
+    public Optional<GameRttStartReadyState> findStartReadyState(Long gameRoomId) {
+        return gameRttMeasurementStore.findStartReadyState(gameRoomId);
     }
 
     public int failTimedOutPings() {

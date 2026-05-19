@@ -206,6 +206,58 @@ class RedisGameRttMeasurementStoreTest {
     }
 
     @Test
+    @DisplayName("findStartReadyState - 양쪽 PASSED이면 Step 6에서 조회 가능한 median RTT를 반환한다")
+    void findStartReadyState() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(startReadyState());
+
+        // when
+        var startReadyState = store.findStartReadyState(GAME_ROOM_ID);
+
+        // then
+        assertThat(startReadyState).isPresent();
+        assertThat(startReadyState.get().gameRoomId()).isEqualTo(GAME_ROOM_ID);
+        assertThat(startReadyState.get().userAId()).isEqualTo(USER_A_ID);
+        assertThat(startReadyState.get().userBId()).isEqualTo(USER_B_ID);
+        assertThat(startReadyState.get().userAMedianRttMs()).isEqualTo(35L);
+        assertThat(startReadyState.get().userBMedianRttMs()).isEqualTo(45L);
+        assertThat(startReadyState.get().medianRttMillis(USER_A_ID)).isEqualTo(35L);
+        assertThat(startReadyState.get().medianRttMillis(USER_B_ID)).isEqualTo(45L);
+        verify(stringRedisTemplate, never()).delete(RTT_KEY);
+    }
+
+    @Test
+    @DisplayName("findStartReadyState - 한 명이라도 PASSED가 아니면 empty를 반환한다")
+    void findStartReadyState_NotBothPassed() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(rttState("", GameRttStatus.PASSED));
+
+        // when
+        var startReadyState = store.findStartReadyState(GAME_ROOM_ID);
+
+        // then
+        assertThat(startReadyState).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findStartReadyState - PASSED 상태여도 median RTT가 없으면 empty를 반환한다")
+    void findStartReadyState_MedianMissing() {
+        // given
+        Map<Object, Object> state = startReadyState();
+        state.remove(GameRttConstants.USER_B_MEDIAN_RTT_MS_FIELD);
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(state);
+
+        // when
+        var startReadyState = store.findStartReadyState(GAME_ROOM_ID);
+
+        // then
+        assertThat(startReadyState).isEmpty();
+    }
+
+    @Test
     @DisplayName("cleanup - RTT HASH를 삭제한다")
     void cleanup() {
         // when
@@ -223,6 +275,19 @@ class RedisGameRttMeasurementStoreTest {
         state.put(GameRttConstants.USER_B_SAMPLES_FIELD, "");
         state.put(GameRttConstants.USER_A_STATUS_FIELD, userAStatus.name());
         state.put(GameRttConstants.USER_B_STATUS_FIELD, GameRttStatus.PENDING.name());
+        return state;
+    }
+
+    private Map<Object, Object> startReadyState() {
+        Map<Object, Object> state = new HashMap<>();
+        state.put(GameRttConstants.USER_A_ID_FIELD, String.valueOf(USER_A_ID));
+        state.put(GameRttConstants.USER_B_ID_FIELD, String.valueOf(USER_B_ID));
+        state.put(GameRttConstants.USER_A_SAMPLES_FIELD, "30,35,40,37,32");
+        state.put(GameRttConstants.USER_B_SAMPLES_FIELD, "40,45,50,47,42");
+        state.put(GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD, "35");
+        state.put(GameRttConstants.USER_B_MEDIAN_RTT_MS_FIELD, "45");
+        state.put(GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.PASSED.name());
+        state.put(GameRttConstants.USER_B_STATUS_FIELD, GameRttStatus.PASSED.name());
         return state;
     }
 }

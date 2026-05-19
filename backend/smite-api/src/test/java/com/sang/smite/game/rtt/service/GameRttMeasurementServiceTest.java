@@ -3,11 +3,13 @@ package com.sang.smite.game.rtt.service;
 import com.sang.smite.game.rtt.domain.GameRttPendingPing;
 import com.sang.smite.game.rtt.domain.GameRttFailureReason;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
+import com.sang.smite.game.rtt.domain.GameRttStartReadyState;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 
@@ -146,6 +148,20 @@ class GameRttMeasurementServiceTest {
         // then
         assertThat(failed).isFalse();
         verify(gameRttFailureProcessor).processFailureWithLock(GAME_ROOM_ID, GameRttFailureReason.RTT_FAILED);
+    }
+
+    @Test
+    @DisplayName("findStartReadyState - Step 6에서 사용할 RTT 준비 상태를 조회한다")
+    void findStartReadyState() {
+        // given
+        GameRttStartReadyState startReadyState = new GameRttStartReadyState(GAME_ROOM_ID, 1L, 2L, 35L, 45L);
+        when(gameRttMeasurementStore.findStartReadyState(GAME_ROOM_ID)).thenReturn(Optional.of(startReadyState));
+
+        // when
+        Optional<GameRttStartReadyState> result = service.findStartReadyState(GAME_ROOM_ID);
+
+        // then
+        assertThat(result).contains(startReadyState);
     }
 
     @Test

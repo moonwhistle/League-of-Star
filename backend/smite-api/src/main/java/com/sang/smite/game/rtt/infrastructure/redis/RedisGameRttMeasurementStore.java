@@ -2,6 +2,7 @@ package com.sang.smite.game.rtt.infrastructure.redis;
 
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
+import com.sang.smite.game.rtt.domain.GameRttStartReadyState;
 import com.sang.smite.game.rtt.domain.GameRttState;
 import com.sang.smite.game.rtt.domain.GameRttStatus;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
@@ -111,6 +112,28 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
     }
 
     @Override
+    public Optional<GameRttStartReadyState> findStartReadyState(Long gameRoomId) {
+        Map<Object, Object> rttState = stringRedisTemplate.opsForHash().entries(rttKey(gameRoomId));
+        if (rttState.isEmpty() || !bothPassed(rttState)) {
+            return Optional.empty();
+        }
+
+        Long userAMedianRttMs = getNullableLong(rttState, GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD);
+        Long userBMedianRttMs = getNullableLong(rttState, GameRttConstants.USER_B_MEDIAN_RTT_MS_FIELD);
+        if (userAMedianRttMs == null || userBMedianRttMs == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new GameRttStartReadyState(
+                gameRoomId,
+                getLong(rttState, GameRttConstants.USER_A_ID_FIELD),
+                getLong(rttState, GameRttConstants.USER_B_ID_FIELD),
+                userAMedianRttMs,
+                userBMedianRttMs
+        ));
+    }
+
+    @Override
     public void cleanup(Long gameRoomId) {
         stringRedisTemplate.delete(rttKey(gameRoomId));
     }
@@ -146,6 +169,11 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
         return GameRttStatus.valueOf(value);
     }
 
+    private boolean bothPassed(Map<Object, Object> rttState) {
+        return status(rttState, GameRttConstants.USER_A_STATUS_FIELD) == GameRttStatus.PASSED
+                && status(rttState, GameRttConstants.USER_B_STATUS_FIELD) == GameRttStatus.PASSED;
+    }
+
     private List<Long> samples(Map<Object, Object> rttState, String samplesField) {
         Object samplesValue = rttState.get(samplesField);
         if (!(samplesValue instanceof String value) || value.isBlank()) {
@@ -161,6 +189,14 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
 
     private Long getLong(Map<Object, Object> rttState, String fieldName) {
         return Long.valueOf((String) rttState.get(fieldName));
+    }
+
+    private Long getNullableLong(Map<Object, Object> rttState, String fieldName) {
+        Object value = rttState.get(fieldName);
+        if (!(value instanceof String stringValue) || stringValue.isBlank()) {
+            return null;
+        }
+        return Long.valueOf(stringValue);
     }
 
     private String samplesValue(List<Long> samples) {

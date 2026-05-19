@@ -196,7 +196,7 @@ local memory / 동시성 기준:
 - [x] RTT 실패/초과 시 LP/배치/승급전 결과를 반영하지 않는다.
 - [x] RTT 실패/초과 시 Redis `match:status:{userId}`를 제거한다.
 - [x] RTT 실패/초과 시 Redis RTT 상태를 cleanup한다.
-- [ ] RTT 성공 시 Redis RTT 상태는 game 판정 완료 전까지 유지한다.
+- [x] RTT 성공 시 Redis RTT 상태는 game 판정 완료 전까지 유지한다.
 - [ ] 게임 종료 후 Redis RTT 상태를 cleanup한다.
 
 구현 결과:
@@ -234,9 +234,19 @@ local memory / 동시성 기준:
 
 ### 9. Step 6 연동 지점 정의
 
-- [ ] 양쪽 `userAStatus`, `userBStatus`가 모두 `PASSED`이면 Step 6과 SMITE 판정에서 조회 가능한 상태로 둔다.
-- [ ] Step 6은 Redis RTT 상태의 양쪽 `PASSED` 여부를 확인한 뒤 `startAt`, scenario, `IN_PROGRESS` 전환을 처리한다.
-- [ ] 이번 이슈에서는 `COUNTDOWN`, `GAME_START`, scenario 전달을 구현하지 않는다.
+- [x] 양쪽 `userAStatus`, `userBStatus`가 모두 `PASSED`이면 Step 6과 SMITE 판정에서 조회 가능한 상태로 둔다.
+- [x] Step 6에서 Redis RTT 상태의 양쪽 `PASSED` 여부를 확인한 뒤 `startAt`, scenario, `IN_PROGRESS` 전환을 처리하도록 연동 계약을 정의한다.
+- [x] 이번 이슈에서는 `COUNTDOWN`, `GAME_START`, scenario 전달을 구현하지 않는다.
+
+구현 결과:
+
+- Step 6이 Redis field를 직접 알 필요 없도록 `GameRttMeasurementService.findStartReadyState(gameRoomId)` 조회 지점을 추가했다.
+- 조회 결과는 `Optional<GameRttStartReadyState>`로 반환한다.
+- `GameRttStartReadyState`는 `gameRoomId`, `userAId`, `userBId`, `userAMedianRttMs`, `userBMedianRttMs`를 포함한다.
+- 양쪽 status가 모두 `PASSED`이고 양쪽 median RTT가 모두 저장된 경우에만 값을 반환한다.
+- RTT 상태가 없거나, 한 명이라도 `PENDING`/`FAILED`이거나, median RTT가 빠져 있으면 `Optional.empty()`를 반환한다.
+- 이 조회는 read-only이며 Redis RTT 상태를 cleanup하지 않는다. 성공한 RTT median은 Step 6과 이후 SMITE 판정에서 계속 조회할 수 있게 유지한다.
+- Step 6은 이 값이 있을 때만 `startAt`, scenario, `IN_PROGRESS` 전환을 진행하고, `COUNTDOWN`/`GAME_START` 전송은 다음 단계에서 구현한다.
 
 ### 10. 테스트
 
@@ -246,7 +256,7 @@ local memory / 동시성 기준:
 - [x] `RTT_PONG` timeout 시 `RTT_FAILED` 처리되는지 검증한다.
 - [x] WebSocket close/error가 RTT 측정 중이면 `RTT_FAILED` 처리되는지 검증한다.
 - [x] RTT 실패 시 gameRoom/participants `ABORTED`, record/LP 미반영을 검증한다.
-- [ ] 양쪽 `PASSED` 시 Step 6과 SMITE 판정에서 조회 가능한 Redis 상태가 남는지 검증한다.
+- [x] 양쪽 `PASSED` 시 Step 6과 SMITE 판정에서 조회 가능한 Redis 상태가 남는지 검증한다.
 - [x] RTT 실패/초과 시 Redis RTT 상태가 cleanup되는지 검증한다.
 - [x] RTT 실패/초과 시 연결된 WebSocket session에 `GAME_START_FAILED`가 전송되고 close 되는지 검증한다.
 
