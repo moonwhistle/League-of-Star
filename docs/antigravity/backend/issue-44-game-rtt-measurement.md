@@ -291,3 +291,229 @@ local memory / 동시성 기준:
 - `GAME_START_FAILED`의 reason은 클라이언트 분기보다 운영/디버깅 목적이 크다.
 - 클라이언트는 `GAME_START_FAILED` reason과 관계없이 start 버튼 화면으로 복귀한다.
 - `COUNTDOWN`은 이번 이슈가 아니라 Step 6에서 `startAt`, scenario, `IN_PROGRESS` 전환과 함께 처리한다.
+
+---
+## PR
+
+## 📌 Summary
+
+양쪽 참가자가 게임 대기 WebSocket에서 `CLIENT_READY`를 완료한 뒤, `GAME_START` 전에 서버 주도 RTT 측정을 수행하는 흐름을 구현했습니다.
+
+각 유저별로 `RTT_PING` / `RTT_PONG`을 5회 측정하고 median RTT를 Redis에 저장합니다. 양쪽 median RTT가 모두 2000ms 이하이면 다음 Step 6에서 `GAME_START` 준비를 진행할 수 있고, RTT 응답 누락/연결 종료/측정 예외/median 초과가 발생하면 아직 게임 시작 전 실패로 보고 gameRoom과 participants를 `ABORTED` 처리합니다.
+
+```mermaid
+flowchart TD
+    A["Both CLIENT_READY"] --> B["Redis game:rtt:{gameRoomId}<br/>A/B status = PENDING"]
+    B --> C["RTT_PING seq=1..5<br/>per user"]
+    C --> D["RTT_PONG 수신<br/>session attributes 기준 user 식별"]
+    D --> E["RTT sample append"]
+    E --> F{"5 samples<br/>collected?"}
+    F -->|"no"| C
+    F -->|"yes"| G["median RTT 계산"]
+    G --> H{"median <= 2000ms?"}
+    H -->|"yes"| I["user status = PASSED<br/>median 유지"]
+    H -->|"no"| J["user status = FAILED<br/>reason = RTT_TOO_HIGH"]
+    C -->|"2500ms timeout<br/>close/error/exception"| K["user status = FAILED<br/>reason = RTT_FAILED"]
+    I --> L{"Both PASSED?"}
+    L -->|"yes"| M["Step 6 조회 가능<br/>GAME_START 준비"]
+    J --> N["READY -> ABORTED"]
+    K --> N
+    N --> O["record/LP 미반영<br/>match:status 제거"]
+    O --> P["GAME_START_FAILED 전송<br/>connected sockets close"]
+```
+
+핵심 정책은 다음과 같습니다.
+
+| 정책 | 내용 |
+| :--- | :--- |
+| 측정 시점 | 양쪽 `CLIENT_READY` 완료 이후, `GAME_START` 이전 |
+| 측정 방식 | 유저별 WebSocket ping-pong 5회 |
+| 판정값 | 평균이 아니라 median RTT |
+| 성공 기준 | 양쪽 median RTT 모두 2000ms 이하 |
+| 응답 제한 | 각 `RTT_PING`은 2500ms 안에 `RTT_PONG` 필요 |
+| 전체 제한 | 5회 측정과 per-ping timeout 기준 최대 15초 |
+| 실패 reason | 응답 누락/close/error/예외는 `RTT_FAILED`, median 초과는 `RTT_TOO_HIGH` |
+| 실패 결과 | `game_rooms=ABORTED`, participants `ABORTED`, record/LP/배치/승급전 미반영 |
+| 클라이언트 복귀 | 연결된 WebSocket에만 `GAME_START_FAILED` 전송 후 close |
+| 성공 상태 | median RTT는 SMITE 판정 보정을 위해 게임 종료 전까지 Redis에 유지 |
+
+## 📚 Changes
+
+### 1. RTT 측정 상태를 Redis HASH 하나로 단순화
+
+RTT 측정 결과는 gameRoom 단위 Redis HASH 하나에 저장합니다.
+
+```text
+game:rtt:{gameRoomId}
+  userAId = 1
+  userBId = 2
+  userASamples = "34,36,35,38,41"
+  userBSamples = "45,44,49,46,48"
+  userAMedianRttMs = 36
+  userBMedianRttMs = 46
+  userAStatus = PASSED
+  userBStatus = PASSED
+```
+
+이 구조를 선택한 이유는 Step 6과 SMITE 판정에 필요한 정보가 `참가자`, `샘플`, `median`, `상태`로 고정되어 있기 때문입니다. 별도 key를 유저별로 쪼개면 개별 갱신은 단순해지지만, “양쪽이 모두 통과했는가?”를 판단할 때 key 조회가 늘고 cleanup 대상도 늘어납니다. 반대로 gameRoom 단위 HASH는 한 번의 상태 조회로 양쪽 상태를 판단할 수 있어 이번 흐름에 더 적합합니다.
+
+| 선택지 | 장점 | 단점 | 결정 |
+| :--- | :--- | :--- | :--- |
+| gameRoom 단위 HASH | 양쪽 상태를 한 번에 조회, cleanup 단순 | 한 HASH에 field가 모임 | 채택 |
+| user 단위 key | 유저별 갱신 범위가 작음 | 양쪽 판정/cleanup 시 key 관리 증가 | 미채택 |
+| DB 저장 | 영속성 강함 | GAME_START 전 임시 측정값이라 write 비용과 정리 부담 증가 | 미채택 |
+
+### 2. median RTT 기준으로 시작 가능 여부 판정
+
+RTT는 순간적인 네트워크 튐이 생길 수 있으므로 평균이 아니라 median을 사용했습니다. 평균은 1회 큰 지연값에 크게 흔들릴 수 있지만, median은 5회 샘플 중 중앙값을 사용하므로 일시적인 outlier 영향을 줄입니다.
+
+정책상 median RTT가 2000ms를 초과하면 게임을 시작하지 않습니다. 이 실패는 게임 중 패배나 탈주가 아니라 아직 `GAME_START` 이전의 진입 실패이므로 record, LP, 배치/승급전에는 반영하지 않습니다.
+
+### 3. RTT 측정과 WebSocket session 책임 분리
+
+WebSocket handler는 메시지 라우팅과 session attributes 검증만 담당하고, RTT 측정은 `GameRttMeasurementService`가 처리하도록 분리했습니다.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant WS as GameWaitingWebSocketService
+    participant Rtt as GameRttMeasurementService
+    participant Store as Redis RTT Store
+    participant Local as Local Ping Tracker
+
+    C->>WS: CLIENT_READY
+    WS->>Rtt: startMeasurement(gameRoomId, userIds)
+    Rtt->>Store: initializeIfAbsent()
+    WS-->>C: RTT_PING seq=1
+    WS->>Rtt: recordPingSent()
+    Rtt->>Local: sentAtNanos 저장
+
+    C->>WS: RTT_PONG seq=1
+    WS->>Rtt: recordPong(gameRoomId, userId, seq)
+    Rtt->>Local: sentAtNanos consume
+    Rtt->>Store: appendSample(rttMillis)
+    alt sample < 5
+        WS-->>C: next RTT_PING
+    else sample = 5
+        Store->>Store: median 계산 + PASSED/FAILED 저장
+    end
+```
+
+`RTT_PONG` payload의 `userId`나 `gameRoomId`는 신뢰하지 않고 WebSocket session attributes의 값을 사용합니다. 클라이언트가 보낸 payload를 그대로 믿으면 다른 유저나 다른 gameRoom의 RTT 상태를 오염시킬 수 있기 때문입니다.
+
+### 4. local memory 사용 범위와 sticky session 전제
+
+RTT ping 전송 시각은 Redis가 아니라 API 인스턴스 local memory에 저장합니다.
+
+이 값은 다음 특성을 가집니다.
+
+| 특성 | 판단 |
+| :--- | :--- |
+| 수명 | `RTT_PING` 전송 후 `RTT_PONG` 수신 또는 timeout까지 아주 짧음 |
+| 용도 | RTT millis 계산용 임시 값 |
+| 영속 필요성 | 없음 |
+| 분산 조회 필요성 | sticky session 전제에서는 낮음 |
+
+sticky session으로 같은 gameRoom의 WebSocket 연결이 같은 API 인스턴스에 붙는다는 전제에서는 local memory가 가장 단순합니다. Redis에 sentAt까지 저장하면 멀티 인스턴스 내구성은 조금 좋아지지만, 매 ping마다 Redis write/read가 추가되고 RTT 측정 자체의 지연도 늘어날 수 있습니다.
+
+`synchronized`는 sticky session을 보장하기 위한 장치가 아닙니다. 같은 JVM 안에서 유저 A/B의 `RTT_PONG`, close/error, timeout scheduler가 동시에 local Map에 접근할 수 있으므로 local memory의 thread-safe 접근을 보장하기 위한 장치입니다.
+
+### 5. 실패 정산은 GAME_START 이전 safe abort로 제한
+
+RTT 실패/초과가 발생하면 gameRoom이 아직 `READY`인 경우에만 `ABORTED`로 전환합니다. 이미 `IN_PROGRESS` 등 READY 이후 상태라면 늦은 실패 이벤트로 정상 진행 중인 게임을 잘못 abort하지 않고 RTT 상태만 정리합니다.
+
+상태 전환은 DB gameRoom status와 Redis RTT status를 분리해서 봐야 합니다.
+
+DB gameRoom 상태 전환:
+
+```mermaid
+stateDiagram-v2
+    [*] --> READY: gameRoom 생성 성공
+    READY --> ABORTED: RTT_FAILED 또는 RTT_TOO_HIGH
+    READY --> IN_PROGRESS: 양쪽 RTT PASSED 이후<br/>Step 6 GAME_START
+    IN_PROGRESS --> FINISHED: 게임 정상 종료
+    ABORTED --> [*]
+    FINISHED --> [*]
+```
+
+Redis RTT 상태 전환:
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: 양쪽 CLIENT_READY 완료<br/>game:rtt 생성
+    PENDING --> PASSED: 5회 측정 완료<br/>median RTT <= 2000ms
+    PENDING --> FAILED: RTT_PONG timeout<br/>close/error/예외
+    PENDING --> FAILED: median RTT > 2000ms
+    PASSED --> [*]: 게임 종료 후 cleanup
+    FAILED --> [*]: abort 정산 후 cleanup
+```
+
+이 전환에서 중요한 점은 `PENDING`, `PASSED`, `FAILED`가 DB gameRoom status가 아니라 Redis RTT 측정 상태라는 점입니다. DB gameRoom은 `READY -> ABORTED` 또는 이후 Step 6에서 `READY -> IN_PROGRESS`로만 전환됩니다.
+
+### 6. 실패 이벤트는 Pub/Sub 없이 local session에만 전송
+
+game waiting timeout은 scheduler가 어느 인스턴스에서 실행될지 모르기 때문에 Pub/Sub이 필요했습니다. 반면 RTT 실패는 WebSocket session이 붙어 있는 인스턴스에서 `RTT_PONG`, close/error, local ping timeout을 처리하는 흐름입니다. sticky session 전제상 실패 이벤트를 전송해야 하는 session도 같은 인스턴스 local registry에 있습니다.
+
+```mermaid
+flowchart TD
+    subgraph API["Sticky session API instance"]
+        A["WebSocket sessions<br/>same gameRoom"] --> B["RTT_PING sentAt<br/>local memory"]
+        B --> C{"RTT failure?"}
+        C -->|"timeout / close / error"| D["Redis RTT status = FAILED"]
+        C -->|"median > 2000ms"| D
+        D --> E["gameRoom lock"]
+        E --> F["READY -> ABORTED"]
+        F --> G["GAME_START_FAILED<br/>local sessions only"]
+        G --> H["WebSocket close"]
+    end
+```
+
+그래서 이번 실패 이벤트에는 Pub/Sub을 추가하지 않았습니다. Pub/Sub을 넣으면 이벤트 전파 범위는 넓어지지만, 현재 RTT 실패 흐름에서는 실제 이득이 작고 구독/발행/중복 전송 방지 로직만 늘어납니다.
+
+| 선택지 | 장점 | 단점 | 결정 |
+| :--- | :--- | :--- | :--- |
+| local session 전송 | 코드 단순, sticky session 정책과 일치, 중복 전송 위험 낮음 | sticky session 전제에 의존 | 채택 |
+| Redis Pub/Sub | session 보유 인스턴스와 정산 인스턴스가 달라도 전송 가능 | 현재 RTT 흐름에서는 과한 fan-out, 중복 처리 고려 필요 | 미채택 |
+
+미접속 유저에게는 별도 push를 보내지 않습니다. 연결된 유저에게만 `GAME_START_FAILED`를 전송하고, 클라이언트는 reason과 관계없이 start 버튼 화면으로 복귀합니다.
+
+### 7. Step 6 연동 계약만 정의
+
+이번 이슈에서는 `COUNTDOWN`, `GAME_START`, HP scenario 전달, gameRoom `IN_PROGRESS` 전환을 구현하지 않습니다. 대신 Step 6이 사용할 조회 계약만 열었습니다.
+
+```mermaid
+flowchart TD
+    A["Step 6"] --> B["findStartReadyState(gameRoomId)"]
+    B --> C{"Both PASSED<br/>and both median exists?"}
+    C -->|"yes"| D["GameRttStartReadyState 반환<br/>median RTT 조회 가능"]
+    C -->|"no"| E["Optional.empty<br/>GAME_START 진행 불가"]
+    D --> F["startAt / scenario / IN_PROGRESS<br/>다음 이슈에서 처리"]
+```
+
+`GameRttStartReadyState`는 Redis field를 외부로 노출하지 않고 `gameRoomId`, `userAId`, `userBId`, `userAMedianRttMs`, `userBMedianRttMs`만 제공합니다. Step 6은 이 값이 있을 때만 게임 시작 준비를 진행하면 됩니다.
+
+### 8. 테스트와 문서 정합성
+
+테스트는 정책 단위로 검증했습니다.
+
+| 검증 대상 | 내용 |
+| :--- | :--- |
+| RTT 저장 | 5회 sample 수집, median 계산, `PASSED`/`FAILED` 저장 |
+| timeout | `RTT_PONG` 2500ms 초과 시 `RTT_FAILED` 처리 |
+| WebSocket close/error | RTT 측정 중 close/error를 `RTT_FAILED`로 처리 |
+| abort 정산 | READY gameRoom만 `ABORTED`, 이미 `IN_PROGRESS`면 abort하지 않음 |
+| cleanup | 실패/초과 시 Redis RTT와 local ping 상태 cleanup |
+| 실패 이벤트 | 연결된 session에 `GAME_START_FAILED` 전송 후 close |
+| Step 6 계약 | 양쪽 `PASSED`와 median 존재 시에만 start ready state 반환 |
+
+문서는 `policy.md`, `domain status.md`, `flow status.md`, `websocket client.md`, `DDL.md`, `plan-checkpoint.md`에 RTT 정책과 Redis 구조를 반영했습니다. 특히 15초 제한은 별도 global timer가 아니라 5회 측정과 per-ping 2500ms timeout 기준이라는 점을 명시했습니다.
+
+## 📝 Note
+
+- RTT 성공 시 Redis RTT 상태는 즉시 삭제하지 않습니다. 이후 SMITE 판정에서 `smiteTimeMs = (serverReceiveTime - gameStartTime) - medianRtt / 2` 보정에 사용하기 때문입니다.
+- RTT 실패 reason은 Redis HASH에 저장하지 않습니다. reason은 이벤트/로그 구분용이고, 저장 상태는 `PENDING`, `PASSED`, `FAILED`만 유지해 단순화했습니다.
+- 게임 종료 후 `game:rtt:{gameRoomId}` cleanup은 후속 게임 종료 흐름에서 처리합니다.
+- `COUNTDOWN`, `GAME_START`, HP scenario 전달, `IN_PROGRESS` 전환은 다음 Step 6 범위입니다.
+
+## 📌 Related Issue
+- Closes #44
