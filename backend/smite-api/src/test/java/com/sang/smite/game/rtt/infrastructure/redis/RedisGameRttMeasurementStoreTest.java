@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -76,5 +77,93 @@ class RedisGameRttMeasurementStoreTest {
         assertThat(initialized).isFalse();
         verify(stringRedisTemplate, never()).opsForHash();
         verify(stringRedisTemplate, never()).expire(RTT_KEY, GameRttConstants.RTT_STATE_TTL_SECONDS, TimeUnit.SECONDS);
+    }
+
+    @Test
+    @DisplayName("appendSample - 5개 미만이면 samples에 RTT를 append한다")
+    void appendSample_Recorded() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(rttState("10,20", GameRttStatus.PENDING));
+
+        // when
+        var result = store.appendSample(GAME_ROOM_ID, USER_A_ID, 30L);
+
+        // then
+        assertThat(result.accepted()).isTrue();
+        assertThat(result.completed()).isFalse();
+        assertThat(result.sampleCount()).isEqualTo(3);
+        verify(hashOperations).put(RTT_KEY, GameRttConstants.USER_A_SAMPLES_FIELD, "10,20,30");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("appendSample - 5개가 모이면 median RTT를 저장하고 PASSED로 전환한다")
+    void appendSample_CompletedPassed() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(rttState("40,10,30,20", GameRttStatus.PENDING));
+
+        // when
+        var result = store.appendSample(GAME_ROOM_ID, USER_A_ID, 50L);
+
+        // then
+        assertThat(result.accepted()).isTrue();
+        assertThat(result.completed()).isTrue();
+        assertThat(result.passed()).isTrue();
+        ArgumentCaptor<Map<Object, Object>> hashCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(hashOperations).putAll(eq(RTT_KEY), hashCaptor.capture());
+        assertThat(hashCaptor.getValue())
+                .containsEntry(GameRttConstants.USER_A_SAMPLES_FIELD, "40,10,30,20,50")
+                .containsEntry(GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD, "30")
+                .containsEntry(GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.PASSED.name());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("appendSample - median RTT가 기준을 넘으면 FAILED로 전환한다")
+    void appendSample_CompletedFailed() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(rttState("2100,2200,2300,2400", GameRttStatus.PENDING));
+
+        // when
+        var result = store.appendSample(GAME_ROOM_ID, USER_A_ID, 2500L);
+
+        // then
+        assertThat(result.accepted()).isTrue();
+        assertThat(result.completed()).isTrue();
+        assertThat(result.passed()).isFalse();
+        ArgumentCaptor<Map<Object, Object>> hashCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(hashOperations).putAll(eq(RTT_KEY), hashCaptor.capture());
+        assertThat(hashCaptor.getValue())
+                .containsEntry(GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD, "2300")
+                .containsEntry(GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.FAILED.name());
+    }
+
+    @Test
+    @DisplayName("appendSample - RTT HASH가 없으면 rejected를 반환한다")
+    void appendSample_NotFound() {
+        // given
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(RTT_KEY)).thenReturn(Map.of());
+
+        // when
+        var result = store.appendSample(GAME_ROOM_ID, USER_A_ID, 30L);
+
+        // then
+        assertThat(result.accepted()).isFalse();
+        verify(hashOperations, never()).put(eq(RTT_KEY), eq(GameRttConstants.USER_A_SAMPLES_FIELD), eq("30"));
+    }
+
+    private Map<Object, Object> rttState(String userASamples, GameRttStatus userAStatus) {
+        Map<Object, Object> state = new HashMap<>();
+        state.put(GameRttConstants.USER_A_ID_FIELD, String.valueOf(USER_A_ID));
+        state.put(GameRttConstants.USER_B_ID_FIELD, String.valueOf(USER_B_ID));
+        state.put(GameRttConstants.USER_A_SAMPLES_FIELD, userASamples);
+        state.put(GameRttConstants.USER_B_SAMPLES_FIELD, "");
+        state.put(GameRttConstants.USER_A_STATUS_FIELD, userAStatus.name());
+        state.put(GameRttConstants.USER_B_STATUS_FIELD, GameRttStatus.PENDING.name());
+        return state;
     }
 }

@@ -1,6 +1,7 @@
 package com.sang.smite.game.websocket.service;
 
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
+import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
 import com.sang.smite.game.websocket.dto.GameWebSocketClientMessage;
 import com.sang.smite.game.websocket.dto.GameWebSocketServerMessage;
@@ -16,6 +17,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.OptionalInt;
 
 @Slf4j
 @Service
@@ -48,8 +50,21 @@ public class GameWaitingWebSocketService {
         }
     }
 
-    public void handleRttPong(GameRoomWebSocketSession currentSession, GameWebSocketClientMessage clientMessage) {
-        // RTT sample 계산과 다음 ping 전송은 RTT_PONG 처리 단계에서 연결한다.
+    public void handleRttPong(GameRoomWebSocketSession currentSession, GameWebSocketClientMessage clientMessage)
+            throws IOException {
+        OptionalInt seq = clientMessage.rttSeq();
+        if (seq.isEmpty()) {
+            return;
+        }
+
+        GameRttPongResult pongResult = gameRttMeasurementService.recordPong(
+                currentSession.getGameRoomId(),
+                currentSession.getUserId(),
+                seq.getAsInt()
+        );
+        if (pongResult.needsNextPing()) {
+            sendRttPing(currentSession, pongResult.nextSeq());
+        }
     }
 
     public void cleanupSession(WebSocketSession session) {
@@ -90,15 +105,19 @@ public class GameWaitingWebSocketService {
         }
 
         for (GameRoomWebSocketSession session : sessions) {
-            messageSender.send(
-                    session.getWebSocketSession(),
-                    GameWebSocketServerMessage.rttPing(GameRttConstants.INITIAL_RTT_SEQUENCE)
-            );
-            gameRttMeasurementService.recordPingSent(
-                    gameRoomId,
-                    session.getUserId(),
-                    GameRttConstants.INITIAL_RTT_SEQUENCE
-            );
+            sendRttPing(session, GameRttConstants.INITIAL_RTT_SEQUENCE);
         }
+    }
+
+    private void sendRttPing(GameRoomWebSocketSession session, int seq) throws IOException {
+        messageSender.send(
+                session.getWebSocketSession(),
+                GameWebSocketServerMessage.rttPing(seq)
+        );
+        gameRttMeasurementService.recordPingSent(
+                session.getGameRoomId(),
+                session.getUserId(),
+                seq
+        );
     }
 }

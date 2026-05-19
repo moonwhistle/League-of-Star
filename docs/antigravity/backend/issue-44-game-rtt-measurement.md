@@ -144,14 +144,31 @@ TTL/cleanup 정책:
 - `GameWaitingWebSocketHandler`는 `CLIENT_READY` 처리 후 Redis waiting 기준 `bothReady=true`이고 local registry 기준 두 세션이 모두 READY일 때 첫 `RTT_PING seq=1`을 양쪽에 전송한다.
 - `RTT_PONG`은 메시지 타입으로 허용하되, 실제 RTT sample 계산과 다음 ping 전송은 Step 5에서 연결한다.
 
+local memory / 동시성 기준:
+
+- sticky session 전제에서는 같은 gameRoom의 두 WebSocket 연결이 같은 API 인스턴스로 붙는다. 그래서 `RTT_PING` 전송 시각처럼 짧게 필요한 값은 Redis가 아니라 local memory에 저장한다.
+- `synchronized`는 sticky session 자체를 위한 장치가 아니라, 같은 JVM 안에서 유저 A/B의 `RTT_PONG`, close/error, 다음 ping 처리가 서로 다른 WebSocket thread로 동시에 들어올 때 local memory Map이 깨지지 않게 보호하기 위한 장치다.
+- 정리하면 sticky session은 local memory 사용 근거이고, `synchronized`는 local memory의 thread-safe 접근 근거다.
+
 ### 5. RTT_PONG 처리와 median 저장
 
-- [ ] `RTT_PONG` 수신 시 session attributes 기준으로 gameRoomId/userId를 식별한다.
-- [ ] `seq`에 해당하는 ping 전송 시각을 조회해 RTT millis를 계산한다.
-- [ ] 계산한 RTT sample을 Redis HASH의 해당 유저 samples에 append한다.
-- [ ] 5개 sample이 모이면 정렬 후 가운데 값을 median으로 저장한다.
-- [ ] median RTT가 2000ms 이하이면 해당 유저 status를 `PASSED`로 저장한다.
-- [ ] median RTT가 2000ms 초과이면 해당 유저 status를 `FAILED`로 저장하고 게임 시작 실패 처리로 이어간다.
+- [x] `RTT_PONG` 수신 시 session attributes 기준으로 gameRoomId/userId를 식별한다.
+- [x] `seq`에 해당하는 ping 전송 시각을 조회해 RTT millis를 계산한다.
+- [x] 계산한 RTT sample을 Redis HASH의 해당 유저 samples에 append한다.
+- [x] 5개 sample이 모이면 정렬 후 가운데 값을 median으로 저장한다.
+- [x] median RTT가 2000ms 이하이면 해당 유저 status를 `PASSED`로 저장한다.
+- [x] median RTT가 2000ms 초과이면 해당 유저 status를 `FAILED`로 저장한다.
+- [x] 5개 sample 수집 전이면 같은 유저에게 다음 `RTT_PING seq`를 이어서 전송한다.
+
+구현 결과:
+
+- `GameWaitingWebSocketService`는 `RTT_PONG` payload의 `seq`만 사용하고, gameRoomId/userId는 WebSocket session attributes 기준으로 처리한다.
+- `GameRttMeasurementService`는 local memory의 `gameRoomId/userId/seq` sentAt을 consume한 뒤 RTT millis를 계산한다.
+- sentAt은 한 번만 consume되므로 같은 `RTT_PONG`이 중복 도착해도 Redis sample에 중복 append되지 않는다.
+- `RedisGameRttMeasurementStore`는 해당 유저의 samples field에 RTT 값을 append한다.
+- sample이 5개 미만이면 `GameWaitingWebSocketService`가 다음 `RTT_PING seq`를 같은 유저에게 전송한다.
+- sample이 5개가 되면 정렬 후 가운데 값을 median으로 저장하고, 2000ms 이하이면 `PASSED`, 초과이면 `FAILED`로 저장한다.
+- median 초과로 `FAILED`가 된 이후의 gameRoom abort, match status 제거, 실패 이벤트 전송은 Step 6~8의 실패 처리 흐름에서 연결한다.
 
 ### 6. RTT 실패 처리
 
@@ -190,9 +207,9 @@ TTL/cleanup 정책:
 
 ### 10. 테스트
 
-- [ ] RTT samples 5개 수집 후 median 계산을 검증한다.
-- [ ] median RTT 2000ms 이하이면 `PASSED`로 저장되는지 검증한다.
-- [ ] median RTT 2000ms 초과이면 `FAILED` 및 abort 흐름으로 이어지는지 검증한다.
+- [x] RTT samples 5개 수집 후 median 계산을 검증한다.
+- [x] median RTT 2000ms 이하이면 `PASSED`로 저장되는지 검증한다.
+- [x] median RTT 2000ms 초과이면 `FAILED`로 저장되는지 검증한다.
 - [ ] `RTT_PONG` timeout 시 `RTT_FAILED` 처리되는지 검증한다.
 - [ ] WebSocket close/error가 RTT 측정 중이면 `RTT_FAILED` 처리되는지 검증한다.
 - [ ] RTT 실패 시 gameRoom/participants `ABORTED`, record/LP 미반영을 검증한다.

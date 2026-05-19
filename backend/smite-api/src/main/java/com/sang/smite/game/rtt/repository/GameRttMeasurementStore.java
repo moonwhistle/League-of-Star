@@ -1,6 +1,10 @@
 package com.sang.smite.game.rtt.repository;
 
+import com.sang.smite.game.rtt.domain.GameRttPongResult;
+
 public interface GameRttMeasurementStore {
 
     boolean initializeIfAbsent(Long gameRoomId, Long userAId, Long userBId);
+
+    GameRttPongResult appendSample(Long gameRoomId, Long userId, long rttMillis);
 }

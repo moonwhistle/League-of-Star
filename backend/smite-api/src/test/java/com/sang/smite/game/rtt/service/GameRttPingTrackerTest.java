@@ -34,4 +34,15 @@ class GameRttPingTrackerTest {
         // then
         assertThat(tracker.findSentAt(GAME_ROOM_ID, USER_ID, 1)).isEmpty();
     }
+
+    @Test
+    @DisplayName("consumeSentAt - ping 전송 시각을 한 번만 소비한다")
+    void consumeSentAt() {
+        // given
+        tracker.recordSentAt(GAME_ROOM_ID, USER_ID, 1, 10L);
+
+        // when & then
+        assertThat(tracker.consumeSentAt(GAME_ROOM_ID, USER_ID, 1)).hasValue(10L);
+        assertThat(tracker.consumeSentAt(GAME_ROOM_ID, USER_ID, 1)).isEmpty();
+    }
 }

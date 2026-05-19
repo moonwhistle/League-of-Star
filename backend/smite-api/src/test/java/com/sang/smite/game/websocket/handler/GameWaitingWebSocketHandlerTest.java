@@ -2,6 +2,7 @@ package com.sang.smite.game.websocket.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
 import com.sang.smite.game.websocket.dto.GameWebSocketMessageType;
 import com.sang.smite.game.websocket.service.GameRoomWebSocketMessageSender;
@@ -160,6 +161,8 @@ class GameWaitingWebSocketHandlerTest {
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
         handler.afterConnectionEstablished(session);
         clearInvocations(session);
+        when(gameRttMeasurementService.recordPong(GAME_ROOM_ID, FIRST_USER_ID, 1))
+                .thenReturn(GameRttPongResult.rejected());
 
         // when
         handler.handleTextMessage(session, new TextMessage("{\"type\":\"RTT_PONG\",\"payload\":{\"seq\":1}}"));
@@ -167,6 +170,26 @@ class GameWaitingWebSocketHandlerTest {
         // then
         verify(session, never()).sendMessage(any());
         verify(gameWaitingReadyService, never()).markReady(GAME_ROOM_ID, FIRST_USER_ID);
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - RTT_PONG 처리 후 완료 전이면 다음 RTT_PING을 전송한다")
+    void handleTextMessage_RttPong_SendNextPing() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameRttMeasurementService.recordPong(GAME_ROOM_ID, FIRST_USER_ID, 1))
+                .thenReturn(GameRttPongResult.recorded(1));
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"RTT_PONG\",\"payload\":{\"seq\":1}}"));
+
+        // then
+        JsonNode message = lastSentMessage(session);
+        assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.RTT_PING.name());
+        assertThat(message.get("payload").get("seq").asInt()).isEqualTo(2);
+        verify(gameRttMeasurementService).recordPingSent(GAME_ROOM_ID, FIRST_USER_ID, 2);
     }
 
     @Test
