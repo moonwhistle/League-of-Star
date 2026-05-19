@@ -129,11 +129,20 @@ TTL/cleanup 정책:
 
 ### 4. RTT 측정 시작 흐름 구현
 
-- [ ] `PLAYER_READY`의 `bothReady=true` 이후 RTT 측정을 시작한다.
-- [ ] RTT 상태가 없으면 `game:rtt:{gameRoomId}`를 생성하고 양쪽 status를 `PENDING`으로 저장한다.
-- [ ] 각 유저에게 5회 `RTT_PING`을 순차 전송한다.
-- [ ] ping 전송 시각은 Redis가 아니라 local session memory에 보관한다.
-- [ ] sticky session 전제에서 같은 gameRoom의 RTT 측정이 같은 API 인스턴스에서 진행되도록 한다.
+- [x] `PLAYER_READY`의 `bothReady=true` 이후 RTT 측정을 시작한다.
+- [x] RTT 상태가 없으면 `game:rtt:{gameRoomId}`를 생성하고 양쪽 status를 `PENDING`으로 저장한다.
+- [x] 각 유저에게 첫 `RTT_PING seq=1`을 전송한다.
+- [x] ping 전송 시각은 Redis가 아니라 local session memory에 보관한다.
+- [x] sticky session 전제에서 같은 gameRoom의 RTT 측정이 같은 API 인스턴스에서 진행되도록 한다.
+- [ ] `RTT_PONG` 수신 후 다음 `RTT_PING`을 이어 보내는 5회 반복은 Step 5에서 처리한다.
+
+구현 결과:
+
+- `GameRttMeasurementService`가 local WebSocket session의 두 userId를 정렬해 `userAId`, `userBId`를 안정적으로 정하고 Redis RTT 상태를 초기화한다.
+- `RedisGameRttMeasurementStore`가 `game:rtt:{gameRoomId}` HASH를 없을 때만 생성하고 TTL 300초를 설정한다.
+- `GameRttPingTracker`가 `gameRoomId/userId/seq` 기준 ping 전송 시각을 API 인스턴스 local memory에 기록한다.
+- `GameWaitingWebSocketHandler`는 `CLIENT_READY` 처리 후 Redis waiting 기준 `bothReady=true`이고 local registry 기준 두 세션이 모두 READY일 때 첫 `RTT_PING seq=1`을 양쪽에 전송한다.
+- `RTT_PONG`은 메시지 타입으로 허용하되, 실제 RTT sample 계산과 다음 ping 전송은 Step 5에서 연결한다.
 
 ### 5. RTT_PONG 처리와 median 저장
 
