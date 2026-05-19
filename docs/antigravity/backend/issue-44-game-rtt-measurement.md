@@ -213,12 +213,24 @@ local memory / 동시성 기준:
 
 ### 8. 실패 이벤트 전송
 
-- [ ] 서버 메시지 `GAME_START_FAILED`를 정의한다.
-- [ ] payload는 `gameRoomId`, `reason`, `action`만 포함해 단순하게 유지한다.
-- [ ] `action`은 `GO_TO_MATCH_START`로 정의한다.
-- [ ] 연결된 WebSocket session에만 `GAME_START_FAILED`를 전송한다.
-- [ ] 실패 이벤트 전송 후 연결된 WebSocket session을 close한다.
-- [ ] 미접속 유저에게는 별도 push를 보내지 않는다.
+- [x] 서버 메시지 `GAME_START_FAILED`를 정의한다.
+- [x] payload는 `gameRoomId`, `reason`, `action`만 포함해 단순하게 유지한다.
+- [x] `action`은 `GO_TO_MATCH_START`로 정의한다.
+- [x] 연결된 WebSocket session에만 `GAME_START_FAILED`를 전송한다.
+- [x] 실패 이벤트 전송 후 연결된 WebSocket session을 close한다.
+- [x] 미접속 유저에게는 별도 push를 보내지 않는다.
+
+구현 결과:
+
+- `GameWebSocketMessageType`에 server message `GAME_START_FAILED`를 추가했다.
+- `GameWebSocketServerMessage.gameStartFailed(gameRoomId, reason, action)` factory를 추가했다.
+- `GameStartFailedWebSocketSender`가 현재 API 인스턴스의 local session registry에서 gameRoom session만 조회해 `GAME_START_FAILED`를 전송한다.
+- 실패 이벤트 payload는 `gameRoomId`, `reason`, `action`만 포함한다.
+  - `reason`: `RTT_FAILED` 또는 `RTT_TOO_HIGH`
+  - `action`: `GO_TO_MATCH_START`
+- 이벤트 전송 후 해당 WebSocket session은 registry에서 제거하고 close한다.
+- sticky session 전제상 RTT 실패 정산은 해당 gameRoom WebSocket session을 가진 인스턴스에서 발생하므로 별도 Pub/Sub 없이 local session에만 전송한다.
+- 미접속 유저에게는 별도 push를 보내지 않는다.
 
 ### 9. Step 6 연동 지점 정의
 
@@ -236,6 +248,7 @@ local memory / 동시성 기준:
 - [x] RTT 실패 시 gameRoom/participants `ABORTED`, record/LP 미반영을 검증한다.
 - [ ] 양쪽 `PASSED` 시 Step 6과 SMITE 판정에서 조회 가능한 Redis 상태가 남는지 검증한다.
 - [x] RTT 실패/초과 시 Redis RTT 상태가 cleanup되는지 검증한다.
+- [x] RTT 실패/초과 시 연결된 WebSocket session에 `GAME_START_FAILED`가 전송되고 close 되는지 검증한다.
 
 ### 11. 문서
 

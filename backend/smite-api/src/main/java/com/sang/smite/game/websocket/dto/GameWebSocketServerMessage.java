@@ -45,6 +45,13 @@ public record GameWebSocketServerMessage(
         );
     }
 
+    public static GameWebSocketServerMessage gameStartFailed(Long gameRoomId, String reason, String action) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.GAME_START_FAILED,
+                new GameStartFailedPayload(gameRoomId, reason, action)
+        );
+    }
+
     public static GameWebSocketServerMessage invalidMessageType() {
         return error(ERROR_INVALID_MESSAGE_TYPE, "Unsupported WebSocket message type.");
     }
@@ -63,6 +70,9 @@ public record GameWebSocketServerMessage(
     }
 
     public record GameWaitingTimeoutPayload(Long gameRoomId, String reason, String action) {
+    }
+
+    public record GameStartFailedPayload(Long gameRoomId, String reason, String action) {
     }
 
     public record RttPingPayload(int seq) {

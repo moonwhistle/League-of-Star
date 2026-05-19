@@ -7,6 +7,7 @@ import com.sang.smite.game.rtt.domain.GameRttFailureReason;
 import com.sang.smite.game.rtt.domain.GameRttState;
 import com.sang.smite.game.rtt.domain.GameRttStatus;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
+import com.sang.smite.game.websocket.service.GameStartFailedWebSocketSender;
 import com.sang.smite.matching.command.MatchUserStatusCommandService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,9 @@ class GameRttFailureProcessorTest {
 
     @Mock
     private MatchUserStatusCommandService matchUserStatusCommandService;
+
+    @Mock
+    private GameStartFailedWebSocketSender gameStartFailedWebSocketSender;
 
     @Test
     @DisplayName("RTT 상태가 없으면 local ping만 정리한다")
@@ -94,8 +98,15 @@ class GameRttFailureProcessorTest {
 
         // then
         verify(gameRoomCommandService).abortReadyRoomIfReady(GAME_ROOM_ID);
-        InOrder inOrder = inOrder(matchUserStatusCommandService, gameRttPingTracker, gameRttMeasurementStore);
+        InOrder inOrder = inOrder(
+                matchUserStatusCommandService,
+                gameStartFailedWebSocketSender,
+                gameRttPingTracker,
+                gameRttMeasurementStore
+        );
         inOrder.verify(matchUserStatusCommandService).removeGameStartFailureStatuses(USER_A_ID, USER_B_ID);
+        inOrder.verify(gameStartFailedWebSocketSender)
+                .sendFailure(GAME_ROOM_ID, GameRttFailureReason.RTT_FAILED.name(), "GO_TO_MATCH_START");
         inOrder.verify(gameRttPingTracker).cleanup(GAME_ROOM_ID);
         inOrder.verify(gameRttMeasurementStore).cleanup(GAME_ROOM_ID);
     }
@@ -133,6 +144,8 @@ class GameRttFailureProcessorTest {
         // then
         verify(gameRoomCommandService, never()).abortReadyRoomIfReady(GAME_ROOM_ID);
         verify(matchUserStatusCommandService).removeGameStartFailureStatuses(USER_A_ID, USER_B_ID);
+        verify(gameStartFailedWebSocketSender)
+                .sendFailure(GAME_ROOM_ID, GameRttFailureReason.RTT_FAILED.name(), "GO_TO_MATCH_START");
         verify(gameRttMeasurementStore).cleanup(GAME_ROOM_ID);
     }
 

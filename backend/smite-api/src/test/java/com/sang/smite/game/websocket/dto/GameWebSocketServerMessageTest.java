@@ -67,6 +67,22 @@ class GameWebSocketServerMessageTest {
     }
 
     @Test
+    @DisplayName("gameStartFailed - GAME_START_FAILED 메시지를 생성한다")
+    void gameStartFailed() {
+        GameWebSocketServerMessage result = GameWebSocketServerMessage.gameStartFailed(
+                100L,
+                "RTT_FAILED",
+                "GO_TO_MATCH_START"
+        );
+
+        JsonNode json = objectMapper.valueToTree(result);
+        assertThat(json.get("type").asText()).isEqualTo(GameWebSocketMessageType.GAME_START_FAILED.name());
+        assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
+        assertThat(json.get("payload").get("reason").asText()).isEqualTo("RTT_FAILED");
+        assertThat(json.get("payload").get("action").asText()).isEqualTo("GO_TO_MATCH_START");
+    }
+
+    @Test
     @DisplayName("invalidMessageType - ERROR 메시지를 생성한다")
     void invalidMessageType() throws Exception {
         GameWebSocketServerMessage result = GameWebSocketServerMessage.invalidMessageType();

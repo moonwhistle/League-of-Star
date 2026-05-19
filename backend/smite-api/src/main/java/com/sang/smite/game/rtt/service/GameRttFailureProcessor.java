@@ -7,6 +7,7 @@ import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttFailureReason;
 import com.sang.smite.game.rtt.domain.GameRttState;
 import com.sang.smite.game.rtt.repository.GameRttMeasurementStore;
+import com.sang.smite.game.websocket.service.GameStartFailedWebSocketSender;
 import com.sang.smite.matching.command.MatchUserStatusCommandService;
 import com.sang.smite.redis.lock.annotation.DistributedRedisLock;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class GameRttFailureProcessor {
     private final GameRoomReadService gameRoomReadService;
     private final GameRoomCommandService gameRoomCommandService;
     private final MatchUserStatusCommandService matchUserStatusCommandService;
+    private final GameStartFailedWebSocketSender gameStartFailedWebSocketSender;
 
     @DistributedRedisLock(key = "'" + GameRttConstants.RTT_FAILURE_LOCK_KEY_PREFIX + "' + #gameRoomId")
     public void processFailureWithLock(Long gameRoomId, GameRttFailureReason reason) {
@@ -43,20 +45,25 @@ public class GameRttFailureProcessor {
             if (!aborted) {
                 return;
             }
-            cleanupFailureState(state);
+            cleanupFailureState(state, reason);
             return;
         }
 
         if (gameStatus == GameStatus.ABORTED) {
-            cleanupFailureState(state);
+            cleanupFailureState(state, reason);
             return;
         }
 
         cleanupRttState(state.gameRoomId());
     }
 
-    private void cleanupFailureState(GameRttState state) {
+    private void cleanupFailureState(GameRttState state, GameRttFailureReason reason) {
         matchUserStatusCommandService.removeGameStartFailureStatuses(state.userAId(), state.userBId());
+        gameStartFailedWebSocketSender.sendFailure(
+                state.gameRoomId(),
+                reason.name(),
+                GameRttConstants.GAME_START_FAILED_ACTION
+        );
         cleanupRttState(state.gameRoomId());
     }
 
