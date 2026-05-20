@@ -31,10 +31,24 @@ public record GameWebSocketServerMessage(
         );
     }
 
+    public static GameWebSocketServerMessage rttPing(int seq) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.RTT_PING,
+                new RttPingPayload(seq)
+        );
+    }
+
     public static GameWebSocketServerMessage gameWaitingTimeout(Long gameRoomId, String reason, String action) {
         return new GameWebSocketServerMessage(
                 GameWebSocketMessageType.GAME_WAITING_TIMEOUT,
                 new GameWaitingTimeoutPayload(gameRoomId, reason, action)
+        );
+    }
+
+    public static GameWebSocketServerMessage gameStartFailed(Long gameRoomId, String reason, String action) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.GAME_START_FAILED,
+                new GameStartFailedPayload(gameRoomId, reason, action)
         );
     }
 
@@ -56,6 +70,12 @@ public record GameWebSocketServerMessage(
     }
 
     public record GameWaitingTimeoutPayload(Long gameRoomId, String reason, String action) {
+    }
+
+    public record GameStartFailedPayload(Long gameRoomId, String reason, String action) {
+    }
+
+    public record RttPingPayload(int seq) {
     }
 
     public record ErrorPayload(String code, String reason) {

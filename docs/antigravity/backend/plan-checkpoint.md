@@ -19,8 +19,8 @@ flowchart TD
     L --> M["gameRoom WebSocket 연결"]
     M --> N["MP4 preload 후 CLIENT_READY"]
     N --> O["WebSocket RTT 5회 측정<br/>median 저장"]
-    O --> P["COUNTDOWN"]
-    P --> Q["GAME_START + scenario 전달"]
+    O --> P["HP scenario 준비<br/>startAt 결정"]
+    P --> Q["COUNTDOWN / GAME_START<br/>scenario 전달"]
     Q --> R["SMITE command 수신<br/>serverReceiveTime 기준 판정"]
     R --> S["game_actions 저장"]
     S --> SA["game_records 생성<br/>rank 반영"]
@@ -84,14 +84,15 @@ flowchart TD
 13. MP4 preload
 14. 클라이언트가 `CLIENT_READY` 전송
 15. 서버가 RTT 5회 측정
-16. 서버가 `startAt` 결정
-17. WebSocket으로 countdown 후 `GAME_START` 전송
-18. 클라이언트가 MP4 재생 + HP overlay 렌더링
-19. 유저가 D/F 입력 시 WebSocket으로 `SMITE` 전송
-20. 서버가 수신 시각 기준으로 HP 역산
-21. 승패 판정
-22. `game_actions` 저장
-23. `game_records` 생성 및 랭크 반영
+16. 서버가 RTT 정상 여부를 확정
+17. 서버가 HP scenario 준비, `startAt` 결정, gameRoom 시작 처리를 수행
+18. WebSocket으로 `COUNTDOWN`/`GAME_START`와 scenario를 전달
+19. 클라이언트가 `startAt` 기준으로 MP4 재생 + HP overlay 렌더링
+20. 유저가 D/F 입력 시 WebSocket으로 `SMITE` 전송
+21. 서버가 수신 시각 기준으로 HP 역산
+22. 승패 판정
+23. `game_actions` 저장
+24. `game_records` 생성 및 랭크 반영
 
 ## 4. 구현 단계
 
@@ -141,19 +142,25 @@ flowchart TD
 - [x] timeout 시 클라이언트 start 버튼 화면 복귀 이벤트/응답 정책 확정
 - [x] timeout scheduler/worker 중복 처리 방지 정책 정의
 
-### Step 5. RTT 측정과 카운트다운
+### Step 5. RTT 측정
 
-- [ ] WebSocket ping-pong으로 각 유저별 RTT 5회 측정
-- [ ] median RTT 저장
-- [ ] 2000ms 초과 시 게임 시작 차단
-- [ ] 양쪽 정상 상태면 `startAt` 결정
-- [ ] `COUNTDOWN` 이벤트 전송
-- [ ] RTT 실패/초과/상대 이탈 시 gameRoom 상태 전이 정책 정의
+- [x] WebSocket ping-pong으로 각 유저별 RTT 5회 측정
+- [x] median RTT 저장
+- [x] median RTT 2000ms 초과 시 게임 시작 차단
+- [x] 각 `RTT_PING`은 2500ms 안에 `RTT_PONG` 응답을 받아야 함
+- [x] gameRoom 전체 RTT 측정은 5회 측정과 per-ping 2500ms timeout 기준 최대 15초 안에 완료되어야 함
+- [x] `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 게임 시작 차단
+- [x] 양쪽 RTT 정상 여부를 Step 6에서 조회할 수 있게 저장
+- [x] RTT 실패/초과 시 gameRoom `ABORTED`, record/LP 미반영, `GAME_START_FAILED` 전송 정책 정의
 
 ### Step 6. GAME_START와 HP 시나리오 전달
 
-- [ ] WebSocket `GAME_START` 직전에만 scenario를 클라이언트에 전달
+- [ ] HP scenario 생성/조회 및 시작 payload 확정
+- [ ] 양쪽 RTT 정상 상태 확인 후 `startAt` 결정
+- [ ] gameRoom 상태를 `IN_PROGRESS`로 전환
+- [ ] `COUNTDOWN`/`GAME_START` 이벤트로 `startAt`과 scenario를 클라이언트에 전달
 - [ ] 클라이언트는 `startAt` 기준으로 HP bar overlay 계산
+- [x] MP4 preload 완료 여부는 `CLIENT_READY` 전제로 보고 Step 6에서 다시 검증하지 않음
 - [x] MP4는 배경으로만 사용
 - [ ] `GAME_START` 시 서버 기준 game end timer/scheduler 등록
 
@@ -370,7 +377,8 @@ gameRoom.status = READY
 -> 두 유저 WebSocket connect
 -> MP4 preload 후 CLIENT_READY
 -> 양쪽 READY + RTT 정상
--> GAME_START
+-> HP scenario 준비 + startAt 결정
+-> COUNTDOWN / GAME_START
 ```
 
 게임 시작 전 timeout:
@@ -537,27 +545,50 @@ gameRoom 생성 실패 mapping:
 - timeout 된 게임은 record/LP/배치/승급전에 반영되지 않음
 - 두 유저는 큐 자동 복귀 없이 start 버튼 화면으로 복귀함
 
-### Issue 40. RTT 측정과 GAME_START
+### Issue 44. RTT 측정
 
 목표:
 
-- WebSocket 경로에서 RTT를 측정하고 서버 기준 `startAt`으로 동시에 게임을 시작한다.
+- WebSocket 경로에서 RTT를 측정하고, 양쪽 유저가 게임 시작 가능한 네트워크 상태인지 확정한다.
 
 범위:
 
 - 각 유저별 ping-pong 5회
 - median RTT 저장
-- RTT 2000ms 초과 시 시작 차단
-- `COUNTDOWN`, `GAME_START` 메시지 전송
-- `GAME_START` 직전에 scenario 전달
+- median RTT 2000ms 초과 시 시작 차단
+- 각 `RTT_PING` 응답 제한 2500ms
+- gameRoom 전체 RTT 측정 제한은 5회 측정과 per-ping 2500ms timeout 기준 최대 15초
+- `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외 시 시작 차단
+- 양쪽 RTT 정상 여부 저장
+- RTT 실패/초과 시 gameRoom `ABORTED`, record/LP 미반영, `GAME_START_FAILED` 정책 정의
+
+완료 기준:
+
+- 양쪽 유저의 median RTT를 저장함
+- 양쪽 RTT 정상 여부를 Step 6에서 조회할 수 있음
+- RTT 실패/초과 시 gameRoom이 시작되지 않고 `ABORTED`로 정리됨
+
+### Issue 46. GAME_START와 HP 시나리오 전달
+
+목표:
+
+- RTT 정상 확인 이후 HP scenario와 서버 기준 `startAt`을 확정하고, 클라이언트가 `startAt`에 즉시 게임을 시작할 수 있게 한다.
+
+범위:
+
+- HP scenario 생성/조회
+- gameRoom `IN_PROGRESS` 전환
+- 서버 기준 `startAt` 결정
+- `COUNTDOWN`/`GAME_START` 메시지로 `startAt`과 scenario 전달
+- `GAME_START` 시 서버 기준 game end timer/scheduler 등록
 
 완료 기준:
 
 - 양쪽 정상 RTT일 때 같은 `startAt`을 받음
 - 클라이언트는 `startAt` 기준으로 MP4 재생과 HP overlay 계산 가능
-- RTT 실패/초과 시 gameRoom이 시작되지 않음
+- 카운트다운 종료 후 추가 서버 메시지 대기 없이 게임을 시작할 수 있음
 
-### Issue 41. SMITE 서버 판정과 action 저장
+### Issue 48. SMITE 서버 판정과 action 저장
 
 목표:
 
@@ -578,7 +609,7 @@ gameRoom 생성 실패 mapping:
 - 같은 유저의 두 번째 SMITE는 거부 또는 무시
 - 판정 결과가 서버 로그와 DB에 남음
 
-### Issue 42. 서버 timer/scheduler 기반 gameRoom 종료
+### Issue 50. 서버 timer/scheduler 기반 gameRoom 종료
 
 목표:
 
@@ -599,7 +630,7 @@ gameRoom 생성 실패 mapping:
 - scenario 종료 시점 또는 몬스터 사망 시점에 최종 결과가 확정됨
 - 종료 job 중복 실행 시에도 상태가 중복 변경되지 않음
 
-### Issue 43. 게임 종료와 record/rank 연결
+### Issue 52. 게임 종료와 record/rank 연결
 
 목표:
 

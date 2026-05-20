@@ -319,7 +319,7 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitin
 - `GO_TO_GAME_WAITING` 이후 gameRoom은 `READY` 상태로 대기한다.
 - waiting deadline은 서버가 gameRoom `READY`를 확정하고 `GO_TO_GAME_WAITING` 발행을 시작한 서버 시각을 기준으로 계산한다.
 - timeout duration 값은 후속 timeout 구현 이슈에서 확정한다.
-- waiting deadline 안에 두 참가자가 WebSocket에 접속하고 `CLIENT_READY`를 보내야 다음 RTT/countdown 단계로 넘어갈 수 있다.
+- waiting deadline 안에 두 참가자가 WebSocket에 접속하고 `CLIENT_READY`를 보내야 다음 RTT 측정 단계로 넘어갈 수 있다.
 - WebSocket 미접속, 연결 후 `CLIENT_READY` 미수신, RTT 단계 진입 전 대기 실패는 모두 `GAME_START` 이전 timeout으로 본다.
 - `GAME_START` 이전 timeout은 실제 판이 시작되지 않은 실패이므로 gameRoom을 `ABORTED`로 정리한다.
 - `GAME_START` 이전 timeout은 `game_records`를 생성하지 않고 LP/배치/승급전 결과도 반영하지 않는다.

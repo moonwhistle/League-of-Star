@@ -10,7 +10,7 @@
 gameRoom.createdAt + 30초
 ```
 
-30초 안에 두 참가자가 모두 WebSocket에 연결하고 `CLIENT_READY`까지 보내야 다음 RTT/countdown 단계로 넘어갈 수 있다.
+30초 안에 두 참가자가 모두 WebSocket에 연결하고 `CLIENT_READY`까지 보내야 다음 RTT 측정 단계로 넘어갈 수 있다.
 
 30초 안에 조건을 만족하지 못하면 `GAME_START` 이전 timeout으로 정리한다. 이 timeout은 아직 유효한 판이 시작되지 않은 실패이므로 `game_records`, LP, 배치/승급전 `RankSeries`에는 반영하지 않는다.
 
@@ -26,7 +26,7 @@ flowchart TD
     E --> F["Update Redis ready state"]
 
     F --> G{"Both users READY<br/>within 30s?"}
-    G -->|"yes"| H["Cleanup waiting timeout<br/>Proceed to RTT / countdown"]
+    G -->|"yes"| H["Cleanup waiting timeout<br/>Proceed to RTT measurement"]
     G -->|"no"| I["Timeout Scheduler<br/>detects expired gameRoom"]
 
     I --> J{"DB gameRoom<br/>status?"}
@@ -281,7 +281,7 @@ cleanup 정책:
 - [x] `CLIENT_READY`를 보낸 userId가 gameRoom의 userA/userB 중 누구인지 확인한다.
 - [x] 이미 timeout 또는 abort된 gameRoom이면 `CLIENT_READY` 처리를 거부하거나 no-op 처리한다.
 - [x] 양쪽 ready가 모두 true가 되면 waiting timeout index를 정리한다.
-- [x] 양쪽 ready가 모두 true이면 다음 RTT/countdown 단계로 넘어갈 수 있는 상태로 둔다.
+- [x] 양쪽 ready가 모두 true이면 다음 RTT 측정 단계로 넘어갈 수 있는 상태로 둔다.
 - [x] `PLAYER_READY` broadcast는 기존 local registry 기반 흐름을 유지한다.
 
 처리 흐름:
@@ -746,7 +746,7 @@ flowchart TD
     D --> E["WebSocket handshake"]
     E --> F["CLIENT_READY"]
     F --> G{"Both READY<br/>within 30s?"}
-    G -->|"yes"| H["Redis waiting cleanup<br/>RTT/countdown 진입 가능"]
+    G -->|"yes"| H["Redis waiting cleanup<br/>RTT 측정 진입 가능"]
     G -->|"no"| I["Timeout Scheduler"]
     I --> J["DB READY 최종 확인"]
     J --> K["gameRoom/participants ABORTED"]
@@ -869,7 +869,7 @@ gameRoom과 WebSocket session 상태는 저장 위치와 의미가 다릅니다.
 stateDiagram-v2
     [*] --> READY: gameRoom 생성 성공
     READY --> ABORTED: createdAt + 30초까지<br/>양쪽 CLIENT_READY 미완료
-    READY --> IN_PROGRESS: 양쪽 CLIENT_READY 이후<br/>RTT/countdown/GAME_START
+    READY --> IN_PROGRESS: 양쪽 CLIENT_READY 이후<br/>RTT 통과 + GAME_START
     IN_PROGRESS --> FINISHED: 게임 정상 종료
     ABORTED --> [*]
     FINISHED --> [*]

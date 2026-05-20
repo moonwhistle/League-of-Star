@@ -24,4 +24,32 @@ class GameWebSocketClientMessageTest {
         assertThat(result.payload().isObject()).isTrue();
         assertThat(result.isClientReady()).isTrue();
     }
+
+    @Test
+    @DisplayName("RTT_PONG 메시지를 공통 envelope로 역직렬화하고 seq를 조회한다")
+    void deserialize_RttPong() throws Exception {
+        // when
+        GameWebSocketClientMessage result = objectMapper.readValue(
+                "{\"type\":\"RTT_PONG\",\"payload\":{\"seq\":3,\"userId\":999,\"gameRoomId\":999}}",
+                GameWebSocketClientMessage.class
+        );
+
+        // then
+        assertThat(result.type()).isEqualTo(GameWebSocketMessageType.RTT_PONG);
+        assertThat(result.isRttPong()).isTrue();
+        assertThat(result.rttSeq()).hasValue(3);
+    }
+
+    @Test
+    @DisplayName("RTT_PONG payload에 seq가 없으면 빈 값을 반환한다")
+    void rttSeq_MissingSeq() throws Exception {
+        // when
+        GameWebSocketClientMessage result = objectMapper.readValue(
+                "{\"type\":\"RTT_PONG\",\"payload\":{}}",
+                GameWebSocketClientMessage.class
+        );
+
+        // then
+        assertThat(result.rttSeq()).isEmpty();
+    }
 }

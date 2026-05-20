@@ -4,8 +4,8 @@
 
 범위:
 
-- 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, `CLIENT_READY`, game waiting timeout, `GAME_WAITING_TIMEOUT`
-- 제외: RTT, countdown, `GAME_START`, SMITE, game record/LP 반영
+- 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, `CLIENT_READY`, game waiting timeout, `GAME_WAITING_TIMEOUT`, RTT 측정 정책
+- 제외: countdown, `GAME_START`, SMITE, game record/LP 반영
 - 게임 대기 WebSocket timeout 기준: gameRoom `createdAt`부터 **30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 모두 완료되어야 함**
 
 ## 1. Overall Flow
@@ -77,6 +77,17 @@ flowchart LR
         WS_TIMEOUT_SEND["Local session 보유 인스턴스만<br/>GAME_WAITING_TIMEOUT 전송 후 close"]
     end
 
+    subgraph RTT["RTT Measurement Before GAME_START"]
+        RTT_STATE["Redis game:rtt:{gameRoomId}<br/>A/B status = PENDING"]
+        RTT_PING["RTT_PING<br/>5 times per user"]
+        RTT_RESULT{"median RTT<br/><= 2000ms?"}
+        RTT_PASSED["A/B status = PASSED<br/>median 유지"]
+        RTT_FAILED["status = FAILED<br/>RTT_FAILED or RTT_TOO_HIGH"]
+        RTT_ABORT["DB game_rooms = ABORTED<br/>DB game_participants = ABORTED<br/>match:status 제거"]
+        RTT_FAIL_EVENT["GAME_START_FAILED<br/>connected sockets only<br/>then close"]
+        NEXT_GAME_START["Step 6<br/>GAME_START + scenario 준비"]
+    end
+
     START --> US_MATCHING
     US_MATCHING --> MQ_WAIT
     MQ_WAIT --> FOUND
@@ -135,6 +146,14 @@ flowchart LR
     WAITING_TIMEOUT --> GAME_WAITING_ABORT
     GAME_WAITING_ABORT --> WS_TIMEOUT_EVENT
     WS_TIMEOUT_EVENT --> WS_TIMEOUT_SEND
+    WAITING_CLEANUP --> RTT_STATE
+    RTT_STATE --> RTT_PING
+    RTT_PING --> RTT_RESULT
+    RTT_RESULT -->|yes| RTT_PASSED
+    RTT_RESULT -->|no / timeout / close / error| RTT_FAILED
+    RTT_PASSED --> NEXT_GAME_START
+    RTT_FAILED --> RTT_ABORT
+    RTT_ABORT --> RTT_FAIL_EVENT
 ```
 
 ## 2. Scenario Summary
@@ -142,6 +161,8 @@ flowchart LR
 | 시나리오 | MatchSessionStore | UserStatusStore | MatchQueueStore | Game DB | 최종 클라이언트 이동 |
 |---|---|---|---|---|---|
 | `ACCEPTED + ACCEPTED` + game setup 성공 | `ACCEPTED` | A/B `IN_GAME` | A/B 제거 유지 | `game_rooms=READY`, participants `READY` | `GO_TO_GAME_WAITING` 후 WebSocket 연결 |
+| WebSocket 양쪽 READY + RTT 정상 | `ACCEPTED` | A/B `IN_GAME` | A/B 제거 유지 | `game_rooms=READY`, participants `READY` | Step 6 `GAME_START` 준비 |
+| WebSocket 양쪽 READY + RTT 실패/초과 | `ACCEPTED` | A/B 제거 | A/B 복귀 없음 | `game_rooms=ABORTED`, participants `ABORTED` | `GAME_START_FAILED` 후 start 버튼 화면 |
 | `ACCEPTED + ACCEPTED` + game setup 실패 | `GAME_SETUP_FAILED` | A/B 제거 | A/B 복귀 없음 | 생성 전이면 없음 | `GO_TO_MATCH_START` |
 | `ACCEPTED + ACCEPTED` + Redis 상태 전환 실패 | `GAME_SETUP_FAILED` best-effort | A/B 제거 best-effort | A/B 복귀 없음 | 생성된 gameRoom/participants `ABORTED` | `GO_TO_MATCH_START` |
 | `ACCEPTED + REJECTED` | `DECLINED` | accepted user `MATCHING`, rejected user 제거 | accepted user 기존 entryTime으로 복귀 | 없음 | `GO_TO_MATCH_START` |
@@ -159,11 +180,19 @@ flowchart LR
 | handshake 성공 | `CONNECTED` | API local memory `GameRoomWebSocketSessionRegistry` |
 | `CLIENT_READY` 수신 | `READY` | Redis `game:waiting:{gameRoomId}` + API local memory `GameRoomWebSocketSessionRegistry` |
 | 30초 안에 양쪽 `READY` 미완료 | `ABORTED` | DB `game_rooms`, `game_participants`; Redis `game_waiting_timeout` Pub/Sub |
+| 양쪽 `READY` 완료 후 RTT 측정 중 | `PENDING` | Redis `game:rtt:{gameRoomId}` |
+| RTT median 2000ms 이하 | `PASSED` | Redis `game:rtt:{gameRoomId}`. SMITE 판정 보정을 위해 게임 종료 전까지 유지 |
+| RTT 응답 누락/close/error/예외 또는 median 2000ms 초과 | `FAILED` | DB `game_rooms`, `game_participants`; WebSocket `GAME_START_FAILED` |
 
 주의:
 
 - WebSocket `CONNECTED`는 DB `game_participants.status=READY`와 다릅니다.
-- gameRoom `createdAt`부터 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료해야 RTT/countdown 단계로 넘어갑니다.
+- gameRoom `createdAt`부터 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료해야 RTT 측정 단계로 넘어갑니다.
+- RTT 측정은 양쪽 `CLIENT_READY` 이후 `GAME_START` 이전에 수행합니다.
+- 각 유저별 RTT는 5회 측정하고 median 값을 사용합니다.
+- 각 `RTT_PING`은 2500ms 안에 응답해야 하며, 5회 측정 구조상 gameRoom 전체 RTT 측정은 최대 15초 안에 완료되어야 합니다.
+- median RTT 2000ms 초과는 `RTT_TOO_HIGH`, 응답 누락/close/error/측정 중 예외는 `RTT_FAILED`로 처리합니다.
+- RTT 실패/초과는 `GAME_START` 이전 실패이므로 gameRoom/participants를 `ABORTED`로 정리하고 record/LP를 반영하지 않습니다.
 - 멀티 인스턴스에서는 같은 `gameRoomId`가 같은 API 인스턴스로 라우팅되어야 WebSocket registry가 정상 동작합니다.
 - timeout 판정은 local registry가 아니라 Redis waiting ready 상태와 DB gameRoom status를 기준으로 합니다.
 - timeout 이벤트는 Redis Pub/Sub으로 모든 API 인스턴스에 전파하고, 실제 local session을 가진 인스턴스만 WebSocket 전송/close를 수행합니다.
@@ -175,3 +204,4 @@ flowchart LR
 | 2026-05-15 | 매칭 시작부터 WebSocket 연결까지 시나리오별 status 흐름을 하나의 Mermaid 다이어그램으로 정리 |
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정하고 `CLIENT_READY` 완료 조건 명시 |
 | 2026-05-19 | Redis waiting ready 상태, timeout scheduler, Pub/Sub, local session 보유 인스턴스 전송 흐름 반영 |
+| 2026-05-19 | RTT 5회 median 측정, 2500ms per-ping timeout, 15초 전체 제한, RTT 실패/초과 시 GAME_START 이전 ABORTED 정책 반영 |

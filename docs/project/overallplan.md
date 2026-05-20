@@ -119,9 +119,11 @@ HP: ████░██████░░█░░████░░█░░�
 
 ### 3.4 RTT 보정
 
-- 게임 시작 세팅 화면에서 5회 Ping-Pong 측정, **중간값(Median)** 사용
+- 게임 대기 WebSocket에서 각 유저별 5회 Ping-Pong 측정, **중간값(Median)** 사용
 - 서버는 `smite_time = (server_receive_time - game_start_time) - RTT/2` 방식으로 보정
-- RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도)
+- median RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도)
+- 각 `RTT_PING`은 2500ms 안에 응답해야 하며, 5회 측정 구조상 gameRoom 전체 RTT 측정은 최대 15초 안에 완료되어야 함
+- `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 처리
 
 ---
 
@@ -387,6 +389,7 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-04-24 | 프론트엔드 기술 스택 고도화 (PixiJS, Web Worker 도입) |
 | 2026-04-27 | 통합 시리즈 아키텍처(RankSeries) 도입 및 도메인 정규화 |
 | 2026-05-13 | 매칭 SSE는 `match_response_result`까지, 게임 준비/RTT/카운트다운/SMITE/종료는 WebSocket으로 처리하는 흐름 반영. gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 정책 추가 |
+| 2026-05-19 | RTT 5회 median 측정, per-ping 2500ms timeout, GAME_START 이전 실패 시 `GAME_START_FAILED` 복귀 정책 반영 |
 | 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화. PixiJS/Web Worker/OffscreenCanvas/STOMP/SockJS는 MVP 이후 검토로 이동 |
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GAME_SETUP_FAILED` reason 기준으로 start 버튼 화면 복귀하도록 정책 조정 |
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책과 8~17초 게임 시간 반영 |

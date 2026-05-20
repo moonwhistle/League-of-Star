@@ -7,8 +7,8 @@ import com.sang.smite.game.websocket.dto.GameWebSocketServerMessage;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSession;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSessionRegistry;
 import com.sang.smite.game.websocket.session.GameWebSocketSessionAttribute;
-import com.sang.smite.game.waiting.domain.GameWaitingReadyResult;
-import com.sang.smite.game.waiting.service.GameWaitingReadyService;
+import com.sang.smite.game.websocket.service.GameRoomWebSocketMessageSender;
+import com.sang.smite.game.websocket.service.GameWaitingWebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,6 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -29,7 +28,8 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper objectMapper;
     private final GameRoomWebSocketSessionRegistry sessionRegistry;
-    private final GameWaitingReadyService gameWaitingReadyService;
+    private final GameWaitingWebSocketService gameWaitingWebSocketService;
+    private final GameRoomWebSocketMessageSender messageSender;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -40,8 +40,7 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        sessionRegistry.register(gameRoomId, userId, session);
-        broadcast(gameRoomId, GameWebSocketServerMessage.playerJoined(userId));
+        gameWaitingWebSocketService.registerSession(gameRoomId, userId, session);
     }
 
     @Override
@@ -60,67 +59,40 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        if (!isSupportedClientMessage(clientMessage)) {
+        if (!isClientMessage(clientMessage)) {
             send(session, GameWebSocketServerMessage.invalidMessageType());
             return;
         }
 
-        handleClientReady(currentSession.get());
+        if (clientMessage.isClientReady()) {
+            gameWaitingWebSocketService.handleClientReady(currentSession.get());
+            return;
+        }
+        if (clientMessage.isRttPong()) {
+            gameWaitingWebSocketService.handleRttPong(currentSession.get(), clientMessage);
+            return;
+        }
+
+        send(session, GameWebSocketServerMessage.invalidMessageType());
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        cleanupSession(session);
+        gameWaitingWebSocketService.cleanupSession(session);
     }
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
         log.warn("Game waiting WebSocket transport error. sessionId={}", session.getId(), exception);
-        cleanupSession(session);
+        gameWaitingWebSocketService.cleanupSession(session);
         if (session.isOpen()) {
             session.close(CloseStatus.SERVER_ERROR);
         }
     }
 
-    private boolean isSupportedClientMessage(GameWebSocketClientMessage clientMessage) {
+    private boolean isClientMessage(GameWebSocketClientMessage clientMessage) {
         return clientMessage.type() != null
-                && clientMessage.type().isClientMessage()
-                && clientMessage.isClientReady();
-    }
-
-    private void handleClientReady(GameRoomWebSocketSession currentSession) throws IOException {
-        Long gameRoomId = currentSession.getGameRoomId();
-        Long userId = currentSession.getUserId();
-        GameWaitingReadyResult readyResult = gameWaitingReadyService.markReady(gameRoomId, userId);
-        if (!readyResult.accepted()) {
-            WebSocketSession webSocketSession = currentSession.getWebSocketSession();
-            sessionRegistry.unregister(webSocketSession.getId());
-            if (webSocketSession.isOpen()) {
-                webSocketSession.close(CloseStatus.POLICY_VIOLATION);
-            }
-            return;
-        }
-
-        sessionRegistry.markReady(gameRoomId, userId);
-        broadcast(gameRoomId, GameWebSocketServerMessage.playerReady(userId, readyResult.bothReady()));
-    }
-
-    private void cleanupSession(WebSocketSession session) {
-        Optional<GameRoomWebSocketSession> currentSession = sessionRegistry.findBySessionId(session.getId());
-        if (currentSession.isEmpty()) {
-            return;
-        }
-
-        GameRoomWebSocketSession removedSession = currentSession.get();
-        sessionRegistry.unregister(session.getId());
-        try {
-            broadcast(
-                    removedSession.getGameRoomId(),
-                    GameWebSocketServerMessage.playerLeft(removedSession.getUserId())
-            );
-        } catch (IOException e) {
-            log.warn("Failed to broadcast player left message. sessionId={}", session.getId(), e);
-        }
+                && clientMessage.type().isClientMessage();
     }
 
     private Long getRequiredLongAttribute(WebSocketSession session, String attributeName) {
@@ -134,21 +106,7 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
         return null;
     }
 
-    private void broadcast(Long gameRoomId, GameWebSocketServerMessage message) throws IOException {
-        List<GameRoomWebSocketSession> sessions = sessionRegistry.findByRoom(gameRoomId);
-        String payload = objectMapper.writeValueAsString(message);
-        for (GameRoomWebSocketSession session : sessions) {
-            send(session.getWebSocketSession(), payload);
-        }
-    }
-
     private void send(WebSocketSession session, GameWebSocketServerMessage message) throws IOException {
-        send(session, objectMapper.writeValueAsString(message));
-    }
-
-    private void send(WebSocketSession session, String payload) throws IOException {
-        if (session.isOpen()) {
-            session.sendMessage(new TextMessage(payload));
-        }
+        messageSender.send(session, message);
     }
 }
