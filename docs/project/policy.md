@@ -134,10 +134,11 @@
 - 정산 대상 조회 시작 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 등록한다.
 - `settlementDueAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각이다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
 - 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않는다. 서버 종료 기준은 `startAt + scenario.durationMs`다.
-- `inputGraceMs`는 2000ms로 둔다. 자연사 직전 입력이 서버에 도착할 수 있는 여유 시간이며, RTT 보정 판정 자체는 기존 서버 수신 시각과 median RTT 기준을 유지한다.
+- `inputGraceMs`는 2000ms로 둔다. 자연사 직전 입력이 서버에 도착할 수 있는 여유 시간이며, SMITE 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리한다.
 - `GAME_START` 확정 후 `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom과 participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않는다. 이 경우 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫으며, record와 LP/티어 변동은 반영하지 않는다.
 - `GAME_START` 메시지 전송에 실패하면 이미 등록된 `game:end:pending` deadline을 제거하고 gameRoom과 participants를 `ABORTED` 처리한다. 이 경우 match user status, RTT 상태, waiting 상태를 정리하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫는다.
 - game end scheduler는 `settlementDueAt`에 도달한 gameRoom만 정산 대상으로 삼고, 정산 시 gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
+- SMITE로 승/패가 확정되거나 두 유저가 모두 SMITE를 소모해 `DRAW`가 확정된 경우에도 `game:end:pending` member cleanup은 필수로 하지 않는다. DB의 `game_rooms.status`가 최종 기준이며, 후속 game end scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
 - `GAME_START` 이후 결과가 승/패로 확정되면 일반 게임 결과처럼 record와 LP를 반영한다.
 - `GAME_START` 이후 결과가 무승부면 record는 무승부로 저장하고 LP는 변동하지 않는다.
 
@@ -151,15 +152,20 @@
 1. 클라이언트 → 서버: WebSocket으로 "SMITE" 액션만 전송 (시간 정보 없음)
 2. 서버: 수신 시각을 직접 기록 (server_receive_time)
 3. 서버: 판정 시점 계산
-   → smite_time = (server_receive_time - game_start_time) - RTT / 2
+   → smite_time = server_receive_time - game_start_time
 4. 서버: 시나리오에서 smite_time 시점의 HP를 역산
 5. 서버: HP ≤ 1200이면 킬 성공
 ```
 
 - 클라이언트는 **시간 정보를 전송하지 않음** → 시간 조작 원천 차단
 - 서버가 직접 측정한 수신 시각만 사용 → 판정의 신뢰성 확보
-- RTT/2 보정으로 네트워크 지연 보상
-- RTT 측정과 SMITE 입력은 같은 WebSocket 경로에서 처리하여 보정 기준을 일관되게 유지
+- RTT 보정은 SMITE 판정에 사용하지 않음
+- RTT 측정은 `GAME_START` 전 연결 품질 검사와 비정상 네트워크 환경 차단에만 사용
+- SMITE 판정은 실제 롤 강타 감각에 맞춰 서버가 받은 입력 순서를 기준으로 처리
+- 드래곤 초기 HP는 `10000`, SMITE 데미지는 `1200` 고정값으로 둔다.
+- `game_actions.dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 이전 SMITE 데미지를 반영한 이번 SMITE 적용 전 현재 HP를 저장한다.
+- 킬 실패한 SMITE도 이후 HP 판정에는 `1200` 데미지로 반영한다.
+- `afterHp = max(0, dragonHpAtSmite - 1200)`은 응답 payload에서 계산하고 DB에는 저장하지 않는다.
 
 #### RTT 측정
 
@@ -173,13 +179,13 @@
 | **전체 측정 제한** | 5회 측정과 per-ping 2500ms timeout 기준 gameRoom RTT 측정은 최대 15초 안에 완료되어야 함 |
 | **실패 기준** | `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED` |
 | **초과 기준** | 5회 측정은 완료했지만 median RTT가 2000ms를 초과하면 `RTT_TOO_HIGH` |
-| **성공 상태 보존** | median RTT는 이후 SMITE 보정에 필요하므로 게임 판정 완료 전까지 Redis에 유지 |
+| **성공 상태 보존** | RTT `PASSED` 상태는 `GAME_START` 결정 전까지 유지하고, SMITE 판정에는 사용하지 않음 |
 
 #### GAME_START 시작 동기화
 
 | 규칙 | 내용 |
 |------|------|
-| **진입 조건** | 양쪽 RTT가 모두 `PASSED`이고 양쪽 median RTT가 저장된 gameRoom만 `GAME_START`로 진입 |
+| **진입 조건** | 양쪽 RTT가 모두 `PASSED`인 gameRoom만 `GAME_START`로 진입 |
 | **시작 기준** | 서버가 `startAt = serverNow + 4000ms`로 절대 시작 시각을 확정 |
 | **카운트다운 표시** | 클라이언트는 `startAt`까지 남은 시간이 3000ms 이하가 되면 `3, 2, 1`을 렌더링 |
 | **메시지 전송 시점** | 서버는 `COUNTDOWN`과 `GAME_START`를 countdown 종료 후가 아니라 `startAt` 전에 미리 전송 |

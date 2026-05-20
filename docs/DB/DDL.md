@@ -154,7 +154,7 @@ stateDiagram-v2
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| 강타 입력 | INSERT | 서버 수신 시각, RTT 보정, HP 역산 결과 저장 |
+| 강타 입력 | INSERT | 서버 수신 시각 기준 입력 시점, HP 역산 결과 저장 |
 
 - **불변(Immutable)**: 한번 기록되면 수정 없음
 - **조건부 생성**: 강타 사용 시에만 생성 (미사용 시 행 없음)
@@ -400,9 +400,8 @@ CREATE TABLE game_participants (
 | `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 게임 방 |
 | `user_id` | BIGINT | FK → users, NOT NULL | 강타 사용 유저 |
 | `server_receive_time_ms` | BIGINT | NOT NULL | 서버 수신 시각 (epoch ms) |
-| `rtt_ms` | INT | NOT NULL | 측정된 RTT (ms) |
-| `smite_time_ms` | INT | NOT NULL | 보정된 강타 시점 (게임 시작 기준 ms) |
-| `dragon_hp_at_smite` | INT | NOT NULL | 역산된 드래곤 HP |
+| `smite_time_ms` | INT | NOT NULL | 서버 수신 시각 기준 강타 시점 (게임 시작 기준 ms) |
+| `dragon_hp_at_smite` | INT | NOT NULL | 이전 SMITE 데미지 반영 후, 이번 SMITE 적용 전 현재 HP |
 | `is_kill` | BOOLEAN | NOT NULL | 킬 성공 여부 (HP 1200 이하) |
 | `created_at` | DATETIME | NOT NULL | 기록일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
@@ -413,7 +412,6 @@ CREATE TABLE game_actions (
     game_room_id            BIGINT   NOT NULL,
     user_id                 BIGINT   NOT NULL,
     server_receive_time_ms  BIGINT   NOT NULL,
-    rtt_ms                  INT      NOT NULL,
     smite_time_ms           INT      NOT NULL,
     dragon_hp_at_smite      INT      NOT NULL,
     is_kill                 BOOLEAN  NOT NULL,
@@ -425,6 +423,10 @@ CREATE TABLE game_actions (
     CONSTRAINT fk_game_actions_user FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
+
+- `dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 같은 gameRoom에서 더 이른 SMITE 데미지를 모두 반영한 현재 HP입니다.
+- SMITE 데미지는 정책상 `1200` 고정이므로 별도 컬럼으로 저장하지 않습니다.
+- `afterHp = max(0, dragon_hp_at_smite - 1200)`은 WebSocket 응답에서 계산하는 값이며 DB에는 저장하지 않습니다.
 
 > **uk_game_room_user**: 한 게임에서 유저당 강타 1회만 → 유니크 제약으로 DB 레벨 보장
 
@@ -499,7 +501,7 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 | `game:waiting:{gameRoomId}` | Hash | gameRoom waiting ready 상태. `userAId`, `userBId`, `userAReady`, `userBReady`, `createdAtMillis`, `deadlineAtMillis` | 60초 |
 | `game:waiting:timeout:lock:{gameRoomId}` | Redis Lock | 멀티 인스턴스 scheduler 중복 timeout 정산 방지 | 작업 lease |
 | `game_waiting_timeout` | Pub/Sub Channel | timeout 확정 후 모든 API 인스턴스에 WebSocket 전송 이벤트 전파 | - |
-| `game:rtt:{gameRoomId}` | Hash | `GAME_START` 이전 RTT 측정 결과. `userAId`, `userBId`, `userASamples`, `userBSamples`, `userAMedianRttMs`, `userBMedianRttMs`, `userAStatus`, `userBStatus` | 300초 |
+| `game:rtt:{gameRoomId}` | Hash | `GAME_START` 이전 RTT 품질 검사 결과. `userAId`, `userBId`, `userASamples`, `userBSamples`, `userAStatus`, `userBStatus` | 300초 |
 | `game:end:pending` | Sorted Set | GAME_START 이후 종료 정산 후보. score = `settlementDueAtMillis`, member = `gameRoomId` | - |
 
 > 매칭 응답 완료 전 상태는 Redis가 관리합니다. 양쪽 수락 후 gameRoom `READY` 생성이 완료되면 game waiting timeout 상태도 Redis에 등록합니다.
@@ -512,15 +514,13 @@ game:rtt:{gameRoomId}
   userBId = 2
   userASamples = "34,36,35,38,41"
   userBSamples = "45,44,49,46,48"
-  userAMedianRttMs = 36
-  userBMedianRttMs = 46
   userAStatus = PASSED
   userBStatus = PASSED
 ```
 
 - status는 `PENDING`, `PASSED`, `FAILED`만 사용합니다.
 - `RTT_FAILED`, `RTT_TOO_HIGH` reason은 이벤트/로그 용도이며 Redis RTT HASH에는 별도 reason field를 두지 않습니다.
-- RTT 성공 시 median RTT는 SMITE 판정 보정에 필요하므로 게임 종료 전까지 유지합니다.
+- median RTT는 `PASSED`/`FAILED` 판단에만 사용하며 SMITE 판정 보정에는 사용하지 않습니다.
 - RTT 실패/초과 또는 게임 정상 종료 시 `game:rtt:{gameRoomId}`를 cleanup합니다.
 - TTL 300초는 cleanup 누락 방지용 안전장치이며, 게임 진행/판정 시간을 충분히 감싸기 위한 값입니다.
 
@@ -538,6 +538,7 @@ ZADD game:end:pending settlementDueAtMillis gameRoomId
 - `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending` cleanup을 시도하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 이미 등록된 `game:end:pending` member를 제거하고 gameRoom/participants를 `ABORTED` 처리합니다.
 - 후속 game end scheduler는 `settlementDueAtMillis`가 지난 gameRoom을 조회하고, gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
+- SMITE로 먼저 `FINISHED`된 gameRoom의 member가 `game:end:pending`에 남아 있어도 정상입니다. DB 상태가 최종 기준이며 scheduler no-op으로 정리합니다.
 
 후속 게임 흐름에서 사용할 예정인 Redis 구조:
 
