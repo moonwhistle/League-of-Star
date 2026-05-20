@@ -46,10 +46,19 @@ flowchart TD
 
 ### 2. 시작 조건 확인
 
-- [ ] Redis RTT 상태에서 양쪽 `PASSED`와 median RTT 존재 여부를 조회한다.
-- [ ] gameRoom 현재 상태가 `READY`인지 확인한다.
-- [ ] 이미 `IN_PROGRESS`, `ABORTED`, `FINISHED`인 gameRoom은 중복 시작하지 않는다.
-- [ ] WebSocket local session이 양쪽 모두 존재하는지 확인한다.
+- [x] Redis RTT 상태에서 양쪽 `PASSED`와 median RTT 존재 여부를 조회한다.
+- [x] gameRoom 현재 상태가 `READY`인지 확인한다.
+- [x] 이미 `IN_PROGRESS`, `ABORTED`, `FINISHED`인 gameRoom은 중복 시작하지 않는다.
+- [x] WebSocket local session이 양쪽 모두 존재하는지 확인한다.
+
+구현 결과:
+
+- `GameStartConditionService.checkStartReady(gameRoomId)`로 Step 6 진입 조건을 한 곳에서 확인한다.
+- RTT 조건은 `GameRttMeasurementService.findStartReadyState(gameRoomId)` 결과를 기준으로 한다.
+- RTT 상태가 없거나 양쪽 `PASSED`와 median RTT가 모두 준비되지 않았으면 `RTT_NOT_READY`로 차단한다.
+- DB gameRoom이 `READY`가 아니면 `GAME_ROOM_NOT_READY`로 차단한다. 따라서 이미 `IN_PROGRESS`, `ABORTED`, `FINISHED`인 gameRoom은 중복 시작되지 않는다.
+- sticky session 전제에서 local WebSocket registry에 RTT 통과 유저 A/B session이 모두 있어야 시작 가능하다. 둘 중 하나라도 없으면 `WEB_SOCKET_SESSION_NOT_READY`로 차단한다.
+- 이 단계는 조건 확인만 담당한다. `READY -> IN_PROGRESS`, `COUNTDOWN`, `GAME_START` 전송은 이후 task에서 처리한다.
 
 ### 3. HP scenario payload 확정
 
