@@ -137,12 +137,29 @@ lock 비용 판단:
 
 ### 5. WebSocket 메시지 정의 및 전송
 
-- [ ] server message `COUNTDOWN`을 정의한다.
-- [ ] `COUNTDOWN` payload에 `gameRoomId`, `serverTime`, `startAt`, `countdownDisplaySeconds=3`을 포함한다.
-- [ ] server message `GAME_START`를 정의한다.
-- [ ] `GAME_START` payload에 `gameRoomId`, `serverTime`, `startAt`, `scenario`를 포함한다.
-- [ ] 두 메시지는 같은 `startAt`을 사용한다.
-- [ ] 클라이언트는 `GAME_START`를 받더라도 즉시 시작하지 않고 `startAt`까지 대기한다.
+- [x] server message `COUNTDOWN`을 정의한다.
+- [x] `COUNTDOWN` payload에 `gameRoomId`, `serverTime`, `startAt`, `countdownDisplaySeconds=3`을 포함한다.
+- [x] server message `GAME_START`를 정의한다.
+- [x] `GAME_START` payload에 `gameRoomId`, `serverTime`, `startAt`, `scenario`를 포함한다.
+- [x] 두 메시지는 같은 `startAt`을 사용한다.
+- [x] 클라이언트는 `GAME_START`를 받더라도 즉시 시작하지 않고 `startAt`까지 대기한다.
+
+구현 결과:
+
+- `GameWebSocketMessageType`에 server message `COUNTDOWN`, `GAME_START`를 추가했다.
+- `GameWebSocketServerMessage.countdown(...)` factory를 추가했다.
+  - payload: `gameRoomId`, `serverTime`, `startAt`, `countdownDisplaySeconds`
+- `GameWebSocketServerMessage.gameStart(...)` factory를 추가했다.
+  - payload: `gameRoomId`, `serverTime`, `startAt`, `scenario`
+- `GameStartConstants.COUNTDOWN_DISPLAY_SECONDS = 3`으로 countdown 표시 시간을 상수화했다.
+- `GameStartWebSocketSender.sendStart(...)`에서 같은 `serverTime`과 `startAt`으로 `COUNTDOWN`을 먼저 broadcast하고, 이어서 `GAME_START`를 broadcast한다.
+- `GameWaitingWebSocketService.handleRttPong(...)`는 RTT sample 저장이 완료되고 해당 유저가 `PASSED`인 경우에만 game start 시도를 수행한다.
+- game start 시도는 다음 순서로 진행한다.
+  1. `GameStartScenarioService.getScenarioPayload(gameRoomId)`로 HP scenario payload를 조회한다.
+  2. `GameStartTransitionService.transitionToInProgress(gameRoomId)`로 Step 4 시작 전환을 수행한다.
+  3. `transitionResult.started() == true`인 경우에만 `COUNTDOWN` / `GAME_START`를 전송한다.
+  4. 시작 조건 미충족, DB 상태 전환 실패, scenario 조회 실패 시 시작 메시지를 보내지 않는다.
+- `GAME_START` payload의 `startAt`은 실제 게임 시작 기준 시각이다. 클라이언트는 이 메시지를 수신해도 즉시 시작하지 않고 `startAt`까지 대기한다.
 
 ### 6. game end timer/scheduler 등록 지점 정의
 

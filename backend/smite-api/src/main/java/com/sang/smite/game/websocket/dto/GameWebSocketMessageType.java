@@ -18,6 +18,8 @@ public enum GameWebSocketMessageType {
     RTT_PING(Direction.SERVER),
     GAME_WAITING_TIMEOUT(Direction.SERVER),
     GAME_START_FAILED(Direction.SERVER),
+    COUNTDOWN(Direction.SERVER),
+    GAME_START(Direction.SERVER),
     ERROR(Direction.SERVER);
 
     private final Direction direction;

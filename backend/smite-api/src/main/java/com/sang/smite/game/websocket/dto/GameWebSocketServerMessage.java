@@ -1,5 +1,7 @@
 package com.sang.smite.game.websocket.dto;
 
+import com.sang.smite.game.start.dto.GameStartScenarioPayload;
+
 /**
  * 서버가 게임 대기 WebSocket으로 보내는 공통 메시지 envelope입니다.
  */
@@ -52,6 +54,26 @@ public record GameWebSocketServerMessage(
         );
     }
 
+    public static GameWebSocketServerMessage countdown(Long gameRoomId,
+                                                       long serverTime,
+                                                       long startAt,
+                                                       int countdownDisplaySeconds) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.COUNTDOWN,
+                new CountdownPayload(gameRoomId, serverTime, startAt, countdownDisplaySeconds)
+        );
+    }
+
+    public static GameWebSocketServerMessage gameStart(Long gameRoomId,
+                                                       long serverTime,
+                                                       long startAt,
+                                                       GameStartScenarioPayload scenario) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.GAME_START,
+                new GameStartPayload(gameRoomId, serverTime, startAt, scenario)
+        );
+    }
+
     public static GameWebSocketServerMessage invalidMessageType() {
         return error(ERROR_INVALID_MESSAGE_TYPE, "Unsupported WebSocket message type.");
     }
@@ -76,6 +98,18 @@ public record GameWebSocketServerMessage(
     }
 
     public record RttPingPayload(int seq) {
+    }
+
+    public record CountdownPayload(Long gameRoomId,
+                                   long serverTime,
+                                   long startAt,
+                                   int countdownDisplaySeconds) {
+    }
+
+    public record GameStartPayload(Long gameRoomId,
+                                   long serverTime,
+                                   long startAt,
+                                   GameStartScenarioPayload scenario) {
     }
 
     public record ErrorPayload(String code, String reason) {
