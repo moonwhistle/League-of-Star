@@ -46,7 +46,7 @@
 - `GAME_START` 이후 disconnect는 게임을 중단하지 않고 서버 timer/scheduler, 시나리오, 수신 액션 기준으로 끝까지 판정
 - WebSocket 연결이 모두 끊겨도 서버 timer/scheduler가 gameRoom 종료 작업을 완료
 - GAME_START 확정 시 `gameEndAt = startAt + scenario.durationMs`, `settlementDueAt = gameEndAt + 2000ms`로 종료 정산 deadline을 등록
-- deadline 등록 실패 시 gameRoom/participants를 `ABORTED` 처리하고 record/LP를 반영하지 않음
+- deadline 등록 실패 시 `game:end:pending`, match user status, RTT/waiting 상태 cleanup을 시도하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않음
 - `COUNTDOWN`/`GAME_START` 전송 실패 시 등록된 deadline을 제거하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않음
 - 드래곤 위에 **마우스를 올린 상태**에서 **D 또는 F 키**를 눌러 강타 발동
 - 각 플레이어는 **단 한 번** 강타 사용 가능

@@ -184,9 +184,9 @@ lock 비용 판단:
 - `GameEndScheduleService.registerEndDeadline(gameRoomId, startAtMillis, durationMs)`에서 `gameEndAtMillis`, `settlementDueAtMillis`를 계산한다.
 - `GameEndScheduleStore` port를 추가해 종료 정산 등록 책임을 분리했다.
 - `RedisGameEndScheduleStore`는 `game:end:pending` ZSET에 `member=gameRoomId`, `score=settlementDueAtMillis`로 등록한다.
-- `RedisGameEndScheduleStore.cleanupEndDeadline(gameRoomId)`로 시작 메시지 전송 실패 시 이미 등록된 deadline을 제거한다.
+- `RedisGameEndScheduleStore.cleanupEndDeadline(gameRoomId)`로 deadline 등록 실패 또는 시작 메시지 전송 실패 시 남아 있을 수 있는 deadline을 제거한다.
 - `GameWaitingWebSocketService`는 `transitionResult.started() == true` 이후, `COUNTDOWN` / `GAME_START` 전송 전에 종료 deadline을 등록한다.
-- deadline 등록이 실패하면 이미 `IN_PROGRESS`로 전환된 gameRoom을 `ABORTED`로 보상 전환하고 시작 메시지를 보내지 않는다.
+- deadline 등록이 실패하면 이미 `IN_PROGRESS`로 전환된 gameRoom을 `ABORTED`로 보상 전환하고 시작 메시지를 보내지 않으며 `game:end:pending` cleanup을 시도한다.
 - 이 abort는 서버가 game end scheduler 기반 종료를 보장할 수 없는 인프라 실패로 보며, game record와 LP/티어 변동은 반영하지 않는다.
 
 ### 7. 실패/예외 처리
@@ -202,7 +202,7 @@ lock 비용 판단:
 
 - `GameStartFailureReason`으로 시작 실패 사유를 분리했다.
 - `GameStartFailureProcessor`가 `IN_PROGRESS -> ABORTED` 보상, match user status 제거, RTT 상태 cleanup, waiting 상태 cleanup, `GAME_START_FAILED` 전송/close를 담당한다.
-- `GAME_START_MESSAGE_SEND_FAILED`는 deadline 등록 이후 실패이므로 `game:end:pending`에서도 gameRoom을 제거한다.
+- `GAME_END_DEADLINE_REGISTRATION_FAILED`와 `GAME_START_MESSAGE_SEND_FAILED`는 모두 `game:end:pending`에서도 gameRoom 제거를 시도한다.
 - RTT 상태 조회가 실패해도 DB abort와 실패 이벤트 전송을 먼저 보장한다.
 - 실패 상태 저장소 cleanup은 개별 best-effort로 수행하고 실패 시 로그를 남긴다.
 
@@ -214,6 +214,8 @@ lock 비용 판단:
 - [x] `COUNTDOWN`과 `GAME_START`가 같은 `startAt`을 사용하는지 검증한다.
 - [x] `GAME_START` payload에 HP scenario가 포함되는지 검증한다.
 - [x] 이미 시작된 gameRoom의 중복 시작을 방지하는지 검증한다.
+- [x] scenario 조회 실패, deadline 등록 실패, 시작 메시지 전송 실패가 `GameStartFailureProcessor`로 위임되는지 검증한다.
+- [x] 시작 실패 보상 처리에서 gameRoom abort, match status 제거, RTT/waiting cleanup, 실패 이벤트 전송, deadline cleanup을 검증한다.
 
 ### 9. 문서
 

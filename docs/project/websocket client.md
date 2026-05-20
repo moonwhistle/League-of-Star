@@ -315,7 +315,7 @@ sequenceDiagram
 - `GAME_START` 이전에는 gameRoom `createdAt` 기준 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료하지 못하면 `ABORTED` 대상이 됩니다.
 - `GAME_START` 이후에는 WebSocket 연결이 끊겨도 gameRoom을 즉시 중단하지 않고 서버 timer/scheduler가 종료 판정을 완료합니다.
 - 서버는 `GAME_START` 확정 시 `gameEndAt = startAt + scenario.durationMs`, `settlementDueAt = gameEndAt + 2000ms`로 종료 정산 deadline을 등록합니다.
-- deadline 등록 실패 시 서버는 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 record/LP를 반영하지 않습니다.
+- deadline 등록 실패 시 서버는 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 상태 저장소 cleanup을 수행합니다. 연결된 클라이언트에는 `GAME_START_FAILED`를 전송하고 record/LP는 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송 실패 시 서버는 `GAME_START_FAILED` 전송 후 WebSocket을 닫고, 클라이언트는 start 버튼 화면으로 복귀합니다.
 
 ## 9. 게임 대기 Timeout과 미연결
@@ -542,7 +542,7 @@ sequenceDiagram
 | `PLAYER_LEFT` | gameRoom 참가자 WebSocket 연결 종료 |
 | `GAME_WAITING_TIMEOUT` | gameRoom `createdAt` 기준 30초 안에 양쪽 READY가 완료되지 않아 start 버튼 화면으로 복귀해야 함 |
 | `RTT_PING` | 서버가 RTT 측정을 위해 보내는 ping. 클라이언트는 같은 `seq`로 `RTT_PONG` 응답 |
-| `GAME_START_FAILED` | RTT 실패/초과로 GAME_START 전에 gameRoom이 `ABORTED` 되어 start 버튼 화면으로 복귀해야 함 |
+| `GAME_START_FAILED` | RTT 실패/초과 또는 GAME_START 확정 중 실패로 gameRoom이 `ABORTED` 되어 start 버튼 화면으로 복귀해야 함 |
 | `COUNTDOWN` | 서버 기준 `startAt`까지 남은 시간을 렌더링하기 위한 시작 예고 |
 | `GAME_START` | `startAt`과 HP scenario를 포함한 실제 게임 시작 데이터 |
 | `ERROR` | 잘못된 메시지 또는 처리 불가 |
