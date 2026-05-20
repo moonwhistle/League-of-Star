@@ -242,7 +242,7 @@ stateDiagram-v2
     [*] --> READY: 게임 세션 생성 완료
     READY --> ABORTED: createdAt 기준 30초 안에<br/>WebSocket 연결 + CLIENT_READY 미완료
     READY --> ABORTED: RTT_FAILED 또는 RTT_TOO_HIGH<br/>GAME_START 이전 실패
-    READY --> IN_PROGRESS: RTT PASSED 이후<br/>GAME_START
+    READY --> IN_PROGRESS: RTT PASSED 이후<br/>startAt 확정 + GAME_START
     
     state IN_PROGRESS {
         [*] --> WAITING_ACTION: 강타 대기
@@ -263,6 +263,9 @@ stateDiagram-v2
 - RTT 측정은 양쪽 `CLIENT_READY` 이후 `GAME_START` 이전 단계입니다.
 - RTT 측정 실패, median RTT 2000ms 초과, RTT 측정 중 WebSocket close/error는 모두 `GAME_START` 이전 실패로 보고 `ABORTED` 처리하며 record/LP를 반영하지 않습니다.
 - RTT 실패 reason은 단순하게 `RTT_FAILED`, `RTT_TOO_HIGH`만 사용합니다.
+- `GAME_START`는 양쪽 RTT `PASSED`와 median RTT 저장이 확인된 경우에만 진행합니다.
+- 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링합니다.
+- `COUNTDOWN`과 `GAME_START`는 countdown 종료 후가 아니라 `startAt` 전에 미리 전송하며, 반드시 같은 `startAt`을 사용합니다.
 - `GAME_START` 이후 disconnect는 gameRoom을 `ABORTED`로 만들지 않습니다.
 - disconnect 유저는 이후 추가 입력을 할 수 없지만, 이미 서버가 수신한 액션은 유지합니다.
 - WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료합니다.
@@ -296,7 +299,7 @@ stateDiagram-v2
     REPLACED --> [*]: 기존 session 닫기
     WAITING_TIMEOUT --> [*]: gameRoom ABORTED<br/>session close 또는 미연결 유지
     RTT_FAILED --> [*]: GAME_START_FAILED<br/>gameRoom ABORTED + session close
-    RTT_PASSED --> [*]: Step 6 GAME_START 준비
+    RTT_PASSED --> [*]: Step 6 startAt 확정<br/>COUNTDOWN/GAME_START
 ```
 
 | 상태 | 저장 위치 | 의미 |
@@ -308,6 +311,7 @@ stateDiagram-v2
 | `READY` | API local memory registry | 클라이언트가 `CLIENT_READY`를 보내 대기 준비 완료 |
 | `RTT_MEASURING` | Redis `game:rtt:{gameRoomId}` + API local memory | 양쪽 `CLIENT_READY` 완료 후 RTT 측정 중. 각 `RTT_PING`은 2500ms 안에 응답해야 하고 5회 측정 구조상 전체 측정은 최대 15초 안에 끝나야 함 |
 | `RTT_PASSED` | Redis `game:rtt:{gameRoomId}` | 양쪽 median RTT가 2000ms 이하. median RTT는 SMITE 판정 보정에 필요하므로 게임 종료 전까지 유지 |
+| `GAME_STARTING` | WebSocket message | 서버가 `startAt = serverNow + 4000ms`를 확정하고 `COUNTDOWN`/`GAME_START`를 전송한 상태. 클라이언트는 남은 시간이 3000ms 이하일 때 countdown을 렌더링하고 `startAt`까지 대기 |
 | `RTT_FAILED` | DB `game_rooms`, `game_participants`; 연결된 session은 close | `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외, median RTT 2000ms 초과로 gameRoom/participants가 `ABORTED` 된 상태 |
 | `DISCONNECTED` | registry에서 제거 | WebSocket 연결 종료로 session 제거 |
 | `REPLACED` | registry에서 기존 session 제거 | 같은 userId가 같은 gameRoom에 재연결하여 기존 session을 새 session으로 교체 |
@@ -319,6 +323,7 @@ stateDiagram-v2
 - GAME_START 이전 WebSocket 미접속과 READY timeout은 gameRoom `createdAt` 기준 30초 timeout 정책에서 수행합니다.
 - RTT 측정 중 WebSocket 연결 종료는 별도 `PEER_LEFT` 상태를 만들지 않고 `RTT_FAILED`로 처리합니다.
 - WebSocket 미연결 유저는 `WAITING_TIMEOUT` 이벤트를 받을 수 없습니다. 늦은 handshake는 gameRoom `ABORTED` 상태 검증에서 거절됩니다.
+- GAME_START 진입 시 `COUNTDOWN`과 `GAME_START`는 같은 `startAt`을 사용하며, 클라이언트는 `GAME_START`를 받아도 즉시 시작하지 않고 `startAt`까지 대기합니다.
 - GAME_START 이후 disconnect는 session registry에서 제거되지만, gameRoom은 정상 판정 흐름을 유지합니다.
 
 ## 5. Password Reset (비밀번호 재설정)

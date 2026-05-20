@@ -92,6 +92,8 @@ HP: ████░██████░░█░░████░░█░░�
 - HP 바를 읽는 **판독력** + 순간적인 클릭 **반응속도** 둘 다 필요
 - 양쪽 클라이언트에는 게임 시작 직전 동일한 시나리오를 전달 (WebSocket)
 - 클라이언트는 서버가 내려준 `startAt` 기준으로 MP4 재생과 HP overlay를 동기화
+- 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링
+- `COUNTDOWN`과 `GAME_START`는 countdown 종료 후가 아니라 `startAt` 전에 미리 전송하며, 클라이언트는 `GAME_START`를 받아도 `startAt`까지 대기
 
 ### 3.2 판정 프로세스 (서버 권위 방식)
 
@@ -398,3 +400,4 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-05-15 | WebSocket session 상태를 API local memory registry 상태로 분리하여 명시 |
 | 2026-05-18 | GAME_START 이전 timeout은 `ABORTED` 및 전적/LP 미반영, GAME_START 이후 disconnect는 정상 판정 흐름 유지로 정책 조정 |
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
+| 2026-05-20 | GAME_START `startAt = serverNow + 4000ms`, 프론트 3초 countdown, COUNTDOWN/GAME_START 사전 전송 정책 반영 |

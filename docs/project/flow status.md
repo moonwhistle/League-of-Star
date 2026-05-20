@@ -4,8 +4,8 @@
 
 범위:
 
-- 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, `CLIENT_READY`, game waiting timeout, `GAME_WAITING_TIMEOUT`, RTT 측정 정책
-- 제외: countdown, `GAME_START`, SMITE, game record/LP 반영
+- 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, `CLIENT_READY`, game waiting timeout, `GAME_WAITING_TIMEOUT`, RTT 측정 정책, `COUNTDOWN`, `GAME_START` 진입 정책
+- 제외: SMITE, game record/LP 반영
 - 게임 대기 WebSocket timeout 기준: gameRoom `createdAt`부터 **30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 모두 완료되어야 함**
 
 ## 1. Overall Flow
@@ -85,7 +85,10 @@ flowchart LR
         RTT_FAILED["status = FAILED<br/>RTT_FAILED or RTT_TOO_HIGH"]
         RTT_ABORT["DB game_rooms = ABORTED<br/>DB game_participants = ABORTED<br/>match:status 제거"]
         RTT_FAIL_EVENT["GAME_START_FAILED<br/>connected sockets only<br/>then close"]
-        NEXT_GAME_START["Step 6<br/>GAME_START + scenario 준비"]
+        NEXT_GAME_START["Step 6<br/>startAt = serverNow + 4000ms"]
+        IN_PROGRESS["DB game_rooms = IN_PROGRESS"]
+        COUNTDOWN["COUNTDOWN<br/>startAt, display=3s"]
+        GAME_START["GAME_START<br/>same startAt + scenario"]
     end
 
     START --> US_MATCHING
@@ -152,6 +155,9 @@ flowchart LR
     RTT_RESULT -->|yes| RTT_PASSED
     RTT_RESULT -->|no / timeout / close / error| RTT_FAILED
     RTT_PASSED --> NEXT_GAME_START
+    NEXT_GAME_START --> IN_PROGRESS
+    IN_PROGRESS --> COUNTDOWN
+    IN_PROGRESS --> GAME_START
     RTT_FAILED --> RTT_ABORT
     RTT_ABORT --> RTT_FAIL_EVENT
 ```
@@ -161,7 +167,7 @@ flowchart LR
 | 시나리오 | MatchSessionStore | UserStatusStore | MatchQueueStore | Game DB | 최종 클라이언트 이동 |
 |---|---|---|---|---|---|
 | `ACCEPTED + ACCEPTED` + game setup 성공 | `ACCEPTED` | A/B `IN_GAME` | A/B 제거 유지 | `game_rooms=READY`, participants `READY` | `GO_TO_GAME_WAITING` 후 WebSocket 연결 |
-| WebSocket 양쪽 READY + RTT 정상 | `ACCEPTED` | A/B `IN_GAME` | A/B 제거 유지 | `game_rooms=READY`, participants `READY` | Step 6 `GAME_START` 준비 |
+| WebSocket 양쪽 READY + RTT 정상 | `ACCEPTED` | A/B `IN_GAME` | A/B 제거 유지 | `game_rooms=IN_PROGRESS`, participants `PLAYING` | `COUNTDOWN` / `GAME_START` 후 startAt 기준 게임 시작 |
 | WebSocket 양쪽 READY + RTT 실패/초과 | `ACCEPTED` | A/B 제거 | A/B 복귀 없음 | `game_rooms=ABORTED`, participants `ABORTED` | `GAME_START_FAILED` 후 start 버튼 화면 |
 | `ACCEPTED + ACCEPTED` + game setup 실패 | `GAME_SETUP_FAILED` | A/B 제거 | A/B 복귀 없음 | 생성 전이면 없음 | `GO_TO_MATCH_START` |
 | `ACCEPTED + ACCEPTED` + Redis 상태 전환 실패 | `GAME_SETUP_FAILED` best-effort | A/B 제거 best-effort | A/B 복귀 없음 | 생성된 gameRoom/participants `ABORTED` | `GO_TO_MATCH_START` |
@@ -182,6 +188,7 @@ flowchart LR
 | 30초 안에 양쪽 `READY` 미완료 | `ABORTED` | DB `game_rooms`, `game_participants`; Redis `game_waiting_timeout` Pub/Sub |
 | 양쪽 `READY` 완료 후 RTT 측정 중 | `PENDING` | Redis `game:rtt:{gameRoomId}` |
 | RTT median 2000ms 이하 | `PASSED` | Redis `game:rtt:{gameRoomId}`. SMITE 판정 보정을 위해 게임 종료 전까지 유지 |
+| GAME_START 진입 | `IN_PROGRESS` | DB `game_rooms`; WebSocket `COUNTDOWN`, `GAME_START` | 양쪽 RTT `PASSED` 이후 `startAt = serverNow + 4000ms` 확정. 클라이언트는 남은 시간이 3000ms 이하일 때 countdown 렌더링 |
 | RTT 응답 누락/close/error/예외 또는 median 2000ms 초과 | `FAILED` | DB `game_rooms`, `game_participants`; WebSocket `GAME_START_FAILED` |
 
 주의:
@@ -193,6 +200,8 @@ flowchart LR
 - 각 `RTT_PING`은 2500ms 안에 응답해야 하며, 5회 측정 구조상 gameRoom 전체 RTT 측정은 최대 15초 안에 완료되어야 합니다.
 - median RTT 2000ms 초과는 `RTT_TOO_HIGH`, 응답 누락/close/error/측정 중 예외는 `RTT_FAILED`로 처리합니다.
 - RTT 실패/초과는 `GAME_START` 이전 실패이므로 gameRoom/participants를 `ABORTED`로 정리하고 record/LP를 반영하지 않습니다.
+- GAME_START 진입 시 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, `COUNTDOWN`과 `GAME_START`를 `startAt` 전에 미리 전송합니다.
+- 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고, `GAME_START`를 받아도 즉시 시작하지 않고 `startAt`까지 대기합니다.
 - 멀티 인스턴스에서는 같은 `gameRoomId`가 같은 API 인스턴스로 라우팅되어야 WebSocket registry가 정상 동작합니다.
 - timeout 판정은 local registry가 아니라 Redis waiting ready 상태와 DB gameRoom status를 기준으로 합니다.
 - timeout 이벤트는 Redis Pub/Sub으로 모든 API 인스턴스에 전파하고, 실제 local session을 가진 인스턴스만 WebSocket 전송/close를 수행합니다.
@@ -205,3 +214,4 @@ flowchart LR
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정하고 `CLIENT_READY` 완료 조건 명시 |
 | 2026-05-19 | Redis waiting ready 상태, timeout scheduler, Pub/Sub, local session 보유 인스턴스 전송 흐름 반영 |
 | 2026-05-19 | RTT 5회 median 측정, 2500ms per-ping timeout, 15초 전체 제한, RTT 실패/초과 시 GAME_START 이전 ABORTED 정책 반영 |
+| 2026-05-20 | RTT 통과 후 `startAt = serverNow + 4000ms`, `COUNTDOWN`/`GAME_START` 사전 전송, 프론트 3초 countdown 정책 반영 |

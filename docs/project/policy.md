@@ -168,6 +168,20 @@
 | **초과 기준** | 5회 측정은 완료했지만 median RTT가 2000ms를 초과하면 `RTT_TOO_HIGH` |
 | **성공 상태 보존** | median RTT는 이후 SMITE 보정에 필요하므로 게임 판정 완료 전까지 Redis에 유지 |
 
+#### GAME_START 시작 동기화
+
+| 규칙 | 내용 |
+|------|------|
+| **진입 조건** | 양쪽 RTT가 모두 `PASSED`이고 양쪽 median RTT가 저장된 gameRoom만 `GAME_START`로 진입 |
+| **시작 기준** | 서버가 `startAt = serverNow + 4000ms`로 절대 시작 시각을 확정 |
+| **카운트다운 표시** | 클라이언트는 `startAt`까지 남은 시간이 3000ms 이하가 되면 `3, 2, 1`을 렌더링 |
+| **메시지 전송 시점** | 서버는 `COUNTDOWN`과 `GAME_START`를 countdown 종료 후가 아니라 `startAt` 전에 미리 전송 |
+| **GAME_START 처리** | 클라이언트는 `GAME_START`를 받아도 즉시 시작하지 않고, payload의 `startAt`까지 대기 |
+| **동일 기준** | `COUNTDOWN`과 `GAME_START`는 반드시 같은 `startAt`을 사용 |
+| **MP4 preload** | MP4 preload 완료 여부는 `CLIENT_READY` 전제로 보고 `GAME_START` 단계에서 다시 검증하지 않음 |
+
+`startAt`을 서버 기준으로 고정하는 이유는 클라이언트마다 WebSocket 메시지를 받는 시점이 다를 수 있기 때문이다. 메시지를 받은 뒤 각자 3초를 세면 실제 시작 시각이 달라질 수 있으므로, 서버가 하나의 절대 시작 시각을 정하고 클라이언트는 그 시각까지 남은 시간만 렌더링한다.
+
 #### 동시 판정 처리 (Tie-Breaking)
 
 두 플레이어의 보정된 smite_time이 **1ms 이내**로 동일한 경우:
@@ -464,3 +478,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
 | 2026-05-18 | 게임 대기 WebSocket 미연결 유저는 timeout 전까지 저장 상태 없음, timeout 후 이벤트 수신 불가 및 late handshake 거절 정책 명시 |
 | 2026-05-19 | RTT 5회 median 측정, 2500ms per-ping timeout, 15초 전체 제한, RTT 실패/초과 시 GAME_START 이전 `ABORTED` 정책 추가 |
+| 2026-05-20 | GAME_START 진입 조건, `startAt = serverNow + 4000ms`, 프론트 3초 countdown 렌더링, COUNTDOWN/GAME_START 사전 전송 정책 추가 |

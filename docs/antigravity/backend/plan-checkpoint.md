@@ -156,10 +156,10 @@ flowchart TD
 ### Step 6. GAME_START와 HP 시나리오 전달
 
 - [ ] HP scenario 생성/조회 및 시작 payload 확정
-- [ ] 양쪽 RTT 정상 상태 확인 후 `startAt` 결정
+- [ ] 양쪽 RTT 정상 상태 확인 후 `startAt = serverNow + 4000ms` 결정
 - [ ] gameRoom 상태를 `IN_PROGRESS`로 전환
-- [ ] `COUNTDOWN`/`GAME_START` 이벤트로 `startAt`과 scenario를 클라이언트에 전달
-- [ ] 클라이언트는 `startAt` 기준으로 HP bar overlay 계산
+- [ ] `COUNTDOWN`/`GAME_START` 이벤트를 countdown 종료 후가 아니라 `startAt` 전에 미리 전달
+- [ ] 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고 `startAt` 기준으로 HP bar overlay 계산
 - [x] MP4 preload 완료 여부는 `CLIENT_READY` 전제로 보고 Step 6에서 다시 검증하지 않음
 - [x] MP4는 배경으로만 사용
 - [ ] `GAME_START` 시 서버 기준 game end timer/scheduler 등록
@@ -578,14 +578,14 @@ gameRoom 생성 실패 mapping:
 
 - HP scenario 생성/조회
 - gameRoom `IN_PROGRESS` 전환
-- 서버 기준 `startAt` 결정
-- `COUNTDOWN`/`GAME_START` 메시지로 `startAt`과 scenario 전달
+- 서버 기준 `startAt = serverNow + 4000ms` 결정
+- `COUNTDOWN`/`GAME_START` 메시지를 `startAt` 전에 미리 전송하고 같은 `startAt`과 scenario 전달
 - `GAME_START` 시 서버 기준 game end timer/scheduler 등록
 
 완료 기준:
 
 - 양쪽 정상 RTT일 때 같은 `startAt`을 받음
-- 클라이언트는 `startAt` 기준으로 MP4 재생과 HP overlay 계산 가능
+- 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고 `startAt` 기준으로 MP4 재생과 HP overlay 계산 가능
 - 카운트다운 종료 후 추가 서버 메시지 대기 없이 게임을 시작할 수 있음
 
 ### Issue 48. SMITE 서버 판정과 action 저장
