@@ -134,6 +134,7 @@
 - 최종 정산 실행 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 등록한다.
 - `inputGraceMs`는 2000ms로 둔다. 자연사 직전 입력이 서버에 도착할 수 있는 여유 시간이며, RTT 보정 판정 자체는 기존 서버 수신 시각과 median RTT 기준을 유지한다.
 - `GAME_START` 확정 후 `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom과 participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않는다. 이 경우 record와 LP/티어 변동은 반영하지 않는다.
+- `GAME_START` 메시지 전송에 실패하면 이미 등록된 `game:end:pending` deadline을 제거하고 gameRoom과 participants를 `ABORTED` 처리한다. 이 경우 match user status, RTT 상태, waiting 상태를 정리하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫는다.
 - game end scheduler는 `settlementDueAt`에 도달한 gameRoom만 정산 대상으로 삼고, 정산 시 gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
 - `GAME_START` 이후 결과가 승/패로 확정되면 일반 게임 결과처럼 record와 LP를 반영한다.
 - `GAME_START` 이후 결과가 무승부면 record는 무승부로 저장하고 LP는 변동하지 않는다.

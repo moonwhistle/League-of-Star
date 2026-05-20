@@ -21,4 +21,12 @@ public class RedisGameEndScheduleStore implements GameEndScheduleStore {
                 registration.settlementDueAtMillis()
         );
     }
+
+    @Override
+    public void cleanupEndDeadline(Long gameRoomId) {
+        stringRedisTemplate.opsForZSet().remove(
+                GameEndConstants.GAME_END_PENDING_KEY,
+                String.valueOf(gameRoomId)
+        );
+    }
 }

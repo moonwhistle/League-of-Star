@@ -13,16 +13,17 @@ flowchart TD
     A["RTT both PASSED"] --> B["findStartReadyState(gameRoomId)"]
     B --> C{"RTT start ready<br/>exists?"}
     C -->|"no"| D["GAME_START 차단"]
-    C -->|"yes"| E["HP scenario 조회"]
-    E --> F["startAt = serverNow + 4000ms"]
-    F --> G["gameRoom READY -> IN_PROGRESS"]
-    G --> H["COUNTDOWN 전송<br/>startAt, display=3s"]
-    G --> I["GAME_START 전송<br/>startAt, scenario"]
-    H --> J["Client countdown<br/>remaining <= 3000ms부터 3,2,1"]
-    I --> K["Client stores scenario<br/>waits until startAt"]
-    J --> L["startAt 도달"]
-    K --> L
-    L --> M["MP4 재생 + HP overlay 시작"]
+    C -->|"yes"| E["startAt = serverNow + 4000ms"]
+    E --> F["gameRoom READY -> IN_PROGRESS"]
+    F --> G["HP scenario 조회"]
+    G --> H["game:end:pending 등록"]
+    H --> I["COUNTDOWN 전송<br/>startAt, display=3s"]
+    H --> J["GAME_START 전송<br/>startAt, scenario"]
+    I --> K["Client countdown<br/>remaining <= 3000ms부터 3,2,1"]
+    J --> L["Client stores scenario<br/>waits until startAt"]
+    K --> M["startAt 도달"]
+    L --> M
+    M --> N["MP4 재생 + HP overlay 시작"]
 ```
 
 ## 📚 Tasks
@@ -155,10 +156,12 @@ lock 비용 판단:
 - `GameStartWebSocketSender.sendStart(...)`에서 같은 `serverTime`과 `startAt`으로 `COUNTDOWN`을 먼저 broadcast하고, 이어서 `GAME_START`를 broadcast한다.
 - `GameWaitingWebSocketService.handleRttPong(...)`는 RTT sample 저장이 완료되고 해당 유저가 `PASSED`인 경우에만 game start 시도를 수행한다.
 - game start 시도는 다음 순서로 진행한다.
-  1. `GameStartScenarioService.getScenarioPayload(gameRoomId)`로 HP scenario payload를 조회한다.
-  2. `GameStartTransitionService.transitionToInProgress(gameRoomId)`로 Step 4 시작 전환을 수행한다.
-  3. `transitionResult.started() == true`인 경우에만 `COUNTDOWN` / `GAME_START`를 전송한다.
-  4. 시작 조건 미충족, DB 상태 전환 실패, scenario 조회 실패 시 시작 메시지를 보내지 않는다.
+  1. `GameStartTransitionService.transitionToInProgress(gameRoomId)`로 Step 4 시작 전환을 수행한다.
+  2. `transitionResult.started() == true`인 경우에만 HP scenario payload를 조회한다.
+  3. `GameEndScheduleService.registerEndDeadline(...)`로 종료 정산 deadline을 등록한다.
+  4. `GameStartWebSocketSender.sendStart(...)`로 `COUNTDOWN` / `GAME_START`를 전송한다.
+  5. 시작 조건 미충족 또는 DB 상태 전환 실패는 아직 유효 게임 시작 전 no-op으로 차단한다.
+  6. `IN_PROGRESS` 전환 이후 scenario 조회, deadline 등록, 시작 메시지 전송 실패는 `GameStartFailureProcessor`에 위임한다.
 - `GAME_START` payload의 `startAt`은 실제 게임 시작 기준 시각이다. 클라이언트는 이 메시지를 수신해도 즉시 시작하지 않고 `startAt`까지 대기한다.
 
 ### 6. game end timer/scheduler 등록 지점 정의
@@ -181,18 +184,27 @@ lock 비용 판단:
 - `GameEndScheduleService.registerEndDeadline(gameRoomId, startAtMillis, durationMs)`에서 `gameEndAtMillis`, `settlementDueAtMillis`를 계산한다.
 - `GameEndScheduleStore` port를 추가해 종료 정산 등록 책임을 분리했다.
 - `RedisGameEndScheduleStore`는 `game:end:pending` ZSET에 `member=gameRoomId`, `score=settlementDueAtMillis`로 등록한다.
+- `RedisGameEndScheduleStore.cleanupEndDeadline(gameRoomId)`로 시작 메시지 전송 실패 시 이미 등록된 deadline을 제거한다.
 - `GameWaitingWebSocketService`는 `transitionResult.started() == true` 이후, `COUNTDOWN` / `GAME_START` 전송 전에 종료 deadline을 등록한다.
 - deadline 등록이 실패하면 이미 `IN_PROGRESS`로 전환된 gameRoom을 `ABORTED`로 보상 전환하고 시작 메시지를 보내지 않는다.
 - 이 abort는 서버가 game end scheduler 기반 종료를 보장할 수 없는 인프라 실패로 보며, game record와 LP/티어 변동은 반영하지 않는다.
 
 ### 7. 실패/예외 처리
 
-- [ ] RTT start ready 상태가 없으면 시작 차단한다.
-- [ ] scenario 조회 실패 시 시작 차단한다.
-- [ ] gameRoom 상태 전환 실패 시 시작 차단한다.
-- [ ] WebSocket 전송 실패 시 정책을 정의한다.
+- [x] RTT start ready 상태가 없으면 시작 차단한다.
+- [x] scenario 조회 실패 시 시작된 gameRoom을 `ABORTED` 처리하고 상태 저장소를 정리한다.
+- [x] gameRoom 상태 전환 실패 시 아직 시작 전 실패로 보고 시작 메시지를 보내지 않는다.
+- [x] WebSocket 전송 실패 시 `ABORTED` 처리하고 이미 등록된 game end deadline을 제거한다.
 - [x] game end deadline 등록 실패는 `IN_PROGRESS` 이후 실패지만 서버 종료 보장 불가 상태이므로 `ABORTED` 처리하고 record/LP를 반영하지 않는다.
 - [x] 시작 실패가 GAME_START 이전 실패인지, 이미 IN_PROGRESS 이후 실패인지 구분한다.
+
+구현 결과:
+
+- `GameStartFailureReason`으로 시작 실패 사유를 분리했다.
+- `GameStartFailureProcessor`가 `IN_PROGRESS -> ABORTED` 보상, match user status 제거, RTT 상태 cleanup, waiting 상태 cleanup, `GAME_START_FAILED` 전송/close를 담당한다.
+- `GAME_START_MESSAGE_SEND_FAILED`는 deadline 등록 이후 실패이므로 `game:end:pending`에서도 gameRoom을 제거한다.
+- RTT 상태 조회가 실패해도 DB abort와 실패 이벤트 전송을 먼저 보장한다.
+- 실패 상태 저장소 cleanup은 개별 best-effort로 수행하고 실패 시 로그를 남긴다.
 
 ### 8. 테스트
 

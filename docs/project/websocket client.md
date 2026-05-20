@@ -316,6 +316,7 @@ sequenceDiagram
 - `GAME_START` 이후에는 WebSocket 연결이 끊겨도 gameRoom을 즉시 중단하지 않고 서버 timer/scheduler가 종료 판정을 완료합니다.
 - 서버는 `GAME_START` 확정 시 `gameEndAt = startAt + scenario.durationMs`, `settlementDueAt = gameEndAt + 2000ms`로 종료 정산 deadline을 등록합니다.
 - deadline 등록 실패 시 서버는 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 record/LP를 반영하지 않습니다.
+- `COUNTDOWN`/`GAME_START` 전송 실패 시 서버는 `GAME_START_FAILED` 전송 후 WebSocket을 닫고, 클라이언트는 start 버튼 화면으로 복귀합니다.
 
 ## 9. 게임 대기 Timeout과 미연결
 

@@ -1,12 +1,13 @@
 package com.sang.smite.game.websocket.service;
 
-import com.sang.smite.domain.game.service.GameRoomCommandService;
 import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
+import com.sang.smite.game.start.domain.GameStartFailureReason;
 import com.sang.smite.game.start.domain.GameStartTransitionResult;
 import com.sang.smite.game.start.dto.GameStartScenarioPayload;
+import com.sang.smite.game.start.service.GameStartFailureProcessor;
 import com.sang.smite.game.start.service.GameStartScenarioService;
 import com.sang.smite.game.start.service.GameStartTransitionService;
 import com.sang.smite.game.websocket.dto.GameWebSocketClientMessage;
@@ -36,7 +37,7 @@ public class GameWaitingWebSocketService {
     private final GameRoomWebSocketMessageSender messageSender;
     private final GameStartScenarioService gameStartScenarioService;
     private final GameStartTransitionService gameStartTransitionService;
-    private final GameRoomCommandService gameRoomCommandService;
+    private final GameStartFailureProcessor gameStartFailureProcessor;
     private final GameEndScheduleService gameEndScheduleService;
     private final GameStartWebSocketSender gameStartWebSocketSender;
 
@@ -140,16 +141,21 @@ public class GameWaitingWebSocketService {
     }
 
     private void startGameIfReady(Long gameRoomId) {
+        GameStartTransitionResult transitionResult = gameStartTransitionService.transitionToInProgress(gameRoomId);
+        if (!transitionResult.started()) {
+            return;
+        }
+
         GameStartScenarioPayload scenario;
         try {
             scenario = gameStartScenarioService.getScenarioPayload(gameRoomId);
         } catch (RuntimeException e) {
             log.warn("Failed to load game start scenario. gameRoomId={}", gameRoomId, e);
-            return;
-        }
-
-        GameStartTransitionResult transitionResult = gameStartTransitionService.transitionToInProgress(gameRoomId);
-        if (!transitionResult.started()) {
+            gameStartFailureProcessor.processStartedFailure(
+                    gameRoomId,
+                    GameStartFailureReason.SCENARIO_LOAD_FAILED,
+                    false
+            );
             return;
         }
 
@@ -161,28 +167,26 @@ public class GameWaitingWebSocketService {
             );
         } catch (RuntimeException e) {
             log.warn("Failed to register game end deadline. gameRoomId={}", gameRoomId, e);
-            abortStartedGameAfterDeadlineRegistrationFailure(gameRoomId);
+            gameStartFailureProcessor.processStartedFailure(
+                    gameRoomId,
+                    GameStartFailureReason.GAME_END_DEADLINE_REGISTRATION_FAILED,
+                    true
+            );
             return;
         }
 
-        gameStartWebSocketSender.sendStart(
+        boolean sent = gameStartWebSocketSender.sendStart(
                 gameRoomId,
                 transitionResult.serverTimeMillis(),
                 transitionResult.startAtMillis(),
                 scenario
         );
-    }
-
-    private void abortStartedGameAfterDeadlineRegistrationFailure(Long gameRoomId) {
-        try {
-            boolean aborted = gameRoomCommandService.abortInProgressRoomIfInProgress(gameRoomId);
-            if (!aborted) {
-                log.warn("Game end deadline registration failed, but gameRoom was not IN_PROGRESS. gameRoomId={}",
-                        gameRoomId);
-            }
-        } catch (RuntimeException abortException) {
-            log.warn("Failed to abort gameRoom after game end deadline registration failure. gameRoomId={}",
-                    gameRoomId, abortException);
+        if (!sent) {
+            gameStartFailureProcessor.processStartedFailure(
+                    gameRoomId,
+                    GameStartFailureReason.GAME_START_MESSAGE_SEND_FAILED,
+                    true
+            );
         }
     }
 

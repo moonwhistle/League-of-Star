@@ -81,4 +81,19 @@ class GameRoomReadServiceJpaTest {
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
     }
+
+    @Test
+    @DisplayName("getParticipantUserIds - DB에 저장된 gameRoom 참가자 userId 목록을 반환한다")
+    void getParticipantUserIds_PersistedGameRoom() {
+        // given
+        GameRoom gameRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        var result = gameRoomReadService.getParticipantUserIds(gameRoom.getId());
+
+        // then
+        assertThat(result).containsExactlyInAnyOrder(FIRST_USER_ID, SECOND_USER_ID);
+    }
 }

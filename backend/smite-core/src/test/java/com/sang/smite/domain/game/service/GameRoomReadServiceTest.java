@@ -146,6 +146,32 @@ class GameRoomReadServiceTest {
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }
 
+    @Test
+    @DisplayName("getParticipantUserIds - gameRoom 참가자 userId 목록을 반환한다")
+    void getParticipantUserIds() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when
+        List<Long> result = gameRoomReadService.getParticipantUserIds(GAME_ROOM_ID);
+
+        // then
+        assertThat(result).containsExactly(FIRST_USER_ID, SECOND_USER_ID);
+    }
+
+    @Test
+    @DisplayName("getParticipantUserIds - gameRoom이 없으면 예외를 던진다")
+    void getParticipantUserIds_NotFound_ThrowException() {
+        // given
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.getParticipantUserIds(GAME_ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
     private GameRoom createReadyGameRoom() {
         GameRoom gameRoom = GameRoom.builder().build();
         gameRoom.addParticipant(FIRST_USER_ID);

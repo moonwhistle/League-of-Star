@@ -23,4 +23,8 @@ public class GameEndScheduleService {
         gameEndScheduleStore.registerEndDeadline(registration);
         return registration;
     }
+
+    public void cleanupEndDeadline(Long gameRoomId) {
+        gameEndScheduleStore.cleanupEndDeadline(gameRoomId);
+    }
 }

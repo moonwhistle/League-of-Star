@@ -2,6 +2,7 @@ package com.sang.smite.domain.game.service;
 
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
+import com.sang.smite.domain.game.domain.GameParticipant;
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
@@ -9,6 +10,8 @@ import com.sang.smite.domain.game.repository.GameRoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -39,5 +42,13 @@ public class GameRoomReadService {
         return gameRoomRepository.findById(gameRoomId)
                 .map(GameRoom::getScenarioData)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
+    public List<Long> getParticipantUserIds(Long gameRoomId) {
+        GameRoom gameRoom = gameRoomRepository.findById(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+        return gameRoom.getParticipants().stream()
+                .map(GameParticipant::getUserId)
+                .toList();
     }
 }

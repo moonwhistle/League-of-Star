@@ -33,4 +33,14 @@ class GameEndScheduleServiceTest {
         assertThat(result.settlementDueAtMillis()).isEqualTo(9_000L + GameEndConstants.INPUT_GRACE_MILLIS);
         verify(gameEndScheduleStore).registerEndDeadline(result);
     }
+
+    @Test
+    @DisplayName("cleanupEndDeadline - 등록된 종료 정산 deadline 제거를 저장소에 위임한다")
+    void cleanupEndDeadline() {
+        // when
+        service.cleanupEndDeadline(GAME_ROOM_ID);
+
+        // then
+        verify(gameEndScheduleStore).cleanupEndDeadline(GAME_ROOM_ID);
+    }
 }

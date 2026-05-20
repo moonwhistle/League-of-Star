@@ -43,4 +43,17 @@ class RedisGameEndScheduleStoreTest {
         // then
         verify(zSetOperations).add(GameEndConstants.GAME_END_PENDING_KEY, "100", 11_000L);
     }
+
+    @Test
+    @DisplayName("cleanupEndDeadline - game end pending ZSET에서 gameRoomId를 제거한다")
+    void cleanupEndDeadline() {
+        // given
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOperations);
+
+        // when
+        store.cleanupEndDeadline(100L);
+
+        // then
+        verify(zSetOperations).remove(GameEndConstants.GAME_END_PENDING_KEY, "100");
+    }
 }

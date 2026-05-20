@@ -205,6 +205,7 @@ flowchart LR
 - GAME_START 진입 시 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, `COUNTDOWN`과 `GAME_START`를 `startAt` 전에 미리 전송합니다.
 - GAME_START 진입 시 서버는 `game:end:pending`에 `settlementDueAt = startAt + scenario.durationMs + 2000ms`를 등록합니다.
 - `game:end:pending` 등록에 실패하면 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 record/LP를 반영하지 않습니다.
+- `COUNTDOWN`/`GAME_START` 전송에 실패하면 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending`, match user status, RTT 상태, waiting 상태를 정리합니다.
 - 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고, `GAME_START`를 받아도 즉시 시작하지 않고 `startAt`까지 대기합니다.
 - 멀티 인스턴스에서는 같은 `gameRoomId`가 같은 API 인스턴스로 라우팅되어야 WebSocket registry가 정상 동작합니다.
 - timeout 판정은 local registry가 아니라 Redis waiting ready 상태와 DB gameRoom status를 기준으로 합니다.

@@ -11,6 +11,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -36,9 +37,10 @@ class GameStartWebSocketSenderTest {
         );
 
         // when
-        sender.sendStart(GAME_ROOM_ID, SERVER_TIME, START_AT, scenario);
+        boolean sent = sender.sendStart(GAME_ROOM_ID, SERVER_TIME, START_AT, scenario);
 
         // then
+        assertThat(sent).isTrue();
         ArgumentCaptor<GameWebSocketServerMessage> messageCaptor =
                 ArgumentCaptor.forClass(GameWebSocketServerMessage.class);
         verify(messageSender, times(2)).broadcast(
@@ -62,5 +64,25 @@ class GameStartWebSocketSenderTest {
                 START_AT,
                 scenario
         ));
+    }
+
+    @Test
+    @DisplayName("sendStart - broadcast 실패 시 false를 반환한다")
+    void sendStart_BroadcastFailed() throws Exception {
+        // given
+        GameStartScenarioPayload scenario = new GameStartScenarioPayload(
+                10000,
+                1000L,
+                List.of(new GameStartScenarioPayload.HpTimelineStep(0L, 10000))
+        );
+        doThrow(new java.io.IOException("send failed"))
+                .when(messageSender)
+                .broadcast(eq(GAME_ROOM_ID), org.mockito.ArgumentMatchers.any());
+
+        // when
+        boolean sent = sender.sendStart(GAME_ROOM_ID, SERVER_TIME, START_AT, scenario);
+
+        // then
+        assertThat(sent).isFalse();
     }
 }

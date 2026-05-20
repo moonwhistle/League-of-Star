@@ -16,10 +16,10 @@ public class GameStartWebSocketSender {
 
     private final GameRoomWebSocketMessageSender messageSender;
 
-    public void sendStart(Long gameRoomId,
-                          long serverTime,
-                          long startAt,
-                          GameStartScenarioPayload scenario) {
+    public boolean sendStart(Long gameRoomId,
+                             long serverTime,
+                             long startAt,
+                             GameStartScenarioPayload scenario) {
         try {
             messageSender.broadcast(
                     gameRoomId,
@@ -34,8 +34,10 @@ public class GameStartWebSocketSender {
                     gameRoomId,
                     GameWebSocketServerMessage.gameStart(gameRoomId, serverTime, startAt, scenario)
             );
+            return true;
         } catch (IOException e) {
             log.warn("Failed to send game start WebSocket messages. gameRoomId={}", gameRoomId, e);
+            return false;
         }
     }
 }
