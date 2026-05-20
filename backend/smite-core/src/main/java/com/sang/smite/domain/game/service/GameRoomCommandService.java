@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -61,6 +62,16 @@ public class GameRoomCommandService {
     public boolean abortReadyRoomIfReady(Long gameRoomId) {
         return gameRoomRepository.findById(gameRoomId)
                 .map(GameRoom::abortBeforeStartIfReady)
+                .orElse(false);
+    }
+
+    public boolean startReadyRoomIfReady(Long gameRoomId, LocalDateTime startTime) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .filter(gameRoom -> gameRoom.getStatus().isReady())
+                .map(gameRoom -> {
+                    gameRoom.start(startTime);
+                    return true;
+                })
                 .orElse(false);
     }
 

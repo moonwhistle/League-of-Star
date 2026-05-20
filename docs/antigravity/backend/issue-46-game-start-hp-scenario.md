@@ -79,10 +79,61 @@ flowchart TD
 
 ### 4. startAt 결정과 상태 전환
 
-- [ ] 서버 기준 `serverTime`과 `startAt`을 millisecond timestamp로 확정한다.
-- [ ] gameRoom을 `READY -> IN_PROGRESS`로 전환한다.
-- [ ] 상태 전환 성공 이후에만 `COUNTDOWN` / `GAME_START`를 전송한다.
-- [ ] 상태 전환 실패 시 WebSocket 시작 이벤트를 보내지 않는다.
+- [x] 서버 기준 `serverTime`과 `startAt`을 millisecond timestamp로 확정한다.
+- [x] gameRoom을 `READY -> IN_PROGRESS`로 전환한다.
+- [x] 상태 전환 성공 이후에만 `COUNTDOWN` / `GAME_START`를 전송한다.
+- [x] 상태 전환 실패 시 WebSocket 시작 이벤트를 보내지 않는다.
+- [x] 같은 gameRoom의 중복 시작 시도에 대비해 `READY -> IN_PROGRESS` 전환은 DB row lock 기반으로 한 번만 성공하게 보강한다.
+
+구현 결과:
+
+- `GameStartTransitionService.transitionToInProgress(gameRoomId)`에서 시작 조건 확인, `serverTime/startAt` 확정, DB 상태 전환을 순서대로 처리한다.
+- 시작 조건은 Step 2의 `GameStartConditionService.checkStartReady(gameRoomId)` 결과를 사용한다.
+- `serverTime`은 서버 `Clock` 기준 현재 millisecond timestamp다.
+- `startAt`은 `serverTime + 4000ms`로 확정한다.
+- DB에는 같은 `startAt`을 `gameRoom.gameStartTime`으로 저장하고, gameRoom은 `READY -> IN_PROGRESS`, participants는 `READY -> PLAYING`으로 전환한다.
+- DB 상태 전환은 `GameRoomCommandService.startReadyRoomIfReady(gameRoomId, startTime)`로 처리한다.
+- 시작 조건 미충족 또는 DB 상태 전환 실패 시 `started=false`를 반환한다. 이 경우 이후 WebSocket `COUNTDOWN` / `GAME_START` 전송 단계로 진행하지 않는다.
+- 이 단계는 상태 전환까지만 담당한다. 실제 `COUNTDOWN` / `GAME_START` 메시지 정의와 전송은 Step 5에서 처리한다.
+
+동시성 보강 결정:
+
+대상 로직은 `gameRoom READY -> IN_PROGRESS` 전환이다. 이 전환은 단순 상태 변경이 아니라, 성공 직후 `COUNTDOWN` / `GAME_START` 전송으로 이어지는 게임 시작 트리거다. 따라서 같은 `gameRoomId`에서 성공 결과는 반드시 한 번만 나와야 한다.
+
+검토한 선택지는 3개다.
+
+| 선택지 | 장점 | 단점 | 판단 |
+|---|---|---|---|
+| RTT 성공 경로에서 마지막 통과자만 호출 | 불필요한 DB lock 없음. 정상 흐름에서 호출 1회로 깔끔함 | Redis RTT 저장/완료 판별을 원자화해야 함. 현재 `appendSample()`은 lock/Lua 없이 HASH read-modify-write 구조라 추가 변경 범위가 큼. 이후 retry/scheduler 등 다른 시작 트리거가 생기면 다시 방어 필요 | 단독 방어로는 부족 |
+| 조건부 update `UPDATE ... WHERE status=READY` | DB 레벨 원자성 강함. 성능 가볍고 명확함 | `GameRoom.start()` 도메인 메서드를 우회함. `game_rooms`와 `game_participants`를 각각 update해야 해서 상태 전이 규칙이 repository query로 분산됨 | 가능하지만 현재 도메인 구조와 덜 맞음 |
+| 비관락 `SELECT ... FOR UPDATE` 후 `GameRoom.start()` | `GameRoom.start()` 도메인 규칙 유지. participants `PLAYING` 전환도 한 곳에서 처리. 같은 room 동시 시작 시 한 트랜잭션만 `READY`를 보고 성공. 변경 범위 작음 | 같은 gameRoom에 동시 요청이 있으면 후행 요청이 짧게 대기. DB lock 비용 있음 | 현재 구조에 가장 적합 |
+
+비관락을 선택하는 이유:
+
+- 현재 시작 규칙은 `GameRoom.start(startTime)`에 모여 있다.
+  - gameRoom이 `READY`인지 검증
+  - participant가 2명인지 검증
+  - participants가 모두 `READY`인지 검증
+  - gameRoom을 `IN_PROGRESS`로 변경
+  - participants를 `PLAYING`으로 변경
+- 조건부 update를 쓰면 이 규칙 일부가 JPQL update로 흩어진다.
+- 특히 `game_participants` 상태 전환까지 별도 update가 필요해지고, 도메인 메서드가 가진 검증 흐름을 우회한다.
+- 반면 비관락은 조회만 잠그고, 실제 상태 변경은 기존 도메인 메서드에 맡긴다.
+- 따라서 코드베이스의 "상태 변경은 도메인 메서드를 통해 수행" 컨벤션과 가장 잘 맞는다.
+
+lock 비용 판단:
+
+- lock 대상은 전체 매칭 큐나 유저 단위가 아니라 단일 `game_rooms` row다.
+- lock 안에서는 상태 확인과 엔티티 필드 변경만 수행한다.
+- 외부 API 호출, WebSocket 전송, Redis Pub/Sub 전송은 lock 안에서 하지 않는다.
+- 일반적인 게임 플로우에서는 gameRoom당 시작 전환은 한 번이므로 경합 빈도도 낮다.
+
+구현 방향:
+
+- `GameRoomRepository.findByIdForUpdate(gameRoomId)`를 추가했다.
+- `@Lock(LockModeType.PESSIMISTIC_WRITE)` 방식으로 gameRoom row를 잠근다.
+- `GameRoomCommandService.startReadyRoomIfReady(gameRoomId, startTime)`는 locked 조회 후 기존 `GameRoom.start(startTime)`을 호출한다.
+- Step 5 전송 단계는 `transitionResult.started() == true`일 때만 `COUNTDOWN` / `GAME_START`를 전송한다.
 
 ### 5. WebSocket 메시지 정의 및 전송
 
