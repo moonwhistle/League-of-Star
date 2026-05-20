@@ -148,4 +148,19 @@ public class GameRoom extends BaseEntity {
         this.participants.forEach(p -> p.updateStatus(ParticipantStatus.ABORTED));
         return true;
     }
+
+    /**
+     * GAME_START 이후 서버가 게임 종료를 보장할 수 없는 경우 gameRoom을 ABORTED로 전환합니다.
+     *
+     * @return IN_PROGRESS에서 ABORTED로 전환했으면 true, 이미 다른 상태이면 false
+     */
+    public boolean abortAfterStartIfInProgress() {
+        if (this.status != GameStatus.IN_PROGRESS) {
+            return false;
+        }
+        this.status = GameStatus.ABORTED;
+        this.finishedAt = LocalDateTime.now();
+        this.participants.forEach(p -> p.updateStatus(ParticipantStatus.ABORTED));
+        return true;
+    }
 }

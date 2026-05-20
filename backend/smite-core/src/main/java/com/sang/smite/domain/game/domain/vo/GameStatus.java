@@ -12,4 +12,8 @@ public enum GameStatus {
     ABORTED("중단됨");
 
     private final String description;
+
+    public boolean isReady() {
+        return this == READY;
+    }
 }

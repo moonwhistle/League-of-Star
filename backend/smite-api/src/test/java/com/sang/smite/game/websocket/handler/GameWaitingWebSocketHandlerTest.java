@@ -2,10 +2,19 @@ package com.sang.smite.game.websocket.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
+import com.sang.smite.game.start.domain.GameStartBlockedReason;
+import com.sang.smite.game.start.domain.GameStartFailureReason;
+import com.sang.smite.game.start.domain.GameStartTransitionResult;
+import com.sang.smite.game.start.dto.GameStartScenarioPayload;
+import com.sang.smite.game.start.service.GameStartFailureProcessor;
+import com.sang.smite.game.start.service.GameStartScenarioService;
+import com.sang.smite.game.start.service.GameStartTransitionService;
 import com.sang.smite.game.websocket.dto.GameWebSocketMessageType;
 import com.sang.smite.game.websocket.service.GameRoomWebSocketMessageSender;
+import com.sang.smite.game.websocket.service.GameStartWebSocketSender;
 import com.sang.smite.game.websocket.service.GameWaitingWebSocketService;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSession;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSessionRegistry;
@@ -25,9 +34,13 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -46,6 +59,11 @@ class GameWaitingWebSocketHandlerTest {
     private final GameRoomWebSocketSessionRegistry sessionRegistry = new GameRoomWebSocketSessionRegistry();
     private final GameWaitingReadyService gameWaitingReadyService = mock(GameWaitingReadyService.class);
     private final GameRttMeasurementService gameRttMeasurementService = mock(GameRttMeasurementService.class);
+    private final GameStartScenarioService gameStartScenarioService = mock(GameStartScenarioService.class);
+    private final GameStartTransitionService gameStartTransitionService = mock(GameStartTransitionService.class);
+    private final GameStartFailureProcessor gameStartFailureProcessor = mock(GameStartFailureProcessor.class);
+    private final GameEndScheduleService gameEndScheduleService = mock(GameEndScheduleService.class);
+    private final GameStartWebSocketSender gameStartWebSocketSender = mock(GameStartWebSocketSender.class);
     private final GameRoomWebSocketMessageSender messageSender = new GameRoomWebSocketMessageSender(
             objectMapper,
             sessionRegistry
@@ -54,7 +72,12 @@ class GameWaitingWebSocketHandlerTest {
             sessionRegistry,
             gameWaitingReadyService,
             gameRttMeasurementService,
-            messageSender
+            messageSender,
+            gameStartScenarioService,
+            gameStartTransitionService,
+            gameStartFailureProcessor,
+            gameEndScheduleService,
+            gameStartWebSocketSender
     );
     private final GameWaitingWebSocketHandler handler = new GameWaitingWebSocketHandler(
             objectMapper,
@@ -193,6 +216,134 @@ class GameWaitingWebSocketHandlerTest {
     }
 
     @Test
+    @DisplayName("handleTextMessage - RTT가 완료되고 시작 전환에 성공하면 COUNTDOWN과 GAME_START 전송을 요청한다")
+    void handleTextMessage_RttPong_StartGame() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        GameStartScenarioPayload scenario = scenario();
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameRttMeasurementService.recordPong(GAME_ROOM_ID, FIRST_USER_ID, 5))
+                .thenReturn(GameRttPongResult.completed(true, 5));
+        when(gameStartScenarioService.getScenarioPayload(GAME_ROOM_ID)).thenReturn(scenario);
+        when(gameStartTransitionService.transitionToInProgress(GAME_ROOM_ID))
+                .thenReturn(GameStartTransitionResult.started(1000L, 5000L));
+        when(gameStartWebSocketSender.sendStart(GAME_ROOM_ID, 1000L, 5000L, scenario)).thenReturn(true);
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"RTT_PONG\",\"payload\":{\"seq\":5}}"));
+
+        // then
+        var inOrder = inOrder(gameEndScheduleService, gameStartWebSocketSender);
+        inOrder.verify(gameEndScheduleService).registerEndDeadline(GAME_ROOM_ID, 5000L, scenario.durationMs());
+        inOrder.verify(gameStartWebSocketSender).sendStart(GAME_ROOM_ID, 1000L, 5000L, scenario);
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - RTT가 완료되어도 시작 전환이 실패하면 시작 메시지를 보내지 않는다")
+    void handleTextMessage_RttPong_StartBlocked() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameRttMeasurementService.recordPong(GAME_ROOM_ID, FIRST_USER_ID, 5))
+                .thenReturn(GameRttPongResult.completed(true, 5));
+        when(gameStartTransitionService.transitionToInProgress(GAME_ROOM_ID))
+                .thenReturn(GameStartTransitionResult.blocked(GameStartBlockedReason.RTT_NOT_READY));
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"RTT_PONG\",\"payload\":{\"seq\":5}}"));
+
+        // then
+        verify(gameStartScenarioService, never()).getScenarioPayload(GAME_ROOM_ID);
+        verify(gameEndScheduleService, never()).registerEndDeadline(any(), anyLong(), anyLong());
+        verify(gameStartWebSocketSender, never()).sendStart(any(), anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - scenario 조회에 실패하면 시작 실패 processor에 위임하고 시작 메시지를 보내지 않는다")
+    void handleTextMessage_RttPong_ScenarioLoadFailed_ProcessStartedFailure() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameRttMeasurementService.recordPong(GAME_ROOM_ID, FIRST_USER_ID, 5))
+                .thenReturn(GameRttPongResult.completed(true, 5));
+        when(gameStartTransitionService.transitionToInProgress(GAME_ROOM_ID))
+                .thenReturn(GameStartTransitionResult.started(1000L, 5000L));
+        when(gameStartScenarioService.getScenarioPayload(GAME_ROOM_ID))
+                .thenThrow(new IllegalStateException("scenario missing"));
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"RTT_PONG\",\"payload\":{\"seq\":5}}"));
+
+        // then
+        verify(gameStartFailureProcessor).processStartedFailure(
+                GAME_ROOM_ID,
+                GameStartFailureReason.SCENARIO_LOAD_FAILED,
+                false
+        );
+        verify(gameEndScheduleService, never()).registerEndDeadline(any(), anyLong(), anyLong());
+        verify(gameStartWebSocketSender, never()).sendStart(any(), anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - 종료 deadline 등록에 실패하면 시작 실패 processor에 위임하고 시작 메시지를 보내지 않는다")
+    void handleTextMessage_RttPong_DeadlineRegistrationFailed_ProcessStartedFailure() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        GameStartScenarioPayload scenario = scenario();
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameRttMeasurementService.recordPong(GAME_ROOM_ID, FIRST_USER_ID, 5))
+                .thenReturn(GameRttPongResult.completed(true, 5));
+        when(gameStartScenarioService.getScenarioPayload(GAME_ROOM_ID)).thenReturn(scenario);
+        when(gameStartTransitionService.transitionToInProgress(GAME_ROOM_ID))
+                .thenReturn(GameStartTransitionResult.started(1000L, 5000L));
+        doThrow(new IllegalStateException("redis down"))
+                .when(gameEndScheduleService)
+                .registerEndDeadline(GAME_ROOM_ID, 5000L, scenario.durationMs());
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"RTT_PONG\",\"payload\":{\"seq\":5}}"));
+
+        // then
+        verify(gameStartFailureProcessor).processStartedFailure(
+                GAME_ROOM_ID,
+                GameStartFailureReason.GAME_END_DEADLINE_REGISTRATION_FAILED,
+                true
+        );
+        verify(gameStartWebSocketSender, never()).sendStart(any(), anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - GAME_START 메시지 전송에 실패하면 등록된 deadline cleanup까지 실패 processor에 위임한다")
+    void handleTextMessage_RttPong_SendStartFailed_ProcessStartedFailure() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        GameStartScenarioPayload scenario = scenario();
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameRttMeasurementService.recordPong(GAME_ROOM_ID, FIRST_USER_ID, 5))
+                .thenReturn(GameRttPongResult.completed(true, 5));
+        when(gameStartTransitionService.transitionToInProgress(GAME_ROOM_ID))
+                .thenReturn(GameStartTransitionResult.started(1000L, 5000L));
+        when(gameStartScenarioService.getScenarioPayload(GAME_ROOM_ID)).thenReturn(scenario);
+        when(gameStartWebSocketSender.sendStart(GAME_ROOM_ID, 1000L, 5000L, scenario)).thenReturn(false);
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"RTT_PONG\",\"payload\":{\"seq\":5}}"));
+
+        // then
+        verify(gameEndScheduleService).registerEndDeadline(GAME_ROOM_ID, 5000L, scenario.durationMs());
+        verify(gameStartFailureProcessor).processStartedFailure(
+                GAME_ROOM_ID,
+                GameStartFailureReason.GAME_START_MESSAGE_SEND_FAILED,
+                true
+        );
+    }
+
+    @Test
     @DisplayName("handleTextMessage - server-only type을 클라이언트가 보내면 ERROR를 응답한다")
     void handleTextMessage_ServerOnlyType_ReturnError() throws Exception {
         // given
@@ -301,6 +452,14 @@ class GameWaitingWebSocketHandlerTest {
         return session;
     }
 
+    private GameStartScenarioPayload scenario() {
+        return new GameStartScenarioPayload(
+                10000,
+                1000L,
+                List.of(new GameStartScenarioPayload.HpTimelineStep(0L, 10000))
+        );
+    }
+
     private WebSocketSession sessionWithoutAttributes(String sessionId) {
         WebSocketSession session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn(sessionId);
@@ -317,7 +476,7 @@ class GameWaitingWebSocketHandlerTest {
 
     private JsonNode lastSentMessage(WebSocketSession session) throws Exception {
         ArgumentCaptor<TextMessage> messageCaptor = ArgumentCaptor.forClass(TextMessage.class);
-        verify(session, org.mockito.Mockito.atLeastOnce()).sendMessage(messageCaptor.capture());
+        verify(session, atLeastOnce()).sendMessage(messageCaptor.capture());
         TextMessage lastMessage = messageCaptor.getAllValues().get(messageCaptor.getAllValues().size() - 1);
         return objectMapper.readTree(lastMessage.getPayload());
     }

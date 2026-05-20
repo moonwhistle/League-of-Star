@@ -2,8 +2,11 @@ package com.sang.smite.game.websocket.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.game.start.dto.GameStartScenarioPayload;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -80,6 +83,38 @@ class GameWebSocketServerMessageTest {
         assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
         assertThat(json.get("payload").get("reason").asText()).isEqualTo("RTT_FAILED");
         assertThat(json.get("payload").get("action").asText()).isEqualTo("GO_TO_MATCH_START");
+    }
+
+    @Test
+    @DisplayName("countdown - COUNTDOWN 메시지를 생성한다")
+    void countdown() {
+        GameWebSocketServerMessage result = GameWebSocketServerMessage.countdown(100L, 1000L, 5000L, 3);
+
+        JsonNode json = objectMapper.valueToTree(result);
+        assertThat(json.get("type").asText()).isEqualTo(GameWebSocketMessageType.COUNTDOWN.name());
+        assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
+        assertThat(json.get("payload").get("serverTime").asLong()).isEqualTo(1000L);
+        assertThat(json.get("payload").get("startAt").asLong()).isEqualTo(5000L);
+        assertThat(json.get("payload").get("countdownDisplaySeconds").asInt()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("gameStart - GAME_START 메시지를 생성한다")
+    void gameStart() {
+        GameStartScenarioPayload scenario = new GameStartScenarioPayload(
+                10000,
+                1000L,
+                List.of(new GameStartScenarioPayload.HpTimelineStep(0L, 10000))
+        );
+        GameWebSocketServerMessage result = GameWebSocketServerMessage.gameStart(100L, 1000L, 5000L, scenario);
+
+        JsonNode json = objectMapper.valueToTree(result);
+        assertThat(json.get("type").asText()).isEqualTo(GameWebSocketMessageType.GAME_START.name());
+        assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
+        assertThat(json.get("payload").get("serverTime").asLong()).isEqualTo(1000L);
+        assertThat(json.get("payload").get("startAt").asLong()).isEqualTo(5000L);
+        assertThat(json.get("payload").get("scenario").get("dragonMaxHp").asInt()).isEqualTo(10000);
+        assertThat(json.get("payload").get("scenario").get("hpTimeline").get(0).get("hp").asInt()).isEqualTo(10000);
     }
 
     @Test

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -61,6 +62,27 @@ public class GameRoomCommandService {
     public boolean abortReadyRoomIfReady(Long gameRoomId) {
         return gameRoomRepository.findById(gameRoomId)
                 .map(GameRoom::abortBeforeStartIfReady)
+                .orElse(false);
+    }
+
+    public boolean startReadyRoomIfReady(Long gameRoomId, LocalDateTime startTime) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .filter(gameRoom -> gameRoom.getStatus().isReady())
+                .map(gameRoom -> {
+                    gameRoom.start(startTime);
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    /**
+     * GAME_START 이후 서버가 게임 종료를 보장할 수 없는 경우에만 gameRoom 중단을 시도합니다.
+     *
+     * @return IN_PROGRESS에서 ABORTED로 전환했으면 true, 대상이 없거나 이미 다른 상태이면 false
+     */
+    public boolean abortInProgressRoomIfInProgress(Long gameRoomId) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .map(GameRoom::abortAfterStartIfInProgress)
                 .orElse(false);
     }
 

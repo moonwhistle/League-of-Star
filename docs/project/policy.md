@@ -130,7 +130,14 @@
 - `GAME_START` 이전 timeout 후 두 유저는 start 버튼 화면으로 복귀한다. 큐 자동 복귀는 하지 않는다.
 - `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
 - `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
-- 서버 timer/scheduler는 HP scenario의 종료 시각 또는 몬스터 사망 시각까지 진행한 뒤 최종 판정을 수행한다.
+- 서버 timer/scheduler는 `gameEndAt = startAt + scenario.durationMs` 기준으로 게임의 논리적 종료 시각을 계산한다.
+- 정산 대상 조회 시작 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 등록한다.
+- `settlementDueAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각이다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
+- 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않는다. 서버 종료 기준은 `startAt + scenario.durationMs`다.
+- `inputGraceMs`는 2000ms로 둔다. 자연사 직전 입력이 서버에 도착할 수 있는 여유 시간이며, RTT 보정 판정 자체는 기존 서버 수신 시각과 median RTT 기준을 유지한다.
+- `GAME_START` 확정 후 `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom과 participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않는다. 이 경우 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫으며, record와 LP/티어 변동은 반영하지 않는다.
+- `GAME_START` 메시지 전송에 실패하면 이미 등록된 `game:end:pending` deadline을 제거하고 gameRoom과 participants를 `ABORTED` 처리한다. 이 경우 match user status, RTT 상태, waiting 상태를 정리하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫는다.
+- game end scheduler는 `settlementDueAt`에 도달한 gameRoom만 정산 대상으로 삼고, 정산 시 gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
 - `GAME_START` 이후 결과가 승/패로 확정되면 일반 게임 결과처럼 record와 LP를 반영한다.
 - `GAME_START` 이후 결과가 무승부면 record는 무승부로 저장하고 LP는 변동하지 않는다.
 
@@ -167,6 +174,20 @@
 | **실패 기준** | `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED` |
 | **초과 기준** | 5회 측정은 완료했지만 median RTT가 2000ms를 초과하면 `RTT_TOO_HIGH` |
 | **성공 상태 보존** | median RTT는 이후 SMITE 보정에 필요하므로 게임 판정 완료 전까지 Redis에 유지 |
+
+#### GAME_START 시작 동기화
+
+| 규칙 | 내용 |
+|------|------|
+| **진입 조건** | 양쪽 RTT가 모두 `PASSED`이고 양쪽 median RTT가 저장된 gameRoom만 `GAME_START`로 진입 |
+| **시작 기준** | 서버가 `startAt = serverNow + 4000ms`로 절대 시작 시각을 확정 |
+| **카운트다운 표시** | 클라이언트는 `startAt`까지 남은 시간이 3000ms 이하가 되면 `3, 2, 1`을 렌더링 |
+| **메시지 전송 시점** | 서버는 `COUNTDOWN`과 `GAME_START`를 countdown 종료 후가 아니라 `startAt` 전에 미리 전송 |
+| **GAME_START 처리** | 클라이언트는 `GAME_START`를 받아도 즉시 시작하지 않고, payload의 `startAt`까지 대기 |
+| **동일 기준** | `COUNTDOWN`과 `GAME_START`는 반드시 같은 `startAt`을 사용 |
+| **MP4 preload** | MP4 preload 완료 여부는 `CLIENT_READY` 전제로 보고 `GAME_START` 단계에서 다시 검증하지 않음 |
+
+`startAt`을 서버 기준으로 고정하는 이유는 클라이언트마다 WebSocket 메시지를 받는 시점이 다를 수 있기 때문이다. 메시지를 받은 뒤 각자 3초를 세면 실제 시작 시각이 달라질 수 있으므로, 서버가 하나의 절대 시작 시각을 정하고 클라이언트는 그 시각까지 남은 시간만 렌더링한다.
 
 #### 동시 판정 처리 (Tie-Breaking)
 
@@ -464,3 +485,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
 | 2026-05-18 | 게임 대기 WebSocket 미연결 유저는 timeout 전까지 저장 상태 없음, timeout 후 이벤트 수신 불가 및 late handshake 거절 정책 명시 |
 | 2026-05-19 | RTT 5회 median 측정, 2500ms per-ping timeout, 15초 전체 제한, RTT 실패/초과 시 GAME_START 이전 `ABORTED` 정책 추가 |
+| 2026-05-20 | GAME_START 진입 조건, `startAt = serverNow + 4000ms`, 프론트 3초 countdown 렌더링, COUNTDOWN/GAME_START 사전 전송 정책 추가 |

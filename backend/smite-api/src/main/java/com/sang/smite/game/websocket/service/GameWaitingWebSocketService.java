@@ -1,8 +1,15 @@
 package com.sang.smite.game.websocket.service;
 
+import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
+import com.sang.smite.game.start.domain.GameStartFailureReason;
+import com.sang.smite.game.start.domain.GameStartTransitionResult;
+import com.sang.smite.game.start.dto.GameStartScenarioPayload;
+import com.sang.smite.game.start.service.GameStartFailureProcessor;
+import com.sang.smite.game.start.service.GameStartScenarioService;
+import com.sang.smite.game.start.service.GameStartTransitionService;
 import com.sang.smite.game.websocket.dto.GameWebSocketClientMessage;
 import com.sang.smite.game.websocket.dto.GameWebSocketServerMessage;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSession;
@@ -28,6 +35,11 @@ public class GameWaitingWebSocketService {
     private final GameWaitingReadyService gameWaitingReadyService;
     private final GameRttMeasurementService gameRttMeasurementService;
     private final GameRoomWebSocketMessageSender messageSender;
+    private final GameStartScenarioService gameStartScenarioService;
+    private final GameStartTransitionService gameStartTransitionService;
+    private final GameStartFailureProcessor gameStartFailureProcessor;
+    private final GameEndScheduleService gameEndScheduleService;
+    private final GameStartWebSocketSender gameStartWebSocketSender;
 
     public void registerSession(Long gameRoomId, Long userId, WebSocketSession session) throws IOException {
         sessionRegistry.register(gameRoomId, userId, session);
@@ -56,18 +68,31 @@ public class GameWaitingWebSocketService {
             return;
         }
 
+        GameRttPongResult pongResult;
         try {
-            GameRttPongResult pongResult = gameRttMeasurementService.recordPong(
+            pongResult = gameRttMeasurementService.recordPong(
                     currentSession.getGameRoomId(),
                     currentSession.getUserId(),
                     seq.getAsInt()
             );
-            if (pongResult.needsNextPing()) {
-                sendRttPing(currentSession, pongResult.nextSeq());
-            }
         } catch (Exception e) {
             gameRttMeasurementService.failMeasurement(currentSession.getGameRoomId(), currentSession.getUserId());
             log.warn("Failed to process RTT_PONG. gameRoomId={}, userId={}",
+                    currentSession.getGameRoomId(), currentSession.getUserId(), e);
+            return;
+        }
+
+        try {
+            if (pongResult.needsNextPing()) {
+                sendRttPing(currentSession, pongResult.nextSeq());
+                return;
+            }
+            if (pongResult.completed() && pongResult.passed()) {
+                startGameIfReady(currentSession.getGameRoomId());
+            }
+        } catch (IOException e) {
+            gameRttMeasurementService.failMeasurement(currentSession.getGameRoomId(), currentSession.getUserId());
+            log.warn("Failed to send RTT_PING. gameRoomId={}, userId={}",
                     currentSession.getGameRoomId(), currentSession.getUserId(), e);
         }
     }
@@ -112,6 +137,56 @@ public class GameWaitingWebSocketService {
 
         for (GameRoomWebSocketSession session : sessions) {
             sendRttPing(session, GameRttConstants.INITIAL_RTT_SEQUENCE);
+        }
+    }
+
+    private void startGameIfReady(Long gameRoomId) {
+        GameStartTransitionResult transitionResult = gameStartTransitionService.transitionToInProgress(gameRoomId);
+        if (!transitionResult.started()) {
+            return;
+        }
+
+        GameStartScenarioPayload scenario;
+        try {
+            scenario = gameStartScenarioService.getScenarioPayload(gameRoomId);
+        } catch (RuntimeException e) {
+            log.warn("Failed to load game start scenario. gameRoomId={}", gameRoomId, e);
+            gameStartFailureProcessor.processStartedFailure(
+                    gameRoomId,
+                    GameStartFailureReason.SCENARIO_LOAD_FAILED,
+                    false
+            );
+            return;
+        }
+
+        try {
+            gameEndScheduleService.registerEndDeadline(
+                    gameRoomId,
+                    transitionResult.startAtMillis(),
+                    scenario.durationMs()
+            );
+        } catch (RuntimeException e) {
+            log.warn("Failed to register game end deadline. gameRoomId={}", gameRoomId, e);
+            gameStartFailureProcessor.processStartedFailure(
+                    gameRoomId,
+                    GameStartFailureReason.GAME_END_DEADLINE_REGISTRATION_FAILED,
+                    true
+            );
+            return;
+        }
+
+        boolean sent = gameStartWebSocketSender.sendStart(
+                gameRoomId,
+                transitionResult.serverTimeMillis(),
+                transitionResult.startAtMillis(),
+                scenario
+        );
+        if (!sent) {
+            gameStartFailureProcessor.processStartedFailure(
+                    gameRoomId,
+                    GameStartFailureReason.GAME_START_MESSAGE_SEND_FAILED,
+                    true
+            );
         }
     }
 

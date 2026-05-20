@@ -4,8 +4,8 @@
 
 범위:
 
-- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, 클라이언트 복구 정책, `ERROR`
-- 제외: countdown, `GAME_START`, scenario 전달, SMITE 판정
+- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, 클라이언트 복구 정책, `ERROR`
+- 제외: SMITE 판정, game record/LP 반영
 
 ## 1. 책임 경계
 
@@ -314,6 +314,9 @@ sequenceDiagram
 - 위 `PLAYER_LEFT`는 게임 대기 WebSocket의 연결 상태 알림입니다.
 - `GAME_START` 이전에는 gameRoom `createdAt` 기준 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료하지 못하면 `ABORTED` 대상이 됩니다.
 - `GAME_START` 이후에는 WebSocket 연결이 끊겨도 gameRoom을 즉시 중단하지 않고 서버 timer/scheduler가 종료 판정을 완료합니다.
+- 서버는 `GAME_START` 확정 시 `gameEndAt = startAt + scenario.durationMs`, `settlementDueAt = gameEndAt + 2000ms`로 종료 정산 deadline을 등록합니다.
+- deadline 등록 실패 시 서버는 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 상태 저장소 cleanup을 수행합니다. 연결된 클라이언트에는 `GAME_START_FAILED`를 전송하고 record/LP는 반영하지 않습니다.
+- `COUNTDOWN`/`GAME_START` 전송 실패 시 서버는 `GAME_START_FAILED` 전송 후 WebSocket을 닫고, 클라이언트는 start 버튼 화면으로 복귀합니다.
 
 ## 9. 게임 대기 Timeout과 미연결
 
@@ -454,9 +457,51 @@ RTT 실패/초과 시 서버는 `GAME_START_FAILED`를 전송하고 연결을 �
 - `RTT_PING`을 받으면 payload의 `seq`를 그대로 담아 `RTT_PONG`을 즉시 보냅니다.
 - `GAME_START_FAILED`를 받으면 reason과 관계없이 WebSocket을 정리하고 start 버튼 화면으로 복귀합니다.
 - `RTT_FAILED`, `RTT_TOO_HIGH`는 안내/로그 구분용이며 화면 이동 정책은 동일합니다.
-- RTT 성공 후에도 `COUNTDOWN`, `GAME_START`, scenario는 후속 단계에서 별도로 수신합니다.
+- RTT 성공 후 `COUNTDOWN`과 `GAME_START`를 수신합니다. 두 메시지는 같은 `startAt`을 사용해야 합니다.
 
-## 11. 잘못된 메시지 처리
+## 11. COUNTDOWN과 GAME_START
+
+양쪽 RTT가 모두 `PASSED`이면 서버는 `startAt = serverNow + 4000ms`를 확정합니다.
+
+서버는 `COUNTDOWN`과 `GAME_START`를 countdown 종료 후가 아니라 `startAt` 전에 미리 전송합니다. 클라이언트는 두 메시지를 받아도 즉시 게임을 시작하지 않고, payload의 `startAt`까지 대기합니다.
+
+`COUNTDOWN` 예시:
+
+```json
+{
+  "type": "COUNTDOWN",
+  "payload": {
+    "gameRoomId": 10,
+    "serverTime": 1716192000000,
+    "startAt": 1716192004000,
+    "countdownDisplaySeconds": 3
+  }
+}
+```
+
+`GAME_START` 예시:
+
+```json
+{
+  "type": "GAME_START",
+  "payload": {
+    "gameRoomId": 10,
+    "serverTime": 1716192000000,
+    "startAt": 1716192004000,
+    "scenario": {}
+  }
+}
+```
+
+클라이언트 처리:
+
+- `COUNTDOWN`을 받으면 `startAt`까지 남은 시간을 계산합니다.
+- 남은 시간이 3000ms 이하가 되면 `3, 2, 1` countdown을 렌더링합니다.
+- 메시지를 늦게 받아 남은 시간이 2초대이면 `2`부터 보여줄 수 있습니다. 그래도 실제 시작 기준은 `startAt`입니다.
+- `GAME_START`를 받으면 scenario를 저장하고, `startAt` 도달 시 MP4 재생과 HP overlay를 시작합니다.
+- `COUNTDOWN`과 `GAME_START`의 `startAt`이 다르면 잘못된 서버 메시지로 보고 시작하지 않습니다.
+
+## 12. 잘못된 메시지 처리
 
 클라이언트가 JSON 파싱이 불가능한 메시지나 server-only type을 보내면 백엔드는 `ERROR`를 응답합니다.
 
@@ -488,7 +533,7 @@ sequenceDiagram
 | `CLIENT_READY` | MP4 preload 등 대기 준비 완료 |
 | `RTT_PONG` | 서버 `RTT_PING`에 대한 RTT 측정 응답. payload의 `seq`를 그대로 반환 |
 
-현재 server message로만 사용하는 type:
+서버가 보내는 message type:
 
 | type | 설명 |
 |------|------|
@@ -497,10 +542,12 @@ sequenceDiagram
 | `PLAYER_LEFT` | gameRoom 참가자 WebSocket 연결 종료 |
 | `GAME_WAITING_TIMEOUT` | gameRoom `createdAt` 기준 30초 안에 양쪽 READY가 완료되지 않아 start 버튼 화면으로 복귀해야 함 |
 | `RTT_PING` | 서버가 RTT 측정을 위해 보내는 ping. 클라이언트는 같은 `seq`로 `RTT_PONG` 응답 |
-| `GAME_START_FAILED` | RTT 실패/초과로 GAME_START 전에 gameRoom이 `ABORTED` 되어 start 버튼 화면으로 복귀해야 함 |
+| `GAME_START_FAILED` | RTT 실패/초과 또는 GAME_START 확정 중 실패로 gameRoom이 `ABORTED` 되어 start 버튼 화면으로 복귀해야 함 |
+| `COUNTDOWN` | 서버 기준 `startAt`까지 남은 시간을 렌더링하기 위한 시작 예고 |
+| `GAME_START` | `startAt`과 HP scenario를 포함한 실제 게임 시작 데이터 |
 | `ERROR` | 잘못된 메시지 또는 처리 불가 |
 
-## 12. 클라이언트 UI 상태
+## 13. 클라이언트 UI 상태
 
 ```mermaid
 stateDiagram-v2
@@ -519,6 +566,9 @@ stateDiagram-v2
     BothReady --> RttMeasuring: RTT_PING / RTT_PONG
     RttMeasuring --> GameStartReady: RTT passed
     RttMeasuring --> MatchStart: GAME_START_FAILED
+    GameStartReady --> Countdown: COUNTDOWN
+    Countdown --> GameDataReady: GAME_START
+    GameDataReady --> Playing: wait until startAt
     WebSocketConnecting --> MatchStart: late handshake fail<br/>gameRoom ABORTED
     WaitingPage --> MatchStart: client 30s timer expired
     WaitingConnected --> MatchStart: GAME_WAITING_TIMEOUT
@@ -528,7 +578,7 @@ stateDiagram-v2
     ReadySent --> WaitingDisconnected: close/error
     WaitingOtherPlayer --> WaitingDisconnected: close/error
     WaitingDisconnected --> MatchStart: waiting failed
-    GameStartReady --> [*]: wait for countdown/GAME_START
+    Playing --> [*]: game play
 ```
 
 클라이언트 구현 체크리스트:
@@ -536,14 +586,15 @@ stateDiagram-v2
 - `match_response_result` 수신 후 매칭 SSE를 닫습니다.
 - `GO_TO_GAME_WAITING`일 때만 게임 대기 화면으로 이동합니다.
 - `game.webSocketUrl`에 access token query parameter를 붙여 WebSocket에 연결합니다.
-- WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `ERROR`를 처리합니다.
+- WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `ERROR`를 처리합니다.
 - MP4 preload 완료 후 `CLIENT_READY`를 한 번 전송합니다.
 - `GAME_WAITING_TIMEOUT`, handshake 실패, close/error, 자체 30초 timer 만료 시 start 버튼 화면으로 복귀합니다.
 - RTT 단계의 `GAME_START_FAILED` 수신 시 start 버튼 화면으로 복귀합니다.
 - 복귀 시 기존 waiting 화면 상태, WebSocket 객체, 자체 timer를 정리합니다.
 - `bothReady=true`를 `GAME_START`로 오해하지 않습니다.
 - RTT 성공을 `GAME_START`로 오해하지 않습니다.
-- `GAME_START`, countdown, SMITE는 후속 WebSocket 단계에서 별도로 처리합니다.
+- `COUNTDOWN`과 `GAME_START`를 받아도 즉시 시작하지 않고, 같은 `startAt` 기준으로 대기한 뒤 게임을 시작합니다.
+- SMITE는 후속 WebSocket 단계에서 별도로 처리합니다.
 
 ## 변경 이력
 
@@ -552,3 +603,4 @@ stateDiagram-v2
 | 2026-05-15 | 양쪽 수락 이후 매칭 SSE 종료, 게임 대기 WebSocket handshake, PLAYER_JOINED, CLIENT_READY, PLAYER_READY, PLAYER_LEFT 흐름 정리 |
 | 2026-05-18 | gameRoom `createdAt` 기준 30초 waiting timeout, 미연결 유저 이벤트 수신 불가, `GAME_WAITING_TIMEOUT` 클라이언트 복귀 흐름 추가 |
 | 2026-05-19 | RTT_PING/RTT_PONG, 5회 median RTT, 2500ms per-ping timeout, 15초 전체 제한, GAME_START_FAILED 복귀 정책 추가 |
+| 2026-05-20 | `startAt = serverNow + 4000ms`, 프론트 3초 countdown 렌더링, `COUNTDOWN`/`GAME_START` 사전 수신 후 startAt 대기 정책 추가 |

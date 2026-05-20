@@ -66,6 +66,43 @@ class GameRoomTest {
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
     }
 
+    @Test
+    @DisplayName("abortAfterStartIfInProgress - IN_PROGRESS 게임룸과 참가자를 ABORTED로 전환하고 true를 반환한다")
+    void abortAfterStartIfInProgress_InProgress() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        gameRoom.start(LocalDateTime.now());
+
+        // when
+        boolean aborted = gameRoom.abortAfterStartIfInProgress();
+
+        // then
+        assertThat(aborted).isTrue();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(gameRoom.getFinishedAt()).isNotNull();
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
+    }
+
+    @Test
+    @DisplayName("abortAfterStartIfInProgress - IN_PROGRESS가 아니면 상태를 바꾸지 않고 false를 반환한다")
+    void abortAfterStartIfInProgress_NotInProgress() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+
+        // when
+        boolean aborted = gameRoom.abortAfterStartIfInProgress();
+
+        // then
+        assertThat(aborted).isFalse();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.READY);
+        assertThat(gameRoom.getFinishedAt()).isNull();
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.READY);
+    }
+
     private GameRoom createReadyGameRoom() {
         GameRoom gameRoom = GameRoom.builder().build();
         gameRoom.addParticipant(FIRST_USER_ID);

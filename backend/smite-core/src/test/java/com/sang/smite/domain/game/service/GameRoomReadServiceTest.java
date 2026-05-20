@@ -3,7 +3,9 @@ package com.sang.smite.domain.game.service;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
+import com.sang.smite.domain.game.domain.vo.HpStep;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,6 +110,64 @@ class GameRoomReadServiceTest {
 
         // when & then
         assertThatThrownBy(() -> gameRoomReadService.getStatus(GAME_ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("getScenarioData - gameRoom의 HP 시나리오를 반환한다")
+    void getScenarioData() {
+        // given
+        GameScenario scenarioData = GameScenario.of(List.of(
+                new HpStep(0L, 10000),
+                new HpStep(1000L, 9000)
+        ));
+        GameRoom gameRoom = GameRoom.builder()
+                .scenarioData(scenarioData)
+                .build();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when
+        GameScenario result = gameRoomReadService.getScenarioData(GAME_ROOM_ID);
+
+        // then
+        assertThat(result).isEqualTo(scenarioData);
+    }
+
+    @Test
+    @DisplayName("getScenarioData - gameRoom이 없으면 예외를 던진다")
+    void getScenarioData_NotFound_ThrowException() {
+        // given
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.getScenarioData(GAME_ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("getParticipantUserIds - gameRoom 참가자 userId 목록을 반환한다")
+    void getParticipantUserIds() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when
+        List<Long> result = gameRoomReadService.getParticipantUserIds(GAME_ROOM_ID);
+
+        // then
+        assertThat(result).containsExactly(FIRST_USER_ID, SECOND_USER_ID);
+    }
+
+    @Test
+    @DisplayName("getParticipantUserIds - gameRoom이 없으면 예외를 던진다")
+    void getParticipantUserIds_NotFound_ThrowException() {
+        // given
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.getParticipantUserIds(GAME_ROOM_ID))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }

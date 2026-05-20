@@ -16,6 +16,8 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
@@ -129,6 +131,35 @@ class GameRoomCommandServiceJpaTest {
 
         // then
         assertThat(aborted).isTrue();
+        assertThat(gameRecordRepository.count()).isZero();
+        assertThat(rankSeriesRepository.count()).isZero();
+        assertThat(userRankInfoRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("abortInProgressRoomIfInProgress - GAME_START 이후 인프라 실패 abort는 game record와 rank 데이터를 생성하지 않는다")
+    void abortInProgressRoomIfInProgress_DoesNotCreateRecordAndRankData() {
+        // given
+        GameRoom savedGameRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomCommandService.startReadyRoomIfReady(
+                savedGameRoom.getId(),
+                LocalDateTime.of(2026, 5, 20, 12, 0)
+        );
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        boolean aborted = gameRoomCommandService.abortInProgressRoomIfInProgress(savedGameRoom.getId());
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(aborted).isTrue();
+        assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
         assertThat(gameRecordRepository.count()).isZero();
         assertThat(rankSeriesRepository.count()).isZero();
         assertThat(userRankInfoRepository.count()).isZero();
