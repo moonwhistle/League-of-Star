@@ -75,6 +75,17 @@ public class GameRoomCommandService {
                 .orElse(false);
     }
 
+    /**
+     * GAME_START 이후 서버가 게임 종료를 보장할 수 없는 경우에만 gameRoom 중단을 시도합니다.
+     *
+     * @return IN_PROGRESS에서 ABORTED로 전환했으면 true, 대상이 없거나 이미 다른 상태이면 false
+     */
+    public boolean abortInProgressRoomIfInProgress(Long gameRoomId) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .map(GameRoom::abortAfterStartIfInProgress)
+                .orElse(false);
+    }
+
     private void validateParticipants(Long firstUserId, Long secondUserId) {
         if (firstUserId == null || secondUserId == null || firstUserId.equals(secondUserId)) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);

@@ -155,14 +155,14 @@ flowchart TD
 
 ### Step 6. GAME_START와 HP 시나리오 전달
 
-- [ ] HP scenario 생성/조회 및 시작 payload 확정
-- [ ] 양쪽 RTT 정상 상태 확인 후 `startAt = serverNow + 4000ms` 결정
-- [ ] gameRoom 상태를 `IN_PROGRESS`로 전환
-- [ ] `COUNTDOWN`/`GAME_START` 이벤트를 countdown 종료 후가 아니라 `startAt` 전에 미리 전달
-- [ ] 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고 `startAt` 기준으로 HP bar overlay 계산
+- [x] HP scenario 생성/조회 및 시작 payload 확정
+- [x] 양쪽 RTT 정상 상태 확인 후 `startAt = serverNow + 4000ms` 결정
+- [x] gameRoom 상태를 `IN_PROGRESS`로 전환
+- [x] `COUNTDOWN`/`GAME_START` 이벤트를 countdown 종료 후가 아니라 `startAt` 전에 미리 전달
+- [x] 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고 `startAt` 기준으로 HP bar overlay 계산
 - [x] MP4 preload 완료 여부는 `CLIENT_READY` 전제로 보고 Step 6에서 다시 검증하지 않음
 - [x] MP4는 배경으로만 사용
-- [ ] `GAME_START` 시 서버 기준 game end timer/scheduler 등록
+- [x] `GAME_START` 시 서버 기준 game end timer/scheduler 등록
 
 ### Step 7. SMITE 입력과 서버 판정
 

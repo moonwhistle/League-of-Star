@@ -163,8 +163,27 @@ lock 비용 판단:
 
 ### 6. game end timer/scheduler 등록 지점 정의
 
-- [ ] `GAME_START` 확정 시 서버 기준 game end deadline을 등록한다.
-- [ ] SMITE 미입력, 정상 종료, timeout 종료 흐름에서 재사용할 수 있게 등록 지점을 분리한다.
+- [x] `GAME_START` 확정 시 서버 기준 game end deadline을 등록한다.
+- [x] SMITE 미입력, 정상 종료, timeout 종료 흐름에서 재사용할 수 있게 등록 지점을 분리한다.
+
+정책:
+
+- 게임의 논리적 종료 시각은 `gameEndAt = startAt + scenario.durationMs`로 계산한다.
+- 최종 정산 실행 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 계산한다.
+- `inputGraceMs`는 2000ms로 둔다.
+- 2000ms grace는 자연사 직전 SMITE 입력이 서버에 도착할 수 있는 여유 시간이다.
+- 판정 시각 보정은 기존 정책처럼 `serverReceiveTime - gameStartTime - medianRtt/2`를 사용한다.
+- 고정 25초 같은 값은 실제 정산 deadline으로 쓰지 않는다. 필요하면 cleanup TTL 같은 안전장치에서 별도로 검토한다.
+
+구현 결과:
+
+- `GameEndConstants.INPUT_GRACE_MILLIS = 2000L`로 입력 유예 시간을 상수화했다.
+- `GameEndScheduleService.registerEndDeadline(gameRoomId, startAtMillis, durationMs)`에서 `gameEndAtMillis`, `settlementDueAtMillis`를 계산한다.
+- `GameEndScheduleStore` port를 추가해 종료 정산 등록 책임을 분리했다.
+- `RedisGameEndScheduleStore`는 `game:end:pending` ZSET에 `member=gameRoomId`, `score=settlementDueAtMillis`로 등록한다.
+- `GameWaitingWebSocketService`는 `transitionResult.started() == true` 이후, `COUNTDOWN` / `GAME_START` 전송 전에 종료 deadline을 등록한다.
+- deadline 등록이 실패하면 이미 `IN_PROGRESS`로 전환된 gameRoom을 `ABORTED`로 보상 전환하고 시작 메시지를 보내지 않는다.
+- 이 abort는 서버가 game end scheduler 기반 종료를 보장할 수 없는 인프라 실패로 보며, game record와 LP/티어 변동은 반영하지 않는다.
 
 ### 7. 실패/예외 처리
 
@@ -172,25 +191,26 @@ lock 비용 판단:
 - [ ] scenario 조회 실패 시 시작 차단한다.
 - [ ] gameRoom 상태 전환 실패 시 시작 차단한다.
 - [ ] WebSocket 전송 실패 시 정책을 정의한다.
-- [ ] 시작 실패가 GAME_START 이전 실패인지, 이미 IN_PROGRESS 이후 실패인지 구분한다.
+- [x] game end deadline 등록 실패는 `IN_PROGRESS` 이후 실패지만 서버 종료 보장 불가 상태이므로 `ABORTED` 처리하고 record/LP를 반영하지 않는다.
+- [x] 시작 실패가 GAME_START 이전 실패인지, 이미 IN_PROGRESS 이후 실패인지 구분한다.
 
 ### 8. 테스트
 
-- [ ] 양쪽 RTT `PASSED`이면 `startAt`이 `serverNow + 4000ms` 기준으로 생성되는지 검증한다.
-- [ ] RTT 상태가 없거나 한쪽이라도 `PASSED`가 아니면 시작하지 않는지 검증한다.
-- [ ] gameRoom `READY -> IN_PROGRESS` 전환을 검증한다.
-- [ ] `COUNTDOWN`과 `GAME_START`가 같은 `startAt`을 사용하는지 검증한다.
-- [ ] `GAME_START` payload에 HP scenario가 포함되는지 검증한다.
-- [ ] 이미 시작된 gameRoom의 중복 시작을 방지하는지 검증한다.
+- [x] 양쪽 RTT `PASSED`이면 `startAt`이 `serverNow + 4000ms` 기준으로 생성되는지 검증한다.
+- [x] RTT 상태가 없거나 한쪽이라도 `PASSED`가 아니면 시작하지 않는지 검증한다.
+- [x] gameRoom `READY -> IN_PROGRESS` 전환을 검증한다.
+- [x] `COUNTDOWN`과 `GAME_START`가 같은 `startAt`을 사용하는지 검증한다.
+- [x] `GAME_START` payload에 HP scenario가 포함되는지 검증한다.
+- [x] 이미 시작된 gameRoom의 중복 시작을 방지하는지 검증한다.
 
 ### 9. 문서
 
 - [x] Step 1 정책 확정 내용(`startAt = serverNow + 4000ms`, 프론트 3초 countdown, `COUNTDOWN`/`GAME_START` 사전 전송)을 관련 문서에 선반영한다.
-- [ ] 구현 완료 후 `policy.md`를 실제 구현 결과와 맞춘다.
-- [ ] 구현 완료 후 `domain status.md`의 `READY -> IN_PROGRESS` 전이를 실제 구현 결과와 맞춘다.
-- [ ] 구현 완료 후 `flow status.md`의 RTT 통과 후 `COUNTDOWN` / `GAME_START` 흐름을 실제 구현 결과와 맞춘다.
-- [ ] 구현 완료 후 `websocket client.md`의 메시지 payload와 클라이언트 처리 정책을 실제 구현 결과와 맞춘다.
-- [ ] 구현 완료 후 `plan-checkpoint.md` Step 6 상태를 구현 결과와 맞춘다.
+- [x] 구현 완료 후 `policy.md`를 실제 구현 결과와 맞춘다.
+- [x] 구현 완료 후 `domain status.md`의 `READY -> IN_PROGRESS` 전이를 실제 구현 결과와 맞춘다.
+- [x] 구현 완료 후 `flow status.md`의 RTT 통과 후 `COUNTDOWN` / `GAME_START` 흐름을 실제 구현 결과와 맞춘다.
+- [x] 구현 완료 후 `websocket client.md`의 메시지 payload와 클라이언트 처리 정책을 실제 구현 결과와 맞춘다.
+- [x] 구현 완료 후 `plan-checkpoint.md` Step 6 상태를 구현 결과와 맞춘다.
 
 ## ✅ 완료 기준
 

@@ -1,5 +1,7 @@
 package com.sang.smite.game.websocket.service;
 
+import com.sang.smite.domain.game.service.GameRoomCommandService;
+import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
@@ -34,6 +36,8 @@ public class GameWaitingWebSocketService {
     private final GameRoomWebSocketMessageSender messageSender;
     private final GameStartScenarioService gameStartScenarioService;
     private final GameStartTransitionService gameStartTransitionService;
+    private final GameRoomCommandService gameRoomCommandService;
+    private final GameEndScheduleService gameEndScheduleService;
     private final GameStartWebSocketSender gameStartWebSocketSender;
 
     public void registerSession(Long gameRoomId, Long userId, WebSocketSession session) throws IOException {
@@ -149,12 +153,37 @@ public class GameWaitingWebSocketService {
             return;
         }
 
+        try {
+            gameEndScheduleService.registerEndDeadline(
+                    gameRoomId,
+                    transitionResult.startAtMillis(),
+                    scenario.durationMs()
+            );
+        } catch (RuntimeException e) {
+            log.warn("Failed to register game end deadline. gameRoomId={}", gameRoomId, e);
+            abortStartedGameAfterDeadlineRegistrationFailure(gameRoomId);
+            return;
+        }
+
         gameStartWebSocketSender.sendStart(
                 gameRoomId,
                 transitionResult.serverTimeMillis(),
                 transitionResult.startAtMillis(),
                 scenario
         );
+    }
+
+    private void abortStartedGameAfterDeadlineRegistrationFailure(Long gameRoomId) {
+        try {
+            boolean aborted = gameRoomCommandService.abortInProgressRoomIfInProgress(gameRoomId);
+            if (!aborted) {
+                log.warn("Game end deadline registration failed, but gameRoom was not IN_PROGRESS. gameRoomId={}",
+                        gameRoomId);
+            }
+        } catch (RuntimeException abortException) {
+            log.warn("Failed to abort gameRoom after game end deadline registration failure. gameRoomId={}",
+                    gameRoomId, abortException);
+        }
     }
 
     private void sendRttPing(GameRoomWebSocketSession session, int seq) throws IOException {

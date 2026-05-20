@@ -500,6 +500,7 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 | `game:waiting:timeout:lock:{gameRoomId}` | Redis Lock | 멀티 인스턴스 scheduler 중복 timeout 정산 방지 | 작업 lease |
 | `game_waiting_timeout` | Pub/Sub Channel | timeout 확정 후 모든 API 인스턴스에 WebSocket 전송 이벤트 전파 | - |
 | `game:rtt:{gameRoomId}` | Hash | `GAME_START` 이전 RTT 측정 결과. `userAId`, `userBId`, `userASamples`, `userBSamples`, `userAMedianRttMs`, `userBMedianRttMs`, `userAStatus`, `userBStatus` | 300초 |
+| `game:end:pending` | Sorted Set | GAME_START 이후 종료 정산 후보. score = `settlementDueAtMillis`, member = `gameRoomId` | - |
 
 > 매칭 응답 완료 전 상태는 Redis가 관리합니다. 양쪽 수락 후 gameRoom `READY` 생성이 완료되면 game waiting timeout 상태도 Redis에 등록합니다.
 
@@ -522,6 +523,20 @@ game:rtt:{gameRoomId}
 - RTT 성공 시 median RTT는 SMITE 판정 보정에 필요하므로 게임 종료 전까지 유지합니다.
 - RTT 실패/초과 또는 게임 정상 종료 시 `game:rtt:{gameRoomId}`를 cleanup합니다.
 - TTL 300초는 cleanup 누락 방지용 안전장치이며, 게임 진행/판정 시간을 충분히 감싸기 위한 값입니다.
+
+게임 종료 정산 deadline은 `game:end:pending` ZSET에 저장합니다.
+
+```text
+gameEndAtMillis = startAtMillis + scenario.durationMs
+settlementDueAtMillis = gameEndAtMillis + 2000
+ZADD game:end:pending settlementDueAtMillis gameRoomId
+```
+
+- `gameEndAtMillis`는 HP scenario 기준 드래곤이 0이 되는 논리적 종료 시각입니다.
+- `settlementDueAtMillis`는 서버가 최종 판정을 시도할 시각입니다.
+- 2000ms는 자연사 직전 SMITE 입력이 서버에 도착할 수 있게 두는 입력 유예 시간입니다.
+- `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 record/LP를 반영하지 않습니다.
+- 후속 game end scheduler는 `settlementDueAtMillis`가 지난 gameRoom을 조회하고, gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
 
 후속 게임 흐름에서 사용할 예정인 Redis 구조:
 
@@ -559,3 +574,4 @@ game:rtt:{gameRoomId}
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
 | 2026-05-19 | game waiting timeout Redis ZSET/HASH/lock/PubSub 구조와 participants `ABORTED` 정리 정책 반영 |
 | 2026-05-19 | RTT 측정 Redis `game:rtt:{gameRoomId}` HASH 구조, 300초 TTL, 성공 median 유지 및 실패 cleanup 정책 반영 |
+| 2026-05-20 | GAME_START 이후 종료 정산 deadline용 `game:end:pending` ZSET과 `settlementDueAt = startAt + durationMs + 2000ms` 정책 반영 |

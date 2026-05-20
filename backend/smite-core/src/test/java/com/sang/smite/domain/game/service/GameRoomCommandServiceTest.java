@@ -253,4 +253,47 @@ class GameRoomCommandServiceTest {
         // then
         assertThat(started).isFalse();
     }
+
+    @Test
+    @DisplayName("abortInProgressRoomIfInProgress - IN_PROGRESS 게임룸이면 ABORTED로 전환하고 true를 반환한다")
+    void abortInProgressRoomIfInProgress_InProgress() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        boolean aborted = gameRoomCommandService.abortInProgressRoomIfInProgress(100L);
+
+        // then
+        assertThat(aborted).isTrue();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
+    }
+
+    @Test
+    @DisplayName("abortInProgressRoomIfInProgress - IN_PROGRESS가 아니면 상태를 바꾸지 않고 false를 반환한다")
+    void abortInProgressRoomIfInProgress_NotInProgress() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        boolean aborted = gameRoomCommandService.abortInProgressRoomIfInProgress(100L);
+
+        // then
+        assertThat(aborted).isFalse();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.READY);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.READY);
+    }
 }
