@@ -7,10 +7,12 @@ import com.sang.smite.game.websocket.dto.GameWebSocketServerMessage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -84,5 +86,35 @@ class GameStartWebSocketSenderTest {
 
         // then
         assertThat(sent).isFalse();
+    }
+
+    @Test
+    @DisplayName("sendStart - COUNTDOWN 전송 성공 후 GAME_START 전송 실패 시 false를 반환한다")
+    void sendStart_GameStartBroadcastFailed() throws Exception {
+        // given
+        GameStartScenarioPayload scenario = scenario();
+        doThrow(new java.io.IOException("game start send failed"))
+                .when(messageSender)
+                .broadcast(eq(GAME_ROOM_ID), argThat(messageType(GameWebSocketMessageType.GAME_START)));
+
+        // when
+        boolean sent = sender.sendStart(GAME_ROOM_ID, SERVER_TIME, START_AT, scenario);
+
+        // then
+        assertThat(sent).isFalse();
+        verify(messageSender).broadcast(eq(GAME_ROOM_ID), argThat(messageType(GameWebSocketMessageType.COUNTDOWN)));
+        verify(messageSender).broadcast(eq(GAME_ROOM_ID), argThat(messageType(GameWebSocketMessageType.GAME_START)));
+    }
+
+    private GameStartScenarioPayload scenario() {
+        return new GameStartScenarioPayload(
+                10000,
+                1000L,
+                List.of(new GameStartScenarioPayload.HpTimelineStep(0L, 10000))
+        );
+    }
+
+    private ArgumentMatcher<GameWebSocketServerMessage> messageType(GameWebSocketMessageType type) {
+        return message -> message != null && message.type() == type;
     }
 }

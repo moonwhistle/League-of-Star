@@ -204,6 +204,7 @@ flowchart LR
 - RTT 실패/초과는 `GAME_START` 이전 실패이므로 gameRoom/participants를 `ABORTED`로 정리하고 record/LP를 반영하지 않습니다.
 - GAME_START 진입 시 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, `COUNTDOWN`과 `GAME_START`를 `startAt` 전에 미리 전송합니다.
 - GAME_START 진입 시 서버는 `game:end:pending`에 `settlementDueAt = startAt + scenario.durationMs + 2000ms`를 등록합니다.
+- `settlementDueAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각입니다.
 - `game:end:pending` 등록에 실패하면 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도합니다. 연결된 클라이언트에는 `GAME_START_FAILED`를 전송하고 record/LP는 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending`, match user status, RTT 상태, waiting 상태를 정리합니다.
 - 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고, `GAME_START`를 받아도 즉시 시작하지 않고 `startAt`까지 대기합니다.

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 @ExtendWith(MockitoExtension.class)
 class GameStartFailureProcessorTest {
@@ -186,6 +187,89 @@ class GameStartFailureProcessorTest {
                 GameStartFailureReason.SCENARIO_LOAD_FAILED.name(),
                 GameStartConstants.GAME_START_FAILED_ACTION
         );
+    }
+
+    @Test
+    @DisplayName("processStartedFailure - match status 제거 실패해도 실패 이벤트와 cleanup을 계속 수행한다")
+    void processStartedFailure_MatchStatusCleanupFailed_ContinueCleanup() {
+        // given
+        when(gameRttMeasurementStore.findState(GAME_ROOM_ID)).thenReturn(Optional.of(rttState()));
+        when(gameRoomCommandService.abortInProgressRoomIfInProgress(GAME_ROOM_ID)).thenReturn(true);
+        doThrow(new IllegalStateException("match status cleanup failed"))
+                .when(matchUserStatusCommandService)
+                .removeGameStartFailureStatuses(USER_A_ID, USER_B_ID);
+
+        // when & then
+        assertThatCode(() -> processor.processStartedFailure(
+                GAME_ROOM_ID,
+                GameStartFailureReason.SCENARIO_LOAD_FAILED,
+                false
+        )).doesNotThrowAnyException();
+        verify(gameStartFailedWebSocketSender).sendFailure(
+                GAME_ROOM_ID,
+                GameStartFailureReason.SCENARIO_LOAD_FAILED.name(),
+                GameStartConstants.GAME_START_FAILED_ACTION
+        );
+        verify(gameRttMeasurementStore).cleanup(GAME_ROOM_ID);
+        verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("processStartedFailure - RTT cleanup 실패해도 waiting cleanup과 deadline cleanup을 계속 수행한다")
+    void processStartedFailure_RttCleanupFailed_ContinueCleanup() {
+        // given
+        when(gameRttMeasurementStore.findState(GAME_ROOM_ID)).thenReturn(Optional.of(rttState()));
+        when(gameRoomCommandService.abortInProgressRoomIfInProgress(GAME_ROOM_ID)).thenReturn(true);
+        doThrow(new IllegalStateException("rtt cleanup failed"))
+                .when(gameRttMeasurementStore)
+                .cleanup(GAME_ROOM_ID);
+
+        // when & then
+        assertThatCode(() -> processor.processStartedFailure(
+                GAME_ROOM_ID,
+                GameStartFailureReason.GAME_START_MESSAGE_SEND_FAILED,
+                true
+        )).doesNotThrowAnyException();
+        verify(gameWaitingStore).cleanup(GAME_ROOM_ID);
+        verify(gameEndScheduleService).cleanupEndDeadline(GAME_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("processStartedFailure - waiting cleanup 실패해도 deadline cleanup을 계속 수행한다")
+    void processStartedFailure_WaitingCleanupFailed_ContinueDeadlineCleanup() {
+        // given
+        when(gameRttMeasurementStore.findState(GAME_ROOM_ID)).thenReturn(Optional.of(rttState()));
+        when(gameRoomCommandService.abortInProgressRoomIfInProgress(GAME_ROOM_ID)).thenReturn(true);
+        doThrow(new IllegalStateException("waiting cleanup failed"))
+                .when(gameWaitingStore)
+                .cleanup(GAME_ROOM_ID);
+
+        // when & then
+        assertThatCode(() -> processor.processStartedFailure(
+                GAME_ROOM_ID,
+                GameStartFailureReason.GAME_START_MESSAGE_SEND_FAILED,
+                true
+        )).doesNotThrowAnyException();
+        verify(gameEndScheduleService).cleanupEndDeadline(GAME_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("processStartedFailure - deadline cleanup 실패를 밖으로 전파하지 않는다")
+    void processStartedFailure_DeadlineCleanupFailed_DoNotThrow() {
+        // given
+        when(gameRttMeasurementStore.findState(GAME_ROOM_ID)).thenReturn(Optional.of(rttState()));
+        when(gameRoomCommandService.abortInProgressRoomIfInProgress(GAME_ROOM_ID)).thenReturn(true);
+        doThrow(new IllegalStateException("deadline cleanup failed"))
+                .when(gameEndScheduleService)
+                .cleanupEndDeadline(GAME_ROOM_ID);
+
+        // when & then
+        assertThatCode(() -> processor.processStartedFailure(
+                GAME_ROOM_ID,
+                GameStartFailureReason.GAME_START_MESSAGE_SEND_FAILED,
+                true
+        )).doesNotThrowAnyException();
+        verify(gameEndScheduleService).cleanupEndDeadline(GAME_ROOM_ID);
     }
 
     private GameRttState rttState() {

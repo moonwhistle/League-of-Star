@@ -131,7 +131,9 @@
 - `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
 - `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
 - 서버 timer/scheduler는 `gameEndAt = startAt + scenario.durationMs` 기준으로 게임의 논리적 종료 시각을 계산한다.
-- 최종 정산 실행 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 등록한다.
+- 정산 대상 조회 시작 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 등록한다.
+- `settlementDueAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각이다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
+- 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않는다. 서버 종료 기준은 `startAt + scenario.durationMs`다.
 - `inputGraceMs`는 2000ms로 둔다. 자연사 직전 입력이 서버에 도착할 수 있는 여유 시간이며, RTT 보정 판정 자체는 기존 서버 수신 시각과 median RTT 기준을 유지한다.
 - `GAME_START` 확정 후 `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom과 participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않는다. 이 경우 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫으며, record와 LP/티어 변동은 반영하지 않는다.
 - `GAME_START` 메시지 전송에 실패하면 이미 등록된 `game:end:pending` deadline을 제거하고 gameRoom과 participants를 `ABORTED` 처리한다. 이 경우 match user status, RTT 상태, waiting 상태를 정리하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫는다.

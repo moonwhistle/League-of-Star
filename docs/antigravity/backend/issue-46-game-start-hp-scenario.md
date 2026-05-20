@@ -172,7 +172,7 @@ lock 비용 판단:
 정책:
 
 - 게임의 논리적 종료 시각은 `gameEndAt = startAt + scenario.durationMs`로 계산한다.
-- 최종 정산 실행 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 계산한다.
+- 정산 대상 조회 시작 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 계산한다.
 - `inputGraceMs`는 2000ms로 둔다.
 - 2000ms grace는 자연사 직전 SMITE 입력이 서버에 도착할 수 있는 여유 시간이다.
 - 판정 시각 보정은 기존 정책처럼 `serverReceiveTime - gameStartTime - medianRtt/2`를 사용한다.
@@ -249,9 +249,101 @@ lock 비용 판단:
 
 ## 📌 Summary
 
+RTT 측정을 통과한 gameRoom을 서버 기준 동일한 `startAt`으로 시작시키기 위해 GAME_START 진입 흐름을 연결했습니다.
+
+핵심 흐름은 `READY -> IN_PROGRESS` 전환, HP scenario 조회, game end deadline 등록, `COUNTDOWN`/`GAME_START` 사전 전송입니다. 시작 확정 중 실패가 발생하면 유효한 게임으로 방치하지 않고 `ABORTED` 보상 처리하며, record/LP/tier는 반영하지 않습니다.
+
+```mermaid
+flowchart TD
+    A["Both players CLIENT_READY"] --> B["RTT measurement"]
+    B --> C{"Both RTT PASSED?"}
+    C -->|"no"| X["GAME_START_FAILED<br/>gameRoom ABORTED<br/>record/LP no-op"]
+    C -->|"yes"| D["Check start-ready state"]
+    D --> E["READY -> IN_PROGRESS<br/>DB row lock"]
+    E --> F["serverTime = now<br/>startAt = serverTime + 4000ms"]
+    F --> G["Load HP scenario"]
+    G --> H["Register game:end:pending<br/>settlementDueAt = startAt + durationMs + 2000ms"]
+    H --> I["Send COUNTDOWN<br/>display=3s"]
+    I --> J["Send GAME_START<br/>same startAt + scenario"]
+    J --> K["Client waits until startAt"]
+    K --> L["MP4 + HP overlay start"]
+```
+
 ## 📚 Changes
 
+- `GameStartConditionService`에서 GAME_START 진입 조건을 한 곳에서 확인하도록 분리했습니다.
+  - RTT 양쪽 `PASSED`
+  - gameRoom `READY`
+  - 양쪽 WebSocket session connected
+- `GameStartTransitionService`에서 `startAt = serverNow + 4000ms`를 확정하고 `READY -> IN_PROGRESS` 전환을 수행했습니다.
+- `READY -> IN_PROGRESS` 전환은 DB row lock 기반으로 한 번만 성공하게 했습니다.
+  - 양쪽 RTT가 거의 동시에 완료되면 서로 다른 WebSocket 처리 스레드가 같은 gameRoom에 대해 시작을 시도할 수 있습니다.
+  - 이때 `findByIdForUpdate(gameRoomId)`로 gameRoom row를 잠그고, lock을 획득한 트랜잭션만 `READY` 여부를 확인한 뒤 `IN_PROGRESS`로 전환합니다.
+  - 뒤늦게 lock을 얻은 요청은 이미 `READY`가 아니므로 `started=false`로 종료되고, `COUNTDOWN`/`GAME_START`/deadline 등록까지 이어지지 않습니다.
+- `COUNTDOWN`, `GAME_START` WebSocket server message를 정의했습니다.
+- `COUNTDOWN`과 `GAME_START`는 countdown 종료 후가 아니라 `startAt` 전에 미리 전송하며, 반드시 같은 `startAt`을 사용합니다.
+- `GAME_START` payload에 HP scenario를 포함했습니다.
+- `GAME_START` 확정 시 game end deadline을 Redis ZSET에 등록합니다.
+
+```text
+gameEndAt = startAt + scenario.durationMs
+settlementDueAt = gameEndAt + 2000ms
+ZADD game:end:pending settlementDueAtMillis gameRoomId
+```
+
+- `GameStartFailureProcessor`를 추가해 `IN_PROGRESS` 이후 시작 실패 보상 처리를 분리했습니다.
+  - gameRoom/participants `ABORTED`
+  - match user status cleanup
+  - RTT state cleanup
+  - waiting state cleanup
+  - 필요 시 `game:end:pending` cleanup
+  - `GAME_START_FAILED` 전송 후 WebSocket close
+
+```mermaid
+flowchart TD
+    A["IN_PROGRESS 이후 시작 실패"] --> B{"Failure reason"}
+    B --> C["SCENARIO_LOAD_FAILED"]
+    B --> D["GAME_END_DEADLINE_REGISTRATION_FAILED"]
+    B --> E["GAME_START_MESSAGE_SEND_FAILED"]
+
+    C --> F["GameStartFailureProcessor"]
+    D --> F
+    E --> F
+
+    F --> G["gameRoom / participants ABORTED"]
+    F --> H["match user status cleanup"]
+    F --> I["RTT state cleanup"]
+    F --> J["waiting state cleanup"]
+    F --> K["game:end:pending cleanup if needed"]
+    F --> L["GAME_START_FAILED send + WebSocket close"]
+    F --> M["record / LP / tier no-op"]
+```
+
 ## 📝 Note
+
+- `startAt`은 클라이언트 로컬 시간이 아니라 서버 시간이 기준입니다. 메시지 수신 시각이 달라도 양쪽 클라이언트가 같은 기준 시각에 시작해야 하기 때문입니다.
+- `COUNTDOWN`과 `GAME_START`를 미리 보내는 이유는 countdown 종료 후 전송하면 네트워크 지연 때문에 실제 시작이 늦어질 수 있기 때문입니다.
+- `READY -> IN_PROGRESS`는 단순 상태 변경이 아니라 이후 메시지 전송과 deadline 등록으로 이어지는 시작 트리거입니다. 따라서 같은 gameRoom에서 성공 결과가 한 번만 나와야 하며, DB row lock을 선택했습니다.
+  - Redis RTT 결과만 보고 “마지막 PONG을 처리한 요청이 시작까지 처리한다”로 둘 수도 있습니다. 하지만 그렇게 하면 RTT 저장 로직이 게임 시작까지 결정하게 되고, DB gameRoom 상태는 뒤늦게 따라가는 구조가 됩니다. 이번 흐름에서는 게임 시작 여부를 DB gameRoom 상태로 판단하는 편이 더 명확합니다.
+  - 애플리케이션 메모리 lock은 구현은 쉽지만, API 서버가 2대 이상이면 각 서버가 자기 메모리 lock만 보기 때문에 같은 gameRoom 시작을 동시에 처리할 수 있습니다.
+  - 조건부 update(`where status = READY`)도 가능하지만, update 결과만으로는 엔티티의 `start()` 도메인 메서드 흐름이 약해지고, 이후 `startAt`, participant 상태, 메시지 전송, deadline 등록을 다시 조합해야 합니다.
+  - DB row lock은 같은 gameRoom row 하나만 짧게 잠급니다. 먼저 lock을 잡은 요청만 `READY -> IN_PROGRESS`를 성공시키고, 나중 요청은 이미 `READY`가 아니므로 바로 중단됩니다. 그래서 시작 메시지와 deadline 등록도 한 번만 이어집니다.
+  - lock 범위는 `READY -> IN_PROGRESS` 전환까지만 잡습니다. scenario 조회, Redis deadline 등록, WebSocket 전송까지 lock 안에 넣으면 외부 I/O 동안 DB row를 오래 잠그게 됩니다. 대신 전환 이후 실패는 `GameStartFailureProcessor`가 `ABORTED`로 보상합니다.
+- game end deadline은 고정 25초가 아니라 scenario duration 기준으로 계산합니다. 실제 드래곤 자연사 시각은 scenario가 표현하므로, 고정값은 정산 deadline이 아니라 cleanup TTL 같은 안전장치에서 다루는 편이 맞습니다.
+- `settlementDueAt`은 정산 완료 시각이 아니라 scheduler가 해당 gameRoom을 정산 대상으로 집기 시작할 수 있는 시각입니다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리해야 합니다.
+- 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않습니다. 서버는 `startAt + scenario.durationMs`를 논리적 종료 시각으로 사용하고, 클라이언트 화면은 서버가 내려준 `startAt`과 scenario를 따라가는 표시 계층으로 봅니다.
+- `2000ms` grace는 자연사 직전 SMITE 입력이 서버에 도착할 수 있는 여유 시간입니다. 판정 보정은 기존 정책처럼 `serverReceiveTime`, `gameStartTime`, median RTT를 기준으로 처리합니다.
+- deadline 등록 실패도 `game:end:pending` cleanup을 시도합니다. Redis write가 일부 반영된 뒤 예외가 발생할 수 있고, ZSET remove는 대상이 없어도 no-op이라 방어적으로 처리하는 편이 안전합니다.
+- `IN_PROGRESS` 이후 시작 실패는 이미 유효 게임에 가까운 상태이므로 단순 return 하지 않고 `ABORTED`로 보상 처리합니다. 다만 이 경우 record/LP/tier는 반영하지 않습니다.
+
+| 실패 지점 | 상태 | 정책 |
+|---|---|---|
+| RTT not ready | GAME_START 이전 | 시작 차단, 메시지 미전송 |
+| gameRoom not READY | GAME_START 이전 | 시작 차단, 메시지 미전송 |
+| scenario 조회 실패 | IN_PROGRESS 이후 | ABORTED, 상태 저장소 cleanup, GAME_START_FAILED |
+| game:end:pending 등록 실패 | IN_PROGRESS 이후 | ABORTED, deadline cleanup 시도, 상태 저장소 cleanup, GAME_START_FAILED |
+| COUNTDOWN 성공 후 GAME_START 전송 실패 | deadline 등록 이후 | ABORTED, deadline cleanup, 상태 저장소 cleanup, GAME_START_FAILED |
+| cleanup 일부 실패 | 시작 실패 보상 중 | 다음 cleanup 계속 진행, 단계별 warn log 기록 |
 
 ## 📌 Related Issue
 - Closes #46

@@ -533,7 +533,7 @@ ZADD game:end:pending settlementDueAtMillis gameRoomId
 ```
 
 - `gameEndAtMillis`는 HP scenario 기준 드래곤이 0이 되는 논리적 종료 시각입니다.
-- `settlementDueAtMillis`는 서버가 최종 판정을 시도할 시각입니다.
+- `settlementDueAtMillis`는 서버가 최종 판정 대상으로 조회하기 시작할 수 있는 시각입니다. 정산 완료 시각이 아닙니다.
 - 2000ms는 자연사 직전 SMITE 입력이 서버에 도착할 수 있게 두는 입력 유예 시간입니다.
 - `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending` cleanup을 시도하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 이미 등록된 `game:end:pending` member를 제거하고 gameRoom/participants를 `ABORTED` 처리합니다.
