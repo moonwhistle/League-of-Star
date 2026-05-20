@@ -62,10 +62,20 @@ flowchart TD
 
 ### 3. HP scenario payload 확정
 
-- [ ] 기존 gameRoom scenario 저장 구조를 확인한다.
-- [ ] `GAME_START` payload에 포함할 HP scenario 구조를 정의한다.
-- [ ] 클라이언트가 `startAt` 기준으로 HP bar overlay를 계산할 수 있게 필요한 값만 전달한다.
-- [ ] MP4는 배경으로만 사용하고, HP 변화는 scenario와 `startAt` 기준으로 계산한다.
+- [x] 기존 gameRoom scenario 저장 구조를 확인한다.
+- [x] `GAME_START` payload에 포함할 HP scenario 구조를 정의한다.
+- [x] 클라이언트가 `startAt` 기준으로 HP bar overlay를 계산할 수 있게 필요한 값만 전달한다.
+- [x] MP4는 배경으로만 사용하고, HP 변화는 scenario와 `startAt` 기준으로 계산한다.
+
+구현 결과:
+
+- HP scenario 원본은 gameRoom 생성 시 저장되는 `GameRoom.scenarioData`를 사용한다.
+- Core에는 저장된 scenario를 읽기 위한 `GameRoomReadService.getScenarioData(gameRoomId)`만 추가했다.
+- API 계층에서는 `GameStartScenarioPayload`로 WebSocket payload에 실을 형태를 확정했다.
+- Payload는 `dragonMaxHp`, `durationMs`, `hpTimeline`만 포함한다.
+- `hpTimeline`의 각 step은 `timeMs`, `hp`로 구성한다.
+- 클라이언트는 이후 `GAME_START.startAt`을 기준으로 `elapsedMs = now - startAt`을 계산하고, `hpTimeline`에서 현재 HP를 렌더링한다.
+- MP4 preload 여부는 이 단계에서 다시 확인하지 않는다. MP4는 배경 재생이고, HP bar overlay는 scenario payload와 `startAt` 기준으로 계산한다.
 
 ### 4. startAt 결정과 상태 전환
 

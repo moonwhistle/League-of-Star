@@ -3,6 +3,7 @@ package com.sang.smite.domain.game.service;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,12 @@ public class GameRoomReadService {
     public GameStatus getStatus(Long gameRoomId) {
         return gameRoomRepository.findById(gameRoomId)
                 .map(GameRoom::getStatus)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
+    public GameScenario getScenarioData(Long gameRoomId) {
+        return gameRoomRepository.findById(gameRoomId)
+                .map(GameRoom::getScenarioData)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }
 }
