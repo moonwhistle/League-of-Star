@@ -8,8 +8,6 @@ public final class GameRttConstants {
     public static final String USER_B_ID_FIELD = "userBId";
     public static final String USER_A_SAMPLES_FIELD = "userASamples";
     public static final String USER_B_SAMPLES_FIELD = "userBSamples";
-    public static final String USER_A_MEDIAN_RTT_MS_FIELD = "userAMedianRttMs";
-    public static final String USER_B_MEDIAN_RTT_MS_FIELD = "userBMedianRttMs";
     public static final String USER_A_STATUS_FIELD = "userAStatus";
     public static final String USER_B_STATUS_FIELD = "userBStatus";
 

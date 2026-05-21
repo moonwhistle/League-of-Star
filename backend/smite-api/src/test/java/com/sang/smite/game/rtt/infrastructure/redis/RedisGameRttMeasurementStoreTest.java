@@ -98,7 +98,7 @@ class RedisGameRttMeasurementStoreTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    @DisplayName("appendSample - 5개가 모이면 median RTT를 저장하고 PASSED로 전환한다")
+    @DisplayName("appendSample - 5개가 모이면 median RTT로 pass/fail 판단 후 PASSED로 전환한다")
     void appendSample_CompletedPassed() {
         // given
         when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
@@ -115,8 +115,8 @@ class RedisGameRttMeasurementStoreTest {
         verify(hashOperations).putAll(eq(RTT_KEY), hashCaptor.capture());
         assertThat(hashCaptor.getValue())
                 .containsEntry(GameRttConstants.USER_A_SAMPLES_FIELD, "40,10,30,20,50")
-                .containsEntry(GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD, "30")
-                .containsEntry(GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.PASSED.name());
+                .containsEntry(GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.PASSED.name())
+                .hasSize(2);
     }
 
     @Test
@@ -137,8 +137,9 @@ class RedisGameRttMeasurementStoreTest {
         ArgumentCaptor<Map<Object, Object>> hashCaptor = ArgumentCaptor.forClass(Map.class);
         verify(hashOperations).putAll(eq(RTT_KEY), hashCaptor.capture());
         assertThat(hashCaptor.getValue())
-                .containsEntry(GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD, "2300")
-                .containsEntry(GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.FAILED.name());
+                .containsEntry(GameRttConstants.USER_A_SAMPLES_FIELD, "2100,2200,2300,2400,2500")
+                .containsEntry(GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.FAILED.name())
+                .hasSize(2);
     }
 
     @Test
@@ -206,7 +207,7 @@ class RedisGameRttMeasurementStoreTest {
     }
 
     @Test
-    @DisplayName("findStartReadyState - 양쪽 PASSED이면 Step 6에서 조회 가능한 median RTT를 반환한다")
+    @DisplayName("findStartReadyState - 양쪽 PASSED이면 참가자 id만 포함한 start-ready 상태를 반환한다")
     void findStartReadyState() {
         // given
         when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
@@ -220,10 +221,6 @@ class RedisGameRttMeasurementStoreTest {
         assertThat(startReadyState.get().gameRoomId()).isEqualTo(GAME_ROOM_ID);
         assertThat(startReadyState.get().userAId()).isEqualTo(USER_A_ID);
         assertThat(startReadyState.get().userBId()).isEqualTo(USER_B_ID);
-        assertThat(startReadyState.get().userAMedianRttMs()).isEqualTo(35L);
-        assertThat(startReadyState.get().userBMedianRttMs()).isEqualTo(45L);
-        assertThat(startReadyState.get().medianRttMillis(USER_A_ID)).isEqualTo(35L);
-        assertThat(startReadyState.get().medianRttMillis(USER_B_ID)).isEqualTo(45L);
         verify(stringRedisTemplate, never()).delete(RTT_KEY);
     }
 
@@ -233,22 +230,6 @@ class RedisGameRttMeasurementStoreTest {
         // given
         when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
         when(hashOperations.entries(RTT_KEY)).thenReturn(rttState("", GameRttStatus.PASSED));
-
-        // when
-        var startReadyState = store.findStartReadyState(GAME_ROOM_ID);
-
-        // then
-        assertThat(startReadyState).isEmpty();
-    }
-
-    @Test
-    @DisplayName("findStartReadyState - PASSED 상태여도 median RTT가 없으면 empty를 반환한다")
-    void findStartReadyState_MedianMissing() {
-        // given
-        Map<Object, Object> state = startReadyState();
-        state.remove(GameRttConstants.USER_B_MEDIAN_RTT_MS_FIELD);
-        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
-        when(hashOperations.entries(RTT_KEY)).thenReturn(state);
 
         // when
         var startReadyState = store.findStartReadyState(GAME_ROOM_ID);
@@ -284,8 +265,6 @@ class RedisGameRttMeasurementStoreTest {
         state.put(GameRttConstants.USER_B_ID_FIELD, String.valueOf(USER_B_ID));
         state.put(GameRttConstants.USER_A_SAMPLES_FIELD, "30,35,40,37,32");
         state.put(GameRttConstants.USER_B_SAMPLES_FIELD, "40,45,50,47,42");
-        state.put(GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD, "35");
-        state.put(GameRttConstants.USER_B_MEDIAN_RTT_MS_FIELD, "45");
         state.put(GameRttConstants.USER_A_STATUS_FIELD, GameRttStatus.PASSED.name());
         state.put(GameRttConstants.USER_B_STATUS_FIELD, GameRttStatus.PASSED.name());
         return state;

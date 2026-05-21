@@ -115,19 +115,19 @@ flowchart TD
 
 ### 5. RTT 로직 단순화
 
-- [ ] RTT 측정은 `GAME_START` 전 품질 gate로만 유지한다.
+- [x] RTT 측정은 `GAME_START` 전 품질 gate로만 유지한다.
   - `RTT_PING` / `RTT_PONG`
   - 5회 sample 수집
   - median 계산으로 `RTT_LIMIT_MILLIS` 초과 여부 판단
   - 양쪽 `PASSED`일 때만 `GAME_START` 진행
-- [ ] RTT median을 SMITE 판정용 값으로 노출하지 않는다.
-- [ ] `GameRttStartReadyState`에서 `userAMedianRttMs`, `userBMedianRttMs`, `medianRttMillis(userId)`를 제거한다.
-- [ ] `findStartReadyState(...)`는 양쪽 `PASSED` 여부와 참가자 userId만 반환하도록 단순화한다.
-- [ ] Redis `game:rtt:{gameRoomId}`에 median 값을 저장하지 않거나, 저장하더라도 로그/진단용으로만 취급하고 service contract에서 제거한다.
-- [ ] `GameAction.rttMs`와 `game_actions.rtt_ms` 컬럼은 제거한다.
-- [ ] `SMITE_RESULT`와 `GAME_RESULT` payload에 RTT 값을 포함하지 않는다.
-- [ ] `GameSmiteService`는 `GameRttMeasurementService` / `GameRttMeasurementStore`에 의존하지 않는다.
-- [ ] RTT cleanup은 기존처럼 `GAME_START_FAILED`, `GAME_START` 이후 시작 처리 완료, abort/finish cleanup 경로에서 수행한다.
+- [x] RTT median을 SMITE 판정용 값으로 노출하지 않는다.
+- [x] `GameRttStartReadyState`에서 `userAMedianRttMs`, `userBMedianRttMs`, `medianRttMillis(userId)`를 제거한다.
+- [x] `findStartReadyState(...)`는 양쪽 `PASSED` 여부와 참가자 userId만 반환하도록 단순화한다.
+- [x] Redis `game:rtt:{gameRoomId}`에 median 값을 저장하지 않거나, 저장하더라도 로그/진단용으로만 취급하고 service contract에서 제거한다.
+- [x] `GameAction.rttMs`와 `game_actions.rtt_ms` 컬럼은 제거한다.
+- [x] `SMITE_RESULT`와 `GAME_RESULT` payload에 RTT 값을 포함하지 않는다.
+- [x] `GameSmiteService`는 `GameRttMeasurementService` / `GameRttMeasurementStore`에 의존하지 않는다.
+- [x] RTT cleanup은 기존처럼 `GAME_START_FAILED`, `GAME_START` 이후 시작 처리 완료, abort/finish cleanup 경로에서 수행한다.
 
 ### 6. 멱등성과 중복 입력 보장
 
@@ -211,7 +211,7 @@ flowchart TD
   - 정렬 기준: `serverReceiveTimeMs ASC`, `id ASC`
 - [ ] 필요한 경우 `GameAction` 생성 정적 팩토리 또는 도메인 메서드를 추가해 필드 의미를 명확히 한다.
 - [ ] DDL 문서에서 `dragon_hp_at_smite` 의미를 “이전 SMITE 데미지 반영 후, 이번 SMITE 적용 전 HP”로 명확히 한다.
-- [ ] DDL 문서에서 `rtt_ms` 컬럼을 제거하고 `smite_time_ms` 의미를 “서버 수신 시각 기준 게임 시작 후 경과 ms”로 수정한다.
+- [x] DDL 문서에서 `rtt_ms` 컬럼을 제거하고 `smite_time_ms` 의미를 “서버 수신 시각 기준 게임 시작 후 경과 ms”로 수정한다.
 - [ ] `game_actions`는 유저당 1회 입력 기록으로 유지하고, record/LP 결과 저장은 `game_records`에서 처리한다.
 
 ### 13. 실패/예외 응답

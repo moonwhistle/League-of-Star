@@ -81,7 +81,7 @@ flowchart LR
         RTT_STATE["Redis game:rtt:{gameRoomId}<br/>A/B status = PENDING"]
         RTT_PING["RTT_PING<br/>5 times per user"]
         RTT_RESULT{"median RTT<br/><= 2000ms?"}
-        RTT_PASSED["A/B status = PASSED<br/>median 유지"]
+        RTT_PASSED["A/B status = PASSED<br/>start-ready 조건"]
         RTT_FAILED["status = FAILED<br/>RTT_FAILED or RTT_TOO_HIGH"]
         RTT_ABORT["DB game_rooms = ABORTED<br/>DB game_participants = ABORTED<br/>match:status 제거"]
         RTT_FAIL_EVENT["GAME_START_FAILED<br/>connected sockets only<br/>then close"]

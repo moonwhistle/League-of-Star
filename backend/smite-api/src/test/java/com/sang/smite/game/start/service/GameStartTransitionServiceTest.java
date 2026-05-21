@@ -45,9 +45,7 @@ class GameStartTransitionServiceTest {
                 .thenReturn(GameStartReadyResult.ready(new GameRttStartReadyState(
                         GAME_ROOM_ID,
                         1L,
-                        2L,
-                        30L,
-                        40L
+                        2L
                 )));
         when(gameRoomCommandService.startReadyRoomIfReady(GAME_ROOM_ID, startTime)).thenReturn(true);
 
@@ -91,9 +89,7 @@ class GameStartTransitionServiceTest {
                 .thenReturn(GameStartReadyResult.ready(new GameRttStartReadyState(
                         GAME_ROOM_ID,
                         1L,
-                        2L,
-                        30L,
-                        40L
+                        2L
                 )));
         when(gameRoomCommandService.startReadyRoomIfReady(GAME_ROOM_ID, startTime)).thenReturn(false);
 

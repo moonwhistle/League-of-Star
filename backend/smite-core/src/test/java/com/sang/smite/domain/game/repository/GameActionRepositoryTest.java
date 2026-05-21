@@ -49,7 +49,7 @@ class GameActionRepositoryTest {
 
         GameAction action1 = GameAction.builder()
                 .gameRoomId(room.getId()).userId(p1.getId())
-                .serverReceiveTimeMs(1000L).rttMs(20).smiteTimeMs(980).dragonHpAtSmite(1000).isKill(true)
+                .serverReceiveTimeMs(1000L).smiteTimeMs(980).dragonHpAtSmite(1000).isKill(true)
                 .build();
         gameActionRepository.save(action1);
         gameActionRepository.flush();
@@ -57,7 +57,7 @@ class GameActionRepositoryTest {
         // when & then
         GameAction action2 = GameAction.builder()
                 .gameRoomId(room.getId()).userId(p1.getId()) // 동일 유저, 동일 게임방
-                .serverReceiveTimeMs(1100L).rttMs(20).smiteTimeMs(1080).dragonHpAtSmite(900).isKill(false)
+                .serverReceiveTimeMs(1100L).smiteTimeMs(1080).dragonHpAtSmite(900).isKill(false)
                 .build();
 
         assertThatThrownBy(() -> {

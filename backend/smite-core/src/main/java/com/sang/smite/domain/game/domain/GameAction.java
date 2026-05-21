@@ -41,9 +41,6 @@ public class GameAction extends BaseEntity {
     private long serverReceiveTimeMs;
 
     @Column(nullable = false)
-    private int rttMs;
-
-    @Column(nullable = false)
     private int smiteTimeMs;
 
     @Column(nullable = false)
