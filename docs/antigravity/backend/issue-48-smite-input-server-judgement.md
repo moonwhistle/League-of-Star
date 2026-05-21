@@ -98,20 +98,20 @@ flowchart TD
 
 ### 4. 패키지 책임 분리
 
-- [ ] `smite-api/game/smite` 패키지를 추가해 SMITE 입력 use-case를 분리한다.
+- [x] `smite-api/game/smite` 패키지를 추가해 SMITE 입력 use-case를 분리한다.
   - `common/constant`: API 레벨 SMITE 상수
   - `domain`: SMITE 처리 결과, 실패 사유, 결과 확정 여부 등 use-case 값 객체
   - `dto`: WebSocket 응답 payload
   - `service`: `GameSmiteService`, `GameSmiteWebSocketSender`
-- [ ] `smite-api/game/websocket`은 메시지 수신/전송 경로만 담당하고, 판정 로직은 `game/smite/service`로 위임한다.
+- [x] `smite-api/game/websocket`은 메시지 수신/전송 경로만 담당하고, 판정 로직은 `game/smite/service`로 위임한다.
 - [ ] `smite-core/domain/game`에는 DB 상태와 도메인 규칙을 둔다.
   - `GameAction` 생성/조회
   - `GameActionRepository` 조회 메서드
   - `GameActionCommandService`, `GameActionReadService` 추가 여부 검토
 - [ ] gameRoom `FINISHED` 전환은 core의 `GameRoom` 도메인 메서드와 command service를 통해 수행한다.
-- [ ] SMITE 패키지는 `game:end:pending` Redis ZSET을 직접 다루지 않는다.
-- [ ] record/LP 반영은 SMITE 패키지가 담당하지 않는다.
-- [ ] RTT 측정 결과는 SMITE 판정에서 조회하지 않는다. RTT는 `GAME_START` 전 품질 검사에만 사용한다.
+- [x] SMITE 패키지는 `game:end:pending` Redis ZSET을 직접 다루지 않는다.
+- [x] record/LP 반영은 SMITE 패키지가 담당하지 않는다.
+- [x] RTT 측정 결과는 SMITE 판정에서 조회하지 않는다. RTT는 `GAME_START` 전 품질 검사에만 사용한다.
 
 ### 5. RTT 로직 단순화
 

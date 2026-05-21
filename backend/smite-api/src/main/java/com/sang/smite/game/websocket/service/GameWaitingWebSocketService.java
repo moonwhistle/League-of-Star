@@ -4,6 +4,7 @@ import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
+import com.sang.smite.game.smite.domain.GameSmiteCommand;
 import com.sang.smite.game.smite.service.GameSmiteService;
 import com.sang.smite.game.start.domain.GameStartFailureReason;
 import com.sang.smite.game.start.domain.GameStartTransitionResult;
@@ -100,11 +101,11 @@ public class GameWaitingWebSocketService {
     }
 
     public void handleSmite(GameRoomWebSocketSession currentSession, long serverReceiveTimeMs) {
-        gameSmiteService.handleSmite(
+        gameSmiteService.handleSmite(new GameSmiteCommand(
                 currentSession.getGameRoomId(),
                 currentSession.getUserId(),
                 serverReceiveTimeMs
-        );
+        ));
     }
 
     public void cleanupSession(WebSocketSession session) {

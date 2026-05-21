@@ -38,8 +38,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
@@ -216,11 +217,11 @@ class GameWaitingWebSocketHandlerTest {
         handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
 
         // then
-        verify(gameSmiteService).handleSmite(
-                GAME_ROOM_ID,
-                FIRST_USER_ID,
-                SERVER_RECEIVE_TIME.toEpochMilli()
-        );
+        verify(gameSmiteService).handleSmite(argThat(command ->
+                command.gameRoomId().equals(GAME_ROOM_ID)
+                        && command.userId().equals(FIRST_USER_ID)
+                        && command.serverReceiveTimeMs() == SERVER_RECEIVE_TIME.toEpochMilli()
+        ));
         verify(session, never()).sendMessage(any());
     }
 

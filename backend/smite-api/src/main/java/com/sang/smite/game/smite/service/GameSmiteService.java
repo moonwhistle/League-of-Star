@@ -1,5 +1,6 @@
 package com.sang.smite.game.smite.service;
 
+import com.sang.smite.game.smite.domain.GameSmiteCommand;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -7,8 +8,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class GameSmiteService {
 
-    public void handleSmite(Long gameRoomId, Long userId, long serverReceiveTimeMs) {
+    public void handleSmite(GameSmiteCommand command) {
         log.debug("SMITE message received. gameRoomId={}, userId={}, serverReceiveTimeMs={}",
-                gameRoomId, userId, serverReceiveTimeMs);
+                command.gameRoomId(), command.userId(), command.serverReceiveTimeMs());
     }
 }
