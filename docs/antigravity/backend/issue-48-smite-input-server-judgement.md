@@ -131,11 +131,11 @@ flowchart TD
 
 ### 6. 멱등성과 중복 입력 보장
 
-- [ ] `game_actions`의 `UNIQUE(game_room_id, user_id)` 제약을 최종 방어선으로 사용한다.
-- [ ] 서비스 진입 시 `gameRoomId + userId`로 기존 SMITE action을 먼저 조회한다.
-- [ ] 기존 action이 있으면 새로 판정하지 않고 기존 결과를 `idempotent=true`로 재응답한다.
-- [ ] 동시에 같은 유저의 SMITE가 두 번 들어와 unique 충돌이 발생하면 기존 action을 다시 조회해 같은 결과로 응답한다.
-- [ ] 클라이언트는 버튼 클릭 즉시 SMITE 버튼을 비활성화하는 정책을 문서에 반영한다.
+- [x] `game_actions`의 `UNIQUE(game_room_id, user_id)` 제약을 최종 방어선으로 사용한다.
+- [x] 서비스 진입 시 `gameRoomId + userId`로 기존 SMITE action을 먼저 조회한다.
+- [x] 기존 action이 있으면 새로 판정하지 않고 기존 결과를 `idempotent=true`로 재응답한다.
+- [x] 동시에 같은 유저의 SMITE가 두 번 들어와 unique 충돌이 발생하면 기존 action을 다시 조회해 같은 결과로 응답한다.
+- [x] 클라이언트는 버튼 클릭 즉시 SMITE 버튼을 비활성화하는 정책을 문서에 반영한다.
 
 ### 7. 동시성 제어와 판정 순서
 
@@ -206,11 +206,11 @@ flowchart TD
 
 ### 12. GameAction 저장/조회 보강
 
-- [ ] `GameActionRepository`에 `findByGameRoomIdAndUserId(...)`를 추가한다.
-- [ ] `GameActionRepository`에 gameRoom 단위 action 정렬 조회 메서드를 추가한다.
+- [x] `GameActionRepository`에 `findByGameRoomIdAndUserId(...)`를 추가한다.
+- [x] `GameActionRepository`에 gameRoom 단위 action 정렬 조회 메서드를 추가한다.
   - 정렬 기준: `serverReceiveTimeMs ASC`, `id ASC`
 - [ ] 필요한 경우 `GameAction` 생성 정적 팩토리 또는 도메인 메서드를 추가해 필드 의미를 명확히 한다.
-- [ ] DDL 문서에서 `dragon_hp_at_smite` 의미를 “이전 SMITE 데미지 반영 후, 이번 SMITE 적용 전 HP”로 명확히 한다.
+- [x] DDL 문서에서 `dragon_hp_at_smite` 의미를 “이전 SMITE 데미지 반영 후, 이번 SMITE 적용 전 HP”로 명확히 한다.
 - [x] DDL 문서에서 `rtt_ms` 컬럼을 제거하고 `smite_time_ms` 의미를 “서버 수신 시각 기준 게임 시작 후 경과 ms”로 수정한다.
 - [ ] `game_actions`는 유저당 1회 입력 기록으로 유지하고, record/LP 결과 저장은 `game_records`에서 처리한다.
 
@@ -236,8 +236,8 @@ flowchart TD
 - [ ] scenario HP에서 이전 SMITE 데미지를 차감해 current HP를 계산하는지 검증한다.
 - [ ] HP `1200` 이하이면 킬 성공, 초과이면 킬 실패로 저장하는지 검증한다.
 - [ ] 킬 실패한 SMITE도 이후 action의 HP 계산에 `1200` 데미지로 반영되는지 검증한다.
-- [ ] 같은 유저 중복 SMITE는 기존 결과를 재응답하는지 검증한다.
-- [ ] 같은 유저 동시 SMITE unique 충돌도 멱등 응답으로 처리되는지 검증한다.
+- [x] 같은 유저 중복 SMITE는 기존 결과를 재응답하는지 검증한다.
+- [x] 같은 유저 동시 SMITE unique 충돌도 멱등 응답으로 처리되는지 검증한다.
 - [ ] 서로 다른 두 유저 동시 SMITE가 gameRoom row lock 기준으로 일관되게 저장되는지 검증한다.
 - [ ] 두 유저가 동시에 SMITE를 보냈을 때 `serverReceiveTimeMs`, `id` 정렬 기준으로 winner가 결정되는지 검증한다.
 - [ ] SMITE 적용 후 `afterHp <= 0`이면 gameRoom이 즉시 `FINISHED`로 전환되고 `GAME_RESULT`가 브로드캐스트되는지 검증한다.
@@ -249,15 +249,15 @@ flowchart TD
 ### 15. 문서
 
 - [ ] `docs/project/policy.md`의 HP 감소 패턴과 실제 scenario 생성 규칙을 맞춘다.
-- [ ] `docs/project/policy.md`에 킬 실패 SMITE도 `1200` 데미지를 반영한다는 정책을 추가한다.
-- [ ] `docs/project/policy.md`에 SMITE는 RTT 보정 없이 서버 수신 시각 기준으로 판정한다는 정책을 추가한다.
-- [ ] `docs/project/policy.md`에 동시 SMITE 정렬 기준과 처치 시 `GAME_RESULT` 반환 정책을 추가한다.
-- [ ] `docs/project/policy.md`에 두 유저 SMITE 소모 후 처치하지 못하면 즉시 `DRAW`로 확정한다는 정책을 추가한다.
-- [ ] `docs/project/policy.md`에 SMITE로 먼저 `FINISHED`된 gameRoom의 `game:end:pending` member는 필수 cleanup하지 않고 scheduler no-op으로 처리한다는 정책을 추가한다.
-- [ ] `docs/project/overallplan.md`의 판정 프로세스에 이전 SMITE 데미지 차감 규칙을 반영한다.
-- [ ] `docs/project/websocket client.md`에 `SMITE`, `SMITE_RESULT` 메시지와 클라이언트 버튼 1회 사용 정책을 추가한다.
+- [x] `docs/project/policy.md`에 킬 실패 SMITE도 `1200` 데미지를 반영한다는 정책을 추가한다.
+- [x] `docs/project/policy.md`에 SMITE는 RTT 보정 없이 서버 수신 시각 기준으로 판정한다는 정책을 추가한다.
+- [x] `docs/project/policy.md`에 동시 SMITE 정렬 기준과 처치 시 `GAME_RESULT` 반환 정책을 추가한다.
+- [x] `docs/project/policy.md`에 두 유저 SMITE 소모 후 처치하지 못하면 즉시 `DRAW`로 확정한다는 정책을 추가한다.
+- [x] `docs/project/policy.md`에 SMITE로 먼저 `FINISHED`된 gameRoom의 `game:end:pending` member는 필수 cleanup하지 않고 scheduler no-op으로 처리한다는 정책을 추가한다.
+- [x] `docs/project/overallplan.md`의 판정 프로세스에 이전 SMITE 데미지 차감 규칙을 반영한다.
+- [x] `docs/project/websocket client.md`에 `SMITE`, `SMITE_RESULT` 메시지와 클라이언트 버튼 1회 사용 정책을 추가한다.
 - [ ] `docs/project/domain status.md`에 `IN_PROGRESS` 중 SMITE action 저장 흐름을 반영한다.
-- [ ] `docs/DB/DDL.md`의 `game_actions` 컬럼 설명, Redis RTT 구조, `game:end:pending` no-op 정책을 실제 판정 의미와 맞춘다.
+- [x] `docs/DB/DDL.md`의 `game_actions` 컬럼 설명, Redis RTT 구조, `game:end:pending` no-op 정책을 실제 판정 의미와 맞춘다.
 
 ## ✅ 완료 기준
 

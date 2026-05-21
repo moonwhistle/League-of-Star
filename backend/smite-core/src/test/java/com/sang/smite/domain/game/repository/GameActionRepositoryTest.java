@@ -16,6 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
@@ -64,5 +65,70 @@ class GameActionRepositoryTest {
             gameActionRepository.save(action2);
             gameActionRepository.flush();
         }).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("findByGameRoomIdAndUserId - 같은 gameRoom의 유저 action을 조회한다")
+    void findByGameRoomIdAndUserId() {
+        // given
+        User p1 = userRepository.save(User.builder().email("p3@test.com").nickname("p3").build());
+        User p2 = userRepository.save(User.builder().email("p4@test.com").nickname("p4").build());
+        GameRoom room = createRoom(p1.getId(), p2.getId());
+        GameAction action = gameActionRepository.save(GameAction.builder()
+                .gameRoomId(room.getId())
+                .userId(p1.getId())
+                .serverReceiveTimeMs(1000L)
+                .smiteTimeMs(900)
+                .dragonHpAtSmite(1000)
+                .isKill(true)
+                .build());
+
+        // when
+        var result = gameActionRepository.findByGameRoomIdAndUserId(room.getId(), p1.getId());
+
+        // then
+        assertThat(result).contains(action);
+    }
+
+    @Test
+    @DisplayName("findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc - 서버 수신 시각, id 순서로 조회한다")
+    void findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc() {
+        // given
+        User p1 = userRepository.save(User.builder().email("p5@test.com").nickname("p5").build());
+        User p2 = userRepository.save(User.builder().email("p6@test.com").nickname("p6").build());
+        GameRoom room = createRoom(p1.getId(), p2.getId());
+        GameAction later = gameActionRepository.save(GameAction.builder()
+                .gameRoomId(room.getId())
+                .userId(p1.getId())
+                .serverReceiveTimeMs(1200L)
+                .smiteTimeMs(1100)
+                .dragonHpAtSmite(1000)
+                .isKill(true)
+                .build());
+        GameAction earlier = gameActionRepository.save(GameAction.builder()
+                .gameRoomId(room.getId())
+                .userId(p2.getId())
+                .serverReceiveTimeMs(1000L)
+                .smiteTimeMs(900)
+                .dragonHpAtSmite(1500)
+                .isKill(false)
+                .build());
+
+        // when
+        List<GameAction> result = gameActionRepository.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(room.getId());
+
+        // then
+        assertThat(result).containsExactly(earlier, later);
+    }
+
+    private GameRoom createRoom(Long firstUserId, Long secondUserId) {
+        GameRoom room = GameRoom.builder()
+                .status(GameStatus.IN_PROGRESS)
+                .durationSeconds(60)
+                .scenarioData(GameScenario.of(List.of(new HpStep(0, 10000))))
+                .build();
+        room.addParticipant(firstUserId);
+        room.addParticipant(secondUserId);
+        return gameRoomRepository.save(room);
     }
 }

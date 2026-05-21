@@ -122,13 +122,14 @@ HP: ████░██████░░█░░████░░█░░�
 
 > **강타 데미지**: 1200 고정 (True Damage)
 
-### 3.4 RTT 보정
+### 3.4 RTT 측정
 
 - 게임 대기 WebSocket에서 각 유저별 5회 Ping-Pong 측정, **중간값(Median)** 사용
-- 서버는 `smite_time = (server_receive_time - game_start_time) - RTT/2` 방식으로 보정
 - median RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도)
 - 각 `RTT_PING`은 2500ms 안에 응답해야 하며, 5회 측정 구조상 gameRoom 전체 RTT 측정은 최대 15초 안에 완료되어야 함
 - `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 처리
+- RTT 측정값은 `GAME_START` 전 연결 품질 검사에만 사용하고, SMITE 판정 보정에는 사용하지 않음
+- SMITE 판정은 `server_receive_time - game_start_time`으로 계산한 서버 기준 입력 시각만 사용
 
 ---
 

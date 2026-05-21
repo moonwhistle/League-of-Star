@@ -5,7 +5,9 @@ import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
+import com.sang.smite.game.smite.dto.SmiteResultPayload;
 import com.sang.smite.game.smite.service.GameSmiteService;
+import com.sang.smite.game.smite.service.GameSmiteWebSocketSender;
 import com.sang.smite.game.start.domain.GameStartFailureReason;
 import com.sang.smite.game.start.domain.GameStartTransitionResult;
 import com.sang.smite.game.start.dto.GameStartScenarioPayload;
@@ -43,6 +45,7 @@ public class GameWaitingWebSocketService {
     private final GameEndScheduleService gameEndScheduleService;
     private final GameStartWebSocketSender gameStartWebSocketSender;
     private final GameSmiteService gameSmiteService;
+    private final GameSmiteWebSocketSender gameSmiteWebSocketSender;
 
     public void registerSession(Long gameRoomId, Long userId, WebSocketSession session) throws IOException {
         sessionRegistry.register(gameRoomId, userId, session);
@@ -102,10 +105,21 @@ public class GameWaitingWebSocketService {
 
     public void handleSmite(GameRoomWebSocketSession currentSession, long serverReceiveTimeMs) {
         gameSmiteService.handleSmite(new GameSmiteCommand(
-                currentSession.getGameRoomId(),
-                currentSession.getUserId(),
-                serverReceiveTimeMs
-        ));
+                        currentSession.getGameRoomId(),
+                        currentSession.getUserId(),
+                        serverReceiveTimeMs
+                ))
+                .ifPresent(payload -> sendSmiteResult(currentSession, payload));
+    }
+
+    private void sendSmiteResult(GameRoomWebSocketSession currentSession,
+                                 SmiteResultPayload payload) {
+        try {
+            gameSmiteWebSocketSender.sendSmiteResult(currentSession.getWebSocketSession(), payload);
+        } catch (IOException e) {
+            log.warn("Failed to send idempotent SMITE_RESULT. gameRoomId={}, userId={}",
+                    currentSession.getGameRoomId(), currentSession.getUserId(), e);
+        }
     }
 
     public void cleanupSession(WebSocketSession session) {

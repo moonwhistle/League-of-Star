@@ -6,6 +6,7 @@ import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
 import com.sang.smite.game.smite.service.GameSmiteService;
+import com.sang.smite.game.smite.service.GameSmiteWebSocketSender;
 import com.sang.smite.game.start.domain.GameStartBlockedReason;
 import com.sang.smite.game.start.domain.GameStartFailureReason;
 import com.sang.smite.game.start.domain.GameStartTransitionResult;
@@ -35,6 +36,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -72,6 +74,7 @@ class GameWaitingWebSocketHandlerTest {
     private final GameEndScheduleService gameEndScheduleService = mock(GameEndScheduleService.class);
     private final GameStartWebSocketSender gameStartWebSocketSender = mock(GameStartWebSocketSender.class);
     private final GameSmiteService gameSmiteService = mock(GameSmiteService.class);
+    private final GameSmiteWebSocketSender gameSmiteWebSocketSender = mock(GameSmiteWebSocketSender.class);
     private final GameRoomWebSocketMessageSender messageSender = new GameRoomWebSocketMessageSender(
             objectMapper,
             sessionRegistry
@@ -86,7 +89,8 @@ class GameWaitingWebSocketHandlerTest {
             gameStartFailureProcessor,
             gameEndScheduleService,
             gameStartWebSocketSender,
-            gameSmiteService
+            gameSmiteService,
+            gameSmiteWebSocketSender
     );
     private final GameWaitingWebSocketHandler handler = new GameWaitingWebSocketHandler(
             objectMapper,
@@ -212,6 +216,7 @@ class GameWaitingWebSocketHandlerTest {
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
         handler.afterConnectionEstablished(session);
         clearInvocations(session);
+        when(gameSmiteService.handleSmite(any())).thenReturn(Optional.empty());
 
         // when
         handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
