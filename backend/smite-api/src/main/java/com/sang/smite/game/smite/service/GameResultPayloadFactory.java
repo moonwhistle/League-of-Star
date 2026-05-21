@@ -29,6 +29,23 @@ public class GameResultPayloadFactory {
         );
     }
 
+    public GameResultPayload bothSmitesUsedDraw(Long gameRoomId,
+                                                GameResult result,
+                                                Long winnerUserId,
+                                                long finishedAt,
+                                                List<GameAction> actions) {
+        return new GameResultPayload(
+                gameRoomId,
+                result,
+                winnerUserId,
+                GameSmiteResultReason.BOTH_SMITES_USED_DRAW.getCode(),
+                finishedAt,
+                actions.stream()
+                        .map(this::toActionSummary)
+                        .toList()
+        );
+    }
+
     public GameResultPayload currentResult(Long gameRoomId,
                                            GameResult result,
                                            Long winnerUserId,

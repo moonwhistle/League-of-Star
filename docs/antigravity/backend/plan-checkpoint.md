@@ -177,6 +177,7 @@ flowchart TD
 - [x] 중복 SMITE 차단
 - [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리하되, SMITE 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리
 - [x] SMITE로 HP가 `0` 이하가 되면 gameRoom을 즉시 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast
+- [x] 두 유저가 모두 실패 SMITE를 사용하면 gameRoom을 즉시 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast
 - [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action 없이 현재 `GAME_RESULT`를 재응답
 
 ### Step 8. 서버 timer/scheduler 기반 게임 종료 보장

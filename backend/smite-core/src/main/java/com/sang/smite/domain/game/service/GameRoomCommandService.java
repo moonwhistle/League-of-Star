@@ -109,6 +109,16 @@ public class GameRoomCommandService {
                 });
     }
 
+    public Optional<GameRoom> finishInProgressRoomByBothSmitesUsedDraw(Long gameRoomId) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .filter(gameRoom -> gameRoom.getStatus().isInProgress())
+                .map(gameRoom -> {
+                    validateCompleteParticipants(gameRoom);
+                    gameRoom.finish(GameResult.DRAW, null);
+                    return gameRoom;
+                });
+    }
+
     private void validateSmiteJudgementRoom(GameRoom gameRoom, Long userId) {
         if (!gameRoom.getStatus().isInProgress() || gameRoom.getGameStartTime() == null) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
@@ -143,7 +153,8 @@ public class GameRoomCommandService {
     }
 
     private GameResult resolveWinResult(GameRoom gameRoom, Long winnerUserId) {
-        if (gameRoom.getParticipants().size() != GameRoom.MAX_PARTICIPANTS || !gameRoom.hasParticipant(winnerUserId)) {
+        validateCompleteParticipants(gameRoom);
+        if (!gameRoom.hasParticipant(winnerUserId)) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
         }
         Long firstParticipantUserId = gameRoom.getParticipants().stream()
@@ -151,5 +162,11 @@ public class GameRoomCommandService {
                 .map(GameParticipant::getUserId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
         return firstParticipantUserId.equals(winnerUserId) ? GameResult.PLAYER1_WIN : GameResult.PLAYER2_WIN;
+    }
+
+    private void validateCompleteParticipants(GameRoom gameRoom) {
+        if (gameRoom.getParticipants().size() != GameRoom.MAX_PARTICIPANTS) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
     }
 }

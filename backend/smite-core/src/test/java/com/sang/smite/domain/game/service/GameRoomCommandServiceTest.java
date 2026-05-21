@@ -433,4 +433,46 @@ class GameRoomCommandServiceTest {
         assertThat(result).isEmpty();
         assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.READY);
     }
+
+    @Test
+    @DisplayName("finishInProgressRoomByBothSmitesUsedDraw - IN_PROGRESS 게임룸을 DRAW로 종료한다")
+    void finishInProgressRoomByBothSmitesUsedDraw_InProgress() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(100L);
+
+        // then
+        assertThat(result).contains(gameRoom);
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(gameRoom.getResult()).isEqualTo(GameResult.DRAW);
+        assertThat(gameRoom.getWinnerId()).isNull();
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomByBothSmitesUsedDraw - IN_PROGRESS가 아니면 종료하지 않고 empty를 반환한다")
+    void finishInProgressRoomByBothSmitesUsedDraw_NotInProgress() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(100L);
+
+        // then
+        assertThat(result).isEmpty();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.READY);
+    }
 }

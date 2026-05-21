@@ -85,7 +85,7 @@ flowchart TD
 - [x] server message `GAME_RESULT`를 정의한다.
 - [x] `GAME_RESULT` payload에는 `gameRoomId`, `result`, `winnerUserId`, `reason`, `finishedAt`, `actions` 요약을 포함한다.
 - [x] SMITE로 드래곤 HP가 `0` 이하가 되면 양쪽 클라이언트에 `GAME_RESULT`를 브로드캐스트한다.
-- [ ] 두 유저가 모두 SMITE를 사용하고 처치하지 못하면 즉시 `DRAW GAME_RESULT`를 양쪽 클라이언트에 브로드캐스트한다.
+- [x] 두 유저가 모두 SMITE를 사용하고 처치하지 못하면 즉시 `DRAW GAME_RESULT`를 양쪽 클라이언트에 브로드캐스트한다.
 - [ ] 잘못된 payload, 게임 상태 불일치, 참가자 아님 등은 기존 `ERROR` 메시지 구조로 응답한다.
 
 ### 3. WebSocket handler 연결
@@ -200,11 +200,11 @@ flowchart TD
 
 ### 11. 두 유저 SMITE 소모 후 즉시 DRAW 확정
 
-- [ ] 두 유저가 모두 SMITE를 사용했고 어느 action도 처치하지 못했다면 더 이상 입력이 들어올 수 없다고 본다.
-- [ ] 두 번째 실패 SMITE 저장 transaction 안에서 gameRoom을 `DRAW`로 `FINISHED` 처리한다.
-- [ ] 이 경우 `game:end:pending` score를 변경하거나 별도 scheduler를 추가하지 않는다.
-- [ ] 기존 `game:end:pending` member는 남아 있어도 후속 end scheduler가 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
-- [ ] 두 유저 SMITE 소모 후 즉시 `DRAW GAME_RESULT`를 브로드캐스트한다.
+- [x] 두 유저가 모두 SMITE를 사용했고 어느 action도 처치하지 못했다면 더 이상 입력이 들어올 수 없다고 본다.
+- [x] 두 번째 실패 SMITE 저장 transaction 안에서 gameRoom을 `DRAW`로 `FINISHED` 처리한다.
+- [x] 이 경우 `game:end:pending` score를 변경하거나 별도 scheduler를 추가하지 않는다.
+- [ ] 후속 end scheduler 구현 시 기존 `game:end:pending` member가 남아 있어도 이미 `FINISHED`인 gameRoom은 no-op 처리한다.
+- [x] 두 유저 SMITE 소모 후 즉시 `DRAW GAME_RESULT`를 브로드캐스트한다.
 
 ### 12. GameAction 저장/조회 보강
 
@@ -243,8 +243,8 @@ flowchart TD
 - [ ] 서로 다른 두 유저 동시 SMITE가 gameRoom row lock 기준으로 일관되게 저장되는지 검증한다.
 - [ ] 두 유저가 동시에 SMITE를 보냈을 때 `serverReceiveTimeMs`, `id` 정렬 기준으로 winner가 결정되는지 검증한다.
 - [x] SMITE 적용 후 `afterHp <= 0`이면 gameRoom이 즉시 `FINISHED`로 전환되고 `GAME_RESULT`가 브로드캐스트되는지 검증한다.
-- [ ] 두 유저가 모두 SMITE를 사용하고 처치하지 못한 경우 즉시 `DRAW GAME_RESULT`가 반환되는지 검증한다.
-- [ ] 두 유저가 모두 SMITE를 사용한 실패 판은 `gameEndAt`/`inputGraceMs`를 기다리지 않는지 검증한다.
+- [x] 두 유저가 모두 SMITE를 사용하고 처치하지 못한 경우 즉시 `DRAW GAME_RESULT`가 반환되는지 검증한다.
+- [x] 두 유저가 모두 SMITE를 사용한 실패 판은 `gameEndAt`/`inputGraceMs`를 기다리지 않는지 검증한다.
 - [x] 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 action 저장 없이 `GAME_RESULT`를 재응답하는지 검증한다.
 - [ ] `IN_PROGRESS`가 아닌 gameRoom, participant 아님, scenario 없음 실패 케이스를 검증한다.
 

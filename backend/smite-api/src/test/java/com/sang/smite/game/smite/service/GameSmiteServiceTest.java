@@ -30,6 +30,7 @@ class GameSmiteServiceTest {
 
     private static final Long GAME_ROOM_ID = 100L;
     private static final Long USER_ID = 1L;
+    private static final Long OTHER_USER_ID = 2L;
     private static final long SERVER_RECEIVE_TIME_MS = 1_200L;
     private static final Instant FINISHED_AT = Instant.parse("2026-05-21T03:00:00Z");
 
@@ -168,6 +169,64 @@ class GameSmiteServiceTest {
         assertThat(result.get().gameResult().reason()).isEqualTo("SMITE_KILL");
         assertThat(result.get().gameResult().finishedAt()).isEqualTo(FINISHED_AT.toEpochMilli());
         assertThat(result.get().gameResult().actions()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("handleSmite - 두 유저가 모두 실패 SMITE를 사용하면 DRAW GAME_RESULT payload를 반환한다")
+    void handleSmite_BothUsersFailedSmite_FinishDrawAndReturnGameResult() {
+        // given
+        GameRoom lockedRoom = mock(GameRoom.class);
+        GameRoom finishedRoom = mock(GameRoom.class);
+        GameAction firstAction = GameAction.builder()
+                .gameRoomId(GAME_ROOM_ID)
+                .userId(OTHER_USER_ID)
+                .serverReceiveTimeMs(1_000L)
+                .smiteTimeMs(100)
+                .dragonHpAtSmite(5_000)
+                .isKill(false)
+                .build();
+        GameAction secondAction = GameAction.builder()
+                .gameRoomId(GAME_ROOM_ID)
+                .userId(USER_ID)
+                .serverReceiveTimeMs(SERVER_RECEIVE_TIME_MS)
+                .smiteTimeMs(200)
+                .dragonHpAtSmite(2_500)
+                .isKill(false)
+                .build();
+        when(gameRoomCommandService.lockSmiteResultRoom(GAME_ROOM_ID, USER_ID))
+                .thenReturn(lockedRoom);
+        when(lockedRoom.getStatus()).thenReturn(GameStatus.IN_PROGRESS);
+        when(gameActionReadService.findByGameRoomIdAndUserId(GAME_ROOM_ID, USER_ID))
+                .thenReturn(Optional.empty());
+        when(gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))
+                .thenReturn(List.of(firstAction))
+                .thenReturn(List.of(firstAction, secondAction));
+        when(gameSmiteJudgementService.judge(
+                lockedRoom,
+                USER_ID,
+                SERVER_RECEIVE_TIME_MS,
+                List.of(firstAction)
+        )).thenReturn(Optional.of(secondAction));
+        when(gameActionCommandService.saveIfAbsent(secondAction))
+                .thenReturn(GameActionSaveResult.saved(secondAction));
+        when(gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(GAME_ROOM_ID))
+                .thenReturn(Optional.of(finishedRoom));
+        when(finishedRoom.getResult()).thenReturn(GameResult.DRAW);
+        when(finishedRoom.getWinnerId()).thenReturn(null);
+
+        // when
+        var result = service.handleSmite(new GameSmiteCommand(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS));
+
+        // then
+        assertThat(result).isPresent();
+        assertThat(result.get().smiteResult().isKill()).isFalse();
+        assertThat(result.get().smiteResult().afterHp()).isEqualTo(1_300);
+        assertThat(result.get().gameResult()).isNotNull();
+        assertThat(result.get().gameResult().result()).isEqualTo(GameResult.DRAW);
+        assertThat(result.get().gameResult().winnerUserId()).isNull();
+        assertThat(result.get().gameResult().reason()).isEqualTo("BOTH_SMITES_USED_DRAW");
+        assertThat(result.get().gameResult().finishedAt()).isEqualTo(FINISHED_AT.toEpochMilli());
+        assertThat(result.get().gameResult().actions()).hasSize(2);
     }
 
     @Test

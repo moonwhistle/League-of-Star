@@ -61,21 +61,45 @@ public class GameSmiteService {
     private GameSmiteHandleResponse toResponse(Long gameRoomId, GameActionSaveResult saveResult) {
         SmiteResultPayload smiteResult = SmiteResultPayload.from(saveResult.action(), saveResult.idempotent());
         if (saveResult.action().getDragonHpAtSmite() > GameRules.SMITE_DAMAGE) {
-            return GameSmiteHandleResponse.smiteOnly(smiteResult);
+            return nonKillResponse(gameRoomId, smiteResult);
         }
 
         Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomBySmiteKill(
                 gameRoomId,
                 saveResult.action().getUserId()
         );
-        if (finishedGameRoom.isEmpty()) {
+        return finishedGameRoom.map(gameRoom -> GameSmiteHandleResponse.withGameResult(
+                smiteResult,
+                smiteKillGameResult(gameRoomId, gameRoom)
+        )).orElseGet(() -> GameSmiteHandleResponse.smiteOnly(smiteResult));
+
+    }
+
+    private GameSmiteHandleResponse nonKillResponse(Long gameRoomId,
+                                                    SmiteResultPayload smiteResult) {
+        List<GameAction> currentActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
+                gameRoomId
+        );
+        if (!bothUsersUsedSmiteWithoutKill(currentActions)) {
             return GameSmiteHandleResponse.smiteOnly(smiteResult);
         }
 
-        return GameSmiteHandleResponse.withGameResult(
-                smiteResult,
-                smiteKillGameResult(gameRoomId, finishedGameRoom.get())
+        Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(
+                gameRoomId
         );
+        return finishedGameRoom.map(gameRoom -> GameSmiteHandleResponse.withGameResult(
+                smiteResult,
+                bothSmitesUsedDrawGameResult(gameRoomId, gameRoom, currentActions)
+        )).orElseGet(() -> GameSmiteHandleResponse.smiteOnly(smiteResult));
+
+    }
+
+    private boolean bothUsersUsedSmiteWithoutKill(List<GameAction> actions) {
+        return actions.stream()
+                .map(GameAction::getUserId)
+                .distinct()
+                .count() == GameRoom.MAX_PARTICIPANTS
+                && actions.stream().noneMatch(GameAction::isKill);
     }
 
     private GameSmiteHandleResponse currentGameResult(Long gameRoomId, GameRoom gameRoom) {
@@ -95,6 +119,18 @@ public class GameSmiteService {
                 gameRoom.getWinnerId(),
                 Instant.now(clock).toEpochMilli(),
                 gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(gameRoomId)
+        );
+    }
+
+    private GameResultPayload bothSmitesUsedDrawGameResult(Long gameRoomId,
+                                                           GameRoom gameRoom,
+                                                           List<GameAction> actions) {
+        return gameResultPayloadFactory.bothSmitesUsedDraw(
+                gameRoomId,
+                gameRoom.getResult(),
+                gameRoom.getWinnerId(),
+                Instant.now(clock).toEpochMilli(),
+                actions
         );
     }
 }
