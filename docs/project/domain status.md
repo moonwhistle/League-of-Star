@@ -314,7 +314,7 @@ stateDiagram-v2
 | `CONNECTED` | API local memory registry | handshake 성공 후 gameRoom/user 단위 WebSocket session 등록 완료 |
 | `READY` | API local memory registry | 클라이언트가 `CLIENT_READY`를 보내 대기 준비 완료 |
 | `RTT_MEASURING` | Redis `game:rtt:{gameRoomId}` + API local memory | 양쪽 `CLIENT_READY` 완료 후 RTT 측정 중. 각 `RTT_PING`은 2500ms 안에 응답해야 하고 5회 측정 구조상 전체 측정은 최대 15초 안에 끝나야 함 |
-| `RTT_PASSED` | Redis `game:rtt:{gameRoomId}` | 양쪽 median RTT가 2000ms 이하. median RTT는 SMITE 판정 보정에 필요하므로 게임 종료 전까지 유지 |
+| `RTT_PASSED` | Redis `game:rtt:{gameRoomId}` | 양쪽 median RTT가 2000ms 이하. RTT 측정값은 GAME_START 전 품질 검사에만 사용하며 SMITE 판정 보정에는 사용하지 않음 |
 | `GAME_STARTING` | WebSocket message | 서버가 `startAt = serverNow + 4000ms`를 확정하고 `COUNTDOWN`/`GAME_START`를 전송한 상태. 클라이언트는 남은 시간이 3000ms 이하일 때 countdown을 렌더링하고 `startAt`까지 대기 |
 | `RTT_FAILED` | DB `game_rooms`, `game_participants`; 연결된 session은 close | `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외, median RTT 2000ms 초과로 gameRoom/participants가 `ABORTED` 된 상태 |
 | `DISCONNECTED` | registry에서 제거 | WebSocket 연결 종료로 session 제거 |

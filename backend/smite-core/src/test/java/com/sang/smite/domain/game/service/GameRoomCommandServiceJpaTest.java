@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-@Import(GameRoomCommandService.class)
+@Import({GameRoomCommandService.class, GameScenarioGenerator.class})
 @ActiveProfiles("test")
 class GameRoomCommandServiceJpaTest {
 
@@ -67,9 +67,12 @@ class GameRoomCommandServiceJpaTest {
         assertThat(foundGameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.READY);
-        assertThat(foundGameRoom.getScenarioData().steps()).hasSize(foundGameRoom.getDurationSeconds() + 1);
         assertThat(foundGameRoom.getScenarioData().steps().get(0).hp()).isEqualTo(GameRoom.DEFAULT_DRAGON_MAX_HP);
-        assertThat(foundGameRoom.getScenarioData().steps().get(foundGameRoom.getDurationSeconds()).hp()).isZero();
+        assertThat(foundGameRoom.getScenarioData().steps().get(0).timeMs()).isZero();
+        int lastStepIndex = foundGameRoom.getScenarioData().steps().size() - 1;
+        assertThat(foundGameRoom.getScenarioData().steps().get(lastStepIndex).timeMs())
+                .isEqualTo(foundGameRoom.getDurationSeconds() * 1000L);
+        assertThat(foundGameRoom.getScenarioData().steps().get(lastStepIndex).hp()).isZero();
     }
 
     @Test

@@ -4,7 +4,9 @@ import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameParticipant;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
+import com.sang.smite.domain.game.domain.vo.HpStep;
 import com.sang.smite.domain.game.domain.vo.ParticipantStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -16,11 +18,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,7 +36,11 @@ class GameRoomCommandServiceTest {
     private static final Long SECOND_USER_ID = 2L;
     private static final int MIN_GAME_DURATION_SECONDS = 8;
     private static final int MAX_GAME_DURATION_SECONDS = 17;
-    private static final int SCENARIO_STEP_INTERVAL_MS = 1000;
+    private static final GameScenario SCENARIO = GameScenario.of(List.of(
+            new HpStep(0, GameRoom.DEFAULT_DRAGON_MAX_HP),
+            new HpStep(200, 9_600),
+            new HpStep(400, 0)
+    ));
 
     @InjectMocks
     private GameRoomCommandService gameRoomCommandService;
@@ -40,10 +48,14 @@ class GameRoomCommandServiceTest {
     @Mock
     private GameRoomRepository gameRoomRepository;
 
+    @Mock
+    private GameScenarioGenerator gameScenarioGenerator;
+
     @Test
     @DisplayName("createReadyRoom - READY 상태의 게임룸과 참가자 2명을 저장한다")
     void createReadyRoom_Success() {
         // given
+        given(gameScenarioGenerator.generate(anyInt())).willReturn(SCENARIO);
         given(gameRoomRepository.save(any(GameRoom.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
@@ -67,9 +79,10 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
-    @DisplayName("createReadyRoom - 기본 HP 시나리오를 생성한다")
-    void createReadyRoom_CreateDefaultScenario() {
+    @DisplayName("createReadyRoom - 랜덤 burst HP 시나리오를 생성한다")
+    void createReadyRoom_CreateBurstScenario() {
         // given
+        given(gameScenarioGenerator.generate(anyInt())).willReturn(SCENARIO);
         given(gameRoomRepository.save(any(GameRoom.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
@@ -79,12 +92,8 @@ class GameRoomCommandServiceTest {
         // then
         int durationSeconds = result.getDurationSeconds();
         assertThat(durationSeconds).isBetween(MIN_GAME_DURATION_SECONDS, MAX_GAME_DURATION_SECONDS);
-        assertThat(result.getScenarioData().steps()).hasSize(durationSeconds + 1);
-        assertThat(result.getScenarioData().steps().get(0).timeMs()).isZero();
-        assertThat(result.getScenarioData().steps().get(0).hp()).isEqualTo(GameRoom.DEFAULT_DRAGON_MAX_HP);
-        assertThat(result.getScenarioData().steps().get(durationSeconds).timeMs())
-                .isEqualTo((long) durationSeconds * SCENARIO_STEP_INTERVAL_MS);
-        assertThat(result.getScenarioData().steps().get(durationSeconds).hp()).isZero();
+        assertThat(result.getScenarioData()).isSameAs(SCENARIO);
+        verify(gameScenarioGenerator).generate(durationSeconds);
     }
 
     @Test

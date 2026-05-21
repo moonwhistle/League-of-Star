@@ -168,11 +168,11 @@ flowchart TD
 
 - [ ] 클라이언트는 WebSocket으로 `SMITE` 명령만 전송
 - [ ] 서버는 `serverReceiveTime` 기록
-- [ ] `smiteTimeMs = (serverReceiveTime - gameStartTime) - rttMedian / 2`
+- [ ] `smiteTimeMs = serverReceiveTime - gameStartTime`
 - [ ] scenario에서 HP 역산
 - [ ] `game_actions` 저장
 - [ ] 중복 SMITE 차단
-- [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리해 보정 기준을 일관되게 유지
+- [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리하되, SMITE 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리
 
 ### Step 8. 서버 timer/scheduler 기반 게임 종료 보장
 
@@ -598,7 +598,7 @@ gameRoom 생성 실패 mapping:
 
 - WebSocket `SMITE` command 수신
 - `serverReceiveTime` 기록
-- `smiteTimeMs = (serverReceiveTime - gameStartTime) - rttMedian / 2`
+- `smiteTimeMs = serverReceiveTime - gameStartTime`
 - scenario 기준 HP 역산
 - 중복 SMITE 차단
 - `game_actions` 저장

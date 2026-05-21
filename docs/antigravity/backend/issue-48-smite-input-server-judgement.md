@@ -153,22 +153,22 @@ flowchart TD
 
 ### 8. 랜덤 버스트 HP 시나리오 생성
 
-- [ ] 현재 `GameRoomCommandService.createDefaultScenario(...)`의 1초 단위 선형 감소 로직을 제거한다.
-- [ ] gameRoom 생성 시 `8~17초` 범위에서 duration을 먼저 정하고, 해당 duration 안에서 HP가 `10000 -> 0`에 도달하는 scenario를 생성한다.
-- [ ] HP timeline은 랜덤 burst 패턴으로 생성한다.
+- [x] 현재 `GameRoomCommandService.createDefaultScenario(...)`의 1초 단위 선형 감소 로직을 제거한다.
+- [x] gameRoom 생성 시 `8~17초` 범위에서 duration을 먼저 정하고, 해당 duration 안에서 HP가 `10000 -> 0`에 도달하는 scenario를 생성한다.
+- [x] HP timeline은 랜덤 burst 패턴으로 생성한다.
   - 드래곤이 공격받지 않는 짧은 정체 구간을 허용한다.
   - 한 번에 크게 깎이는 burst 구간을 허용한다.
   - 전체적으로 HP는 증가하지 않고 감소 또는 유지되어야 한다.
   - 마지막 step은 반드시 `timeMs = durationSeconds * 1000`, `hp = 0`이어야 한다.
-- [ ] scenario step 간격은 클라이언트 표시와 서버 판정이 같이 사용할 수 있도록 충분히 촘촘하게 정의한다.
-  - 기존 1초 단위만으로는 burst 타이밍과 SMITE 판정 시점이 거칠 수 있으므로 `100ms~250ms` 단위 후보를 검토한다.
-- [ ] 랜덤 생성 결과가 정책을 깨지 않도록 보정한다.
+- [x] scenario step 간격은 클라이언트 표시와 서버 판정이 같이 사용할 수 있도록 충분히 촘촘하게 정의한다.
+  - `200ms` 단위 step으로 확정했다.
+- [x] 랜덤 생성 결과가 정책을 깨지 않도록 보정한다.
   - 첫 step은 `timeMs = 0`, `hp = 10000`
   - 모든 step의 `timeMs`는 오름차순
   - 모든 step의 `hp`는 `0~10000`
   - HP는 이전 step보다 커질 수 없음
-  - 마지막 step 이전에 HP가 0이 되면 이후 step은 만들지 않거나 0 유지 정책을 명확히 한다.
-- [ ] 시나리오 생성 책임은 `smite-core/domain/game/service/GameScenarioGenerator`로 분리한다.
+  - 마지막 step에서 `hp=0`에 도달하도록 누적 damage weight를 보정한다.
+- [x] 시나리오 생성 책임은 `smite-core/domain/game/service/GameScenarioGenerator`로 분리한다.
   - `GameRoomCommandService`는 generator를 호출해 gameRoom 생성 흐름만 조립한다.
   - WebSocket/API 계층에서는 scenario 생성 로직을 갖지 않는다.
 
@@ -226,9 +226,9 @@ flowchart TD
 
 ### 14. 테스트
 
-- [ ] gameRoom 생성 시 scenario duration이 항상 `8~17초` 범위인지 검증한다.
-- [ ] 랜덤 burst scenario가 `10000 -> 0`으로 끝나고 HP가 증가하지 않는지 검증한다.
-- [ ] 랜덤 burst scenario가 1초 단위 선형 감소로 고정되지 않는지 검증한다.
+- [x] gameRoom 생성 시 scenario duration이 항상 `8~17초` 범위인지 검증한다.
+- [x] 랜덤 burst scenario가 `10000 -> 0`으로 끝나고 HP가 증가하지 않는지 검증한다.
+- [x] 랜덤 burst scenario가 1초 단위 선형 감소로 고정되지 않는지 검증한다.
 - [ ] `SMITE` client message type과 `SMITE_RESULT` server message type 직렬화를 검증한다.
 - [ ] `SMITE` 수신 시 `serverReceiveTime`을 서버에서 기록하는지 검증한다.
 - [ ] `smiteTimeMs`가 RTT 보정 없이 `serverReceiveTimeMs - startAtMillis`로 계산되는지 검증한다.
@@ -249,7 +249,7 @@ flowchart TD
 
 ### 15. 문서
 
-- [ ] `docs/project/policy.md`의 HP 감소 패턴과 실제 scenario 생성 규칙을 맞춘다.
+- [x] `docs/project/policy.md`의 HP 감소 패턴과 실제 scenario 생성 규칙을 맞춘다.
 - [x] `docs/project/policy.md`에 킬 실패 SMITE도 `1200` 데미지를 반영한다는 정책을 추가한다.
 - [x] `docs/project/policy.md`에 SMITE는 RTT 보정 없이 서버 수신 시각 기준으로 판정한다는 정책을 추가한다.
 - [x] `docs/project/policy.md`에 동시 SMITE 정렬 기준과 처치 시 `GAME_RESULT` 반환 정책을 추가한다.

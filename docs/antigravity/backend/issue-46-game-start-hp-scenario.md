@@ -175,7 +175,7 @@ lock 비용 판단:
 - 정산 대상 조회 시작 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 계산한다.
 - `inputGraceMs`는 2000ms로 둔다.
 - 2000ms grace는 자연사 직전 SMITE 입력이 서버에 도착할 수 있는 여유 시간이다.
-- 판정 시각 보정은 기존 정책처럼 `serverReceiveTime - gameStartTime - medianRtt/2`를 사용한다.
+- SMITE 판정 시각은 RTT 보정 없이 `serverReceiveTime - gameStartTime`을 사용한다.
 - 고정 25초 같은 값은 실제 정산 deadline으로 쓰지 않는다. 필요하면 cleanup TTL 같은 안전장치에서 별도로 검토한다.
 
 구현 결과:

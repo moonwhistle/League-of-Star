@@ -106,7 +106,7 @@ userBStatus = PENDING
 TTL/cleanup 정책:
 
 - TTL은 300초로 둔다. RTT 측정, Step 6 시작 처리, SMITE 판정 시간을 충분히 감싸는 cleanup 누락 방지용 안전장치다.
-- RTT 성공 시 `game:rtt:{gameRoomId}`는 즉시 삭제하지 않는다. median RTT가 SMITE 판정 보정에 필요하기 때문이다.
+- RTT 성공 시 `game:rtt:{gameRoomId}`는 Step 6 GAME_START 조건 확인에 사용한다. RTT 측정값은 SMITE 판정 보정에는 사용하지 않는다.
 - RTT 실패/초과 시 gameRoom을 `ABORTED` 처리한 뒤 `game:rtt:{gameRoomId}`를 cleanup한다.
 - 게임이 정상 종료되면 `game:rtt:{gameRoomId}`를 cleanup한다.
 - `RTT_FAILED`, `RTT_TOO_HIGH` reason은 이벤트/로그 용도이며 Redis RTT HASH에는 별도 reason field를 두지 않는다.
@@ -281,13 +281,13 @@ local memory / 동시성 기준:
 - RTT 실패/초과 시 gameRoom과 participants는 `ABORTED`가 된다.
 - RTT 실패/초과 시 `game_records`, LP, 배치/승급전은 반영되지 않는다.
 - RTT 실패/초과 시 연결된 WebSocket에는 `GAME_START_FAILED`가 전송되고 close 된다.
-- 양쪽 RTT가 `PASSED`이면 다음 Step 6에서 `GAME_START` 준비를 진행할 수 있고, 이후 SMITE 판정에서 median RTT를 조회할 수 있다.
+- 양쪽 RTT가 `PASSED`이면 다음 Step 6에서 `GAME_START` 준비를 진행할 수 있다. 이후 SMITE 판정은 RTT 값 조회 없이 서버 수신 시각 기준으로 처리한다.
 - RTT 성공 상태는 게임 종료 전까지 유지되고, 게임 종료 후 cleanup 대상이다.
 
 ## 📝 Note
 
 - `PENDING`, `PASSED`, `FAILED`는 Redis RTT 측정 상태이며 DB gameRoom status가 아니다.
-- RTT 성공 시 median RTT는 `smiteTimeMs = (serverReceiveTime - gameStartTime) - rttMedian / 2` 보정에 사용하므로 즉시 삭제하지 않는다.
+- RTT 성공 상태는 Step 6 GAME_START 조건 확인에 사용한다. SMITE 판정은 `smiteTimeMs = serverReceiveTime - gameStartTime`으로 계산한다.
 - `GAME_START_FAILED`의 reason은 클라이언트 분기보다 운영/디버깅 목적이 크다.
 - 클라이언트는 `GAME_START_FAILED` reason과 관계없이 start 버튼 화면으로 복귀한다.
 - `COUNTDOWN`은 이번 이슈가 아니라 Step 6에서 `startAt`, scenario, `IN_PROGRESS` 전환과 함께 처리한다.
@@ -335,7 +335,7 @@ flowchart TD
 | 실패 reason | 응답 누락/close/error/예외는 `RTT_FAILED`, median 초과는 `RTT_TOO_HIGH` |
 | 실패 결과 | `game_rooms=ABORTED`, participants `ABORTED`, record/LP/배치/승급전 미반영 |
 | 클라이언트 복귀 | 연결된 WebSocket에만 `GAME_START_FAILED` 전송 후 close |
-| 성공 상태 | median RTT는 SMITE 판정 보정을 위해 게임 종료 전까지 Redis에 유지 |
+| 성공 상태 | 양쪽 `PASSED` 상태는 GAME_START 조건 확인에 사용하며, SMITE 판정 보정에는 사용하지 않음 |
 
 ## 📚 Changes
 
@@ -510,7 +510,7 @@ flowchart TD
 
 ## 📝 Note
 
-- RTT 성공 시 Redis RTT 상태는 즉시 삭제하지 않습니다. 이후 SMITE 판정에서 `smiteTimeMs = (serverReceiveTime - gameStartTime) - medianRtt / 2` 보정에 사용하기 때문입니다.
+- RTT 성공 상태는 Step 6 GAME_START 조건 확인에 사용합니다. 이후 SMITE 판정은 RTT 보정 없이 `smiteTimeMs = serverReceiveTime - gameStartTime`으로 계산합니다.
 - RTT 실패 reason은 Redis HASH에 저장하지 않습니다. reason은 이벤트/로그 구분용이고, 저장 상태는 `PENDING`, `PASSED`, `FAILED`만 유지해 단순화했습니다.
 - 게임 종료 후 `game:rtt:{gameRoomId}` cleanup은 후속 게임 종료 흐름에서 처리합니다.
 - `COUNTDOWN`, `GAME_START`, HP scenario 전달, `IN_PROGRESS` 전환은 다음 Step 6 범위입니다.
