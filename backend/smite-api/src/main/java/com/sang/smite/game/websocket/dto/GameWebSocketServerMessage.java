@@ -1,6 +1,8 @@
 package com.sang.smite.game.websocket.dto;
 
 import com.sang.smite.game.start.dto.GameStartScenarioPayload;
+import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.smite.dto.SmiteResultPayload;
 
 /**
  * 서버가 게임 대기 WebSocket으로 보내는 공통 메시지 envelope입니다.
@@ -71,6 +73,20 @@ public record GameWebSocketServerMessage(
         return new GameWebSocketServerMessage(
                 GameWebSocketMessageType.GAME_START,
                 new GameStartPayload(gameRoomId, serverTime, startAt, scenario)
+        );
+    }
+
+    public static GameWebSocketServerMessage smiteResult(SmiteResultPayload payload) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.SMITE_RESULT,
+                payload
+        );
+    }
+
+    public static GameWebSocketServerMessage gameResult(GameResultPayload payload) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.GAME_RESULT,
+                payload
         );
     }
 

@@ -78,12 +78,12 @@ flowchart TD
 
 ### 2. WebSocket 메시지 정의
 
-- [ ] client message `SMITE`를 `GameWebSocketMessageType`에 추가한다.
-- [ ] `SMITE` payload에는 클라이언트 timestamp를 허용하지 않는다.
-- [ ] server message `SMITE_RESULT`를 정의한다.
-- [ ] `SMITE_RESULT` payload에는 `gameRoomId`, `userId`, `serverReceiveTime`, `smiteTimeMs`, `dragonHpAtSmite`, `damage`, `afterHp`, `isKill`, `idempotent`를 포함한다.
-- [ ] server message `GAME_RESULT`를 정의한다.
-- [ ] `GAME_RESULT` payload에는 `gameRoomId`, `result`, `winnerUserId`, `reason`, `finishedAt`, `actions` 요약을 포함한다.
+- [x] client message `SMITE`를 `GameWebSocketMessageType`에 추가한다.
+- [x] `SMITE` payload 계약에는 클라이언트 timestamp를 포함하지 않는다.
+- [x] server message `SMITE_RESULT`를 정의한다.
+- [x] `SMITE_RESULT` payload에는 `gameRoomId`, `userId`, `serverReceiveTime`, `smiteTimeMs`, `dragonHpAtSmite`, `damage`, `afterHp`, `isKill`, `idempotent`를 포함한다.
+- [x] server message `GAME_RESULT`를 정의한다.
+- [x] `GAME_RESULT` payload에는 `gameRoomId`, `result`, `winnerUserId`, `reason`, `finishedAt`, `actions` 요약을 포함한다.
 - [ ] SMITE로 드래곤 HP가 `0` 이하가 되면 양쪽 클라이언트에 `GAME_RESULT`를 브로드캐스트한다.
 - [ ] 두 유저가 모두 SMITE를 사용하고 처치하지 못하면 즉시 `DRAW GAME_RESULT`를 양쪽 클라이언트에 브로드캐스트한다.
 - [ ] 잘못된 payload, 게임 상태 불일치, 참가자 아님 등은 기존 `ERROR` 메시지 구조로 응답한다.

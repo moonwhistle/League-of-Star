@@ -41,6 +41,22 @@ class GameWebSocketClientMessageTest {
     }
 
     @Test
+    @DisplayName("SMITE 메시지는 시간 payload 없이 공통 envelope로 역직렬화한다")
+    void deserialize_Smite() throws Exception {
+        // when
+        GameWebSocketClientMessage result = objectMapper.readValue(
+                "{\"type\":\"SMITE\",\"payload\":{}}",
+                GameWebSocketClientMessage.class
+        );
+
+        // then
+        assertThat(result.type()).isEqualTo(GameWebSocketMessageType.SMITE);
+        assertThat(result.payload().isObject()).isTrue();
+        assertThat(result.payload().has("clientTimestamp")).isFalse();
+        assertThat(result.payload().has("serverReceiveTime")).isFalse();
+    }
+
+    @Test
     @DisplayName("RTT_PONG payload에 seq가 없으면 빈 값을 반환한다")
     void rttSeq_MissingSeq() throws Exception {
         // when
