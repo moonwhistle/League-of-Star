@@ -178,6 +178,10 @@
 - `game_actions.dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 이전 SMITE 데미지를 반영한 이번 SMITE 적용 전 현재 HP를 저장한다.
 - 킬 실패한 SMITE도 이후 HP 판정에는 `1200` 데미지로 반영한다.
 - `afterHp = max(0, dragonHpAtSmite - 1200)`은 응답 payload에서 계산하고 DB에는 저장하지 않는다.
+- `smiteTimeMs`가 HP timeline step 사이에 있으면 인접한 두 step의 HP를 선형 보간해 base HP를 계산한다.
+- `smiteTimeMs`가 scenario 범위를 벗어나면 action을 저장하지 않는다.
+  - `startAt` 이전 입력은 무효 입력으로 본다.
+  - scenario 종료 이후 입력은 자연사 이후 입력이므로 후속 종료 정산 흐름에서 현재 gameRoom 결과를 기준으로 처리한다.
 
 #### RTT 측정
 

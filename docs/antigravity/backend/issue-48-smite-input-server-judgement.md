@@ -174,18 +174,19 @@ flowchart TD
 
 ### 9. HP 계산과 SMITE 판정 구현
 
-- [ ] `smiteTimeMs = serverReceiveTimeMs - startAtMillis`로 계산한다.
-- [ ] `serverReceiveTimeMs`와 `startAtMillis`는 로컬 타임존 시간이 아니라 UTC `Instant` 기반 epoch milliseconds로 맞춘다.
-- [ ] RTT median은 SMITE 판정 계산에 사용하지 않는다.
-- [ ] `smiteTimeMs`가 scenario 범위를 벗어나는 경우의 처리 정책을 정의한다.
+- [x] `smiteTimeMs = serverReceiveTimeMs - startAtMillis`로 계산한다.
+- [x] `serverReceiveTimeMs`와 `startAtMillis`는 로컬 타임존 시간이 아니라 UTC `Instant` 기반 epoch milliseconds로 맞춘다.
+- [x] RTT median은 SMITE 판정 계산에 사용하지 않는다.
+- [x] `smiteTimeMs`가 scenario 범위를 벗어나는 경우의 처리 정책을 정의한다.
   - 시작 전 입력 또는 비정상적으로 빠른 입력은 무효 처리
-  - 자연사 이후 입력은 저장하지 않고 종료된 판으로 응답
-- [ ] scenario에서 `smiteTimeMs` 시점의 base HP를 계산한다.
-- [ ] scenario는 gameRoom 생성 시 저장된 `scenarioData`를 사용하고, SMITE 입력 시 새로 생성하지 않는다.
-- [ ] 현재 action보다 앞선 SMITE action 개수만큼 `1200` 데미지를 차감한다.
-- [ ] `currentHp <= 0`이면 이미 처치된 상태로 보고 킬 실패/무효 처리한다.
-- [ ] `currentHp <= 1200`이면 `isKill=true`, 아니면 `isKill=false`로 저장한다.
-- [ ] 킬 실패여도 `afterHp = max(0, currentHp - 1200)`로 계산하고 이후 action 판정에 반영한다.
+  - 자연사 이후 입력은 저장하지 않고 후속 종료 정산 흐름에서 현재 gameRoom 결과 기준으로 처리
+- [x] scenario에서 `smiteTimeMs` 시점의 base HP를 계산한다.
+  - HP timeline step 사이 입력은 인접 step 사이를 선형 보간한다.
+- [x] scenario는 gameRoom 생성 시 저장된 `scenarioData`를 사용하고, SMITE 입력 시 새로 생성하지 않는다.
+- [x] 현재 action보다 앞선 SMITE action 개수만큼 `1200` 데미지를 차감한다.
+- [x] `currentHp <= 0`이면 이미 처치된 상태로 보고 킬 실패/무효 처리한다.
+- [x] `currentHp <= 1200`이면 `isKill=true`, 아니면 `isKill=false`로 저장한다.
+- [x] 킬 실패여도 `afterHp = max(0, currentHp - 1200)`로 계산하고 이후 action 판정에 반영한다.
 - [ ] `afterHp <= 0`이면 드래곤 처치 action으로 보고 결과 확정 흐름을 호출한다.
 
 ### 10. SMITE 처치 결과 즉시 반환
@@ -231,12 +232,12 @@ flowchart TD
 - [x] 랜덤 burst scenario가 1초 단위 선형 감소로 고정되지 않는지 검증한다.
 - [ ] `SMITE` client message type과 `SMITE_RESULT` server message type 직렬화를 검증한다.
 - [ ] `SMITE` 수신 시 `serverReceiveTime`을 서버에서 기록하는지 검증한다.
-- [ ] `smiteTimeMs`가 RTT 보정 없이 `serverReceiveTimeMs - startAtMillis`로 계산되는지 검증한다.
-- [ ] SMITE 판정 서비스가 RTT service/store에 의존하지 않는지 검증한다.
+- [x] `smiteTimeMs`가 RTT 보정 없이 `serverReceiveTimeMs - startAtMillis`로 계산되는지 검증한다.
+- [x] SMITE 판정 서비스가 RTT service/store에 의존하지 않는지 검증한다.
 - [ ] RTT start-ready 결과가 median 값 없이 양쪽 `PASSED`만으로 GAME_START 진행 조건을 판단하는지 검증한다.
-- [ ] scenario HP에서 이전 SMITE 데미지를 차감해 current HP를 계산하는지 검증한다.
-- [ ] HP `1200` 이하이면 킬 성공, 초과이면 킬 실패로 저장하는지 검증한다.
-- [ ] 킬 실패한 SMITE도 이후 action의 HP 계산에 `1200` 데미지로 반영되는지 검증한다.
+- [x] scenario HP에서 이전 SMITE 데미지를 차감해 current HP를 계산하는지 검증한다.
+- [x] HP `1200` 이하이면 킬 성공, 초과이면 킬 실패로 저장하는지 검증한다.
+- [x] 킬 실패한 SMITE도 이후 action의 HP 계산에 `1200` 데미지로 반영되는지 검증한다.
 - [x] 같은 유저 중복 SMITE는 기존 결과를 재응답하는지 검증한다.
 - [x] 같은 유저 동시 SMITE unique 충돌도 멱등 응답으로 처리되는지 검증한다.
 - [ ] 서로 다른 두 유저 동시 SMITE가 gameRoom row lock 기준으로 일관되게 저장되는지 검증한다.
