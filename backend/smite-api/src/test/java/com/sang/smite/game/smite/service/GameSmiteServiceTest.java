@@ -54,14 +54,7 @@ class GameSmiteServiceTest {
     void handleSmite_ExistingAction_ReturnIdempotentPayload() {
         // given
         GameRoom gameRoom = mock(GameRoom.class);
-        GameAction action = GameAction.builder()
-                .gameRoomId(GAME_ROOM_ID)
-                .userId(USER_ID)
-                .serverReceiveTimeMs(1000L)
-                .smiteTimeMs(900)
-                .dragonHpAtSmite(1000)
-                .isKill(true)
-                .build();
+        GameAction action = GameAction.smite(GAME_ROOM_ID, USER_ID, 1000L, 900, 1000);
         when(gameRoomCommandService.lockSmiteResultRoom(GAME_ROOM_ID, USER_ID))
                 .thenReturn(gameRoom);
         when(gameRoom.getStatus()).thenReturn(GameStatus.IN_PROGRESS);
@@ -91,14 +84,7 @@ class GameSmiteServiceTest {
     void handleSmite_NewAction_SaveAndReturnPayload() {
         // given
         GameRoom gameRoom = mock(GameRoom.class);
-        GameAction action = GameAction.builder()
-                .gameRoomId(GAME_ROOM_ID)
-                .userId(USER_ID)
-                .serverReceiveTimeMs(SERVER_RECEIVE_TIME_MS)
-                .smiteTimeMs(200)
-                .dragonHpAtSmite(1300)
-                .isKill(false)
-                .build();
+        GameAction action = GameAction.smite(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 200, 1300);
         when(gameRoomCommandService.lockSmiteResultRoom(GAME_ROOM_ID, USER_ID))
                 .thenReturn(gameRoom);
         when(gameRoom.getStatus()).thenReturn(GameStatus.IN_PROGRESS);
@@ -131,14 +117,7 @@ class GameSmiteServiceTest {
         // given
         GameRoom lockedRoom = mock(GameRoom.class);
         GameRoom finishedRoom = mock(GameRoom.class);
-        GameAction action = GameAction.builder()
-                .gameRoomId(GAME_ROOM_ID)
-                .userId(USER_ID)
-                .serverReceiveTimeMs(SERVER_RECEIVE_TIME_MS)
-                .smiteTimeMs(200)
-                .dragonHpAtSmite(1000)
-                .isKill(true)
-                .build();
+        GameAction action = GameAction.smite(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 200, 1000);
         when(gameRoomCommandService.lockSmiteResultRoom(GAME_ROOM_ID, USER_ID))
                 .thenReturn(lockedRoom);
         when(lockedRoom.getStatus()).thenReturn(GameStatus.IN_PROGRESS);
@@ -177,22 +156,8 @@ class GameSmiteServiceTest {
         // given
         GameRoom lockedRoom = mock(GameRoom.class);
         GameRoom finishedRoom = mock(GameRoom.class);
-        GameAction firstAction = GameAction.builder()
-                .gameRoomId(GAME_ROOM_ID)
-                .userId(OTHER_USER_ID)
-                .serverReceiveTimeMs(1_000L)
-                .smiteTimeMs(100)
-                .dragonHpAtSmite(5_000)
-                .isKill(false)
-                .build();
-        GameAction secondAction = GameAction.builder()
-                .gameRoomId(GAME_ROOM_ID)
-                .userId(USER_ID)
-                .serverReceiveTimeMs(SERVER_RECEIVE_TIME_MS)
-                .smiteTimeMs(200)
-                .dragonHpAtSmite(2_500)
-                .isKill(false)
-                .build();
+        GameAction firstAction = GameAction.smite(GAME_ROOM_ID, OTHER_USER_ID, 1_000L, 100, 5_000);
+        GameAction secondAction = GameAction.smite(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 200, 2_500);
         when(gameRoomCommandService.lockSmiteResultRoom(GAME_ROOM_ID, USER_ID))
                 .thenReturn(lockedRoom);
         when(lockedRoom.getStatus()).thenReturn(GameStatus.IN_PROGRESS);
@@ -234,14 +199,7 @@ class GameSmiteServiceTest {
     void handleSmite_AlreadyFinished_ReturnCurrentGameResultOnly() {
         // given
         GameRoom finishedRoom = mock(GameRoom.class);
-        GameAction action = GameAction.builder()
-                .gameRoomId(GAME_ROOM_ID)
-                .userId(USER_ID)
-                .serverReceiveTimeMs(SERVER_RECEIVE_TIME_MS)
-                .smiteTimeMs(200)
-                .dragonHpAtSmite(1000)
-                .isKill(true)
-                .build();
+        GameAction action = GameAction.smite(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 200, 1000);
         when(gameRoomCommandService.lockSmiteResultRoom(GAME_ROOM_ID, USER_ID))
                 .thenReturn(finishedRoom);
         when(finishedRoom.getStatus()).thenReturn(GameStatus.FINISHED);

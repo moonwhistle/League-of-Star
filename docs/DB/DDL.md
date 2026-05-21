@@ -427,6 +427,7 @@ CREATE TABLE game_actions (
 - `dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 같은 gameRoom에서 더 이른 SMITE 데미지를 모두 반영한 현재 HP입니다.
 - SMITE 데미지는 정책상 `1200` 고정이므로 별도 컬럼으로 저장하지 않습니다.
 - `afterHp = max(0, dragon_hp_at_smite - 1200)`은 WebSocket 응답에서 계산하는 값이며 DB에는 저장하지 않습니다.
+- `game_actions`는 유저당 1회 SMITE 입력과 판정 스냅샷만 저장합니다. 승패 기록, LP 변동, 배치/승급전 반영은 `game_records`에서 처리합니다.
 
 > **uk_game_room_user**: 한 게임에서 유저당 강타 1회만 → 유니크 제약으로 DB 레벨 보장
 

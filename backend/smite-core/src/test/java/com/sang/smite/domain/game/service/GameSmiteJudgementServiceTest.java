@@ -154,13 +154,12 @@ class GameSmiteJudgementServiceTest {
     }
 
     private GameAction action(long serverReceiveTimeMs) {
-        return GameAction.builder()
-                .gameRoomId(GAME_ROOM_ID)
-                .userId(SECOND_USER_ID)
-                .serverReceiveTimeMs(serverReceiveTimeMs)
-                .smiteTimeMs(Math.toIntExact(serverReceiveTimeMs - START_AT_MILLIS))
-                .dragonHpAtSmite(GameRules.DRAGON_INITIAL_HP)
-                .isKill(false)
-                .build();
+        return GameAction.smite(
+                GAME_ROOM_ID,
+                SECOND_USER_ID,
+                serverReceiveTimeMs,
+                Math.toIntExact(serverReceiveTimeMs - START_AT_MILLIS),
+                GameRules.DRAGON_INITIAL_HP
+        );
     }
 }

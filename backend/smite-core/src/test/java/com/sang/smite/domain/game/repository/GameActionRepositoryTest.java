@@ -48,18 +48,16 @@ class GameActionRepositoryTest {
         room.addParticipant(p2.getId());
         gameRoomRepository.save(room);
 
-        GameAction action1 = GameAction.builder()
-                .gameRoomId(room.getId()).userId(p1.getId())
-                .serverReceiveTimeMs(1000L).smiteTimeMs(980).dragonHpAtSmite(1000).isKill(true)
-                .build();
+        GameAction action1 = GameAction.smite(
+                room.getId(), p1.getId(), 1000L, 980, 1000
+        );
         gameActionRepository.save(action1);
         gameActionRepository.flush();
 
         // when & then
-        GameAction action2 = GameAction.builder()
-                .gameRoomId(room.getId()).userId(p1.getId()) // 동일 유저, 동일 게임방
-                .serverReceiveTimeMs(1100L).smiteTimeMs(1080).dragonHpAtSmite(900).isKill(false)
-                .build();
+        GameAction action2 = GameAction.smite(
+                room.getId(), p1.getId(), 1100L, 1080, 900
+        );
 
         assertThatThrownBy(() -> {
             gameActionRepository.save(action2);
@@ -74,14 +72,13 @@ class GameActionRepositoryTest {
         User p1 = userRepository.save(User.builder().email("p3@test.com").nickname("p3").build());
         User p2 = userRepository.save(User.builder().email("p4@test.com").nickname("p4").build());
         GameRoom room = createRoom(p1.getId(), p2.getId());
-        GameAction action = gameActionRepository.save(GameAction.builder()
-                .gameRoomId(room.getId())
-                .userId(p1.getId())
-                .serverReceiveTimeMs(1000L)
-                .smiteTimeMs(900)
-                .dragonHpAtSmite(1000)
-                .isKill(true)
-                .build());
+        GameAction action = gameActionRepository.save(GameAction.smite(
+                room.getId(),
+                p1.getId(),
+                1000L,
+                900,
+                1000
+        ));
 
         // when
         var result = gameActionRepository.findByGameRoomIdAndUserId(room.getId(), p1.getId());
@@ -97,22 +94,20 @@ class GameActionRepositoryTest {
         User p1 = userRepository.save(User.builder().email("p5@test.com").nickname("p5").build());
         User p2 = userRepository.save(User.builder().email("p6@test.com").nickname("p6").build());
         GameRoom room = createRoom(p1.getId(), p2.getId());
-        GameAction later = gameActionRepository.save(GameAction.builder()
-                .gameRoomId(room.getId())
-                .userId(p1.getId())
-                .serverReceiveTimeMs(1200L)
-                .smiteTimeMs(1100)
-                .dragonHpAtSmite(1000)
-                .isKill(true)
-                .build());
-        GameAction earlier = gameActionRepository.save(GameAction.builder()
-                .gameRoomId(room.getId())
-                .userId(p2.getId())
-                .serverReceiveTimeMs(1000L)
-                .smiteTimeMs(900)
-                .dragonHpAtSmite(1500)
-                .isKill(false)
-                .build());
+        GameAction later = gameActionRepository.save(GameAction.smite(
+                room.getId(),
+                p1.getId(),
+                1200L,
+                1100,
+                1000
+        ));
+        GameAction earlier = gameActionRepository.save(GameAction.smite(
+                room.getId(),
+                p2.getId(),
+                1000L,
+                900,
+                1500
+        ));
 
         // when
         List<GameAction> result = gameActionRepository.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(room.getId());

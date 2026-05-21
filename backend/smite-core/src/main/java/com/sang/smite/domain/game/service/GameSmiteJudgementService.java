@@ -32,14 +32,13 @@ public class GameSmiteJudgementService {
             return Optional.empty();
         }
 
-        return Optional.of(GameAction.builder()
-                .gameRoomId(gameRoom.getId())
-                .userId(userId)
-                .serverReceiveTimeMs(serverReceiveTimeMs)
-                .smiteTimeMs(Math.toIntExact(smiteTimeMillis))
-                .dragonHpAtSmite(dragonHpAtSmite)
-                .isKill(dragonHpAtSmite <= GameRules.SMITE_DAMAGE)
-                .build());
+        return Optional.of(GameAction.smite(
+                gameRoom.getId(),
+                userId,
+                serverReceiveTimeMs,
+                Math.toIntExact(smiteTimeMillis),
+                dragonHpAtSmite
+        ));
     }
 
     private boolean isInScenarioRange(List<HpStep> steps, long smiteTimeMillis) {

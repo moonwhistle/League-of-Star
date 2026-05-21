@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder
+@Builder(access = AccessLevel.PRIVATE)
 public class GameAction extends BaseEntity {
 
     @Id
@@ -48,4 +48,19 @@ public class GameAction extends BaseEntity {
 
     @Column(nullable = false)
     private boolean isKill;
+
+    public static GameAction smite(Long gameRoomId,
+                                   Long userId,
+                                   long serverReceiveTimeMs,
+                                   int smiteTimeMs,
+                                   int dragonHpAtSmite) {
+        return GameAction.builder()
+                .gameRoomId(gameRoomId)
+                .userId(userId)
+                .serverReceiveTimeMs(serverReceiveTimeMs)
+                .smiteTimeMs(smiteTimeMs)
+                .dragonHpAtSmite(dragonHpAtSmite)
+                .isKill(dragonHpAtSmite <= GameRules.SMITE_DAMAGE)
+                .build();
+    }
 }

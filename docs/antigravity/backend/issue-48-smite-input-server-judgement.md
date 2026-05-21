@@ -211,10 +211,10 @@ flowchart TD
 - [x] `GameActionRepository`에 `findByGameRoomIdAndUserId(...)`를 추가한다.
 - [x] `GameActionRepository`에 gameRoom 단위 action 정렬 조회 메서드를 추가한다.
   - 정렬 기준: `serverReceiveTimeMs ASC`, `id ASC`
-- [ ] 필요한 경우 `GameAction` 생성 정적 팩토리 또는 도메인 메서드를 추가해 필드 의미를 명확히 한다.
+- [x] `GameAction.smite(...)` 정적 팩토리로 SMITE action 생성 의미와 `isKill` 계산 기준을 명확히 한다.
 - [x] DDL 문서에서 `dragon_hp_at_smite` 의미를 “이전 SMITE 데미지 반영 후, 이번 SMITE 적용 전 HP”로 명확히 한다.
 - [x] DDL 문서에서 `rtt_ms` 컬럼을 제거하고 `smite_time_ms` 의미를 “서버 수신 시각 기준 게임 시작 후 경과 ms”로 수정한다.
-- [ ] `game_actions`는 유저당 1회 입력 기록으로 유지하고, record/LP 결과 저장은 `game_records`에서 처리한다.
+- [x] `game_actions`는 유저당 1회 입력 기록으로 유지하고, record/LP 결과 저장은 `game_records`에서 처리한다.
 
 ### 13. 실패/예외 응답
 

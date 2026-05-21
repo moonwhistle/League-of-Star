@@ -176,6 +176,7 @@
 - SMITE 판정은 실제 롤 강타 감각에 맞춰 서버가 받은 입력 순서를 기준으로 처리
 - 드래곤 초기 HP는 `10000`, SMITE 데미지는 `1200` 고정값으로 둔다.
 - `game_actions.dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 이전 SMITE 데미지를 반영한 이번 SMITE 적용 전 현재 HP를 저장한다.
+- `game_actions`는 유저당 1회 SMITE 입력 기록으로 유지하고, 승패 기록과 LP/배치/승급전 반영은 `game_records`에서 처리한다.
 - 킬 실패한 SMITE도 이후 HP 판정에는 `1200` 데미지로 반영한다.
 - `afterHp = max(0, dragonHpAtSmite - 1200)`은 응답 payload에서 계산하고 DB에는 저장하지 않는다.
 - `smiteTimeMs`가 HP timeline step 사이에 있으면 인접한 두 step의 HP를 선형 보간해 base HP를 계산한다.

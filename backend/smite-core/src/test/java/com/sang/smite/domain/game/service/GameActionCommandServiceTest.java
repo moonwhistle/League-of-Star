@@ -93,13 +93,12 @@ class GameActionCommandServiceTest {
     }
 
     private GameAction action(long serverReceiveTimeMs) {
-        return GameAction.builder()
-                .gameRoomId(GAME_ROOM_ID)
-                .userId(USER_ID)
-                .serverReceiveTimeMs(serverReceiveTimeMs)
-                .smiteTimeMs((int) serverReceiveTimeMs)
-                .dragonHpAtSmite(1000)
-                .isKill(true)
-                .build();
+        return GameAction.smite(
+                GAME_ROOM_ID,
+                USER_ID,
+                serverReceiveTimeMs,
+                (int) serverReceiveTimeMs,
+                1000
+        );
     }
 }
