@@ -120,7 +120,9 @@ public class GameRoomCommandService {
     }
 
     private void validateSmiteJudgementRoom(GameRoom gameRoom, Long userId) {
-        if (!gameRoom.getStatus().isInProgress() || gameRoom.getGameStartTime() == null) {
+        if (!gameRoom.getStatus().isInProgress()
+                || gameRoom.getGameStartTime() == null
+                || gameRoom.getScenarioData() == null) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
         }
         if (!gameRoom.hasParticipant(userId)) {
@@ -130,7 +132,8 @@ public class GameRoomCommandService {
 
     private void validateSmiteResultRoom(GameRoom gameRoom, Long userId) {
         if ((!gameRoom.getStatus().isInProgress() && !gameRoom.getStatus().isFinished())
-                || gameRoom.getGameStartTime() == null) {
+                || gameRoom.getGameStartTime() == null
+                || gameRoom.getScenarioData() == null) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
         }
         if (!gameRoom.hasParticipant(userId)) {

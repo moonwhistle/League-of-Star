@@ -86,7 +86,7 @@ flowchart TD
 - [x] `GAME_RESULT` payload에는 `gameRoomId`, `result`, `winnerUserId`, `reason`, `finishedAt`, `actions` 요약을 포함한다.
 - [x] SMITE로 드래곤 HP가 `0` 이하가 되면 양쪽 클라이언트에 `GAME_RESULT`를 브로드캐스트한다.
 - [x] 두 유저가 모두 SMITE를 사용하고 처치하지 못하면 즉시 `DRAW GAME_RESULT`를 양쪽 클라이언트에 브로드캐스트한다.
-- [ ] 잘못된 payload, 게임 상태 불일치, 참가자 아님 등은 기존 `ERROR` 메시지 구조로 응답한다.
+- [x] 잘못된 payload, 게임 상태 불일치, 참가자 아님 등은 기존 `ERROR` 메시지 구조로 응답한다.
 
 ### 3. WebSocket handler 연결
 
@@ -223,7 +223,7 @@ flowchart TD
 - [x] userId가 gameRoom participant가 아니면 SMITE를 거절한다.
 - [x] scenario 또는 `startAt`이 없으면 SMITE를 거절한다.
 - [x] unique 충돌은 중복 입력 실패가 아니라 기존 결과 재응답으로 처리한다.
-- [ ] 저장 중 복구 불가능한 DB 예외는 `ERROR` 응답으로 내리고 WebSocket 연결은 유지한다.
+- [x] 저장 중 복구 불가능한 DB 예외는 `ERROR` 응답으로 내리고 WebSocket 연결은 유지한다.
 
 ### 14. 테스트
 
@@ -246,7 +246,7 @@ flowchart TD
 - [x] 두 유저가 모두 SMITE를 사용하고 처치하지 못한 경우 즉시 `DRAW GAME_RESULT`가 반환되는지 검증한다.
 - [x] 두 유저가 모두 SMITE를 사용한 실패 판은 `gameEndAt`/`inputGraceMs`를 기다리지 않는지 검증한다.
 - [x] 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 action 저장 없이 `GAME_RESULT`를 재응답하는지 검증한다.
-- [ ] `IN_PROGRESS`가 아닌 gameRoom, participant 아님, scenario 없음 실패 케이스를 검증한다.
+- [x] `IN_PROGRESS`가 아닌 gameRoom, participant 아님, scenario 없음 실패 케이스를 검증한다.
 
 ### 15. 문서
 

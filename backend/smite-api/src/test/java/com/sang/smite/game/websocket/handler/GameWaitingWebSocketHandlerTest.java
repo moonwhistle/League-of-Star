@@ -2,10 +2,13 @@ package com.sang.smite.game.websocket.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.common.exception.CoreErrorCode;
+import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
+import com.sang.smite.game.smite.domain.GameSmiteFailureReason;
 import com.sang.smite.game.smite.dto.GameResultPayload;
 import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
 import com.sang.smite.game.smite.dto.SmiteResultPayload;
@@ -31,6 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -233,6 +237,89 @@ class GameWaitingWebSocketHandlerTest {
                         && command.serverReceiveTimeMs() == SERVER_RECEIVE_TIME.toEpochMilli()
         ));
         verify(session, never()).sendMessage(any());
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - SMITE payload에 필드가 있으면 ERROR로 응답한다")
+    void handleTextMessage_SmiteInvalidPayload_ReturnError() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{\"clientTime\":1}}"));
+
+        // then
+        JsonNode message = lastSentMessage(session);
+        assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.ERROR.name());
+        assertThat(message.get("payload").get("code").asText())
+                .isEqualTo(GameSmiteFailureReason.INVALID_SMITE_PAYLOAD.getCode());
+        verify(gameSmiteService, never()).handleSmite(any());
+        verify(session, never()).close(any());
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - SMITE 참가자 예외는 ERROR로 응답하고 연결을 유지한다")
+    void handleTextMessage_SmiteNotParticipant_ReturnErrorAndKeepConnection() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameSmiteService.handleSmite(any()))
+                .thenThrow(new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+
+        // then
+        JsonNode message = lastSentMessage(session);
+        assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.ERROR.name());
+        assertThat(message.get("payload").get("code").asText())
+                .isEqualTo(GameSmiteFailureReason.NOT_GAME_PARTICIPANT.getCode());
+        verify(session, never()).close(any());
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - SMITE 상태 예외는 ERROR로 응답하고 연결을 유지한다")
+    void handleTextMessage_SmiteInvalidState_ReturnErrorAndKeepConnection() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameSmiteService.handleSmite(any()))
+                .thenThrow(new CoreException(CoreErrorCode.INVALID_GAME_STATE));
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+
+        // then
+        JsonNode message = lastSentMessage(session);
+        assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.ERROR.name());
+        assertThat(message.get("payload").get("code").asText())
+                .isEqualTo(GameSmiteFailureReason.INVALID_SMITE_STATE.getCode());
+        verify(session, never()).close(any());
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - SMITE DB 예외는 ERROR로 응답하고 연결을 유지한다")
+    void handleTextMessage_SmiteDataAccessException_ReturnErrorAndKeepConnection() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameSmiteService.handleSmite(any()))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+
+        // then
+        JsonNode message = lastSentMessage(session);
+        assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.ERROR.name());
+        assertThat(message.get("payload").get("code").asText())
+                .isEqualTo(GameSmiteFailureReason.SMITE_PROCESSING_FAILED.getCode());
+        verify(session, never()).close(any());
     }
 
     @Test

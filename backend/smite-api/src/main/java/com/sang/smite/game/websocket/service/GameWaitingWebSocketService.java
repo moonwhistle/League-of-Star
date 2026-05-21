@@ -1,10 +1,13 @@
 package com.sang.smite.game.websocket.service;
 
+import com.sang.smite.common.exception.CoreErrorCode;
+import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
+import com.sang.smite.game.smite.domain.GameSmiteFailureReason;
 import com.sang.smite.game.smite.dto.GameResultPayload;
 import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
 import com.sang.smite.game.smite.dto.SmiteResultPayload;
@@ -24,6 +27,7 @@ import com.sang.smite.game.waiting.domain.GameWaitingReadyResult;
 import com.sang.smite.game.waiting.service.GameWaitingReadyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
@@ -106,12 +110,24 @@ public class GameWaitingWebSocketService {
     }
 
     public void handleSmite(GameRoomWebSocketSession currentSession, long serverReceiveTimeMs) {
-        gameSmiteService.handleSmite(new GameSmiteCommand(
-                        currentSession.getGameRoomId(),
-                        currentSession.getUserId(),
-                        serverReceiveTimeMs
-                ))
-                .ifPresent(response -> sendSmiteResponse(currentSession, response));
+        try {
+            gameSmiteService.handleSmite(new GameSmiteCommand(
+                            currentSession.getGameRoomId(),
+                            currentSession.getUserId(),
+                            serverReceiveTimeMs
+                    ))
+                    .ifPresent(response -> sendSmiteResponse(currentSession, response));
+        } catch (CoreException e) {
+            sendSmiteError(currentSession, mapSmiteFailureReason(e), e.getErrorCode().message());
+        } catch (DataAccessException e) {
+            log.warn("Failed to persist SMITE. gameRoomId={}, userId={}",
+                    currentSession.getGameRoomId(), currentSession.getUserId(), e);
+            sendSmiteError(
+                    currentSession,
+                    GameSmiteFailureReason.SMITE_PROCESSING_FAILED,
+                    "Failed to process SMITE."
+            );
+        }
     }
 
     private void sendSmiteResponse(GameRoomWebSocketSession currentSession,
@@ -139,6 +155,27 @@ public class GameWaitingWebSocketService {
         } catch (IOException e) {
             log.warn("Failed to broadcast GAME_RESULT. gameRoomId={}", currentSession.getGameRoomId(), e);
         }
+    }
+
+    private void sendSmiteError(GameRoomWebSocketSession currentSession,
+                                GameSmiteFailureReason reason,
+                                String message) {
+        try {
+            messageSender.send(
+                    currentSession.getWebSocketSession(),
+                    GameWebSocketServerMessage.error(reason.getCode(), message)
+            );
+        } catch (IOException e) {
+            log.warn("Failed to send SMITE ERROR. gameRoomId={}, userId={}",
+                    currentSession.getGameRoomId(), currentSession.getUserId(), e);
+        }
+    }
+
+    private GameSmiteFailureReason mapSmiteFailureReason(CoreException exception) {
+        if (exception.getErrorCode().equals(CoreErrorCode.INVALID_GAME_PARTICIPANTS)) {
+            return GameSmiteFailureReason.NOT_GAME_PARTICIPANT;
+        }
+        return GameSmiteFailureReason.INVALID_SMITE_STATE;
     }
 
     public void cleanupSession(WebSocketSession session) {

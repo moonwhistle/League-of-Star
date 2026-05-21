@@ -118,6 +118,7 @@ class GameRoomCommandServiceTest {
     void abortReadyRoom_Success() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .scenarioData(SCENARIO)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -151,6 +152,7 @@ class GameRoomCommandServiceTest {
     void abortReadyRoomIfReady_Ready() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .scenarioData(SCENARIO)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -172,6 +174,7 @@ class GameRoomCommandServiceTest {
     void abortReadyRoomIfReady_NotReady() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .scenarioData(SCENARIO)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -208,6 +211,7 @@ class GameRoomCommandServiceTest {
         // given
         LocalDateTime startTime = LocalDateTime.of(2026, 5, 20, 12, 0);
         GameRoom gameRoom = GameRoom.builder()
+                .scenarioData(SCENARIO)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -269,6 +273,7 @@ class GameRoomCommandServiceTest {
     void lockInProgressRoomForSmite_InProgressParticipant_ReturnGameRoom() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .scenarioData(SCENARIO)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -316,6 +321,7 @@ class GameRoomCommandServiceTest {
     void lockInProgressRoomForSmite_NotParticipant_ThrowException() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .scenarioData(SCENARIO)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -326,6 +332,23 @@ class GameRoomCommandServiceTest {
         assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, 999L))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
+    @DisplayName("lockInProgressRoomForSmite - scenario가 없으면 예외를 던진다")
+    void lockInProgressRoomForSmite_MissingScenario_ThrowException() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.of(2026, 5, 20, 12, 0));
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
     }
 
     @Test

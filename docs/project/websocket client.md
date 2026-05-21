@@ -503,7 +503,7 @@ RTT 실패/초과 시 서버는 `GAME_START_FAILED`를 전송하고 연결을 �
 
 ## 12. 잘못된 메시지 처리
 
-클라이언트가 JSON 파싱이 불가능한 메시지나 server-only type을 보내면 백엔드는 `ERROR`를 응답합니다.
+클라이언트가 JSON 파싱이 불가능한 메시지나 server-only type을 보내면 백엔드는 `ERROR`를 응답합니다. SMITE 처리 중 잘못된 payload, 게임 상태 불일치, 참가자 불일치, 저장 실패가 발생해도 `ERROR`를 응답하고 WebSocket 연결은 유지합니다.
 
 ```mermaid
 sequenceDiagram
@@ -532,7 +532,7 @@ sequenceDiagram
 |------|------|
 | `CLIENT_READY` | MP4 preload 등 대기 준비 완료 |
 | `RTT_PONG` | 서버 `RTT_PING`에 대한 RTT 측정 응답. payload의 `seq`를 그대로 반환 |
-| `SMITE` | GAME_START 이후 강타 입력. payload에 클라이언트 timestamp를 넣지 않음 |
+| `SMITE` | GAME_START 이후 강타 입력. payload는 비어 있어야 하며 클라이언트 timestamp를 넣지 않음 |
 
 서버가 보내는 message type:
 
@@ -550,12 +550,21 @@ sequenceDiagram
 | `GAME_RESULT` | gameRoom 승패/무승부 확정 결과 |
 | `ERROR` | 잘못된 메시지 또는 처리 불가 |
 
+SMITE 관련 `ERROR.payload.code`:
+
+| code | 의미 |
+|------|------|
+| `INVALID_SMITE_PAYLOAD` | `SMITE` payload가 비어 있지 않음 |
+| `INVALID_SMITE_STATE` | gameRoom 상태, startAt, scenario 등 SMITE 처리 조건이 맞지 않음 |
+| `NOT_GAME_PARTICIPANT` | WebSocket session user가 gameRoom 참가자가 아님 |
+| `SMITE_PROCESSING_FAILED` | 저장 중 복구 불가능한 DB 예외 등 서버 처리 실패 |
+
 ## 13. SMITE 입력 UI
 
 클라이언트는 `GAME_START` 이후 사용자가 SMITE 버튼을 클릭하면 즉시 버튼을 비활성화합니다.
 
 - `SMITE`는 gameRoom WebSocket으로 한 번만 전송합니다.
-- `SMITE` payload에는 클라이언트 timestamp를 포함하지 않습니다.
+- `SMITE` payload에는 클라이언트 timestamp를 포함하지 않으며 빈 object `{}` 또는 payload 생략만 허용합니다.
 - 같은 유저가 같은 gameRoom에서 중복 전송하더라도 서버는 첫 action만 유효하게 유지하고, 기존 결과를 `SMITE_RESULT idempotent=true`로 재응답할 수 있습니다.
 - WebSocket 재시도나 더블 클릭으로 중복 전송이 발생해도 클라이언트는 새 판정으로 취급하지 않고 마지막 `SMITE_RESULT` 기준으로 UI를 동기화합니다.
 

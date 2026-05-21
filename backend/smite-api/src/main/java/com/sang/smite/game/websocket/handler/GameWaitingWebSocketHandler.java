@@ -2,6 +2,7 @@ package com.sang.smite.game.websocket.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.game.smite.domain.GameSmiteFailureReason;
 import com.sang.smite.game.websocket.dto.GameWebSocketClientMessage;
 import com.sang.smite.game.websocket.dto.GameWebSocketServerMessage;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSession;
@@ -77,6 +78,13 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
             return;
         }
         if (clientMessage.isSmite()) {
+            if (clientMessage.hasInvalidSmitePayload()) {
+                send(session, GameWebSocketServerMessage.error(
+                        GameSmiteFailureReason.INVALID_SMITE_PAYLOAD.getCode(),
+                        "SMITE payload must be empty."
+                ));
+                return;
+            }
             gameWaitingWebSocketService.handleSmite(currentSession.get(), receivedAtMillis);
             return;
         }
