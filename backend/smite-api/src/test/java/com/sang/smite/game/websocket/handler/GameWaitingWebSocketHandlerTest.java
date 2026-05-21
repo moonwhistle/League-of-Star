@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
+import com.sang.smite.game.smite.service.GameSmiteService;
 import com.sang.smite.game.start.domain.GameStartBlockedReason;
 import com.sang.smite.game.start.domain.GameStartFailureReason;
 import com.sang.smite.game.start.domain.GameStartTransitionResult;
@@ -28,6 +29,9 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,8 +58,10 @@ class GameWaitingWebSocketHandlerTest {
     private static final Long SECOND_USER_ID = 2L;
     private static final String FIRST_SESSION_ID = "session-1";
     private static final String SECOND_SESSION_ID = "session-2";
+    private static final Instant SERVER_RECEIVE_TIME = Instant.parse("2026-05-21T03:00:00Z");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Clock clock = Clock.fixed(SERVER_RECEIVE_TIME, ZoneOffset.UTC);
     private final GameRoomWebSocketSessionRegistry sessionRegistry = new GameRoomWebSocketSessionRegistry();
     private final GameWaitingReadyService gameWaitingReadyService = mock(GameWaitingReadyService.class);
     private final GameRttMeasurementService gameRttMeasurementService = mock(GameRttMeasurementService.class);
@@ -64,6 +70,7 @@ class GameWaitingWebSocketHandlerTest {
     private final GameStartFailureProcessor gameStartFailureProcessor = mock(GameStartFailureProcessor.class);
     private final GameEndScheduleService gameEndScheduleService = mock(GameEndScheduleService.class);
     private final GameStartWebSocketSender gameStartWebSocketSender = mock(GameStartWebSocketSender.class);
+    private final GameSmiteService gameSmiteService = mock(GameSmiteService.class);
     private final GameRoomWebSocketMessageSender messageSender = new GameRoomWebSocketMessageSender(
             objectMapper,
             sessionRegistry
@@ -77,13 +84,15 @@ class GameWaitingWebSocketHandlerTest {
             gameStartTransitionService,
             gameStartFailureProcessor,
             gameEndScheduleService,
-            gameStartWebSocketSender
+            gameStartWebSocketSender,
+            gameSmiteService
     );
     private final GameWaitingWebSocketHandler handler = new GameWaitingWebSocketHandler(
             objectMapper,
             sessionRegistry,
             gameWaitingWebSocketService,
-            messageSender
+            messageSender,
+            clock
     );
 
     @Test
@@ -193,6 +202,26 @@ class GameWaitingWebSocketHandlerTest {
         // then
         verify(session, never()).sendMessage(any());
         verify(gameWaitingReadyService, never()).markReady(GAME_ROOM_ID, FIRST_USER_ID);
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - SMITE 수신 시 서버 수신 시각을 기록하고 SMITE service로 위임한다")
+    void handleTextMessage_Smite_DelegateWithServerReceiveTime() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+
+        // then
+        verify(gameSmiteService).handleSmite(
+                GAME_ROOM_ID,
+                FIRST_USER_ID,
+                SERVER_RECEIVE_TIME.toEpochMilli()
+        );
+        verify(session, never()).sendMessage(any());
     }
 
     @Test

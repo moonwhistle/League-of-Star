@@ -2,7 +2,8 @@ package com.sang.smite.game.service;
 
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
-import com.sang.smite.game.service.dto.GameRoomSetupResult;
+import com.sang.smite.game.setup.service.GameRoomSetupService;
+import com.sang.smite.game.setup.service.dto.GameRoomSetupResult;
 import com.sang.smite.game.waiting.domain.GameWaitingTimeoutRegistration;
 import com.sang.smite.game.waiting.repository.GameWaitingStore;
 import org.junit.jupiter.api.DisplayName;

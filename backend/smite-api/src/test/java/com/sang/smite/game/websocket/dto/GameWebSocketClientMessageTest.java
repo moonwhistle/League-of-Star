@@ -52,6 +52,7 @@ class GameWebSocketClientMessageTest {
         // then
         assertThat(result.type()).isEqualTo(GameWebSocketMessageType.SMITE);
         assertThat(result.payload().isObject()).isTrue();
+        assertThat(result.isSmite()).isTrue();
         assertThat(result.payload().has("clientTimestamp")).isFalse();
         assertThat(result.payload().has("serverReceiveTime")).isFalse();
     }

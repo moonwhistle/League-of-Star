@@ -159,6 +159,8 @@
 
 - 클라이언트는 **시간 정보를 전송하지 않음** → 시간 조작 원천 차단
 - 서버가 직접 측정한 수신 시각만 사용 → 판정의 신뢰성 확보
+- 서버 판정 시간은 로컬 타임존 시간이 아니라 UTC `Instant` 기반 epoch milliseconds로 기록한다.
+- DB의 `game_start_time`을 SMITE 판정에 사용할 때도 UTC 기준으로 epoch milliseconds로 변환해 `server_receive_time - game_start_time`을 계산한다.
 - RTT 보정은 SMITE 판정에 사용하지 않음
 - RTT 측정은 `GAME_START` 전 연결 품질 검사와 비정상 네트워크 환경 차단에만 사용
 - SMITE 판정은 실제 롤 강타 감각에 맞춰 서버가 받은 입력 순서를 기준으로 처리

@@ -4,6 +4,7 @@ import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
+import com.sang.smite.game.smite.service.GameSmiteService;
 import com.sang.smite.game.start.domain.GameStartFailureReason;
 import com.sang.smite.game.start.domain.GameStartTransitionResult;
 import com.sang.smite.game.start.dto.GameStartScenarioPayload;
@@ -40,6 +41,7 @@ public class GameWaitingWebSocketService {
     private final GameStartFailureProcessor gameStartFailureProcessor;
     private final GameEndScheduleService gameEndScheduleService;
     private final GameStartWebSocketSender gameStartWebSocketSender;
+    private final GameSmiteService gameSmiteService;
 
     public void registerSession(Long gameRoomId, Long userId, WebSocketSession session) throws IOException {
         sessionRegistry.register(gameRoomId, userId, session);
@@ -95,6 +97,14 @@ public class GameWaitingWebSocketService {
             log.warn("Failed to send RTT_PING. gameRoomId={}, userId={}",
                     currentSession.getGameRoomId(), currentSession.getUserId(), e);
         }
+    }
+
+    public void handleSmite(GameRoomWebSocketSession currentSession, long serverReceiveTimeMs) {
+        gameSmiteService.handleSmite(
+                currentSession.getGameRoomId(),
+                currentSession.getUserId(),
+                serverReceiveTimeMs
+        );
     }
 
     public void cleanupSession(WebSocketSession session) {

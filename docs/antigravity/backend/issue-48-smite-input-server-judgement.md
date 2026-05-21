@@ -90,10 +90,11 @@ flowchart TD
 
 ### 3. WebSocket handler 연결
 
-- [ ] `GameWebSocketClientMessage`에 `isSmite()` 판별 메서드를 추가한다.
-- [ ] `GameWaitingWebSocketHandler.handleTextMessage(...)`에서 `SMITE` 메시지를 `GameWaitingWebSocketService`로 위임한다.
-- [ ] 서버는 `SMITE` 메시지 수신 직후 `Clock` 기준 `serverReceiveTime`을 기록한다.
-- [ ] `SMITE`는 `GAME_START` 이후 같은 gameRoom WebSocket 경로에서만 처리한다.
+- [x] `GameWebSocketClientMessage`에 `isSmite()` 판별 메서드를 추가한다.
+- [x] `GameWaitingWebSocketHandler.handleTextMessage(...)`에서 `SMITE` 메시지를 `GameWaitingWebSocketService`로 위임한다.
+- [x] 서버는 `SMITE` 메시지 수신 직후 `Clock` 기준 `serverReceiveTime`을 기록한다.
+- [x] `SMITE`는 기존 gameRoom WebSocket 경로에서 수신한다.
+- [ ] `GAME_START` 이후 상태 검증은 SMITE 판정 service 구현에서 처리한다.
 
 ### 4. 패키지 책임 분리
 
@@ -173,6 +174,7 @@ flowchart TD
 ### 9. HP 계산과 SMITE 판정 구현
 
 - [ ] `smiteTimeMs = serverReceiveTimeMs - startAtMillis`로 계산한다.
+- [ ] `serverReceiveTimeMs`와 `startAtMillis`는 로컬 타임존 시간이 아니라 UTC `Instant` 기반 epoch milliseconds로 맞춘다.
 - [ ] RTT median은 SMITE 판정 계산에 사용하지 않는다.
 - [ ] `smiteTimeMs`가 scenario 범위를 벗어나는 경우의 처리 정책을 정의한다.
   - 시작 전 입력 또는 비정상적으로 빠른 입력은 무효 처리
