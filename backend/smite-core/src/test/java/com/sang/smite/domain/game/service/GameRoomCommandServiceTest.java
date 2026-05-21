@@ -255,6 +255,70 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
+    @DisplayName("lockInProgressRoomForSmite - IN_PROGRESS 게임룸 참가자이면 row lock으로 조회한 게임룸을 반환한다")
+    void lockInProgressRoomForSmite_InProgressParticipant_ReturnGameRoom() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.of(2026, 5, 20, 12, 0));
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        GameRoom result = gameRoomCommandService.lockInProgressRoomForSmite(100L, FIRST_USER_ID);
+
+        // then
+        assertThat(result).isSameAs(gameRoom);
+        verify(gameRoomRepository).findByIdForUpdate(100L);
+    }
+
+    @Test
+    @DisplayName("lockInProgressRoomForSmite - 없는 게임룸이면 예외를 던진다")
+    void lockInProgressRoomForSmite_NotFound_ThrowException() {
+        // given
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("lockInProgressRoomForSmite - IN_PROGRESS가 아니면 예외를 던진다")
+    void lockInProgressRoomForSmite_NotInProgress_ThrowException() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
+    }
+
+    @Test
+    @DisplayName("lockInProgressRoomForSmite - 참가자가 아니면 예외를 던진다")
+    void lockInProgressRoomForSmite_NotParticipant_ThrowException() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.of(2026, 5, 20, 12, 0));
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, 999L))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
     @DisplayName("abortInProgressRoomIfInProgress - IN_PROGRESS 게임룸이면 ABORTED로 전환하고 true를 반환한다")
     void abortInProgressRoomIfInProgress_InProgress() {
         // given

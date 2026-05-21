@@ -16,4 +16,8 @@ public enum GameStatus {
     public boolean isReady() {
         return this == READY;
     }
+
+    public boolean isInProgress() {
+        return this == IN_PROGRESS;
+    }
 }

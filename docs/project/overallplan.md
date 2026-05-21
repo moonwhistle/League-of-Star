@@ -106,7 +106,7 @@ HP: ████░██████░░█░░████░░█░░�
 1. 유저: 드래곤 위에 마우스 올림 + 키(D/F) 입력
 2. 클라이언트 → 서버: WebSocket으로 "SMITE" 액션만 전송 (시간 정보 없음)
 3. 서버: 수신 시각 직접 기록 (server_receive_time)
-4. 서버: smite_time = (server_receive_time - game_start_time) - RTT / 2
+4. 서버: smite_time = server_receive_time - game_start_time
 5. 서버: 시나리오에서 smite_time 시점의 HP 역산
 6. HP ≤ 1200 → 킬 성공 (Smite Secured)
 7. HP > 1200 → 킬 실패 (Smite Failed)
@@ -230,7 +230,7 @@ gap = 상대_티어점수 - 내_티어점수
 | 기술 | 용도 |
 |------|------|
 | **Java 17** | 메인 언어 |
-| **Spring Boot 4.0** | 백엔드 프레임워크 |
+| **Spring Boot 3.4.2** | 백엔드 프레임워크 |
 | **Spring WebSocket** | 게임 WebSocket JSON 통신 |
 | **Spring Security + JWT** | 인증/인가 |
 | **Spring OAuth2 Client** | 소셜 로그인 (Google, Discord) |

@@ -139,12 +139,13 @@ flowchart TD
 
 ### 7. 동시성 제어와 판정 순서
 
-- [ ] 같은 gameRoom의 SMITE 판정은 `game_rooms` row lock 안에서 처리한다.
-- [ ] lock 안에서는 gameRoom 상태 검증, 기존 action 조회, HP 계산, action 저장만 수행한다.
-- [ ] WebSocket 전송은 DB transaction 이후 수행한다.
+- [x] 같은 gameRoom의 SMITE 판정은 `game_rooms` row lock 안에서 처리한다.
+- [x] lock 안에서 gameRoom 상태 검증과 기존 action 조회를 수행한다.
+- [ ] lock 안에서 HP 계산과 action 저장을 수행한다.
+- [x] WebSocket 전송은 DB transaction 이후 수행한다.
 - [ ] 서로 다른 유저가 동시에 SMITE를 보내도 이전 SMITE 데미지 반영 순서가 깨지지 않게 한다.
-- [ ] SMITE action 정렬 기준은 `serverReceiveTimeMs ASC`, 그래도 같으면 `id ASC`로 둔다.
-- [ ] `smiteTimeMs`는 `serverReceiveTimeMs - startAtMillis`로 계산되므로 winner 정렬과 같은 서버 수신 기준을 따른다.
+- [x] SMITE action 정렬 기준은 `serverReceiveTimeMs ASC`, 그래도 같으면 `id ASC`로 정의하고 조회 메서드를 준비한다.
+- [x] `smiteTimeMs`는 `serverReceiveTimeMs - startAtMillis`로 계산되므로 winner 정렬과 같은 서버 수신 기준을 따른다.
 - [ ] 두 유저가 거의 동시에 SMITE를 누른 경우도 서버 수신 기준으로 winner를 결정한다.
 - [ ] 처치 action 발생 시 일반 end scheduler의 `settlementDueAt`까지 기다리지 않는다.
 - [ ] 처치 action 발생 시 같은 transaction 흐름에서 즉시 결과 확정을 시도한다.

@@ -75,6 +75,13 @@ public class GameRoomCommandService {
                 .orElse(false);
     }
 
+    public GameRoom lockInProgressRoomForSmite(Long gameRoomId, Long userId) {
+        GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+        validateSmiteJudgementRoom(gameRoom, userId);
+        return gameRoom;
+    }
+
     /**
      * GAME_START 이후 서버가 게임 종료를 보장할 수 없는 경우에만 gameRoom 중단을 시도합니다.
      *
@@ -84,6 +91,15 @@ public class GameRoomCommandService {
         return gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .map(GameRoom::abortAfterStartIfInProgress)
                 .orElse(false);
+    }
+
+    private void validateSmiteJudgementRoom(GameRoom gameRoom, Long userId) {
+        if (!gameRoom.getStatus().isInProgress() || gameRoom.getGameStartTime() == null) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+        if (!gameRoom.hasParticipant(userId)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
     }
 
     private void validateParticipants(Long firstUserId, Long secondUserId) {
