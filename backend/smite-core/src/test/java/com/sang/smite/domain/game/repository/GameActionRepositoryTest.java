@@ -116,6 +116,36 @@ class GameActionRepositoryTest {
         assertThat(result).containsExactly(earlier, later);
     }
 
+    @Test
+    @DisplayName("findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc - 같은 수신 시각이면 id 순서로 조회한다")
+    void findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc_SameReceiveTime() {
+        // given
+        User p1 = userRepository.save(User.builder().email("p7@test.com").nickname("p7").build());
+        User p2 = userRepository.save(User.builder().email("p8@test.com").nickname("p8").build());
+        GameRoom room = createRoom(p1.getId(), p2.getId());
+        GameAction firstSaved = gameActionRepository.save(GameAction.smite(
+                room.getId(),
+                p1.getId(),
+                1000L,
+                900,
+                1500
+        ));
+        GameAction secondSaved = gameActionRepository.save(GameAction.smite(
+                room.getId(),
+                p2.getId(),
+                1000L,
+                900,
+                1500
+        ));
+
+        // when
+        List<GameAction> result = gameActionRepository.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(room.getId());
+
+        // then
+        assertThat(firstSaved.getId()).isLessThan(secondSaved.getId());
+        assertThat(result).containsExactly(firstSaved, secondSaved);
+    }
+
     private GameRoom createRoom(Long firstUserId, Long secondUserId) {
         GameRoom room = GameRoom.builder()
                 .status(GameStatus.IN_PROGRESS)

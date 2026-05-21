@@ -98,6 +98,30 @@ class GameSmiteJudgementServiceTest {
     }
 
     @Test
+    @DisplayName("judge - 같은 서버 수신 시각의 기존 action은 id 정렬상 앞선 action으로 보고 HP 차감에 반영한다")
+    void judge_SubtractSameReceiveTimeExistingActionDamage() {
+        // given
+        GameRoom gameRoom = startedRoom(scenario(
+                new HpStep(0, 10_000),
+                new HpStep(1_000, 2_000)
+        ));
+        GameAction sameReceiveTimeAction = action(START_AT_MILLIS + 1_000L);
+
+        // when
+        var result = service.judge(
+                gameRoom,
+                FIRST_USER_ID,
+                START_AT_MILLIS + 1_000L,
+                List.of(sameReceiveTimeAction)
+        );
+
+        // then
+        assertThat(result).isPresent();
+        assertThat(result.get().getDragonHpAtSmite()).isEqualTo(800);
+        assertThat(result.get().isKill()).isTrue();
+    }
+
+    @Test
     @DisplayName("judge - scenario 범위 밖 입력은 저장 대상 action을 만들지 않는다")
     void judge_OutOfScenarioRange_ReturnEmpty() {
         // given

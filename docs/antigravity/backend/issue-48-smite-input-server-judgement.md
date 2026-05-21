@@ -230,18 +230,18 @@ flowchart TD
 - [x] gameRoom 생성 시 scenario duration이 항상 `8~17초` 범위인지 검증한다.
 - [x] 랜덤 burst scenario가 `10000 -> 0`으로 끝나고 HP가 증가하지 않는지 검증한다.
 - [x] 랜덤 burst scenario가 1초 단위 선형 감소로 고정되지 않는지 검증한다.
-- [ ] `SMITE` client message type과 `SMITE_RESULT` server message type 직렬화를 검증한다.
-- [ ] `SMITE` 수신 시 `serverReceiveTime`을 서버에서 기록하는지 검증한다.
+- [x] `SMITE` client message type과 `SMITE_RESULT` server message type 직렬화를 검증한다.
+- [x] `SMITE` 수신 시 `serverReceiveTime`을 서버에서 기록하는지 검증한다.
 - [x] `smiteTimeMs`가 RTT 보정 없이 `serverReceiveTimeMs - startAtMillis`로 계산되는지 검증한다.
 - [x] SMITE 판정 서비스가 RTT service/store에 의존하지 않는지 검증한다.
-- [ ] RTT start-ready 결과가 median 값 없이 양쪽 `PASSED`만으로 GAME_START 진행 조건을 판단하는지 검증한다.
+- [x] RTT start-ready 결과가 median 값 없이 양쪽 `PASSED`만으로 GAME_START 진행 조건을 판단하는지 검증한다.
 - [x] scenario HP에서 이전 SMITE 데미지를 차감해 current HP를 계산하는지 검증한다.
 - [x] HP `1200` 이하이면 킬 성공, 초과이면 킬 실패로 저장하는지 검증한다.
 - [x] 킬 실패한 SMITE도 이후 action의 HP 계산에 `1200` 데미지로 반영되는지 검증한다.
 - [x] 같은 유저 중복 SMITE는 기존 결과를 재응답하는지 검증한다.
 - [x] 같은 유저 동시 SMITE unique 충돌도 멱등 응답으로 처리되는지 검증한다.
-- [ ] 서로 다른 두 유저 동시 SMITE가 gameRoom row lock 기준으로 일관되게 저장되는지 검증한다.
-- [ ] 두 유저가 동시에 SMITE를 보냈을 때 `serverReceiveTimeMs`, `id` 정렬 기준으로 winner가 결정되는지 검증한다.
+- [x] 서로 다른 두 유저 SMITE 처리 흐름이 gameRoom row lock 이후 기존 action 조회, 판정, 저장 순서로 진행되는지 검증한다.
+- [x] 두 유저가 같은 `serverReceiveTimeMs`로 SMITE를 보냈을 때 `serverReceiveTimeMs`, `id` 정렬 기준으로 조회되고 앞선 action 데미지가 후속 판정에 반영되는지 검증한다.
 - [x] SMITE 적용 후 `afterHp <= 0`이면 gameRoom이 즉시 `FINISHED`로 전환되고 `GAME_RESULT`가 브로드캐스트되는지 검증한다.
 - [x] 두 유저가 모두 SMITE를 사용하고 처치하지 못한 경우 즉시 `DRAW GAME_RESULT`가 반환되는지 검증한다.
 - [x] 두 유저가 모두 SMITE를 사용한 실패 판은 `gameEndAt`/`inputGraceMs`를 기다리지 않는지 검증한다.

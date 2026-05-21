@@ -109,6 +109,18 @@ class GameSmiteServiceTest {
         assertThat(result.get().smiteResult().isKill()).isFalse();
         assertThat(result.get().smiteResult().idempotent()).isFalse();
         assertThat(result.get().gameResult()).isNull();
+
+        InOrder inOrder = inOrder(
+                gameRoomCommandService,
+                gameActionReadService,
+                gameSmiteJudgementService,
+                gameActionCommandService
+        );
+        inOrder.verify(gameRoomCommandService).lockSmiteResultRoom(GAME_ROOM_ID, USER_ID);
+        inOrder.verify(gameActionReadService).findByGameRoomIdAndUserId(GAME_ROOM_ID, USER_ID);
+        inOrder.verify(gameActionReadService).findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID);
+        inOrder.verify(gameSmiteJudgementService).judge(gameRoom, USER_ID, SERVER_RECEIVE_TIME_MS, List.of());
+        inOrder.verify(gameActionCommandService).saveIfAbsent(action);
     }
 
     @Test
