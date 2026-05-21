@@ -5,6 +5,7 @@ import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameParticipant;
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.vo.GameScenario;
+import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.domain.vo.HpStep;
 import com.sang.smite.domain.game.domain.vo.ParticipantStatus;
@@ -368,5 +369,68 @@ class GameRoomCommandServiceTest {
         assertThat(gameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.READY);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomBySmiteKill - 첫 번째 참가자가 처치하면 PLAYER1_WIN으로 종료한다")
+    void finishInProgressRoomBySmiteKill_FirstParticipant() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomBySmiteKill(100L, FIRST_USER_ID);
+
+        // then
+        assertThat(result).contains(gameRoom);
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(gameRoom.getResult()).isEqualTo(GameResult.PLAYER1_WIN);
+        assertThat(gameRoom.getWinnerId()).isEqualTo(FIRST_USER_ID);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomBySmiteKill - 두 번째 참가자가 처치하면 PLAYER2_WIN으로 종료한다")
+    void finishInProgressRoomBySmiteKill_SecondParticipant() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomBySmiteKill(100L, SECOND_USER_ID);
+
+        // then
+        assertThat(result).contains(gameRoom);
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(gameRoom.getResult()).isEqualTo(GameResult.PLAYER2_WIN);
+        assertThat(gameRoom.getWinnerId()).isEqualTo(SECOND_USER_ID);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomBySmiteKill - IN_PROGRESS가 아니면 종료하지 않고 empty를 반환한다")
+    void finishInProgressRoomBySmiteKill_NotInProgress() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomBySmiteKill(100L, FIRST_USER_ID);
+
+        // then
+        assertThat(result).isEmpty();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.READY);
     }
 }

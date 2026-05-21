@@ -84,7 +84,7 @@ flowchart TD
 - [x] `SMITE_RESULT` payload에는 `gameRoomId`, `userId`, `serverReceiveTime`, `smiteTimeMs`, `dragonHpAtSmite`, `damage`, `afterHp`, `isKill`, `idempotent`를 포함한다.
 - [x] server message `GAME_RESULT`를 정의한다.
 - [x] `GAME_RESULT` payload에는 `gameRoomId`, `result`, `winnerUserId`, `reason`, `finishedAt`, `actions` 요약을 포함한다.
-- [ ] SMITE로 드래곤 HP가 `0` 이하가 되면 양쪽 클라이언트에 `GAME_RESULT`를 브로드캐스트한다.
+- [x] SMITE로 드래곤 HP가 `0` 이하가 되면 양쪽 클라이언트에 `GAME_RESULT`를 브로드캐스트한다.
 - [ ] 두 유저가 모두 SMITE를 사용하고 처치하지 못하면 즉시 `DRAW GAME_RESULT`를 양쪽 클라이언트에 브로드캐스트한다.
 - [ ] 잘못된 payload, 게임 상태 불일치, 참가자 아님 등은 기존 `ERROR` 메시지 구조로 응답한다.
 
@@ -94,7 +94,7 @@ flowchart TD
 - [x] `GameWaitingWebSocketHandler.handleTextMessage(...)`에서 `SMITE` 메시지를 `GameWaitingWebSocketService`로 위임한다.
 - [x] 서버는 `SMITE` 메시지 수신 직후 `Clock` 기준 `serverReceiveTime`을 기록한다.
 - [x] `SMITE`는 기존 gameRoom WebSocket 경로에서 수신한다.
-- [ ] `GAME_START` 이후 상태 검증은 SMITE 판정 service 구현에서 처리한다.
+- [x] `GAME_START` 이후 상태 검증은 SMITE 판정 service 구현에서 처리한다.
 
 ### 4. 패키지 책임 분리
 
@@ -104,11 +104,11 @@ flowchart TD
   - `dto`: WebSocket 응답 payload
   - `service`: `GameSmiteService`, `GameSmiteWebSocketSender`
 - [x] `smite-api/game/websocket`은 메시지 수신/전송 경로만 담당하고, 판정 로직은 `game/smite/service`로 위임한다.
-- [ ] `smite-core/domain/game`에는 DB 상태와 도메인 규칙을 둔다.
+- [x] `smite-core/domain/game`에는 DB 상태와 도메인 규칙을 둔다.
   - `GameAction` 생성/조회
   - `GameActionRepository` 조회 메서드
   - `GameActionCommandService`, `GameActionReadService` 추가 여부 검토
-- [ ] gameRoom `FINISHED` 전환은 core의 `GameRoom` 도메인 메서드와 command service를 통해 수행한다.
+- [x] gameRoom `FINISHED` 전환은 core의 `GameRoom` 도메인 메서드와 command service를 통해 수행한다.
 - [x] SMITE 패키지는 `game:end:pending` Redis ZSET을 직접 다루지 않는다.
 - [x] record/LP 반영은 SMITE 패키지가 담당하지 않는다.
 - [x] RTT 측정 결과는 SMITE 판정에서 조회하지 않는다. RTT는 `GAME_START` 전 품질 검사에만 사용한다.
@@ -141,15 +141,15 @@ flowchart TD
 
 - [x] 같은 gameRoom의 SMITE 판정은 `game_rooms` row lock 안에서 처리한다.
 - [x] lock 안에서 gameRoom 상태 검증과 기존 action 조회를 수행한다.
-- [ ] lock 안에서 HP 계산과 action 저장을 수행한다.
+- [x] lock 안에서 HP 계산과 action 저장을 수행한다.
 - [x] WebSocket 전송은 DB transaction 이후 수행한다.
-- [ ] 서로 다른 유저가 동시에 SMITE를 보내도 이전 SMITE 데미지 반영 순서가 깨지지 않게 한다.
+- [x] 서로 다른 유저가 동시에 SMITE를 보내도 이전 SMITE 데미지 반영 순서가 깨지지 않게 한다.
 - [x] SMITE action 정렬 기준은 `serverReceiveTimeMs ASC`, 그래도 같으면 `id ASC`로 정의하고 조회 메서드를 준비한다.
 - [x] `smiteTimeMs`는 `serverReceiveTimeMs - startAtMillis`로 계산되므로 winner 정렬과 같은 서버 수신 기준을 따른다.
-- [ ] 두 유저가 거의 동시에 SMITE를 누른 경우도 서버 수신 기준으로 winner를 결정한다.
-- [ ] 처치 action 발생 시 일반 end scheduler의 `settlementDueAt`까지 기다리지 않는다.
-- [ ] 처치 action 발생 시 같은 transaction 흐름에서 즉시 결과 확정을 시도한다.
-- [ ] 결과 확정은 gameRoom row lock 안에서 한 번만 성공하게 한다.
+- [x] 두 유저가 거의 동시에 SMITE를 누른 경우도 서버 수신 기준으로 winner를 결정한다.
+- [x] 처치 action 발생 시 일반 end scheduler의 `settlementDueAt`까지 기다리지 않는다.
+- [x] 처치 action 발생 시 같은 transaction 흐름에서 즉시 결과 확정을 시도한다.
+- [x] 결과 확정은 gameRoom row lock 안에서 한 번만 성공하게 한다.
 
 ### 8. 랜덤 버스트 HP 시나리오 생성
 
@@ -187,16 +187,16 @@ flowchart TD
 - [x] `currentHp <= 0`이면 이미 처치된 상태로 보고 킬 실패/무효 처리한다.
 - [x] `currentHp <= 1200`이면 `isKill=true`, 아니면 `isKill=false`로 저장한다.
 - [x] 킬 실패여도 `afterHp = max(0, currentHp - 1200)`로 계산하고 이후 action 판정에 반영한다.
-- [ ] `afterHp <= 0`이면 드래곤 처치 action으로 보고 결과 확정 흐름을 호출한다.
+- [x] `afterHp <= 0`이면 드래곤 처치 action으로 보고 결과 확정 흐름을 호출한다.
 
 ### 10. SMITE 처치 결과 즉시 반환
 
-- [ ] SMITE로 드래곤 HP가 `0` 이하가 되면 gameRoom row lock 안에서 즉시 `FINISHED` 전환을 시도한다.
-- [ ] 확정된 결과는 `GameRoom.finish(result, winnerUserId)`를 사용해 저장한다.
-- [ ] 이미 먼저 처리된 SMITE로 게임이 `FINISHED`가 되었다면 뒤늦은 SMITE는 저장하지 않고 현재 결과를 반환한다.
-- [ ] 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 `GAME_RESULT`를 재응답한다.
-- [ ] `GAME_RESULT` 전송은 transaction commit 이후 수행한다.
-- [ ] record/LP 반영은 `GAME_RESULT` 전송과 분리하고, 기존 record 처리 정책과 이어지게 둔다.
+- [x] SMITE로 드래곤 HP가 `0` 이하가 되면 gameRoom row lock 안에서 즉시 `FINISHED` 전환을 시도한다.
+- [x] 확정된 결과는 `GameRoom.finish(result, winnerUserId)`를 사용해 저장한다.
+- [x] 이미 먼저 처리된 SMITE로 게임이 `FINISHED`가 되었다면 뒤늦은 SMITE는 저장하지 않고 현재 결과를 반환한다.
+- [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 `GAME_RESULT`를 재응답한다.
+- [x] `GAME_RESULT` 전송은 transaction commit 이후 수행한다.
+- [x] record/LP 반영은 `GAME_RESULT` 전송과 분리하고, 기존 record 처리 정책과 이어지게 둔다.
 
 ### 11. 두 유저 SMITE 소모 후 즉시 DRAW 확정
 
@@ -218,11 +218,11 @@ flowchart TD
 
 ### 13. 실패/예외 응답
 
-- [ ] gameRoom이 `IN_PROGRESS`가 아니면 SMITE를 거절한다.
-- [ ] gameRoom이 이미 `FINISHED`이면 현재 gameRoom 결과를 `GAME_RESULT`로 재응답한다.
-- [ ] userId가 gameRoom participant가 아니면 SMITE를 거절한다.
-- [ ] scenario 또는 `startAt`이 없으면 SMITE를 거절한다.
-- [ ] unique 충돌은 중복 입력 실패가 아니라 기존 결과 재응답으로 처리한다.
+- [x] gameRoom이 `IN_PROGRESS`가 아니고 `FINISHED`도 아니면 SMITE를 거절한다.
+- [x] gameRoom이 이미 `FINISHED`이면 현재 gameRoom 결과를 `GAME_RESULT`로 재응답한다.
+- [x] userId가 gameRoom participant가 아니면 SMITE를 거절한다.
+- [x] scenario 또는 `startAt`이 없으면 SMITE를 거절한다.
+- [x] unique 충돌은 중복 입력 실패가 아니라 기존 결과 재응답으로 처리한다.
 - [ ] 저장 중 복구 불가능한 DB 예외는 `ERROR` 응답으로 내리고 WebSocket 연결은 유지한다.
 
 ### 14. 테스트
@@ -242,10 +242,10 @@ flowchart TD
 - [x] 같은 유저 동시 SMITE unique 충돌도 멱등 응답으로 처리되는지 검증한다.
 - [ ] 서로 다른 두 유저 동시 SMITE가 gameRoom row lock 기준으로 일관되게 저장되는지 검증한다.
 - [ ] 두 유저가 동시에 SMITE를 보냈을 때 `serverReceiveTimeMs`, `id` 정렬 기준으로 winner가 결정되는지 검증한다.
-- [ ] SMITE 적용 후 `afterHp <= 0`이면 gameRoom이 즉시 `FINISHED`로 전환되고 `GAME_RESULT`가 브로드캐스트되는지 검증한다.
+- [x] SMITE 적용 후 `afterHp <= 0`이면 gameRoom이 즉시 `FINISHED`로 전환되고 `GAME_RESULT`가 브로드캐스트되는지 검증한다.
 - [ ] 두 유저가 모두 SMITE를 사용하고 처치하지 못한 경우 즉시 `DRAW GAME_RESULT`가 반환되는지 검증한다.
 - [ ] 두 유저가 모두 SMITE를 사용한 실패 판은 `gameEndAt`/`inputGraceMs`를 기다리지 않는지 검증한다.
-- [ ] 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 action 저장 없이 `GAME_RESULT`를 재응답하는지 검증한다.
+- [x] 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 action 저장 없이 `GAME_RESULT`를 재응답하는지 검증한다.
 - [ ] `IN_PROGRESS`가 아닌 gameRoom, participant 아님, scenario 없음 실패 케이스를 검증한다.
 
 ### 15. 문서

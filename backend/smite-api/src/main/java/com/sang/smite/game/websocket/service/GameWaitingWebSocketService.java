@@ -5,6 +5,8 @@ import com.sang.smite.game.rtt.common.constant.GameRttConstants;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
+import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
 import com.sang.smite.game.smite.dto.SmiteResultPayload;
 import com.sang.smite.game.smite.service.GameSmiteService;
 import com.sang.smite.game.smite.service.GameSmiteWebSocketSender;
@@ -109,7 +111,15 @@ public class GameWaitingWebSocketService {
                         currentSession.getUserId(),
                         serverReceiveTimeMs
                 ))
-                .ifPresent(payload -> sendSmiteResult(currentSession, payload));
+                .ifPresent(response -> sendSmiteResponse(currentSession, response));
+    }
+
+    private void sendSmiteResponse(GameRoomWebSocketSession currentSession,
+                                   GameSmiteHandleResponse response) {
+        response.smiteResultOptional()
+                .ifPresent(smiteResult -> sendSmiteResult(currentSession, smiteResult));
+        response.gameResultOptional()
+                .ifPresent(gameResult -> broadcastGameResult(currentSession, gameResult));
     }
 
     private void sendSmiteResult(GameRoomWebSocketSession currentSession,
@@ -117,8 +127,17 @@ public class GameWaitingWebSocketService {
         try {
             gameSmiteWebSocketSender.sendSmiteResult(currentSession.getWebSocketSession(), payload);
         } catch (IOException e) {
-            log.warn("Failed to send idempotent SMITE_RESULT. gameRoomId={}, userId={}",
+            log.warn("Failed to send SMITE_RESULT. gameRoomId={}, userId={}",
                     currentSession.getGameRoomId(), currentSession.getUserId(), e);
+        }
+    }
+
+    private void broadcastGameResult(GameRoomWebSocketSession currentSession,
+                                     GameResultPayload payload) {
+        try {
+            gameSmiteWebSocketSender.broadcastGameResult(currentSession.getGameRoomId(), payload);
+        } catch (IOException e) {
+            log.warn("Failed to broadcast GAME_RESULT. gameRoomId={}", currentSession.getGameRoomId(), e);
         }
     }
 

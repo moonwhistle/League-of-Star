@@ -18,12 +18,15 @@ flowchart TD
     K --> L["클라이언트 /game/{gameRoomId}/waiting 이동<br/>EventSource.close()"]
     L --> M["gameRoom WebSocket 연결"]
     M --> N["MP4 preload 후 CLIENT_READY"]
-    N --> O["WebSocket RTT 5회 측정<br/>median 저장"]
+    N --> O["WebSocket RTT 5회 측정<br/>median으로 시작 가능 여부 판단"]
     O --> P["HP scenario 준비<br/>startAt 결정"]
     P --> Q["COUNTDOWN / GAME_START<br/>scenario 전달"]
     Q --> R["SMITE command 수신<br/>serverReceiveTime 기준 판정"]
     R --> S["game_actions 저장"]
-    S --> SA["game_records 생성<br/>rank 반영"]
+    S --> SR{"SMITE 처치?"}
+    SR -->|"Yes"| SG["gameRoom FINISHED<br/>GAME_RESULT broadcast"]
+    SR -->|"No"| SA["game_records 생성<br/>rank 반영"]
+    SG --> SA
 
     I -->|"실패"| AB["gameRoom/participants ABORTED<br/>Redis status best-effort 정리"]
     AB --> T
@@ -47,9 +50,9 @@ flowchart TD
 - `match_found` SSE 구현 완료
 - accept/reject/timeout 처리 구현 완료
 - 양쪽 수락 시 `match_response_result` 발행 구현 완료
-- 현재 game payload는 `null`
+- `match_response_result.game` payload는 `gameRoomId`, `videoUrl`, `webSocketUrl`을 포함한다.
 - `game_rooms`, `game_participants`, `game_actions`, `game_records` 도메인과 DDL은 준비됨
-- 매칭 성공 이후 실제 게임방 생성/진행은 미구현
+- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, SMITE 입력 저장/판정, SMITE 처치 즉시 GAME_RESULT 반환까지 구현됨
 
 ## 2. 핵심 결정
 
@@ -58,7 +61,7 @@ flowchart TD
 - MP4는 공통 static resource로 제공한다.
 - gameRoom별로 달라지는 것은 참가자, HP 시나리오, 시작 시간, RTT, 액션, 결과다.
 - 클라이언트가 보낸 시간은 신뢰하지 않는다.
-- 최종 판정은 서버 수신 시각, RTT median, 서버 시나리오 기준으로 한다.
+- 최종 판정은 RTT 보정 없이 서버 수신 시각과 서버 시나리오 기준으로 한다.
 - 매칭 SSE는 매칭 결과와 게임 대기 화면 진입 정보까지만 담당한다.
 - `GO_TO_GAME_WAITING`은 gameRoom/scenario 생성과 Redis `ACCEPTED`/`IN_GAME` 상태 전환이 모두 끝난 뒤 발행한다.
 - `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/SMITE/종료 처리는 WebSocket으로 담당한다.
@@ -145,7 +148,7 @@ flowchart TD
 ### Step 5. RTT 측정
 
 - [x] WebSocket ping-pong으로 각 유저별 RTT 5회 측정
-- [x] median RTT 저장
+- [x] median RTT 계산으로 게임 시작 가능 여부 판단
 - [x] median RTT 2000ms 초과 시 게임 시작 차단
 - [x] 각 `RTT_PING`은 2500ms 안에 `RTT_PONG` 응답을 받아야 함
 - [x] gameRoom 전체 RTT 측정은 5회 측정과 per-ping 2500ms timeout 기준 최대 15초 안에 완료되어야 함
@@ -173,6 +176,8 @@ flowchart TD
 - [x] `game_actions` 저장
 - [x] 중복 SMITE 차단
 - [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리하되, SMITE 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리
+- [x] SMITE로 HP가 `0` 이하가 되면 gameRoom을 즉시 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast
+- [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action 없이 현재 `GAME_RESULT`를 재응답
 
 ### Step 8. 서버 timer/scheduler 기반 게임 종료 보장
 
@@ -554,7 +559,7 @@ gameRoom 생성 실패 mapping:
 범위:
 
 - 각 유저별 ping-pong 5회
-- median RTT 저장
+- median RTT 계산으로 게임 시작 가능 여부 판단
 - median RTT 2000ms 초과 시 시작 차단
 - 각 `RTT_PING` 응답 제한 2500ms
 - gameRoom 전체 RTT 측정 제한은 5회 측정과 per-ping 2500ms timeout 기준 최대 15초

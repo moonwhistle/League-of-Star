@@ -263,7 +263,7 @@ stateDiagram-v2
 - RTT 측정은 양쪽 `CLIENT_READY` 이후 `GAME_START` 이전 단계입니다.
 - RTT 측정 실패, median RTT 2000ms 초과, RTT 측정 중 WebSocket close/error는 모두 `GAME_START` 이전 실패로 보고 `ABORTED` 처리하며 record/LP를 반영하지 않습니다.
 - RTT 실패 reason은 단순하게 `RTT_FAILED`, `RTT_TOO_HIGH`만 사용합니다.
-- `GAME_START`는 양쪽 RTT `PASSED`와 median RTT 저장이 확인된 경우에만 진행합니다.
+- `GAME_START`는 양쪽 RTT `PASSED`가 확인된 경우에만 진행합니다. median RTT는 시작 전 품질 검사에만 사용하고 SMITE 판정에는 사용하지 않습니다.
 - 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링합니다.
 - `COUNTDOWN`과 `GAME_START`는 countdown 종료 후가 아니라 `startAt` 전에 미리 전송하며, 반드시 같은 `startAt`을 사용합니다.
 - `GAME_START` 이후 disconnect는 gameRoom을 `ABORTED`로 만들지 않습니다.

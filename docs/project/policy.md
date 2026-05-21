@@ -222,6 +222,11 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 | **HP 반영** | 앞선 SMITE가 킬 실패였더라도 이후 action의 현재 HP에서 `1200`을 차감 |
 | **결과 확정** | SMITE 적용 후 HP가 `0` 이하가 되면 즉시 `FINISHED`, 두 유저가 모두 실패하면 즉시 `DRAW` |
 
+- 서버는 처치 SMITE를 저장한 transaction에서 gameRoom 결과를 확정한다.
+- transaction 완료 후 입력한 클라이언트에는 `SMITE_RESULT`를 전송하고, 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
+- 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 `GAME_RESULT`만 재응답한다.
+- record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리하고 기존 game end settlement 또는 record 처리 흐름에서 수행한다.
+
 ### 2.6 조작 방지
 
 | 규칙 | 내용 |

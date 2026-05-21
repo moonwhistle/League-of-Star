@@ -2,7 +2,9 @@ package com.sang.smite.domain.game.service;
 
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
+import com.sang.smite.domain.game.domain.GameParticipant;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -79,6 +82,13 @@ public class GameRoomCommandService {
         return gameRoom;
     }
 
+    public GameRoom lockSmiteResultRoom(Long gameRoomId, Long userId) {
+        GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+        validateSmiteResultRoom(gameRoom, userId);
+        return gameRoom;
+    }
+
     /**
      * GAME_START 이후 서버가 게임 종료를 보장할 수 없는 경우에만 gameRoom 중단을 시도합니다.
      *
@@ -90,8 +100,27 @@ public class GameRoomCommandService {
                 .orElse(false);
     }
 
+    public Optional<GameRoom> finishInProgressRoomBySmiteKill(Long gameRoomId, Long winnerUserId) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .filter(gameRoom -> gameRoom.getStatus().isInProgress())
+                .map(gameRoom -> {
+                    gameRoom.finish(resolveWinResult(gameRoom, winnerUserId), winnerUserId);
+                    return gameRoom;
+                });
+    }
+
     private void validateSmiteJudgementRoom(GameRoom gameRoom, Long userId) {
         if (!gameRoom.getStatus().isInProgress() || gameRoom.getGameStartTime() == null) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+        if (!gameRoom.hasParticipant(userId)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
+    }
+
+    private void validateSmiteResultRoom(GameRoom gameRoom, Long userId) {
+        if ((!gameRoom.getStatus().isInProgress() && !gameRoom.getStatus().isFinished())
+                || gameRoom.getGameStartTime() == null) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
         }
         if (!gameRoom.hasParticipant(userId)) {
@@ -111,5 +140,16 @@ public class GameRoomCommandService {
 
     private GameScenario createScenario(int durationSeconds) {
         return gameScenarioGenerator.generate(durationSeconds);
+    }
+
+    private GameResult resolveWinResult(GameRoom gameRoom, Long winnerUserId) {
+        if (gameRoom.getParticipants().size() != GameRoom.MAX_PARTICIPANTS || !gameRoom.hasParticipant(winnerUserId)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
+        Long firstParticipantUserId = gameRoom.getParticipants().stream()
+                .findFirst()
+                .map(GameParticipant::getUserId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+        return firstParticipantUserId.equals(winnerUserId) ? GameResult.PLAYER1_WIN : GameResult.PLAYER2_WIN;
     }
 }

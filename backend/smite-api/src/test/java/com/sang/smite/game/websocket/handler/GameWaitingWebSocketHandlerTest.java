@@ -2,9 +2,13 @@ package com.sang.smite.game.websocket.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
+import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
+import com.sang.smite.game.smite.dto.SmiteResultPayload;
 import com.sang.smite.game.smite.service.GameSmiteService;
 import com.sang.smite.game.smite.service.GameSmiteWebSocketSender;
 import com.sang.smite.game.start.domain.GameStartBlockedReason;
@@ -26,6 +30,7 @@ import com.sang.smite.game.waiting.service.GameWaitingReadyService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -228,6 +233,44 @@ class GameWaitingWebSocketHandlerTest {
                         && command.serverReceiveTimeMs() == SERVER_RECEIVE_TIME.toEpochMilli()
         ));
         verify(session, never()).sendMessage(any());
+    }
+
+    @Test
+    @DisplayName("handleTextMessage - SMITE 처치 응답이면 SMITE_RESULT 전송 후 GAME_RESULT를 broadcast한다")
+    void handleTextMessage_SmiteKill_SendSmiteResultAndBroadcastGameResult() throws Exception {
+        // given
+        WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        SmiteResultPayload smiteResult = new SmiteResultPayload(
+                GAME_ROOM_ID,
+                FIRST_USER_ID,
+                SERVER_RECEIVE_TIME.toEpochMilli(),
+                1000,
+                1000,
+                1200,
+                0,
+                true,
+                false
+        );
+        GameResultPayload gameResult = new GameResultPayload(
+                GAME_ROOM_ID,
+                GameResult.PLAYER1_WIN,
+                FIRST_USER_ID,
+                "SMITE_KILL",
+                SERVER_RECEIVE_TIME.toEpochMilli(),
+                List.of()
+        );
+        handler.afterConnectionEstablished(session);
+        clearInvocations(session);
+        when(gameSmiteService.handleSmite(any()))
+                .thenReturn(Optional.of(GameSmiteHandleResponse.withGameResult(smiteResult, gameResult)));
+
+        // when
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+
+        // then
+        InOrder inOrder = inOrder(gameSmiteWebSocketSender);
+        inOrder.verify(gameSmiteWebSocketSender).sendSmiteResult(session, smiteResult);
+        inOrder.verify(gameSmiteWebSocketSender).broadcastGameResult(GAME_ROOM_ID, gameResult);
     }
 
     @Test
