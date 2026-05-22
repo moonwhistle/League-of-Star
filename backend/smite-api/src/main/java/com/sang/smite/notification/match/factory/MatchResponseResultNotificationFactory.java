@@ -83,14 +83,14 @@ public class MatchResponseResultNotificationFactory {
         if (myStatus == MatchResponseStatus.REJECTED) {
             return MatchResponseReason.MY_REJECTED;
         }
-        if (opponentStatus == MatchResponseStatus.REJECTED) {
-            return MatchResponseReason.OPPONENT_REJECTED;
-        }
         if (myStatus == MatchResponseStatus.TIMEOUT && opponentStatus == MatchResponseStatus.TIMEOUT) {
             return MatchResponseReason.BOTH_TIMEOUT;
         }
         if (myStatus == MatchResponseStatus.TIMEOUT) {
             return MatchResponseReason.MY_TIMEOUT;
+        }
+        if (opponentStatus == MatchResponseStatus.REJECTED) {
+            return MatchResponseReason.OPPONENT_REJECTED;
         }
         if (opponentStatus == MatchResponseStatus.TIMEOUT) {
             return MatchResponseReason.OPPONENT_TIMEOUT;

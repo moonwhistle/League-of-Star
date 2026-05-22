@@ -135,6 +135,34 @@ class MatchResponseResultNotificationFactoryTest {
     }
 
     @Test
+    @DisplayName("거절 유저와 timeout 유저에게 유저 관점별 실패 메시지를 생성한다")
+    void createRejectAndTimeoutResult() {
+        MatchResponseResultEvent event = new MatchResponseResultEvent(
+                "match-1",
+                1L,
+                2L,
+                10,
+                13,
+                MatchStatus.TIMEOUT,
+                MatchResponseStatus.REJECTED,
+                MatchResponseStatus.TIMEOUT
+        );
+        givenUser(1L, "rejecter", Tier.SILVER, Division.I);
+        givenUser(2L, "timeout", Tier.GOLD, Division.IV);
+
+        MatchResponseResultPubSubMessage userAMessage = factory.createForUserA(event);
+        MatchResponseResultPubSubMessage userBMessage = factory.createForUserB(event);
+
+        assertThat(userAMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.FAILED);
+        assertThat(userAMessage.notification().reason()).isEqualTo(MatchResponseReason.MY_REJECTED);
+        assertThat(userAMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_MATCH_START);
+
+        assertThat(userBMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.FAILED);
+        assertThat(userBMessage.notification().reason()).isEqualTo(MatchResponseReason.MY_TIMEOUT);
+        assertThat(userBMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_MATCH_START);
+    }
+
+    @Test
     @DisplayName("양쪽 timeout 최종 결과는 양쪽 모두 start 화면 복귀 메시지로 생성한다")
     void createBothTimeoutResult() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
