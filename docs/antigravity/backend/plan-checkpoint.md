@@ -25,8 +25,15 @@ flowchart TD
     R --> S["game_actions 저장"]
     S --> SR{"SMITE 처치?"}
     SR -->|"Yes"| SG["gameRoom FINISHED<br/>GAME_RESULT broadcast"]
-    SR -->|"No"| SA["game_records 생성<br/>rank 반영"]
-    SG --> SA
+    SR -->|"Both failed"| SD["gameRoom FINISHED DRAW<br/>GAME_RESULT broadcast"]
+    SR -->|"One failed / no input"| SE["game:end:pending<br/>effective naturalDeathAt"]
+    SE --> SJ["GameEndScheduler<br/>due 조회 + row lock"]
+    SJ --> SK{"effective HP <= 0?"}
+    SK -->|"Yes"| SL["자연사 DRAW FINISHED<br/>NATURAL_DEATH_DRAW broadcast"]
+    SK -->|"No"| SM["pending score update"]
+    SG --> SA["Step 9<br/>game_records 생성<br/>rank 반영"]
+    SD --> SA
+    SL --> SA
 
     I -->|"실패"| AB["gameRoom/participants ABORTED<br/>Redis status best-effort 정리"]
     AB --> T
@@ -52,7 +59,7 @@ flowchart TD
 - 양쪽 수락 시 `match_response_result` 발행 구현 완료
 - `match_response_result.game` payload는 `gameRoomId`, `videoUrl`, `webSocketUrl`을 포함한다.
 - `game_rooms`, `game_participants`, `game_actions`, `game_records` 도메인과 DDL은 준비됨
-- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, SMITE 입력 저장/판정, SMITE 처치 즉시 GAME_RESULT 반환까지 구현됨
+- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, SMITE 입력 저장/판정, SMITE 즉시 종료, 서버 scheduler 자연사 종료 보장, `NATURAL_DEATH_DRAW` 결과 전송까지 구현됨
 
 ## 2. 핵심 결정
 
@@ -182,11 +189,14 @@ flowchart TD
 
 ### Step 8. 서버 timer/scheduler 기반 게임 종료 보장
 
-- [ ] WebSocket 연결 유무와 무관하게 gameRoom 종료 timer/scheduler 실행
-- [ ] HP scenario의 몬스터 사망 시각 또는 게임 제한 시간 기준 종료 job 등록
-- [ ] 서버 재시작/스케줄러 지연 시에도 종료 대상 gameRoom을 재조회해 마무리하는 복구 정책 정의
-- [ ] 이미 FINISHED/ABORTED 된 gameRoom은 종료 job이 no-op 처리
-- [ ] GAME_START 이후 양쪽 WebSocket이 끊겨도 서버가 승패/무승부 판정을 완료
+- [x] WebSocket 연결 유무와 무관하게 gameRoom 종료 scheduler 실행
+- [x] `GAME_START` 시 최초 `naturalDeathAt = startAt + scenario.durationMs` 기준 종료 후보 등록
+- [x] 실패 SMITE 누적 데미지 기준 effective naturalDeathAt을 계산해 pending score를 앞당김
+- [x] scheduler 지연 시에도 `game:end:pending` due 조회 후 DB row lock 안에서 최종 상태를 재판정
+- [x] 이미 FINISHED/ABORTED 된 gameRoom은 종료 job이 no-op 처리
+- [x] GAME_START 이후 양쪽 WebSocket이 끊겨도 서버가 자연사 DRAW를 확정
+- [x] 자연사 DRAW로 새로 종료된 경우 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)` broadcast
+- [x] 전송 실패/미연결과 DB 결과 확정을 분리하고 pending cleanup은 best-effort로 수행
 
 ### Step 9. 게임 종료와 기록
 
@@ -410,8 +420,8 @@ GAME_START 이후 WebSocket disconnect
 -> 게임 clock/scenario는 서버 기준으로 계속 진행
 -> 상대가 유효한 SMITE로 처치하면 서버 최종 판정 결과대로 승/패 확정
 -> 상대가 처치하지 못하고 자연사하면 무승부
--> 최종 결과 기준으로 game_records 생성
--> 승/패면 LP 반영, 무승부면 LP 변동 없음
+-> 자연사 DRAW로 새로 종료되면 연결된 local session에 NATURAL_DEATH_DRAW GAME_RESULT 전송
+-> game_records 생성과 LP/배치/승급전 반영은 Issue 52에서 처리
 ```
 
 따라서 WebSocket 대기 timeout은 URL 만료 정책이 아니라 gameRoom `READY` 상태의 준비 응답 timeout으로 구현한다.
@@ -619,22 +629,24 @@ gameRoom 생성 실패 mapping:
 
 목표:
 
-- WebSocket 연결 유무와 무관하게 서버 기준으로 gameRoom 종료를 보장한다.
+- WebSocket 연결 유무와 무관하게 서버 기준으로 gameRoom 종료를 보장한다. 완료됨.
 
 범위:
 
-- `GAME_START` 시 game end timer/scheduler 등록
-- HP scenario의 몬스터 사망 시각 또는 게임 제한 시간 기준 종료 job 실행
-- 종료 시점에 저장된 `game_actions`와 scenario 기준으로 최종 승패/무승부 판정
-- 양쪽 WebSocket이 모두 끊겨도 gameRoom 종료 처리 계속 진행
-- 이미 `FINISHED`/`ABORTED` 된 gameRoom에 대한 종료 job no-op 처리
-- 서버 재시작/스케줄러 지연 시 종료 대상 gameRoom 재조회 복구 정책 정의
+- [x] `GAME_START` 시 game end pending 등록
+- [x] HP scenario와 실패 SMITE action을 합성한 effective naturalDeathAt 기준 종료 scheduler 실행
+- [x] 종료 시점에 저장된 `game_actions`와 scenario 기준으로 자연사 `DRAW` 판정
+- [x] 양쪽 WebSocket이 모두 끊겨도 gameRoom 종료 처리 계속 진행
+- [x] 이미 `FINISHED`/`ABORTED` 된 gameRoom에 대한 종료 job no-op 처리
+- [x] scheduler 지연 시 종료 대상 gameRoom 재조회 후 row lock 안에서 복구 정산
+- [x] 자연사 `DRAW` 결과를 공용 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`로 전송
+- [x] record/LP/시리즈 반영은 Issue 52 범위로 분리
 
 완료 기준:
 
-- `GAME_START` 이후 WebSocket 연결이 없어도 gameRoom이 서버 기준으로 종료됨
-- scenario 종료 시점 또는 몬스터 사망 시점에 최종 결과가 확정됨
-- 종료 job 중복 실행 시에도 상태가 중복 변경되지 않음
+- [x] `GAME_START` 이후 WebSocket 연결이 없어도 gameRoom이 서버 기준으로 종료됨
+- [x] scenario 종료 시점 또는 effective naturalDeathAt 시점에 자연사 `DRAW` 결과가 확정됨
+- [x] 종료 job 중복 실행 시에도 상태가 중복 변경되지 않음
 
 ### Issue 52. 게임 종료와 record/rank 연결
 

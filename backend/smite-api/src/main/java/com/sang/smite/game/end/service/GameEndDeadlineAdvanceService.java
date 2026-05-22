@@ -18,14 +18,22 @@ public class GameEndDeadlineAdvanceService {
     private final GameEndScheduleService gameEndScheduleService;
 
     public void advanceAfterFailedSmite(GameRoom gameRoom, List<GameAction> currentActions) {
+        Long naturalDeathAtMillis = null;
+        int actionCount = currentActions.size();
         try {
-            long naturalDeathAtMillis = gameEffectiveNaturalDeathService.calculateNaturalDeathAtMillis(
+            naturalDeathAtMillis = gameEffectiveNaturalDeathService.calculateNaturalDeathAtMillis(
                     gameRoom,
                     currentActions
             );
             gameEndScheduleService.advanceEndDeadlineIfEarlier(gameRoom.getId(), naturalDeathAtMillis);
         } catch (RuntimeException e) {
-            log.warn("Failed to advance game end deadline after failed smite: gameRoomId={}", gameRoom.getId(), e);
+            log.warn(
+                    "Failed to advance game end deadline after failed smite: gameRoomId={}, actionCount={}, naturalDeathAtMillis={}",
+                    gameRoom.getId(),
+                    actionCount,
+                    naturalDeathAtMillis,
+                    e
+            );
         }
     }
 }

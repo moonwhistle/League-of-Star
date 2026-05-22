@@ -162,11 +162,13 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 
 ### 8. 문서 정합성
 
-- [ ] `docs/project/policy.md`에 자연사 종료와 scheduler 책임을 반영한다.
-- [ ] `docs/project/domain status.md`에 `game:end:pending` 정산 흐름을 반영한다.
-- [ ] `docs/project/websocket client.md`에 자연사 `GAME_RESULT` reason을 반영한다.
-- [ ] `docs/DB/DDL.md`와 실제 entity 변경 여부를 비교한다.
-- [ ] Step 9의 `game_records`/LP 반영이 이번 이슈 범위가 아님을 문서에 명시한다.
+- [x] `docs/project/policy.md`에 자연사 종료와 scheduler 책임을 반영한다.
+- [x] `docs/project/domain status.md`에 `game:end:pending` 정산 흐름을 반영한다.
+- [x] `docs/project/websocket client.md`에 자연사 `GAME_RESULT` reason을 반영한다.
+- [x] `docs/DB/DDL.md`와 실제 entity 변경 여부를 비교한다.
+- [x] Step 9의 `game_records`/LP 반영이 이번 이슈 범위가 아님을 문서에 명시한다.
+
+> Issue 50 Step 8 기준 DB entity 변경은 없다. 종료 보장 흐름은 기존 gameRoom/action 스키마와 Redis `game:end:pending`을 사용하며, `game_records`/LP/시리즈 반영은 Step 9 범위로 문서에 분리했다.
 
 ## 📝 Note
 
@@ -177,3 +179,162 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 - 자연사 종료는 `DRAW` 정책으로 처리한다. 이 정책은 현재 2인 게임과 유저당 SMITE 1회 정책을 전제로 한다.
 - `GAME_RESULT` 전송은 사용자 경험 보조 경로다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
 - `game_records` 생성, LP 반영, 배치/승급전 처리는 Step 9에서 처리한다.
+
+---
+## PR
+
+## 📌 Summary
+
+`GAME_START` 이후 WebSocket 연결 유무와 관계없이 gameRoom 종료를 보장하는 서버 scheduler 기반 자연사 정산 흐름을 구현함.
+
+```mermaid
+flowchart TD
+    A[GAME_START] --> B[game:end:pending 등록]
+    B --> C{SMITE 결과}
+    C -->|SMITE kill| D[즉시 FINISHED WIN/LOSE]
+    C -->|양쪽 실패 SMITE| E[즉시 FINISHED DRAW]
+    C -->|단일 실패 SMITE| F[effective naturalDeathAt 앞당김]
+    C -->|입력 없음| G[기존 naturalDeathAt 유지]
+
+    F --> H[GameEndScheduler]
+    G --> H
+    D --> H
+    E --> H
+
+    H --> I[due gameRoom 조회]
+    I --> J[gameRoom row lock]
+    J --> K{DB 상태}
+    K -->|IN_PROGRESS| L[effective HP 재계산]
+    K -->|FINISHED/ABORTED/not found| M[no-op]
+
+    L -->|HP <= 0| N[자연사 DRAW 확정]
+    L -->|HP > 0| O[pending score 재조정]
+
+    N --> P[GAME_RESULT NATURAL_DEATH_DRAW]
+    M --> Q[pending cleanup]
+    O --> R[pending update]
+    P --> Q
+```
+
+핵심 정책은 다음과 같음.
+
+- DB `game_rooms.status/result/winnerId`가 최종 source of truth임
+- Redis `game:end:pending`은 종료 후보 목록일 뿐 결과 저장소가 아님
+- 원본 HP scenario는 수정하지 않고, 저장된 SMITE action을 합성해 effective HP와 effective naturalDeathAt을 계산함
+- SMITE kill과 양쪽 실패 DRAW는 즉시 종료하고, scheduler는 이후 no-op으로 정리함
+- 자연사 종료는 `DRAW`로 확정하며, 연결된 local WebSocket session이 있으면 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 전송함
+- `game_records`, LP, 배치/승급전 반영은 이번 범위에서 제외하고 Step 9로 분리함
+
+## 📚 Changes
+
+### 종료 기준을 Redis 시간이 아니라 DB 재판정으로 둠
+
+```mermaid
+flowchart LR
+    A[Redis due 조회] --> B[DB row lock]
+    B --> C[action 재조회]
+    C --> D[effective HP 재계산]
+    D --> E{종료 가능?}
+    E -->|yes| F[DB FINISHED DRAW]
+    E -->|no| G[Redis score update]
+```
+
+`game:end:pending` score가 due가 되었다고 바로 종료하지 않음. scheduler는 due 후보만 가져오고, 실제 종료 여부는 row lock 안에서 gameRoom 상태와 최신 action 목록을 기준으로 다시 판정함.
+
+Trade-off:
+
+- Redis만 믿고 종료하면 빠르지만, SMITE 저장/즉시 종료와 경합할 때 결과를 덮어쓸 위험이 있음
+- DB row lock 재판정은 비용이 더 있지만, 최종 결과 멱등성과 race safety가 더 중요하다고 판단함
+
+### Redis Lua script를 의도별로 분리함
+
+`game:end:pending` 갱신은 두 가지 계약을 분리함.
+
+- `advanceEndDeadlineIfEarlier`: 실패 SMITE 직후 호출함. member가 없으면 등록할 수 있고, 기존 score보다 빠른 경우에만 앞당김
+- `updateEndDeadlineIfDue`: scheduler 재판정 후 호출함. 이미 due 상태인 기존 member만 재계산된 시각으로 이동함
+
+Trade-off:
+
+- 하나의 범용 script로 합치면 mode 인자와 조건 분기가 늘어남
+- 호출자가 "앞당김"과 "due 재조정" 중 무엇을 원하는지 script 이름만으로 드러나지 않음
+- script를 나누면 파일은 2개가 되지만, 각 Redis 원자 연산의 실패/성공 의미가 명확해짐
+
+### 원본 scenario 보존 + effective HP 합성
+
+자연 HP timeline은 그대로 유지하고, 실패 SMITE 데미지를 action으로만 누적 반영함.
+
+```text
+effectiveHpAt(t) = scenarioHpAt(t) - savedSmiteCount * 1200
+```
+
+Trade-off:
+
+- scenario를 직접 수정하면 조회는 단순해지지만, "원본 자연 HP"와 "실제 판정 HP"의 의미가 섞임
+- action 합성 방식은 계산이 필요하지만, 원본 시나리오 보존, 재계산 가능성, 테스트 가능성이 더 좋음
+
+### 자연사 종료 primitive를 core로 분리함
+
+자연사 `DRAW` 종료는 core `GameRoomCommandService`의 primitive로 처리함. API scheduler는 종료를 직접 만들지 않고, due 조회와 정산 orchestration만 담당함.
+
+Trade-off:
+
+- API에서 바로 `gameRoom.finish(DRAW)`를 호출하면 구현은 짧음
+- 하지만 종료 상태 전환 규칙이 API에 퍼지므로, SMITE 종료/자연사 종료/abort 흐름이 장기적으로 불안정해짐
+- 상태 변경은 core command service에 두고, API는 Redis/WebSocket/scheduling 책임만 갖도록 분리함
+
+### GAME_RESULT를 SMITE 전용에서 공용 result로 분리함
+
+`GAME_RESULT`는 이제 SMITE만의 응답이 아니라 게임 종료 공용 이벤트임.
+
+```mermaid
+flowchart TD
+    A[SMITE kill] --> R[GAME_RESULT SMITE_KILL]
+    B[Both failed SMITE] --> R2[GAME_RESULT BOTH_SMITES_USED_DRAW]
+    C[Natural death scheduler] --> R3[GAME_RESULT NATURAL_DEATH_DRAW]
+```
+
+Trade-off:
+
+- 기존 SMITE 패키지 안에 두면 변경 범위는 작음
+- 하지만 자연사 종료까지 SMITE 패키지에 의존하게 되어 패키지 의미가 깨짐
+- 공용 `game/result` 패키지로 분리해 종료 사유가 늘어나도 같은 payload/sender/factory를 재사용할 수 있게 함
+
+### WebSocket 전송은 보조 경로로 둠
+
+자연사 DRAW로 새로 종료된 경우에만 `NATURAL_DEATH_DRAW`를 broadcast함. 연결된 session이 없거나 전송에 실패해도 DB 결과 확정과 pending cleanup은 계속 진행함.
+
+Trade-off:
+
+- 전송 실패를 rollback하면 클라이언트 경험은 재시도 가능해 보이지만, 이미 DB 종료가 확정된 상태와 충돌함
+- 게임 결과의 source of truth는 DB이므로, WebSocket은 UX 보조 경로로 격리함
+- pending cleanup은 "결과 전송 성공"의 의미가 아니라 "DB 기준 정산 완료 후보 제거"의 의미임. cleanup을 멈추면 이미 종료된 gameRoom이 scheduler tick마다 반복 조회됨
+
+### 테스트와 문서 정합성 보강함
+
+테스트는 Redis store, effective naturalDeathAt 계산, core 정산, API 정산, WebSocket result sender 계층으로 분산함.
+
+검증한 정책:
+
+- due 조회는 `naturalDeathAt <= now`
+- 자연사 deadline은 `startAt + durationMs`
+- 실패 SMITE 누적 데미지 반영
+- step 사이 자연사 시각 선형 보간
+- HP 하락이 없는 구간, 정확한 threshold, 과도한 누적 데미지, action 순서 독립성
+- due지만 effective HP가 남은 경우 pending score update
+- 자연사 DRAW 종료와 participants FINISHED
+- FINISHED/ABORTED/no-op 멱등성
+- 중복 scheduler 정산 시 기존 결과 유지
+- 자연사 DRAW broadcast와 전송 실패 시 cleanup 지속
+- WebSocket session이 없어도 DB 정산 성공
+
+## 📝 Note
+
+- `game:end:pending` member가 SMITE 즉시 종료 이후 남아 있어도 정상임. scheduler가 DB 상태를 다시 보고 no-op cleanup함
+- `finishedAt`은 현재 도메인 primitive의 종료 시각을 사용하고, `GAME_RESULT.finishedAt`은 scheduler 처리 시점 기준 payload 시간임. 엄밀한 단일 종료 시각 필드가 필요하면 후속으로 도메인에서 clock 주입을 검토할 수 있음
+- 현재 `NATURAL_DEATH_DRAW` 판별은 별도 DB reason 컬럼 없이 결과와 action 목록으로 재구성함. DRAW 사유가 더 늘어나면 `finishReason` 영속 필드를 두는 편이 더 명확함
+- 이번 PR은 gameRoom 종료 보장과 결과 전송까지임. `game_records` 생성, LP 반영, 배치/승급전 처리는 의도적으로 Step 9로 분리함
+- 검증: `./gradlew test`
+
+## 📌 Related Issue
+
+- Closes #50
