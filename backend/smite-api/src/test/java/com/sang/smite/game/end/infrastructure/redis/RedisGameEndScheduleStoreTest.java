@@ -65,6 +65,22 @@ class RedisGameEndScheduleStoreTest {
     }
 
     @Test
+    @DisplayName("updateEndDeadlineIfDue - Lua script로 아직 due 상태인 deadline만 갱신한다")
+    void updateEndDeadlineIfDue() {
+        // when
+        store.updateEndDeadlineIfDue(100L, 10_000L, 12_000L);
+
+        // then
+        verify(stringRedisTemplate).execute(
+                any(),
+                eq(List.of(GameEndConstants.GAME_END_PENDING_KEY)),
+                eq("100"),
+                eq("10000"),
+                eq("12000")
+        );
+    }
+
+    @Test
     @DisplayName("findDueEndDeadlines - naturalDeathAt이 지난 gameRoomId를 batch size만큼 조회한다")
     void findDueEndDeadlines() {
         // given

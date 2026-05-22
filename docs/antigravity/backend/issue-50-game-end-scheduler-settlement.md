@@ -91,17 +91,19 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 - [x] scheduler 예외가 다음 tick을 막지 않도록 warn log를 남기고 종료한다.
 - [x] scheduler는 직접 DB 상태를 변경하지 않고 end settlement service로 위임한다.
 
-> `GameEndSettlementService.processDueEndDeadlines()`는 Step 3의 정산 진입점이다. 이번 단계에서는 scheduler wiring과 예외 격리까지만 완료하고, due 조회/row lock/자연사 `DRAW` 확정은 Step 3에서 구현한다.
+> `GameEndScheduler`는 scheduler wiring과 예외 격리만 담당한다. due 조회/row lock/자연사 `DRAW` 확정은 Step 3의 `GameEndSettlementService`와 core `GameNaturalDeathSettlementService`에서 처리한다.
 
 ### 3. 자연사 종료 정산 service 구현
 
 - [x] `game/end/service` 패키지에 `GameEndSettlementService` 정산 진입점을 추가한다.
-- [ ] due gameRoomId를 조회하고 gameRoom별 정산을 수행한다.
-- [ ] 정산 시점에 gameRoom row lock 안에서 action 목록을 다시 조회해 effective HP를 재계산한다.
-- [ ] due로 조회됐더라도 effective HP가 아직 `0`보다 크면 더 늦은 naturalDeathAt으로 pending score를 갱신하고 종료하지 않는다.
-- [ ] 정산 완료 또는 no-op 이후 `game:end:pending`을 cleanup한다.
-- [ ] cleanup은 DB 상태 처리 이후 best-effort로 수행한다.
-- [ ] 같은 gameRoomId가 중복 조회되거나 scheduler가 중복 실행돼도 최종 결과가 바뀌지 않도록 멱등 처리한다.
+- [x] due gameRoomId를 조회하고 gameRoom별 정산을 수행한다.
+- [x] 정산 시점에 gameRoom row lock 안에서 action 목록을 다시 조회해 effective HP를 재계산한다.
+- [x] due로 조회됐더라도 effective HP가 아직 `0`보다 크면 더 늦은 naturalDeathAt으로 pending score를 갱신하고 종료하지 않는다.
+- [x] 정산 완료 또는 no-op 이후 `game:end:pending`을 cleanup한다.
+- [x] cleanup은 DB 상태 처리 이후 best-effort로 수행한다.
+- [x] 같은 gameRoomId가 중복 조회되거나 scheduler가 중복 실행돼도 최종 결과가 바뀌지 않도록 멱등 처리한다.
+
+> `GameEndSettlementService`는 Redis due 목록/cleanup/update만 담당하고, row lock + action 재조회 + 자연사 `DRAW` 판정은 core의 `GameNaturalDeathSettlementService`가 담당한다. 자연사 `DRAW`에 대한 WebSocket `GAME_RESULT` broadcast는 Step 6 범위로 남긴다.
 
 ### 4. effective naturalDeathAt 계산
 

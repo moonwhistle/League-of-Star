@@ -23,11 +23,16 @@ public class RedisGameEndScheduleStore implements GameEndScheduleStore {
 
     private final StringRedisTemplate stringRedisTemplate;
     private RedisScript<Long> advanceEndDeadlineScript;
+    private RedisScript<Long> updateEndDeadlineIfDueScript;
 
     @PostConstruct
     public void init() {
         this.advanceEndDeadlineScript = RedisScript.of(
                 loadLuaScript(GameEndConstants.ADVANCE_END_DEADLINE_LUA_SCRIPT_PATH),
+                Long.class
+        );
+        this.updateEndDeadlineIfDueScript = RedisScript.of(
+                loadLuaScript(GameEndConstants.UPDATE_END_DEADLINE_IF_DUE_LUA_SCRIPT_PATH),
                 Long.class
         );
     }
@@ -48,6 +53,17 @@ public class RedisGameEndScheduleStore implements GameEndScheduleStore {
                 advanceEndDeadlineScript,
                 List.of(GameEndConstants.GAME_END_PENDING_KEY),
                 gameRoomIdValue,
+                String.valueOf(naturalDeathAtMillis)
+        );
+    }
+
+    @Override
+    public void updateEndDeadlineIfDue(Long gameRoomId, long nowMillis, long naturalDeathAtMillis) {
+        stringRedisTemplate.execute(
+                updateEndDeadlineIfDueScript,
+                List.of(GameEndConstants.GAME_END_PENDING_KEY),
+                String.valueOf(gameRoomId),
+                String.valueOf(nowMillis),
                 String.valueOf(naturalDeathAtMillis)
         );
     }

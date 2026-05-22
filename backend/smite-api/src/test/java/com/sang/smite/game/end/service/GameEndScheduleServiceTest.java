@@ -46,6 +46,16 @@ class GameEndScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("updateEndDeadlineIfDue - due 상태 deadline 갱신을 저장소에 위임한다")
+    void updateEndDeadlineIfDue() {
+        // when
+        service.updateEndDeadlineIfDue(GAME_ROOM_ID, 10_000L, 12_000L);
+
+        // then
+        verify(gameEndScheduleStore).updateEndDeadlineIfDue(GAME_ROOM_ID, 10_000L, 12_000L);
+    }
+
+    @Test
     @DisplayName("findDueEndDeadlines - naturalDeathAt이 지난 gameRoomId 조회를 저장소에 위임한다")
     void findDueEndDeadlines() {
         // given

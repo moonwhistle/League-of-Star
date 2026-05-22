@@ -65,6 +65,21 @@ class RedisGameEndScheduleStoreIntegrationTest extends AbstractRedisTest {
     }
 
     @Test
+    @DisplayName("updateEndDeadlineIfDue - 현재 score가 due 상태일 때만 늦은 naturalDeathAt으로 갱신한다")
+    void updateEndDeadlineIfDue() {
+        // given
+        store.registerEndDeadline(new GameEndDeadlineRegistration(GAME_ROOM_ID, 9_000L));
+
+        // when
+        store.updateEndDeadlineIfDue(GAME_ROOM_ID, 9_000L, 11_000L);
+        store.advanceEndDeadlineIfEarlier(GAME_ROOM_ID, 10_000L);
+        store.updateEndDeadlineIfDue(GAME_ROOM_ID, 9_000L, 12_000L);
+
+        // then
+        assertThat(scoreOf(GAME_ROOM_ID)).isEqualTo(10_000D);
+    }
+
+    @Test
     @DisplayName("findDueEndDeadlines - 실제 Redis에서 due gameRoomId만 조회한다")
     void findDueEndDeadlines() {
         // given

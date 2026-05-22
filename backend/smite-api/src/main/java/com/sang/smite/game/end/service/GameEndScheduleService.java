@@ -27,6 +27,10 @@ public class GameEndScheduleService {
         gameEndScheduleStore.advanceEndDeadlineIfEarlier(gameRoomId, naturalDeathAtMillis);
     }
 
+    public void updateEndDeadlineIfDue(Long gameRoomId, long nowMillis, long naturalDeathAtMillis) {
+        gameEndScheduleStore.updateEndDeadlineIfDue(gameRoomId, nowMillis, naturalDeathAtMillis);
+    }
+
     public List<Long> findDueEndDeadlines(long nowMillis, int batchSize) {
         return gameEndScheduleStore.findDueEndDeadlines(nowMillis, batchSize);
     }

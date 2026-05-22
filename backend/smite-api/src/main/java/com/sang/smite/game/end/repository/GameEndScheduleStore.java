@@ -10,6 +10,8 @@ public interface GameEndScheduleStore {
 
     void advanceEndDeadlineIfEarlier(Long gameRoomId, long naturalDeathAtMillis);
 
+    void updateEndDeadlineIfDue(Long gameRoomId, long nowMillis, long naturalDeathAtMillis);
+
     List<Long> findDueEndDeadlines(long nowMillis, int batchSize);
 
     void cleanupEndDeadline(Long gameRoomId);
