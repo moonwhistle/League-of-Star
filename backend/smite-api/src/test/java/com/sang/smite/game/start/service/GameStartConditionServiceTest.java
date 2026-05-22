@@ -116,6 +116,6 @@ class GameStartConditionServiceTest {
     }
 
     private GameRttStartReadyState rttState() {
-        return new GameRttStartReadyState(GAME_ROOM_ID, USER_A_ID, USER_B_ID, 35L, 45L);
+        return new GameRttStartReadyState(GAME_ROOM_ID, USER_A_ID, USER_B_ID);
     }
 }

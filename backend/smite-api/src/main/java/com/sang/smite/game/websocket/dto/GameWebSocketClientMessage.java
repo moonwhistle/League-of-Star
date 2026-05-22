@@ -20,6 +20,17 @@ public record GameWebSocketClientMessage(
         return type == GameWebSocketMessageType.RTT_PONG;
     }
 
+    public boolean isSmite() {
+        return type == GameWebSocketMessageType.SMITE;
+    }
+
+    public boolean hasInvalidSmitePayload() {
+        return isSmite()
+                && payload != null
+                && !payload.isNull()
+                && (!payload.isObject() || !payload.isEmpty());
+    }
+
     public OptionalInt rttSeq() {
         if (payload == null || !payload.has("seq") || !payload.get("seq").canConvertToInt()) {
             return OptionalInt.empty();

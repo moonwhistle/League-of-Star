@@ -91,6 +91,8 @@ HP: ████░██████░░█░░████░░█░░�
 ```
 
 - HP가 **불규칙한 덩어리(버스트)** 단위로 감소
+- HP timeline은 서버가 `200ms` 단위 step으로 생성하며, 첫 step은 `0ms / 10000`, 마지막 step은 `durationSeconds * 1000ms / 0`이다.
+- 각 시나리오는 짧은 정체 구간과 큰 burst 구간을 포함하도록 보정한다.
 - 매판 서버가 새로운 랜덤 시나리오를 생성 → 킬존 진입 시점이 매번 다름
 - HP 바를 읽는 **판독력** + 순간적인 클릭 **반응속도** 둘 다 필요
 - 양쪽 클라이언트에는 게임 시작 직전 동일한 시나리오를 전달 (WebSocket)
@@ -106,7 +108,7 @@ HP: ████░██████░░█░░████░░█░░�
 1. 유저: 드래곤 위에 마우스 올림 + 키(D/F) 입력
 2. 클라이언트 → 서버: WebSocket으로 "SMITE" 액션만 전송 (시간 정보 없음)
 3. 서버: 수신 시각 직접 기록 (server_receive_time)
-4. 서버: smite_time = (server_receive_time - game_start_time) - RTT / 2
+4. 서버: smite_time = server_receive_time - game_start_time
 5. 서버: 시나리오에서 smite_time 시점의 HP 역산
 6. HP ≤ 1200 → 킬 성공 (Smite Secured)
 7. HP > 1200 → 킬 실패 (Smite Failed)
@@ -122,13 +124,14 @@ HP: ████░██████░░█░░████░░█░░�
 
 > **강타 데미지**: 1200 고정 (True Damage)
 
-### 3.4 RTT 보정
+### 3.4 RTT 측정
 
 - 게임 대기 WebSocket에서 각 유저별 5회 Ping-Pong 측정, **중간값(Median)** 사용
-- 서버는 `smite_time = (server_receive_time - game_start_time) - RTT/2` 방식으로 보정
 - median RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도)
 - 각 `RTT_PING`은 2500ms 안에 응답해야 하며, 5회 측정 구조상 gameRoom 전체 RTT 측정은 최대 15초 안에 완료되어야 함
 - `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 처리
+- RTT 측정값은 `GAME_START` 전 연결 품질 검사에만 사용하고, SMITE 판정 보정에는 사용하지 않음
+- SMITE 판정은 `server_receive_time - game_start_time`으로 계산한 서버 기준 입력 시각만 사용
 
 ---
 
@@ -229,7 +232,7 @@ gap = 상대_티어점수 - 내_티어점수
 | 기술 | 용도 |
 |------|------|
 | **Java 17** | 메인 언어 |
-| **Spring Boot 4.0** | 백엔드 프레임워크 |
+| **Spring Boot 3.4.2** | 백엔드 프레임워크 |
 | **Spring WebSocket** | 게임 WebSocket JSON 통신 |
 | **Spring Security + JWT** | 인증/인가 |
 | **Spring OAuth2 Client** | 소셜 로그인 (Google, Discord) |

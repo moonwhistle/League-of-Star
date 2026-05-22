@@ -72,7 +72,6 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
         boolean passed = medianRttMillis <= GameRttConstants.RTT_LIMIT_MILLIS;
         stringRedisTemplate.opsForHash().putAll(rttKey, Map.of(
                 fields.samplesField(), samplesValue,
-                fields.medianField(), String.valueOf(medianRttMillis),
                 fields.statusField(), passed ? GameRttStatus.PASSED.name() : GameRttStatus.FAILED.name()
         ));
         return GameRttPongResult.completed(passed, samples.size());
@@ -118,18 +117,10 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
             return Optional.empty();
         }
 
-        Long userAMedianRttMs = getNullableLong(rttState, GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD);
-        Long userBMedianRttMs = getNullableLong(rttState, GameRttConstants.USER_B_MEDIAN_RTT_MS_FIELD);
-        if (userAMedianRttMs == null || userBMedianRttMs == null) {
-            return Optional.empty();
-        }
-
         return Optional.of(new GameRttStartReadyState(
                 gameRoomId,
                 getLong(rttState, GameRttConstants.USER_A_ID_FIELD),
-                getLong(rttState, GameRttConstants.USER_B_ID_FIELD),
-                userAMedianRttMs,
-                userBMedianRttMs
+                getLong(rttState, GameRttConstants.USER_B_ID_FIELD)
         ));
     }
 
@@ -147,14 +138,12 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
         if (Objects.equals(rttState.get(GameRttConstants.USER_A_ID_FIELD), userIdValue)) {
             return new UserRttFields(
                     GameRttConstants.USER_A_SAMPLES_FIELD,
-                    GameRttConstants.USER_A_MEDIAN_RTT_MS_FIELD,
                     GameRttConstants.USER_A_STATUS_FIELD
             );
         }
         if (Objects.equals(rttState.get(GameRttConstants.USER_B_ID_FIELD), userIdValue)) {
             return new UserRttFields(
                     GameRttConstants.USER_B_SAMPLES_FIELD,
-                    GameRttConstants.USER_B_MEDIAN_RTT_MS_FIELD,
                     GameRttConstants.USER_B_STATUS_FIELD
             );
         }
@@ -191,14 +180,6 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
         return Long.valueOf((String) rttState.get(fieldName));
     }
 
-    private Long getNullableLong(Map<Object, Object> rttState, String fieldName) {
-        Object value = rttState.get(fieldName);
-        if (!(value instanceof String stringValue) || stringValue.isBlank()) {
-            return null;
-        }
-        return Long.valueOf(stringValue);
-    }
-
     private String samplesValue(List<Long> samples) {
         return String.join(",", samples.stream()
                 .map(String::valueOf)
@@ -214,7 +195,6 @@ public class RedisGameRttMeasurementStore implements GameRttMeasurementStore {
 
     private record UserRttFields(
             String samplesField,
-            String medianField,
             String statusField
     ) {
     }

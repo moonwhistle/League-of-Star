@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
-@Import({GameRoomCommandService.class, GameRoomReadService.class})
+@Import({GameRoomCommandService.class, GameRoomReadService.class, GameScenarioGenerator.class})
 @ActiveProfiles("test")
 class GameRoomReadServiceJpaTest {
 

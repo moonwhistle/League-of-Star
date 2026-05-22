@@ -18,7 +18,7 @@ trigger: always_on
 
 | 영역 | 기술 |
 |------|------|
-| **Backend** | Java 17, Spring Boot 4.0, Spring MVC SSE, Spring WebSocket, Spring Security + JWT, OAuth2 Client, JPA (Hibernate), MySQL, Redis |
+| **Backend** | Java 17, Spring Boot 3.4.2, Spring MVC SSE, Spring WebSocket, Spring Security + JWT, OAuth2 Client, JPA (Hibernate), MySQL, Redis |
 | **Frontend** | React 19, TypeScript, Vite, React Router, TanStack Query, EventSource, native WebSocket, HTML video + React/CSS overlay |
 | **Infra** | Docker, Nginx, GitHub Actions |
 

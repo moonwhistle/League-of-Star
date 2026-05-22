@@ -2,17 +2,17 @@ package com.sang.smite.domain.game.service;
 
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
+import com.sang.smite.domain.game.domain.GameParticipant;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.domain.vo.GameScenario;
-import com.sang.smite.domain.game.domain.vo.HpStep;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -22,9 +22,9 @@ public class GameRoomCommandService {
 
     private static final int MIN_GAME_DURATION_SECONDS = 8;
     private static final int MAX_GAME_DURATION_SECONDS = 17;
-    private static final int SCENARIO_STEP_INTERVAL_MS = 1000;
 
     private final GameRoomRepository gameRoomRepository;
+    private final GameScenarioGenerator gameScenarioGenerator;
 
     public GameRoom createReadyRoom(Long firstUserId, Long secondUserId) {
         validateParticipants(firstUserId, secondUserId);
@@ -32,7 +32,7 @@ public class GameRoomCommandService {
         int durationSeconds = createGameDurationSeconds();
         GameRoom gameRoom = GameRoom.builder()
                 .durationSeconds(durationSeconds)
-                .scenarioData(createDefaultScenario(durationSeconds))
+                .scenarioData(createScenario(durationSeconds))
                 .build();
 
         gameRoom.addParticipant(firstUserId);
@@ -75,6 +75,20 @@ public class GameRoomCommandService {
                 .orElse(false);
     }
 
+    public GameRoom lockInProgressRoomForSmite(Long gameRoomId, Long userId) {
+        GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+        validateSmiteJudgementRoom(gameRoom, userId);
+        return gameRoom;
+    }
+
+    public GameRoom lockSmiteResultRoom(Long gameRoomId, Long userId) {
+        GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+        validateSmiteResultRoom(gameRoom, userId);
+        return gameRoom;
+    }
+
     /**
      * GAME_START 이후 서버가 게임 종료를 보장할 수 없는 경우에만 gameRoom 중단을 시도합니다.
      *
@@ -84,6 +98,47 @@ public class GameRoomCommandService {
         return gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .map(GameRoom::abortAfterStartIfInProgress)
                 .orElse(false);
+    }
+
+    public Optional<GameRoom> finishInProgressRoomBySmiteKill(Long gameRoomId, Long winnerUserId) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .filter(gameRoom -> gameRoom.getStatus().isInProgress())
+                .map(gameRoom -> {
+                    gameRoom.finish(resolveWinResult(gameRoom, winnerUserId), winnerUserId);
+                    return gameRoom;
+                });
+    }
+
+    public Optional<GameRoom> finishInProgressRoomByBothSmitesUsedDraw(Long gameRoomId) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .filter(gameRoom -> gameRoom.getStatus().isInProgress())
+                .map(gameRoom -> {
+                    validateCompleteParticipants(gameRoom);
+                    gameRoom.finish(GameResult.DRAW, null);
+                    return gameRoom;
+                });
+    }
+
+    private void validateSmiteJudgementRoom(GameRoom gameRoom, Long userId) {
+        if (!gameRoom.getStatus().isInProgress()
+                || gameRoom.getGameStartTime() == null
+                || gameRoom.getScenarioData() == null) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+        if (!gameRoom.hasParticipant(userId)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
+    }
+
+    private void validateSmiteResultRoom(GameRoom gameRoom, Long userId) {
+        if ((!gameRoom.getStatus().isInProgress() && !gameRoom.getStatus().isFinished())
+                || gameRoom.getGameStartTime() == null
+                || gameRoom.getScenarioData() == null) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+        if (!gameRoom.hasParticipant(userId)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
     }
 
     private void validateParticipants(Long firstUserId, Long secondUserId) {
@@ -96,14 +151,25 @@ public class GameRoomCommandService {
         return ThreadLocalRandom.current().nextInt(MIN_GAME_DURATION_SECONDS, MAX_GAME_DURATION_SECONDS + 1);
     }
 
-    private GameScenario createDefaultScenario(int durationSeconds) {
-        List<HpStep> steps = new ArrayList<>();
-        for (int second = 0; second <= durationSeconds; second++) {
-            long timeMs = (long) second * SCENARIO_STEP_INTERVAL_MS;
-            int hp = GameRoom.DEFAULT_DRAGON_MAX_HP
-                    - (GameRoom.DEFAULT_DRAGON_MAX_HP * second / durationSeconds);
-            steps.add(new HpStep(timeMs, hp));
+    private GameScenario createScenario(int durationSeconds) {
+        return gameScenarioGenerator.generate(durationSeconds);
+    }
+
+    private GameResult resolveWinResult(GameRoom gameRoom, Long winnerUserId) {
+        validateCompleteParticipants(gameRoom);
+        if (!gameRoom.hasParticipant(winnerUserId)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
         }
-        return GameScenario.of(steps);
+        Long firstParticipantUserId = gameRoom.getParticipants().stream()
+                .findFirst()
+                .map(GameParticipant::getUserId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+        return firstParticipantUserId.equals(winnerUserId) ? GameResult.PLAYER1_WIN : GameResult.PLAYER2_WIN;
+    }
+
+    private void validateCompleteParticipants(GameRoom gameRoom) {
+        if (gameRoom.getParticipants().size() != GameRoom.MAX_PARTICIPANTS) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
     }
 }

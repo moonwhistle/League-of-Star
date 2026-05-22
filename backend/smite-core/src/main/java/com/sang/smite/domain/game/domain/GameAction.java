@@ -18,13 +18,13 @@ import lombok.NoArgsConstructor;
 @Table(
     name = "game_actions",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_game_user", columnNames = {"game_room_id", "user_id"})
+        @UniqueConstraint(name = "uk_game_room_user", columnNames = {"game_room_id", "user_id"})
     }
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder
+@Builder(access = AccessLevel.PRIVATE)
 public class GameAction extends BaseEntity {
 
     @Id
@@ -41,9 +41,6 @@ public class GameAction extends BaseEntity {
     private long serverReceiveTimeMs;
 
     @Column(nullable = false)
-    private int rttMs;
-
-    @Column(nullable = false)
     private int smiteTimeMs;
 
     @Column(nullable = false)
@@ -51,4 +48,19 @@ public class GameAction extends BaseEntity {
 
     @Column(nullable = false)
     private boolean isKill;
+
+    public static GameAction smite(Long gameRoomId,
+                                   Long userId,
+                                   long serverReceiveTimeMs,
+                                   int smiteTimeMs,
+                                   int dragonHpAtSmite) {
+        return GameAction.builder()
+                .gameRoomId(gameRoomId)
+                .userId(userId)
+                .serverReceiveTimeMs(serverReceiveTimeMs)
+                .smiteTimeMs(smiteTimeMs)
+                .dragonHpAtSmite(dragonHpAtSmite)
+                .isKill(dragonHpAtSmite <= GameRules.SMITE_DAMAGE)
+                .build();
+    }
 }

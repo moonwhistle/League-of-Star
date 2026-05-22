@@ -2,7 +2,9 @@ package com.sang.smite.game.websocket.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.game.start.dto.GameStartScenarioPayload;
+import com.sang.smite.game.smite.dto.GameResultPayload;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -115,6 +117,39 @@ class GameWebSocketServerMessageTest {
         assertThat(json.get("payload").get("startAt").asLong()).isEqualTo(5000L);
         assertThat(json.get("payload").get("scenario").get("dragonMaxHp").asInt()).isEqualTo(10000);
         assertThat(json.get("payload").get("scenario").get("hpTimeline").get(0).get("hp").asInt()).isEqualTo(10000);
+    }
+
+    @Test
+    @DisplayName("gameResult - GAME_RESULT 메시지를 생성한다")
+    void gameResult() {
+        GameResultPayload payload = new GameResultPayload(
+                100L,
+                GameResult.PLAYER1_WIN,
+                USER_ID,
+                "SMITE_KILL",
+                20_000L,
+                List.of(new GameResultPayload.ActionSummary(
+                        USER_ID,
+                        10_000L,
+                        900,
+                        1_100,
+                        1_200,
+                        0,
+                        true
+                ))
+        );
+
+        GameWebSocketServerMessage result = GameWebSocketServerMessage.gameResult(payload);
+
+        JsonNode json = objectMapper.valueToTree(result);
+        assertThat(json.get("type").asText()).isEqualTo(GameWebSocketMessageType.GAME_RESULT.name());
+        assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
+        assertThat(json.get("payload").get("result").asText()).isEqualTo(GameResult.PLAYER1_WIN.name());
+        assertThat(json.get("payload").get("winnerUserId").asLong()).isEqualTo(USER_ID);
+        assertThat(json.get("payload").get("reason").asText()).isEqualTo("SMITE_KILL");
+        assertThat(json.get("payload").get("finishedAt").asLong()).isEqualTo(20_000L);
+        assertThat(json.get("payload").get("actions").get(0).get("afterHp").asInt()).isZero();
+        assertThat(json.get("payload").get("actions").get(0).get("isKill").asBoolean()).isTrue();
     }
 
     @Test

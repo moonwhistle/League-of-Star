@@ -2,6 +2,7 @@ package com.sang.smite.game.websocket.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.smite.game.smite.domain.GameSmiteFailureReason;
 import com.sang.smite.game.websocket.dto.GameWebSocketClientMessage;
 import com.sang.smite.game.websocket.dto.GameWebSocketServerMessage;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSession;
@@ -18,6 +19,8 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,6 +33,7 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
     private final GameRoomWebSocketSessionRegistry sessionRegistry;
     private final GameWaitingWebSocketService gameWaitingWebSocketService;
     private final GameRoomWebSocketMessageSender messageSender;
+    private final Clock clock;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -45,6 +49,7 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        long receivedAtMillis = Instant.now(clock).toEpochMilli();
         Optional<GameRoomWebSocketSession> currentSession = sessionRegistry.findBySessionId(session.getId());
         if (currentSession.isEmpty()) {
             session.close(CloseStatus.POLICY_VIOLATION);
@@ -70,6 +75,17 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
         }
         if (clientMessage.isRttPong()) {
             gameWaitingWebSocketService.handleRttPong(currentSession.get(), clientMessage);
+            return;
+        }
+        if (clientMessage.isSmite()) {
+            if (clientMessage.hasInvalidSmitePayload()) {
+                send(session, GameWebSocketServerMessage.error(
+                        GameSmiteFailureReason.INVALID_SMITE_PAYLOAD.getCode(),
+                        "SMITE payload must be empty."
+                ));
+                return;
+            }
+            gameWaitingWebSocketService.handleSmite(currentSession.get(), receivedAtMillis);
             return;
         }
 

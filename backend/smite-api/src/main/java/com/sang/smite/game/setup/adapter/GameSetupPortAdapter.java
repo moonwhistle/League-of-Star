@@ -1,7 +1,7 @@
-package com.sang.smite.game.adapter;
+package com.sang.smite.game.setup.adapter;
 
-import com.sang.smite.game.service.GameRoomSetupService;
-import com.sang.smite.game.service.dto.GameRoomSetupResult;
+import com.sang.smite.game.setup.service.GameRoomSetupService;
+import com.sang.smite.game.setup.service.dto.GameRoomSetupResult;
 import com.sang.smite.matching.domain.port.GameSetupPort;
 import com.sang.smite.matching.domain.result.GameSetupResult;
 import lombok.RequiredArgsConstructor;

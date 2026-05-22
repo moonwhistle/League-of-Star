@@ -1,4 +1,4 @@
-package com.sang.smite.game.service.dto;
+package com.sang.smite.game.setup.service.dto;
 
 import java.util.Objects;
 

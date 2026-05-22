@@ -1,7 +1,8 @@
 package com.sang.smite.game.adapter;
 
-import com.sang.smite.game.service.GameRoomSetupService;
-import com.sang.smite.game.service.dto.GameRoomSetupResult;
+import com.sang.smite.game.setup.service.GameRoomSetupService;
+import com.sang.smite.game.setup.service.dto.GameRoomSetupResult;
+import com.sang.smite.game.setup.adapter.GameSetupPortAdapter;
 import com.sang.smite.matching.domain.result.GameSetupResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

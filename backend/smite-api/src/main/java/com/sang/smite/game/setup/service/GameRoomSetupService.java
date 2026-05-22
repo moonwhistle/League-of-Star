@@ -1,8 +1,8 @@
-package com.sang.smite.game.service;
+package com.sang.smite.game.setup.service;
 
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
-import com.sang.smite.game.service.dto.GameRoomSetupResult;
+import com.sang.smite.game.setup.service.dto.GameRoomSetupResult;
 import com.sang.smite.game.waiting.domain.GameWaitingTimeoutRegistration;
 import com.sang.smite.game.waiting.repository.GameWaitingStore;
 import lombok.RequiredArgsConstructor;

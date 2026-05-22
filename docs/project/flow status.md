@@ -81,7 +81,7 @@ flowchart LR
         RTT_STATE["Redis game:rtt:{gameRoomId}<br/>A/B status = PENDING"]
         RTT_PING["RTT_PING<br/>5 times per user"]
         RTT_RESULT{"median RTT<br/><= 2000ms?"}
-        RTT_PASSED["A/B status = PASSED<br/>median 유지"]
+        RTT_PASSED["A/B status = PASSED<br/>start-ready 조건"]
         RTT_FAILED["status = FAILED<br/>RTT_FAILED or RTT_TOO_HIGH"]
         RTT_ABORT["DB game_rooms = ABORTED<br/>DB game_participants = ABORTED<br/>match:status 제거"]
         RTT_FAIL_EVENT["GAME_START_FAILED<br/>connected sockets only<br/>then close"]
@@ -189,7 +189,7 @@ flowchart LR
 | `CLIENT_READY` 수신 | `READY` | Redis `game:waiting:{gameRoomId}` + API local memory `GameRoomWebSocketSessionRegistry` |
 | 30초 안에 양쪽 `READY` 미완료 | `ABORTED` | DB `game_rooms`, `game_participants`; Redis `game_waiting_timeout` Pub/Sub |
 | 양쪽 `READY` 완료 후 RTT 측정 중 | `PENDING` | Redis `game:rtt:{gameRoomId}` |
-| RTT median 2000ms 이하 | `PASSED` | Redis `game:rtt:{gameRoomId}`. SMITE 판정 보정을 위해 게임 종료 전까지 유지 |
+| RTT median 2000ms 이하 | `PASSED` | Redis `game:rtt:{gameRoomId}`. GAME_START 전 품질 검사 통과 상태이며 SMITE 판정 보정에는 사용하지 않음 |
 | GAME_START 진입 | `IN_PROGRESS` | DB `game_rooms`; Redis `game:end:pending`; WebSocket `COUNTDOWN`, `GAME_START` | 양쪽 RTT `PASSED` 이후 `startAt = serverNow + 4000ms` 확정. `settlementDueAt = startAt + scenario.durationMs + 2000ms` 등록. 클라이언트는 남은 시간이 3000ms 이하일 때 countdown 렌더링 |
 | RTT 응답 누락/close/error/예외 또는 median 2000ms 초과 | `FAILED` | DB `game_rooms`, `game_participants`; WebSocket `GAME_START_FAILED` |
 

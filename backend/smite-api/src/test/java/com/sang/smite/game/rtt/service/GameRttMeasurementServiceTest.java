@@ -154,7 +154,7 @@ class GameRttMeasurementServiceTest {
     @DisplayName("findStartReadyState - Step 6에서 사용할 RTT 준비 상태를 조회한다")
     void findStartReadyState() {
         // given
-        GameRttStartReadyState startReadyState = new GameRttStartReadyState(GAME_ROOM_ID, 1L, 2L, 35L, 45L);
+        GameRttStartReadyState startReadyState = new GameRttStartReadyState(GAME_ROOM_ID, 1L, 2L);
         when(gameRttMeasurementStore.findStartReadyState(GAME_ROOM_ID)).thenReturn(Optional.of(startReadyState));
 
         // when
