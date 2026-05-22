@@ -11,7 +11,6 @@ import com.sang.smite.domain.game.service.GameSmiteJudgementService;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
 import com.sang.smite.game.smite.dto.GameResultPayload;
 import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
-import com.sang.smite.game.smite.dto.SmiteResultPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,9 +43,7 @@ public class GameSmiteService {
                 command.userId()
         );
         if (existingAction.isPresent()) {
-            return existingAction.map(action -> GameSmiteHandleResponse.smiteOnly(
-                    SmiteResultPayload.from(action, true)
-            ));
+            return Optional.empty();
         }
 
         List<GameAction> existingActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
@@ -55,43 +52,37 @@ public class GameSmiteService {
         return gameSmiteJudgementService
                 .judge(gameRoom, command.userId(), command.serverReceiveTimeMs(), existingActions)
                 .map(gameActionCommandService::saveIfAbsent)
-                .map(saveResult -> toResponse(command.gameRoomId(), saveResult));
+                .flatMap(saveResult -> toResponse(command.gameRoomId(), saveResult));
     }
 
-    private GameSmiteHandleResponse toResponse(Long gameRoomId, GameActionSaveResult saveResult) {
-        SmiteResultPayload smiteResult = SmiteResultPayload.from(saveResult.action(), saveResult.idempotent());
+    private Optional<GameSmiteHandleResponse> toResponse(Long gameRoomId, GameActionSaveResult saveResult) {
         if (saveResult.action().getDragonHpAtSmite() > GameRules.SMITE_DAMAGE) {
-            return nonKillResponse(gameRoomId, smiteResult);
+            return nonKillResponse(gameRoomId);
         }
 
         Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomBySmiteKill(
                 gameRoomId,
                 saveResult.action().getUserId()
         );
-        return finishedGameRoom.map(gameRoom -> GameSmiteHandleResponse.withGameResult(
-                smiteResult,
+        return finishedGameRoom.map(gameRoom -> GameSmiteHandleResponse.broadcast(
                 smiteKillGameResult(gameRoomId, gameRoom)
-        )).orElseGet(() -> GameSmiteHandleResponse.smiteOnly(smiteResult));
-
+        ));
     }
 
-    private GameSmiteHandleResponse nonKillResponse(Long gameRoomId,
-                                                    SmiteResultPayload smiteResult) {
+    private Optional<GameSmiteHandleResponse> nonKillResponse(Long gameRoomId) {
         List<GameAction> currentActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
                 gameRoomId
         );
         if (!bothUsersUsedSmiteWithoutKill(currentActions)) {
-            return GameSmiteHandleResponse.smiteOnly(smiteResult);
+            return Optional.empty();
         }
 
         Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(
                 gameRoomId
         );
-        return finishedGameRoom.map(gameRoom -> GameSmiteHandleResponse.withGameResult(
-                smiteResult,
+        return finishedGameRoom.map(gameRoom -> GameSmiteHandleResponse.broadcast(
                 bothSmitesUsedDrawGameResult(gameRoomId, gameRoom, currentActions)
-        )).orElseGet(() -> GameSmiteHandleResponse.smiteOnly(smiteResult));
-
+        ));
     }
 
     private boolean bothUsersUsedSmiteWithoutKill(List<GameAction> actions) {
@@ -103,7 +94,7 @@ public class GameSmiteService {
     }
 
     private GameSmiteHandleResponse currentGameResult(Long gameRoomId, GameRoom gameRoom) {
-        return GameSmiteHandleResponse.gameResultOnly(gameResultPayloadFactory.currentResult(
+        return GameSmiteHandleResponse.currentSessionOnly(gameResultPayloadFactory.currentResult(
                 gameRoomId,
                 gameRoom.getResult(),
                 gameRoom.getWinnerId(),

@@ -180,6 +180,7 @@
 - 킬 실패한 SMITE도 이후 HP 판정에는 `1200` 데미지로 반영한다.
 - `afterHp = max(0, dragonHpAtSmite - 1200)`은 응답 payload에서 계산하고 DB에는 저장하지 않는다.
 - `smiteTimeMs`가 HP timeline step 사이에 있으면 인접한 두 step의 HP를 선형 보간해 base HP를 계산한다.
+- `smiteTimeMs < 100`은 게임 시작 직후 비정상적으로 빠른 입력으로 보고 action을 저장하지 않는다.
 - `smiteTimeMs`가 scenario 범위를 벗어나면 action을 저장하지 않는다.
   - `startAt` 이전 입력은 무효 입력으로 본다.
   - scenario 종료 이후 입력은 자연사 이후 입력이므로 후속 종료 정산 흐름에서 현재 gameRoom 결과를 기준으로 처리한다.
@@ -225,8 +226,9 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 
 - 서버는 처치 SMITE를 저장한 transaction에서 gameRoom 결과를 확정한다.
 - 두 유저가 모두 SMITE를 사용했고 둘 다 처치하지 못했다면 두 번째 실패 SMITE를 저장한 transaction에서 gameRoom을 `DRAW`로 확정한다.
-- transaction 완료 후 입력한 클라이언트에는 `SMITE_RESULT`를 전송하고, 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
-- 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 `GAME_RESULT`만 재응답한다.
+- 결과가 확정되지 않은 SMITE는 중간 응답을 전송하지 않는다.
+- SMITE로 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
+- 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 session에 `GAME_RESULT`만 재응답한다.
 - record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리하고 기존 game end settlement 또는 record 처리 흐름에서 수행한다.
 
 ### 2.6 조작 방지
@@ -236,7 +238,7 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 | **시나리오 전달 시점** | 게임 카운트다운 완료 후 시작 시점에만 전달 (사전 유출 차단) |
 | **입력 검증** | 클라이언트는 "SMITE" 액션만 전송, 시간 정보 포함 시 요청 무효 처리 |
 | **셀프 매칭 방지** | 동일 IP에서 양쪽 플레이어 접속 시 매칭 차단 |
-| **매크로 감지** | 게임 시작 후 비정상적으로 빠른 입력 (< 100ms) 감지 시 무효 처리 |
+| **입력 시점 판정** | 게임 시작 후 비정상적으로 빠른 입력 (`smiteTimeMs < 100`) 또는 scenario 범위 밖 입력은 무효 처리 |
 | **요청 중복 차단** | 동일 게임에서 2회 이상 SMITE 요청 수신 시 첫 번째만 유효 |
 
 ### 2.7 WebSocket 라우팅 정책

@@ -2,7 +2,6 @@ package com.sang.smite.game.smite.service;
 
 import com.sang.smite.domain.game.domain.GameAction;
 import com.sang.smite.domain.game.domain.GameRoom;
-import com.sang.smite.domain.game.domain.GameRules;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.service.GameActionCommandService;
@@ -50,8 +49,8 @@ class GameSmiteServiceTest {
     );
 
     @Test
-    @DisplayName("handleSmite - 기존 action이 있으면 idempotent SMITE_RESULT payload를 반환한다")
-    void handleSmite_ExistingAction_ReturnIdempotentPayload() {
+    @DisplayName("handleSmite - 기존 action이 있고 게임이 진행 중이면 중간 응답을 반환하지 않는다")
+    void handleSmite_ExistingActionInProgress_ReturnEmpty() {
         // given
         GameRoom gameRoom = mock(GameRoom.class);
         GameAction action = GameAction.smite(GAME_ROOM_ID, USER_ID, 1000L, 900, 1000);
@@ -65,14 +64,7 @@ class GameSmiteServiceTest {
         var result = service.handleSmite(new GameSmiteCommand(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS));
 
         // then
-        assertThat(result).isPresent();
-        assertThat(result.get().smiteResult().gameRoomId()).isEqualTo(GAME_ROOM_ID);
-        assertThat(result.get().smiteResult().userId()).isEqualTo(USER_ID);
-        assertThat(result.get().smiteResult().damage()).isEqualTo(GameRules.SMITE_DAMAGE);
-        assertThat(result.get().smiteResult().afterHp()).isZero();
-        assertThat(result.get().smiteResult().isKill()).isTrue();
-        assertThat(result.get().smiteResult().idempotent()).isTrue();
-        assertThat(result.get().gameResult()).isNull();
+        assertThat(result).isEmpty();
 
         InOrder inOrder = inOrder(gameRoomCommandService, gameActionReadService);
         inOrder.verify(gameRoomCommandService).lockSmiteResultRoom(GAME_ROOM_ID, USER_ID);
@@ -80,8 +72,8 @@ class GameSmiteServiceTest {
     }
 
     @Test
-    @DisplayName("handleSmite - 신규 SMITE이면 판정 action을 저장하고 SMITE_RESULT payload를 반환한다")
-    void handleSmite_NewAction_SaveAndReturnPayload() {
+    @DisplayName("handleSmite - 신규 SMITE가 처치하지 못하고 게임이 진행 중이면 중간 응답을 반환하지 않는다")
+    void handleSmite_NewNonKillAction_SaveAndReturnEmpty() {
         // given
         GameRoom gameRoom = mock(GameRoom.class);
         GameAction action = GameAction.smite(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 200, 1300);
@@ -101,14 +93,7 @@ class GameSmiteServiceTest {
         var result = service.handleSmite(new GameSmiteCommand(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS));
 
         // then
-        assertThat(result).isPresent();
-        assertThat(result.get().smiteResult().serverReceiveTime()).isEqualTo(SERVER_RECEIVE_TIME_MS);
-        assertThat(result.get().smiteResult().smiteTimeMs()).isEqualTo(200);
-        assertThat(result.get().smiteResult().dragonHpAtSmite()).isEqualTo(1300);
-        assertThat(result.get().smiteResult().afterHp()).isEqualTo(100);
-        assertThat(result.get().smiteResult().isKill()).isFalse();
-        assertThat(result.get().smiteResult().idempotent()).isFalse();
-        assertThat(result.get().gameResult()).isNull();
+        assertThat(result).isEmpty();
 
         InOrder inOrder = inOrder(
                 gameRoomCommandService,
@@ -152,8 +137,8 @@ class GameSmiteServiceTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().smiteResult().afterHp()).isZero();
         assertThat(result.get().gameResult()).isNotNull();
+        assertThat(result.get().broadcast()).isTrue();
         assertThat(result.get().gameResult().gameRoomId()).isEqualTo(GAME_ROOM_ID);
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.PLAYER1_WIN);
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
@@ -196,9 +181,8 @@ class GameSmiteServiceTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().smiteResult().isKill()).isFalse();
-        assertThat(result.get().smiteResult().afterHp()).isEqualTo(1_300);
         assertThat(result.get().gameResult()).isNotNull();
+        assertThat(result.get().broadcast()).isTrue();
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.DRAW);
         assertThat(result.get().gameResult().winnerUserId()).isNull();
         assertThat(result.get().gameResult().reason()).isEqualTo("BOTH_SMITES_USED_DRAW");
@@ -225,8 +209,8 @@ class GameSmiteServiceTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().smiteResult()).isNull();
         assertThat(result.get().gameResult()).isNotNull();
+        assertThat(result.get().broadcast()).isFalse();
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.PLAYER1_WIN);
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
     }

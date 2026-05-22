@@ -425,6 +425,7 @@ CREATE TABLE game_actions (
 ```
 
 - `dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 같은 gameRoom에서 더 이른 SMITE 데미지를 모두 반영한 현재 HP입니다.
+- `smite_time_ms < 100` 또는 scenario 범위 밖 SMITE는 action으로 저장하지 않습니다.
 - SMITE 데미지는 정책상 `1200` 고정이므로 별도 컬럼으로 저장하지 않습니다.
 - `afterHp = max(0, dragon_hp_at_smite - 1200)`은 WebSocket 응답에서 계산하는 값이며 DB에는 저장하지 않습니다.
 - `game_actions`는 유저당 1회 SMITE 입력과 판정 스냅샷만 저장합니다. 승패 기록, LP 변동, 배치/승급전 반영은 `game_records`에서 처리합니다.
@@ -469,7 +470,7 @@ CREATE TABLE game_records (
     created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_game_room_user (game_room_id, user_id),
+    UNIQUE KEY uk_game_records_room_user (game_room_id, user_id),
     INDEX idx_user_id_created (user_id, created_at DESC),
     INDEX idx_user_id_result (user_id, result),
     CONSTRAINT fk_game_records_room      FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,

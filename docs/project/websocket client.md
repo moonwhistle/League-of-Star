@@ -4,7 +4,7 @@
 
 범위:
 
-- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `SMITE`, `SMITE_RESULT`, `GAME_RESULT`, 클라이언트 복구 정책, `ERROR`
+- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `SMITE`, `GAME_RESULT`, 클라이언트 복구 정책, `ERROR`
 - 제외: SMITE 서버 판정 상세, game record/LP 반영
 
 ## 1. 책임 경계
@@ -546,7 +546,6 @@ sequenceDiagram
 | `GAME_START_FAILED` | RTT 실패/초과 또는 GAME_START 확정 중 실패로 gameRoom이 `ABORTED` 되어 start 버튼 화면으로 복귀해야 함 |
 | `COUNTDOWN` | 서버 기준 `startAt`까지 남은 시간을 렌더링하기 위한 시작 예고 |
 | `GAME_START` | `startAt`과 HP scenario를 포함한 실제 게임 시작 데이터 |
-| `SMITE_RESULT` | 서버가 저장/판정한 강타 action 결과. 중복 입력이면 기존 결과를 `idempotent=true`로 재응답 |
 | `GAME_RESULT` | gameRoom 승패/무승부 확정 결과 |
 | `ERROR` | 잘못된 메시지 또는 처리 불가 |
 
@@ -565,8 +564,8 @@ SMITE 관련 `ERROR.payload.code`:
 
 - `SMITE`는 gameRoom WebSocket으로 한 번만 전송합니다.
 - `SMITE` payload에는 클라이언트 timestamp를 포함하지 않으며 빈 object `{}` 또는 payload 생략만 허용합니다.
-- 같은 유저가 같은 gameRoom에서 중복 전송하더라도 서버는 첫 action만 유효하게 유지하고, 기존 결과를 `SMITE_RESULT idempotent=true`로 재응답할 수 있습니다.
-- WebSocket 재시도나 더블 클릭으로 중복 전송이 발생해도 클라이언트는 새 판정으로 취급하지 않고 마지막 `SMITE_RESULT` 기준으로 UI를 동기화합니다.
+- 같은 유저가 같은 gameRoom에서 중복 전송하더라도 서버는 첫 action만 유효하게 유지하고 새 중간 응답을 전송하지 않습니다.
+- 결과가 확정되지 않은 SMITE에는 서버 응답이 없으며, 클라이언트는 `GAME_RESULT`를 받을 때만 종료 UI로 전환합니다.
 
 ```json
 {
@@ -614,7 +613,7 @@ stateDiagram-v2
 - `match_response_result` 수신 후 매칭 SSE를 닫습니다.
 - `GO_TO_GAME_WAITING`일 때만 게임 대기 화면으로 이동합니다.
 - `game.webSocketUrl`에 access token query parameter를 붙여 WebSocket에 연결합니다.
-- WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `ERROR`를 처리합니다.
+- WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `GAME_RESULT`, `ERROR`를 처리합니다.
 - MP4 preload 완료 후 `CLIENT_READY`를 한 번 전송합니다.
 - `GAME_WAITING_TIMEOUT`, handshake 실패, close/error, 자체 30초 timer 만료 시 start 버튼 화면으로 복귀합니다.
 - RTT 단계의 `GAME_START_FAILED` 수신 시 start 버튼 화면으로 복귀합니다.
@@ -622,7 +621,7 @@ stateDiagram-v2
 - `bothReady=true`를 `GAME_START`로 오해하지 않습니다.
 - RTT 성공을 `GAME_START`로 오해하지 않습니다.
 - `COUNTDOWN`과 `GAME_START`를 받아도 즉시 시작하지 않고, 같은 `startAt` 기준으로 대기한 뒤 게임을 시작합니다.
-- SMITE 버튼은 클릭 즉시 비활성화하고, 중복 `SMITE_RESULT`는 `idempotent` 값을 기준으로 기존 결과 재응답으로 처리합니다.
+- SMITE 버튼은 클릭 즉시 비활성화하고, 최종 `GAME_RESULT` 수신 전까지 중간 SMITE 응답을 기다리지 않습니다.
 
 ## 변경 이력
 

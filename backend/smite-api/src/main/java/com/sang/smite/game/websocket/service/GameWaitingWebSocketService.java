@@ -10,7 +10,6 @@ import com.sang.smite.game.smite.domain.GameSmiteCommand;
 import com.sang.smite.game.smite.domain.GameSmiteFailureReason;
 import com.sang.smite.game.smite.dto.GameResultPayload;
 import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
-import com.sang.smite.game.smite.dto.SmiteResultPayload;
 import com.sang.smite.game.smite.service.GameSmiteService;
 import com.sang.smite.game.smite.service.GameSmiteWebSocketSender;
 import com.sang.smite.game.start.domain.GameStartFailureReason;
@@ -132,28 +131,22 @@ public class GameWaitingWebSocketService {
 
     private void sendSmiteResponse(GameRoomWebSocketSession currentSession,
                                    GameSmiteHandleResponse response) {
-        response.smiteResultOptional()
-                .ifPresent(smiteResult -> sendSmiteResult(currentSession, smiteResult));
         response.gameResultOptional()
-                .ifPresent(gameResult -> broadcastGameResult(currentSession, gameResult));
+                .ifPresent(gameResult -> sendGameResult(currentSession, gameResult, response.broadcast()));
     }
 
-    private void sendSmiteResult(GameRoomWebSocketSession currentSession,
-                                 SmiteResultPayload payload) {
+    private void sendGameResult(GameRoomWebSocketSession currentSession,
+                                GameResultPayload payload,
+                                boolean broadcast) {
         try {
-            gameSmiteWebSocketSender.sendSmiteResult(currentSession.getWebSocketSession(), payload);
+            if (broadcast) {
+                gameSmiteWebSocketSender.broadcastGameResult(currentSession.getGameRoomId(), payload);
+                return;
+            }
+            gameSmiteWebSocketSender.sendGameResult(currentSession.getWebSocketSession(), payload);
         } catch (IOException e) {
-            log.warn("Failed to send SMITE_RESULT. gameRoomId={}, userId={}",
-                    currentSession.getGameRoomId(), currentSession.getUserId(), e);
-        }
-    }
-
-    private void broadcastGameResult(GameRoomWebSocketSession currentSession,
-                                     GameResultPayload payload) {
-        try {
-            gameSmiteWebSocketSender.broadcastGameResult(currentSession.getGameRoomId(), payload);
-        } catch (IOException e) {
-            log.warn("Failed to broadcast GAME_RESULT. gameRoomId={}", currentSession.getGameRoomId(), e);
+            log.warn("Failed to send GAME_RESULT. gameRoomId={}, userId={}, broadcast={}",
+                    currentSession.getGameRoomId(), currentSession.getUserId(), broadcast, e);
         }
     }
 

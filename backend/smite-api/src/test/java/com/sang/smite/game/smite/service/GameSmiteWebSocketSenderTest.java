@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.game.smite.dto.GameResultPayload;
-import com.sang.smite.game.smite.dto.SmiteResultPayload;
 import com.sang.smite.game.websocket.dto.GameWebSocketMessageType;
 import com.sang.smite.game.websocket.service.GameRoomWebSocketMessageSender;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSessionRegistry;
@@ -36,30 +35,27 @@ class GameSmiteWebSocketSenderTest {
     private final GameSmiteWebSocketSender sender = new GameSmiteWebSocketSender(messageSender);
 
     @Test
-    @DisplayName("sendSmiteResult - 현재 session에 SMITE_RESULT를 전송한다")
-    void sendSmiteResult() throws Exception {
+    @DisplayName("sendGameResult - 현재 session에 GAME_RESULT를 전송한다")
+    void sendGameResult() throws Exception {
         // given
         WebSocketSession session = session();
-        SmiteResultPayload payload = new SmiteResultPayload(
+        GameResultPayload payload = new GameResultPayload(
                 GAME_ROOM_ID,
+                GameResult.PLAYER1_WIN,
                 USER_ID,
-                10_000L,
-                900,
-                1_100,
-                1_200,
-                0,
-                true,
-                false
+                "SMITE_KILL",
+                20_000L,
+                List.of()
         );
 
         // when
-        sender.sendSmiteResult(session, payload);
+        sender.sendGameResult(session, payload);
 
         // then
         JsonNode message = sentMessage(session);
-        assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.SMITE_RESULT.name());
+        assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.GAME_RESULT.name());
         assertThat(message.get("payload").get("gameRoomId").asLong()).isEqualTo(GAME_ROOM_ID);
-        assertThat(message.get("payload").get("afterHp").asInt()).isZero();
+        assertThat(message.get("payload").get("result").asText()).isEqualTo(GameResult.PLAYER1_WIN.name());
     }
 
     @Test

@@ -246,11 +246,14 @@ stateDiagram-v2
     
     state IN_PROGRESS {
         [*] --> WAITING_ACTION: 강타 대기
-        WAITING_ACTION --> SMITED: 강타 실행 (Smite Action)
+        WAITING_ACTION --> WAITING_ACTION: SMITE 저장<br/>미처치 + 상대 SMITE 남음
+        WAITING_ACTION --> SMITE_KILL: SMITE 저장<br/>HP 0 이하
+        WAITING_ACTION --> BOTH_SMITE_USED: 양쪽 SMITE 저장<br/>미처치
         WAITING_ACTION --> WAITING_ACTION: GAME_START 이후 disconnect<br/>서버 timer/scheduler가 clock 유지
     }
     
-    SMITED --> FINISHED: 판정 완료 (Winner Decided)
+    SMITE_KILL --> FINISHED: 판정 완료 (Winner Decided)
+    BOTH_SMITE_USED --> FINISHED: 즉시 DRAW
     IN_PROGRESS --> FINISHED: 자연사 또는 제한 시간 종료
     FINISHED --> RECORDED: 전적 기록 완료
     RECORDED --> [*]
@@ -272,6 +275,16 @@ stateDiagram-v2
 - 종료 정산 deadline은 `gameEndAt = startAt + scenario.durationMs`, `settlementDueAt = gameEndAt + 2000ms`로 계산합니다.
 - deadline 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 상태 저장소 cleanup을 수행하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 등록된 deadline을 제거하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않습니다.
+- `IN_PROGRESS` 중 클라이언트는 gameRoom WebSocket으로 `SMITE`를 보낼 수 있고, 서버는 클라이언트 timestamp 없이 서버 수신 시각만 저장합니다.
+- SMITE 판정 시각은 `serverReceiveTimeMs - startAt`으로 계산하며, median RTT 또는 `RTT_PONG` 측정값으로 보정하지 않습니다.
+- `smiteTimeMs < 100` 또는 scenario 범위 밖 SMITE는 action으로 저장하지 않습니다.
+- 서버는 저장된 HP scenario와 기존 `game_actions`를 기준으로 해당 시점 HP를 계산하고, 이전 SMITE가 킬 실패였더라도 `1200` 데미지를 차감합니다.
+- 유저당 gameRoom당 SMITE는 한 번만 저장하며, 중복 SMITE는 새 action을 만들지 않습니다.
+- 결과가 확정되지 않은 SMITE는 중간 응답을 전송하지 않습니다.
+- SMITE 적용 후 HP가 `0` 이하이면 같은 처리 흐름에서 gameRoom을 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast합니다.
+- 양쪽 유저가 모두 SMITE를 사용했는데 처치하지 못한 경우 같은 처리 흐름에서 gameRoom을 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast합니다.
+- 한 명만 SMITE를 사용했고 처치하지 못한 경우 gameRoom은 `IN_PROGRESS`를 유지하며, 이후 상대 SMITE 또는 자연사/제한 시간 종료 정산을 기다립니다.
+- 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 새 action을 저장하지 않고 현재 session에 확정된 `GAME_RESULT`만 재응답합니다.
 - scheduler는 `settlementDueAt`에 도달한 gameRoom을 정산 대상으로 삼고, 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
 - 서버는 HP scenario와 수신 액션 기준으로 승/패/무승부를 판정하고, 그 결과만 record/LP에 반영합니다.
 

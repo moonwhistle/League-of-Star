@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.game.start.dto.GameStartScenarioPayload;
 import com.sang.smite.game.smite.dto.GameResultPayload;
-import com.sang.smite.game.smite.dto.SmiteResultPayload;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -118,36 +117,6 @@ class GameWebSocketServerMessageTest {
         assertThat(json.get("payload").get("startAt").asLong()).isEqualTo(5000L);
         assertThat(json.get("payload").get("scenario").get("dragonMaxHp").asInt()).isEqualTo(10000);
         assertThat(json.get("payload").get("scenario").get("hpTimeline").get(0).get("hp").asInt()).isEqualTo(10000);
-    }
-
-    @Test
-    @DisplayName("smiteResult - SMITE_RESULT 메시지를 생성한다")
-    void smiteResult() {
-        SmiteResultPayload payload = new SmiteResultPayload(
-                100L,
-                USER_ID,
-                10_000L,
-                900,
-                1_100,
-                1_200,
-                0,
-                true,
-                false
-        );
-
-        GameWebSocketServerMessage result = GameWebSocketServerMessage.smiteResult(payload);
-
-        JsonNode json = objectMapper.valueToTree(result);
-        assertThat(json.get("type").asText()).isEqualTo(GameWebSocketMessageType.SMITE_RESULT.name());
-        assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
-        assertThat(json.get("payload").get("userId").asLong()).isEqualTo(USER_ID);
-        assertThat(json.get("payload").get("serverReceiveTime").asLong()).isEqualTo(10_000L);
-        assertThat(json.get("payload").get("smiteTimeMs").asInt()).isEqualTo(900);
-        assertThat(json.get("payload").get("dragonHpAtSmite").asInt()).isEqualTo(1_100);
-        assertThat(json.get("payload").get("damage").asInt()).isEqualTo(1_200);
-        assertThat(json.get("payload").get("afterHp").asInt()).isZero();
-        assertThat(json.get("payload").get("isKill").asBoolean()).isTrue();
-        assertThat(json.get("payload").get("idempotent").asBoolean()).isFalse();
     }
 
     @Test

@@ -140,6 +140,35 @@ class GameSmiteJudgementServiceTest {
     }
 
     @Test
+    @DisplayName("judge - 게임 시작 후 100ms 미만 입력은 저장 대상 action을 만들지 않는다")
+    void judge_BeforeMinValidSmiteTime_ReturnEmpty() {
+        // given
+        GameRoom gameRoom = startedRoom(scenario(
+                new HpStep(0, 10_000),
+                new HpStep(1_000, 0)
+        ));
+
+        // when
+        var justAfterStart = service.judge(
+                gameRoom,
+                FIRST_USER_ID,
+                START_AT_MILLIS + GameRules.MIN_VALID_SMITE_TIME_MS - 1L,
+                List.of()
+        );
+        var validBoundary = service.judge(
+                gameRoom,
+                FIRST_USER_ID,
+                START_AT_MILLIS + GameRules.MIN_VALID_SMITE_TIME_MS,
+                List.of()
+        );
+
+        // then
+        assertThat(justAfterStart).isEmpty();
+        assertThat(validBoundary).isPresent();
+        assertThat(validBoundary.get().getSmiteTimeMs()).isEqualTo(GameRules.MIN_VALID_SMITE_TIME_MS);
+    }
+
+    @Test
     @DisplayName("judge - 이전 SMITE 반영 후 현재 HP가 0이면 action을 만들지 않는다")
     void judge_AlreadyKilled_ReturnEmpty() {
         // given

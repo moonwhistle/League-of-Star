@@ -21,7 +21,7 @@ public class GameSmiteJudgementService {
                 .toInstant(ZoneOffset.UTC)
                 .toEpochMilli();
         long smiteTimeMillis = serverReceiveTimeMs - startAtMillis;
-        if (!isInScenarioRange(gameRoom.getScenarioData().steps(), smiteTimeMillis)) {
+        if (!isValidSmiteTime(gameRoom.getScenarioData().steps(), smiteTimeMillis)) {
             return Optional.empty();
         }
 
@@ -41,11 +41,11 @@ public class GameSmiteJudgementService {
         ));
     }
 
-    private boolean isInScenarioRange(List<HpStep> steps, long smiteTimeMillis) {
+    private boolean isValidSmiteTime(List<HpStep> steps, long smiteTimeMillis) {
         if (steps.isEmpty()) {
             return false;
         }
-        return smiteTimeMillis >= steps.get(0).timeMs()
+        return smiteTimeMillis >= GameRules.MIN_VALID_SMITE_TIME_MS
                 && smiteTimeMillis <= steps.get(steps.size() - 1).timeMs();
     }
 

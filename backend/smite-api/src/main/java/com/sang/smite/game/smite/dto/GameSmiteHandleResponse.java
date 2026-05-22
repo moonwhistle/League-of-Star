@@ -3,25 +3,16 @@ package com.sang.smite.game.smite.dto;
 import java.util.Optional;
 
 public record GameSmiteHandleResponse(
-        SmiteResultPayload smiteResult,
-        GameResultPayload gameResult
+        GameResultPayload gameResult,
+        boolean broadcast
 ) {
 
-    public static GameSmiteHandleResponse smiteOnly(SmiteResultPayload smiteResult) {
-        return new GameSmiteHandleResponse(smiteResult, null);
+    public static GameSmiteHandleResponse broadcast(GameResultPayload gameResult) {
+        return new GameSmiteHandleResponse(gameResult, true);
     }
 
-    public static GameSmiteHandleResponse withGameResult(SmiteResultPayload smiteResult,
-                                                         GameResultPayload gameResult) {
-        return new GameSmiteHandleResponse(smiteResult, gameResult);
-    }
-
-    public static GameSmiteHandleResponse gameResultOnly(GameResultPayload gameResult) {
-        return new GameSmiteHandleResponse(null, gameResult);
-    }
-
-    public Optional<SmiteResultPayload> smiteResultOptional() {
-        return Optional.ofNullable(smiteResult);
+    public static GameSmiteHandleResponse currentSessionOnly(GameResultPayload gameResult) {
+        return new GameSmiteHandleResponse(gameResult, false);
     }
 
     public Optional<GameResultPayload> gameResultOptional() {

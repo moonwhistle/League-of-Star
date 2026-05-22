@@ -18,7 +18,7 @@ SMITE 정책값은 고정이다.
 
 HP 판정은 단순히 scenario HP만 보지 않는다. 같은 gameRoom에서 이미 더 이른 시점에 반영된 SMITE가 있으면, 그 SMITE가 킬 실패였더라도 `1,200` 데미지를 현재 HP에서 차감한다.
 
-SMITE 적용 후 HP가 `0` 이하가 되면 해당 action은 드래곤 처치 action이다. 서버는 같은 DB transaction 안에서 action 저장과 gameRoom 결과 확정을 끝내고, commit 이후 `SMITE_RESULT`와 `GAME_RESULT`를 WebSocket으로 반환한다. 같은 순간 두 사용자가 SMITE를 누르는 경합은 서버 수신 시각 기준으로 처리하고, 동률은 `id` 순서로 결정한다.
+SMITE 적용 후 HP가 `0` 이하가 되면 해당 action은 드래곤 처치 action이다. 서버는 같은 DB transaction 안에서 action 저장과 gameRoom 결과 확정을 끝내고, commit 이후 최종 `GAME_RESULT`만 WebSocket으로 반환한다. 같은 순간 두 사용자가 SMITE를 누르는 경합은 서버 수신 시각 기준으로 처리하고, 동률은 `id` 순서로 결정한다.
 
 두 유저가 모두 SMITE를 사용했고 어느 action도 처치하지 못했다면 더 들어올 SMITE 입력은 없다. 이 경우 남은 HP 재생을 끝까지 기다리지 않고 같은 transaction에서 `DRAW`로 확정한다. 클라이언트는 `GAME_RESULT` 수신 즉시 게임 UI를 종료한다.
 
@@ -34,7 +34,7 @@ flowchart TD
     D --> E[Open SMITE judgement transaction]
     E --> F[Lock gameRoom row]
     F --> G{Existing action for gameRoomId and userId}
-    G -- Yes --> H[Return stored SMITE_RESULT as idempotent]
+    G -- Yes --> H[No intermediate response]
     G -- No --> I[Validate IN_PROGRESS and participant]
     I --> J[Load startAt and scenario]
     J --> K[Calculate smiteTimeMs]
@@ -55,13 +55,12 @@ flowchart TD
     U --> Y[Commit transaction]
     W --> Y
     X --> Y
-    Y --> Z[Send SMITE_RESULT]
-    Z --> AA{Game result decided}
-    AA -- Yes --> AB[Broadcast GAME_RESULT]
-    AA -- No --> AC[Wait for next input or end scheduler]
+    Y --> Z{Game result decided}
+    Z -- Yes --> AA[Broadcast GAME_RESULT]
+    Z -- No --> AB[No intermediate response<br/>wait for next input or end scheduler]
 ```
 
-이번 이슈는 SMITE 입력을 서버 판정 가능한 액션으로 저장하고, 액션 단위 결과를 WebSocket으로 응답하는 범위까지 다룬다. SMITE로 드래곤 HP가 `0` 이하가 되면 즉시 `game_rooms.status=FINISHED`와 승패 결과를 확정하고 `GAME_RESULT`를 전송한다. 두 유저가 모두 SMITE를 사용하고도 처치하지 못하면 즉시 `DRAW`로 확정한다. record/LP 반영은 이후 game end settlement 또는 record 처리 흐름에서 처리한다.
+이번 이슈는 SMITE 입력을 서버 판정 가능한 액션으로 저장하고, 최종 결과가 확정된 경우에만 WebSocket으로 `GAME_RESULT`를 응답하는 범위까지 다룬다. SMITE로 드래곤 HP가 `0` 이하가 되면 즉시 `game_rooms.status=FINISHED`와 승패 결과를 확정하고 `GAME_RESULT`를 전송한다. 두 유저가 모두 SMITE를 사용하고도 처치하지 못하면 즉시 `DRAW`로 확정한다. record/LP 반영은 이후 game end settlement 또는 record 처리 흐름에서 처리한다.
 
 ## 📚 Tasks
 
@@ -80,8 +79,7 @@ flowchart TD
 
 - [x] client message `SMITE`를 `GameWebSocketMessageType`에 추가한다.
 - [x] `SMITE` payload 계약에는 클라이언트 timestamp를 포함하지 않는다.
-- [x] server message `SMITE_RESULT`를 정의한다.
-- [x] `SMITE_RESULT` payload에는 `gameRoomId`, `userId`, `serverReceiveTime`, `smiteTimeMs`, `dragonHpAtSmite`, `damage`, `afterHp`, `isKill`, `idempotent`를 포함한다.
+- [x] SMITE 중간 응답 message는 두지 않고 최종 결과는 `GAME_RESULT`로만 전달한다.
 - [x] server message `GAME_RESULT`를 정의한다.
 - [x] `GAME_RESULT` payload에는 `gameRoomId`, `result`, `winnerUserId`, `reason`, `finishedAt`, `actions` 요약을 포함한다.
 - [x] SMITE로 드래곤 HP가 `0` 이하가 되면 양쪽 클라이언트에 `GAME_RESULT`를 브로드캐스트한다.
@@ -125,7 +123,7 @@ flowchart TD
 - [x] `findStartReadyState(...)`는 양쪽 `PASSED` 여부와 참가자 userId만 반환하도록 단순화한다.
 - [x] Redis `game:rtt:{gameRoomId}`에 median 값을 저장하지 않거나, 저장하더라도 로그/진단용으로만 취급하고 service contract에서 제거한다.
 - [x] `GameAction.rttMs`와 `game_actions.rtt_ms` 컬럼은 제거한다.
-- [x] `SMITE_RESULT`와 `GAME_RESULT` payload에 RTT 값을 포함하지 않는다.
+- [x] `GAME_RESULT` payload에 RTT 값을 포함하지 않는다.
 - [x] `GameSmiteService`는 `GameRttMeasurementService` / `GameRttMeasurementStore`에 의존하지 않는다.
 - [x] RTT cleanup은 기존처럼 `GAME_START_FAILED`, `GAME_START` 이후 시작 처리 완료, abort/finish cleanup 경로에서 수행한다.
 
@@ -133,8 +131,8 @@ flowchart TD
 
 - [x] `game_actions`의 `UNIQUE(game_room_id, user_id)` 제약을 최종 방어선으로 사용한다.
 - [x] 서비스 진입 시 `gameRoomId + userId`로 기존 SMITE action을 먼저 조회한다.
-- [x] 기존 action이 있으면 새로 판정하지 않고 기존 결과를 `idempotent=true`로 재응답한다.
-- [x] 동시에 같은 유저의 SMITE가 두 번 들어와 unique 충돌이 발생하면 기존 action을 다시 조회해 같은 결과로 응답한다.
+- [x] 기존 action이 있으면 새로 판정하지 않고 중간 응답 없이 처리한다.
+- [x] 동시에 같은 유저의 SMITE가 두 번 들어와 unique 충돌이 발생하면 기존 action을 다시 조회해 멱등 처리하되 중간 응답은 보내지 않는다.
 - [x] 클라이언트는 버튼 클릭 즉시 SMITE 버튼을 비활성화하는 정책을 문서에 반영한다.
 
 ### 7. 동시성 제어와 판정 순서
@@ -178,7 +176,7 @@ flowchart TD
 - [x] `serverReceiveTimeMs`와 `startAtMillis`는 로컬 타임존 시간이 아니라 UTC `Instant` 기반 epoch milliseconds로 맞춘다.
 - [x] RTT median은 SMITE 판정 계산에 사용하지 않는다.
 - [x] `smiteTimeMs`가 scenario 범위를 벗어나는 경우의 처리 정책을 정의한다.
-  - 시작 전 입력 또는 비정상적으로 빠른 입력은 무효 처리
+  - 시작 전 입력 또는 `smiteTimeMs < 100` 입력은 무효 처리
   - 자연사 이후 입력은 저장하지 않고 후속 종료 정산 흐름에서 현재 gameRoom 결과 기준으로 처리
 - [x] scenario에서 `smiteTimeMs` 시점의 base HP를 계산한다.
   - HP timeline step 사이 입력은 인접 step 사이를 선형 보간한다.
@@ -230,7 +228,7 @@ flowchart TD
 - [x] gameRoom 생성 시 scenario duration이 항상 `8~17초` 범위인지 검증한다.
 - [x] 랜덤 burst scenario가 `10000 -> 0`으로 끝나고 HP가 증가하지 않는지 검증한다.
 - [x] 랜덤 burst scenario가 1초 단위 선형 감소로 고정되지 않는지 검증한다.
-- [x] `SMITE` client message type과 `SMITE_RESULT` server message type 직렬화를 검증한다.
+- [x] `SMITE` client message type과 `GAME_RESULT` server message type 직렬화를 검증한다.
 - [x] `SMITE` 수신 시 `serverReceiveTime`을 서버에서 기록하는지 검증한다.
 - [x] `smiteTimeMs`가 RTT 보정 없이 `serverReceiveTimeMs - startAtMillis`로 계산되는지 검증한다.
 - [x] SMITE 판정 서비스가 RTT service/store에 의존하지 않는지 검증한다.
@@ -257,8 +255,8 @@ flowchart TD
 - [x] `docs/project/policy.md`에 두 유저 SMITE 소모 후 처치하지 못하면 즉시 `DRAW`로 확정한다는 정책을 추가한다.
 - [x] `docs/project/policy.md`에 SMITE로 먼저 `FINISHED`된 gameRoom의 `game:end:pending` member는 필수 cleanup하지 않고 scheduler no-op으로 처리한다는 정책을 추가한다.
 - [x] `docs/project/overallplan.md`의 판정 프로세스에 이전 SMITE 데미지 차감 규칙을 반영한다.
-- [x] `docs/project/websocket client.md`에 `SMITE`, `SMITE_RESULT` 메시지와 클라이언트 버튼 1회 사용 정책을 추가한다.
-- [ ] `docs/project/domain status.md`에 `IN_PROGRESS` 중 SMITE action 저장 흐름을 반영한다.
+- [x] `docs/project/websocket client.md`에 `SMITE`, `GAME_RESULT` 메시지와 클라이언트 버튼 1회 사용 정책을 추가한다.
+- [x] `docs/project/domain status.md`에 `IN_PROGRESS` 중 SMITE action 저장 흐름을 반영한다.
 - [x] `docs/DB/DDL.md`의 `game_actions` 컬럼 설명, Redis RTT 구조, `game:end:pending` no-op 정책을 실제 판정 의미와 맞춘다.
 
 ## ✅ 완료 기준
@@ -280,9 +278,137 @@ flowchart TD
 - REST API가 아니라 기존 gameRoom WebSocket에서 처리한다.
 - 클라이언트 버튼 비활성화는 UX 방어이고, 실제 1회 보장은 서버 멱등 처리와 DB unique 제약이 담당한다.
 - SMITE 판정 transaction 안에서 WebSocket 전송을 하지 않는다.
-- `SMITE_RESULT`는 action 저장 결과이고, `GAME_RESULT`는 gameRoom 승패 확정 결과다.
+- SMITE action 저장 결과는 중간 응답으로 보내지 않고, 클라이언트에는 최종 `GAME_RESULT`만 전달한다.
 - RTT 측정은 `GAME_START` 전 품질 검사이며, SMITE 판정 보정에는 사용하지 않는다.
 
 ---
 
 ## PR
+
+## 📌 Summary
+
+`GAME_START` 이후 클라이언트의 `SMITE` 입력을 서버 수신 시각 기준으로 판정하고, `game_actions`에 서버 판정 가능한 action으로 저장하는 흐름을 구현함.
+RTT는 게임 시작 전 네트워크 품질 검사로만 유지하고, SMITE 승패 판정에는 사용하지 않도록 정책과 구현 경계를 분리함.
+
+클라이언트에는 SMITE 중간 결과를 보내지 않고, 승/패/무승부가 확정된 최종 `GAME_RESULT`만 전달함.
+
+```mermaid
+flowchart TD
+    A[Client SMITE<br/>no timestamp] --> B[WebSocket Handler<br/>record serverReceiveTime]
+    B --> C[SMITE Use Case<br/>lock gameRoom]
+    C --> D{Already FINISHED?}
+    D -->|yes| E[Send current GAME_RESULT<br/>to current session]
+    D -->|no| F{User action exists?}
+    F -->|yes| G[No intermediate response]
+    F -->|no| H[Calculate smiteTimeMs<br/>serverReceiveTime - startAt]
+    H --> I[Read scenario HP<br/>subtract earlier SMITE damage]
+    I --> J[Save game_actions]
+    J --> K{afterHp <= 0?}
+    K -->|yes| L[Finish gameRoom<br/>winner decided]
+    K -->|no| M{Both users used SMITE?}
+    M -->|yes| N[Finish gameRoom<br/>DRAW]
+    M -->|no| O[Keep IN_PROGRESS]
+    L --> P[Broadcast GAME_RESULT]
+    N --> P
+    O --> Q[No intermediate response]
+```
+
+## 📚 Changes
+
+### 서버 중심 SMITE 판정으로 책임을 고정
+
+SMITE 판정 기준을 클라이언트 시간이 아니라 서버가 WebSocket 메시지를 받은 시각으로 고정함.
+클라이언트는 `SMITE`라는 입력 의도만 보내고, 서버는 `serverReceiveTimeMs - startAtMillis`로 `smiteTimeMs`를 계산함.
+
+이렇게 구현한 이유는 SMITE가 짧은 입력 차이로 승패가 갈릴 수 있는 액션이기 때문임.
+클라이언트 timestamp를 받으면 입력 체감은 보정할 수 있지만, 로컬 clock 조작, 브라우저 pause, 지연 보정 악용 가능성이 생김.
+반대로 서버 수신 시각 기준은 네트워크 도착 순서에 의존하는 trade-off가 있지만, 모든 참가자에게 동일한 판정 기준을 적용할 수 있고 조작 가능성을 줄일 수 있음.
+
+```mermaid
+flowchart LR
+    A[Client timestamp 방식] --> A1[입력 체감 보정 가능]
+    A --> A2[시간 조작과 clock drift 위험]
+    B[Server receive time 방식] --> B1[조작면 축소]
+    B --> B2[서버 기준 단일 판정 순서]
+    B --> B3[네트워크 도착 순서 trade-off]
+```
+
+### RTT는 품질 gate로만 유지하고 판정 경로에서 제거
+
+RTT 측정은 `GAME_START` 이전 네트워크 품질 검사로만 남기고, SMITE 판정 계산에서는 조회하지 않도록 분리함.
+기존처럼 `RTT/2`를 판정에 섞으면 느린 네트워크를 일부 보정할 수 있다는 장점은 있지만, 동시 입력 경합에서 실제 서버 도착 순서와 다른 결과를 만들 수 있고 RTT 측정값이 판정 도메인에 섞임.
+
+따라서 `RTT_PING`/`RTT_PONG`은 게임 시작 가능 여부를 판단하는 네트워크 검사 용도로만 사용함.
+SMITE use-case는 RTT store, RTT median, RTT payload에 의존하지 않기 때문에 판정 로직이 단순해지고, “SMITE 판정에 RTT 보정 사용 안 함” 정책과 일치함.
+
+### HP scenario와 action 판정 스냅샷을 분리
+
+gameRoom 생성 시 서버가 `8~17초` duration과 `200ms` 단위 랜덤 burst HP scenario를 먼저 저장함.
+SMITE 입력 시에는 새 scenario를 만들지 않고 저장된 scenario만 읽어, 같은 판 안의 모든 사용자가 동일한 HP timeline을 기준으로 판정되도록 함.
+
+`game_actions.dragonHpAtSmite`는 원본 scenario HP가 아니라, 이전 SMITE 데미지까지 반영한 “이번 SMITE 적용 전 현재 HP”로 정의함.
+이렇게 저장하면 action 자체가 판정 당시의 HP 스냅샷이 되고, 이후 최종 `GAME_RESULT.actions`에서도 같은 의미로 해석할 수 있음.
+
+```mermaid
+flowchart LR
+    A[Saved HP scenario] --> B[Base HP at smiteTimeMs]
+    C[Earlier SMITE actions] --> D[Subtract 1200 each]
+    B --> E[dragonHpAtSmite]
+    D --> E
+    E --> F{dragonHpAtSmite <= 1200?}
+    F -->|yes| G[Kill action]
+    F -->|no| H[Non-kill action]
+```
+
+### 1회 입력 보장은 UX가 아니라 서버 멱등성으로 처리
+
+클라이언트는 SMITE 버튼을 즉시 비활성화하지만, 실제 1회 입력 보장은 서버가 담당함.
+서비스 진입 시 기존 action을 먼저 조회하고, DB unique 제약으로 `gameRoomId + userId` 중복 저장을 최종 차단함.
+동시 중복 입력으로 unique 충돌이 나도 실패 응답으로 끝내지 않고 기존 action을 다시 조회해 멱등 처리함.
+
+중복 SMITE는 새 action을 만들지 않고, 결과가 아직 확정되지 않았다면 중간 응답도 보내지 않음.
+이미 결과가 확정된 gameRoom이면 현재 session에 최종 `GAME_RESULT`만 재응답함.
+단순히 중복 요청을 `ERROR`로 막는 방식보다 구현은 조금 복잡하지만, 네트워크 재시도나 더블 클릭이 있어도 판정 결과가 흔들리지 않음.
+
+### 결과 확정과 action 저장을 같은 트랜잭션 경계에 배치
+
+SMITE로 HP가 `0` 이하가 되면 action 저장과 gameRoom `FINISHED` 전환을 같은 처리 흐름에서 수행함.
+두 유저가 모두 SMITE를 사용했고 둘 다 처치하지 못한 경우에도 더 이상 유효 입력이 남지 않으므로 자연사 deadline을 기다리지 않고 즉시 `DRAW`로 확정함.
+
+```mermaid
+stateDiagram-v2
+    [*] --> IN_PROGRESS
+    IN_PROGRESS --> IN_PROGRESS: first failed SMITE
+    IN_PROGRESS --> FINISHED: SMITE kill
+    IN_PROGRESS --> FINISHED: both failed SMITE -> DRAW
+    IN_PROGRESS --> FINISHED: natural death / later settlement
+    FINISHED --> [*]
+```
+
+트랜잭션 안에서는 action 저장과 gameRoom 상태 확정만 수행하고, WebSocket 전송은 트랜잭션 밖의 응답 흐름에서 처리함.
+DB commit과 외부 I/O를 섞지 않아 실패 지점을 줄이는 대신, 메시지 전송 실패나 재응답은 WebSocket 계층과 클라이언트 복구 흐름에서 다루도록 분리함.
+
+### action과 record/LP 책임을 분리
+
+이번 범위는 `game_actions`에 SMITE 판정 가능한 입력 스냅샷을 저장하고, 확정된 최종 `GAME_RESULT`만 전달하는 데 집중함.
+전적, LP, 배치, 승급전 반영은 `game_records`와 후속 game end settlement 흐름의 책임으로 남김.
+
+한 요청에서 판정, 전적, 랭크 변경까지 모두 처리하면 즉시 일관성은 강해지지만 SMITE 입력 경로가 너무 무거워짐.
+이번 구현은 SMITE use-case의 책임을 “action 저장과 gameRoom 결과 확정”으로 좁혀, 랭크 정책 변경이 SMITE 판정 경로에 영향을 덜 주도록 함.
+
+### 문서와 정책 정합성 보강
+
+정책 문서, 전체 계획, WebSocket 클라이언트 계약, domain status, DDL을 현재 구현 방향에 맞춤.
+특히 기존 문서에 남아 있던 RTT 보정 표현과 SMITE 중간 응답 계약을 제거하고, 클라이언트가 최종 `GAME_RESULT`만 처리하도록 정리함.
+
+## 📝 Note
+
+- 결과가 확정되지 않은 SMITE에는 중간 응답을 보내지 않음
+- `GAME_RESULT`는 gameRoom 승패 또는 무승부 확정 응답임
+- SMITE로 먼저 `FINISHED`된 gameRoom의 `game:end:pending` member는 필수 cleanup 대상이 아님. DB 상태가 최종 기준이며, 후속 scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리해야 함
+- record/LP 반영은 이번 PR의 직접 책임이 아니며, game end settlement 또는 record 처리 흐름에서 이어짐
+- `smiteTimeMs < 100` 입력은 비정상적으로 빠른 입력으로 보고 action을 저장하지 않음
+
+## 📌 Related Issue
+
+- Closes #48

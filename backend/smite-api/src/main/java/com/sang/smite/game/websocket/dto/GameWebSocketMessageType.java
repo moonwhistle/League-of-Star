@@ -21,7 +21,6 @@ public enum GameWebSocketMessageType {
     GAME_START_FAILED(Direction.SERVER),
     COUNTDOWN(Direction.SERVER),
     GAME_START(Direction.SERVER),
-    SMITE_RESULT(Direction.SERVER),
     GAME_RESULT(Direction.SERVER),
     ERROR(Direction.SERVER);
 

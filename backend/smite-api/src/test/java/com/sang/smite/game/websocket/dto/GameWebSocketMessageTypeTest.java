@@ -29,7 +29,6 @@ class GameWebSocketMessageTypeTest {
         assertThat(GameWebSocketMessageType.GAME_START_FAILED.isServerMessage()).isTrue();
         assertThat(GameWebSocketMessageType.COUNTDOWN.isServerMessage()).isTrue();
         assertThat(GameWebSocketMessageType.GAME_START.isServerMessage()).isTrue();
-        assertThat(GameWebSocketMessageType.SMITE_RESULT.isServerMessage()).isTrue();
         assertThat(GameWebSocketMessageType.GAME_RESULT.isServerMessage()).isTrue();
         assertThat(GameWebSocketMessageType.ERROR.isServerMessage()).isTrue();
     }
