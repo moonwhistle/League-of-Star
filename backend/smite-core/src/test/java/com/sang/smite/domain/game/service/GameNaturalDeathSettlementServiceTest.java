@@ -34,9 +34,12 @@ class GameNaturalDeathSettlementServiceTest {
 
     private final GameRoomRepository gameRoomRepository = mock(GameRoomRepository.class);
     private final GameActionRepository gameActionRepository = mock(GameActionRepository.class);
+    private final GameEffectiveNaturalDeathService gameEffectiveNaturalDeathService =
+            new GameEffectiveNaturalDeathService();
     private final GameNaturalDeathSettlementService service = new GameNaturalDeathSettlementService(
             gameRoomRepository,
-            gameActionRepository
+            gameActionRepository,
+            gameEffectiveNaturalDeathService
     );
 
     @Test

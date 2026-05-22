@@ -8,6 +8,7 @@ import com.sang.smite.domain.game.service.GameActionReadService;
 import com.sang.smite.domain.game.service.GameActionSaveResult;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
 import com.sang.smite.domain.game.service.GameSmiteJudgementService;
+import com.sang.smite.game.end.service.GameEndDeadlineAdvanceService;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
 import com.sang.smite.game.smite.dto.GameResultPayload;
 import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
@@ -28,6 +29,7 @@ public class GameSmiteService {
     private final GameActionReadService gameActionReadService;
     private final GameActionCommandService gameActionCommandService;
     private final GameSmiteJudgementService gameSmiteJudgementService;
+    private final GameEndDeadlineAdvanceService gameEndDeadlineAdvanceService;
     private final GameResultPayloadFactory gameResultPayloadFactory;
     private final Clock clock;
 
@@ -52,36 +54,39 @@ public class GameSmiteService {
         return gameSmiteJudgementService
                 .judge(gameRoom, command.userId(), command.serverReceiveTimeMs(), existingActions)
                 .map(gameActionCommandService::saveIfAbsent)
-                .flatMap(saveResult -> toResponse(command.gameRoomId(), saveResult));
+                .flatMap(saveResult -> toResponse(command.gameRoomId(), gameRoom, saveResult));
     }
 
-    private Optional<GameSmiteHandleResponse> toResponse(Long gameRoomId, GameActionSaveResult saveResult) {
+    private Optional<GameSmiteHandleResponse> toResponse(Long gameRoomId,
+                                                         GameRoom gameRoom,
+                                                         GameActionSaveResult saveResult) {
         if (saveResult.action().getDragonHpAtSmite() > GameRules.SMITE_DAMAGE) {
-            return nonKillResponse(gameRoomId);
+            return nonKillResponse(gameRoomId, gameRoom);
         }
 
         Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomBySmiteKill(
                 gameRoomId,
                 saveResult.action().getUserId()
         );
-        return finishedGameRoom.map(gameRoom -> GameSmiteHandleResponse.broadcast(
-                smiteKillGameResult(gameRoomId, gameRoom)
+        return finishedGameRoom.map(finishedRoom -> GameSmiteHandleResponse.broadcast(
+                smiteKillGameResult(gameRoomId, finishedRoom)
         ));
     }
 
-    private Optional<GameSmiteHandleResponse> nonKillResponse(Long gameRoomId) {
+    private Optional<GameSmiteHandleResponse> nonKillResponse(Long gameRoomId, GameRoom gameRoom) {
         List<GameAction> currentActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
                 gameRoomId
         );
         if (!bothUsersUsedSmiteWithoutKill(currentActions)) {
+            gameEndDeadlineAdvanceService.advanceAfterFailedSmite(gameRoom, currentActions);
             return Optional.empty();
         }
 
         Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(
                 gameRoomId
         );
-        return finishedGameRoom.map(gameRoom -> GameSmiteHandleResponse.broadcast(
-                bothSmitesUsedDrawGameResult(gameRoomId, gameRoom, currentActions)
+        return finishedGameRoom.map(finishedRoom -> GameSmiteHandleResponse.broadcast(
+                bothSmitesUsedDrawGameResult(gameRoomId, finishedRoom, currentActions)
         ));
     }
 

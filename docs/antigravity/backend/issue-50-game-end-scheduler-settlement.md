@@ -107,13 +107,15 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 
 ### 4. effective naturalDeathAt 계산
 
-- [ ] 원본 scenario는 수정하지 않고 자연 HP timeline으로 유지한다.
-- [ ] effective HP는 `scenarioHpAt(timeMs) - priorSmiteDamageSum`으로 계산한다.
-- [ ] SMITE 실패 action 저장 후 누적 SMITE 데미지를 반영해 effective HP가 최초로 `0` 이하가 되는 시각을 계산한다.
-- [ ] scenario step 사이에 deadline이 생기면 선형 보간 기준으로 최초 `0` 도달 시각을 계산한다.
-- [ ] 계산된 naturalDeathAt이 현재 pending score보다 빠른 경우에만 score를 앞당긴다.
-- [ ] 이미 SMITE kill 또는 양쪽 SMITE 실패 DRAW로 `FINISHED`된 경우에는 naturalDeathAt을 갱신하지 않는다.
-- [ ] 계산 책임은 API WebSocket handler가 아니라 game end 또는 core 도메인 service로 분리한다.
+- [x] 원본 scenario는 수정하지 않고 자연 HP timeline으로 유지한다.
+- [x] effective HP는 `scenarioHpAt(timeMs) - priorSmiteDamageSum`으로 계산한다.
+- [x] SMITE 실패 action 저장 후 누적 SMITE 데미지를 반영해 effective HP가 최초로 `0` 이하가 되는 시각을 계산한다.
+- [x] scenario step 사이에 deadline이 생기면 선형 보간 기준으로 최초 `0` 도달 시각을 계산한다.
+- [x] 계산된 naturalDeathAt이 현재 pending score보다 빠른 경우에만 score를 앞당긴다.
+- [x] 이미 SMITE kill 또는 양쪽 SMITE 실패 DRAW로 `FINISHED`된 경우에는 naturalDeathAt을 갱신하지 않는다.
+- [x] 계산 책임은 API WebSocket handler가 아니라 game end 또는 core 도메인 service로 분리한다.
+
+> effective HP와 effective naturalDeathAt 계산은 core `GameEffectiveNaturalDeathService`가 담당한다. SMITE 실패 단일 케이스에서만 API `GameEndDeadlineAdvanceService`가 `advanceEndDeadlineIfEarlier`를 호출하며, SMITE kill 또는 양쪽 실패 DRAW에서는 deadline을 갱신하지 않는다.
 
 ### 5. core gameRoom 종료 primitive 보강
 
