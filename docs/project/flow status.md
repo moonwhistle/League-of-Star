@@ -87,7 +87,7 @@ flowchart LR
         RTT_FAIL_EVENT["GAME_START_FAILED<br/>connected sockets only<br/>then close"]
         NEXT_GAME_START["Step 6<br/>startAt = serverNow + 4000ms"]
         IN_PROGRESS["DB game_rooms = IN_PROGRESS"]
-        GAME_END_DEADLINE["Redis game:end:pending<br/>settlementDueAt = startAt + durationMs + 2000ms"]
+        GAME_END_DEADLINE["Redis game:end:pending<br/>naturalDeathAt = startAt + durationMs"]
         COUNTDOWN["COUNTDOWN<br/>startAt, display=3s"]
         GAME_START["GAME_START<br/>same startAt + scenario"]
     end
@@ -190,7 +190,7 @@ flowchart LR
 | 30초 안에 양쪽 `READY` 미완료 | `ABORTED` | DB `game_rooms`, `game_participants`; Redis `game_waiting_timeout` Pub/Sub |
 | 양쪽 `READY` 완료 후 RTT 측정 중 | `PENDING` | Redis `game:rtt:{gameRoomId}` |
 | RTT median 2000ms 이하 | `PASSED` | Redis `game:rtt:{gameRoomId}`. GAME_START 전 품질 검사 통과 상태이며 SMITE 판정 보정에는 사용하지 않음 |
-| GAME_START 진입 | `IN_PROGRESS` | DB `game_rooms`; Redis `game:end:pending`; WebSocket `COUNTDOWN`, `GAME_START` | 양쪽 RTT `PASSED` 이후 `startAt = serverNow + 4000ms` 확정. `settlementDueAt = startAt + scenario.durationMs + 2000ms` 등록. 클라이언트는 남은 시간이 3000ms 이하일 때 countdown 렌더링 |
+| GAME_START 진입 | `IN_PROGRESS` | DB `game_rooms`; Redis `game:end:pending`; WebSocket `COUNTDOWN`, `GAME_START` | 양쪽 RTT `PASSED` 이후 `startAt = serverNow + 4000ms` 확정. 최초 `naturalDeathAt = startAt + scenario.durationMs` 등록. 클라이언트는 남은 시간이 3000ms 이하일 때 countdown 렌더링 |
 | RTT 응답 누락/close/error/예외 또는 median 2000ms 초과 | `FAILED` | DB `game_rooms`, `game_participants`; WebSocket `GAME_START_FAILED` |
 
 주의:
@@ -203,8 +203,8 @@ flowchart LR
 - median RTT 2000ms 초과는 `RTT_TOO_HIGH`, 응답 누락/close/error/측정 중 예외는 `RTT_FAILED`로 처리합니다.
 - RTT 실패/초과는 `GAME_START` 이전 실패이므로 gameRoom/participants를 `ABORTED`로 정리하고 record/LP를 반영하지 않습니다.
 - GAME_START 진입 시 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, `COUNTDOWN`과 `GAME_START`를 `startAt` 전에 미리 전송합니다.
-- GAME_START 진입 시 서버는 `game:end:pending`에 `settlementDueAt = startAt + scenario.durationMs + 2000ms`를 등록합니다.
-- `settlementDueAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각입니다.
+- GAME_START 진입 시 서버는 `game:end:pending`에 최초 `naturalDeathAt = startAt + scenario.durationMs`를 등록합니다.
+- `naturalDeathAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각입니다. 한 명만 SMITE를 사용했고 처치하지 못한 경우 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 score를 앞당길 수 있습니다.
 - `game:end:pending` 등록에 실패하면 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도합니다. 연결된 클라이언트에는 `GAME_START_FAILED`를 전송하고 record/LP는 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending`, match user status, RTT 상태, waiting 상태를 정리합니다.
 - 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고, `GAME_START`를 받아도 즉시 시작하지 않고 `startAt`까지 대기합니다.

@@ -171,19 +171,17 @@ lock 비용 판단:
 
 정책:
 
-- 게임의 논리적 종료 시각은 `gameEndAt = startAt + scenario.durationMs`로 계산한다.
-- 정산 대상 조회 시작 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 계산한다.
-- `inputGraceMs`는 2000ms로 둔다.
-- 2000ms grace는 자연사 직전 SMITE 입력이 서버에 도착할 수 있는 여유 시간이다.
+- 최초 자연사 deadline은 `naturalDeathAt = startAt + scenario.durationMs`로 계산한다.
+- 정산 대상 조회 시작 시각은 `naturalDeathAt`으로 등록한다.
+- 한 명만 SMITE를 사용했고 처치하지 못한 경우 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 score를 앞당길 수 있다.
 - SMITE 판정 시각은 RTT 보정 없이 `serverReceiveTime - gameStartTime`을 사용한다.
 - 고정 25초 같은 값은 실제 정산 deadline으로 쓰지 않는다. 필요하면 cleanup TTL 같은 안전장치에서 별도로 검토한다.
 
 구현 결과:
 
-- `GameEndConstants.INPUT_GRACE_MILLIS = 2000L`로 입력 유예 시간을 상수화했다.
-- `GameEndScheduleService.registerEndDeadline(gameRoomId, startAtMillis, durationMs)`에서 `gameEndAtMillis`, `settlementDueAtMillis`를 계산한다.
+- `GameEndScheduleService.registerEndDeadline(gameRoomId, startAtMillis, durationMs)`에서 `naturalDeathAtMillis`를 계산한다.
 - `GameEndScheduleStore` port를 추가해 종료 정산 등록 책임을 분리했다.
-- `RedisGameEndScheduleStore`는 `game:end:pending` ZSET에 `member=gameRoomId`, `score=settlementDueAtMillis`로 등록한다.
+- `RedisGameEndScheduleStore`는 `game:end:pending` ZSET에 `member=gameRoomId`, `score=naturalDeathAtMillis`로 등록한다.
 - `RedisGameEndScheduleStore.cleanupEndDeadline(gameRoomId)`로 deadline 등록 실패 또는 시작 메시지 전송 실패 시 남아 있을 수 있는 deadline을 제거한다.
 - `GameWaitingWebSocketService`는 `transitionResult.started() == true` 이후, `COUNTDOWN` / `GAME_START` 전송 전에 종료 deadline을 등록한다.
 - deadline 등록이 실패하면 이미 `IN_PROGRESS`로 전환된 gameRoom을 `ABORTED`로 보상 전환하고 시작 메시지를 보내지 않으며 `game:end:pending` cleanup을 시도한다.
@@ -262,7 +260,7 @@ flowchart TD
     D --> E["READY -> IN_PROGRESS<br/>DB row lock"]
     E --> F["serverTime = now<br/>startAt = serverTime + 4000ms"]
     F --> G["Load HP scenario"]
-    G --> H["Register game:end:pending<br/>settlementDueAt = startAt + durationMs + 2000ms"]
+    G --> H["Register game:end:pending<br/>naturalDeathAt = startAt + durationMs"]
     H --> I["Send COUNTDOWN<br/>display=3s"]
     I --> J["Send GAME_START<br/>same startAt + scenario"]
     J --> K["Client waits until startAt"]
@@ -286,9 +284,8 @@ flowchart TD
 - `GAME_START` 확정 시 game end deadline을 Redis ZSET에 등록합니다.
 
 ```text
-gameEndAt = startAt + scenario.durationMs
-settlementDueAt = gameEndAt + 2000ms
-ZADD game:end:pending settlementDueAtMillis gameRoomId
+naturalDeathAt = startAt + scenario.durationMs
+ZADD game:end:pending naturalDeathAtMillis gameRoomId
 ```
 
 - `GameStartFailureProcessor`를 추가해 `IN_PROGRESS` 이후 시작 실패 보상 처리를 분리했습니다.
@@ -330,9 +327,8 @@ flowchart TD
   - DB row lock은 같은 gameRoom row 하나만 짧게 잠급니다. 먼저 lock을 잡은 요청만 `READY -> IN_PROGRESS`를 성공시키고, 나중 요청은 이미 `READY`가 아니므로 바로 중단됩니다. 그래서 시작 메시지와 deadline 등록도 한 번만 이어집니다.
   - lock 범위는 `READY -> IN_PROGRESS` 전환까지만 잡습니다. scenario 조회, Redis deadline 등록, WebSocket 전송까지 lock 안에 넣으면 외부 I/O 동안 DB row를 오래 잠그게 됩니다. 대신 전환 이후 실패는 `GameStartFailureProcessor`가 `ABORTED`로 보상합니다.
 - game end deadline은 고정 25초가 아니라 scenario duration 기준으로 계산합니다. 실제 드래곤 자연사 시각은 scenario가 표현하므로, 고정값은 정산 deadline이 아니라 cleanup TTL 같은 안전장치에서 다루는 편이 맞습니다.
-- `settlementDueAt`은 정산 완료 시각이 아니라 scheduler가 해당 gameRoom을 정산 대상으로 집기 시작할 수 있는 시각입니다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리해야 합니다.
+- `naturalDeathAt`은 정산 완료 시각이 아니라 scheduler가 해당 gameRoom을 정산 대상으로 집기 시작할 수 있는 시각입니다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리해야 합니다.
 - 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않습니다. 서버는 `startAt + scenario.durationMs`를 논리적 종료 시각으로 사용하고, 클라이언트 화면은 서버가 내려준 `startAt`과 scenario를 따라가는 표시 계층으로 봅니다.
-- `2000ms` grace는 자연사 직전 SMITE 입력이 서버에 도착할 수 있는 여유 시간입니다. 판정 보정은 기존 정책처럼 `serverReceiveTime`, `gameStartTime`, median RTT를 기준으로 처리합니다.
 - deadline 등록 실패도 `game:end:pending` cleanup을 시도합니다. Redis write가 일부 반영된 뒤 예외가 발생할 수 있고, ZSET remove는 대상이 없어도 no-op이라 방어적으로 처리하는 편이 안전합니다.
 - `IN_PROGRESS` 이후 시작 실패는 이미 유효 게임에 가까운 상태이므로 단순 return 하지 않고 `ABORTED`로 보상 처리합니다. 다만 이 경우 record/LP/tier는 반영하지 않습니다.
 

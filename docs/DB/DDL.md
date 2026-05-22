@@ -504,7 +504,7 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 | `game:waiting:timeout:lock:{gameRoomId}` | Redis Lock | 멀티 인스턴스 scheduler 중복 timeout 정산 방지 | 작업 lease |
 | `game_waiting_timeout` | Pub/Sub Channel | timeout 확정 후 모든 API 인스턴스에 WebSocket 전송 이벤트 전파 | - |
 | `game:rtt:{gameRoomId}` | Hash | `GAME_START` 이전 RTT 품질 검사 결과. `userAId`, `userBId`, `userASamples`, `userBSamples`, `userAStatus`, `userBStatus` | 300초 |
-| `game:end:pending` | Sorted Set | GAME_START 이후 종료 정산 후보. score = `settlementDueAtMillis`, member = `gameRoomId` | - |
+| `game:end:pending` | Sorted Set | GAME_START 이후 종료 정산 후보. score = `naturalDeathAtMillis`, member = `gameRoomId` | - |
 
 > 매칭 응답 완료 전 상태는 Redis가 관리합니다. 양쪽 수락 후 gameRoom `READY` 생성이 완료되면 game waiting timeout 상태도 Redis에 등록합니다.
 
@@ -529,17 +529,16 @@ game:rtt:{gameRoomId}
 게임 종료 정산 deadline은 `game:end:pending` ZSET에 저장합니다.
 
 ```text
-gameEndAtMillis = startAtMillis + scenario.durationMs
-settlementDueAtMillis = gameEndAtMillis + 2000
-ZADD game:end:pending settlementDueAtMillis gameRoomId
+naturalDeathAtMillis = startAtMillis + scenario.durationMs
+ZADD game:end:pending naturalDeathAtMillis gameRoomId
 ```
 
-- `gameEndAtMillis`는 HP scenario 기준 드래곤이 0이 되는 논리적 종료 시각입니다.
-- `settlementDueAtMillis`는 서버가 최종 판정 대상으로 조회하기 시작할 수 있는 시각입니다. 정산 완료 시각이 아닙니다.
-- 2000ms는 자연사 직전 SMITE 입력이 서버에 도착할 수 있게 두는 입력 유예 시간입니다.
+- `naturalDeathAtMillis`는 HP scenario 기준 드래곤이 0이 되는 최초 자연사 후보 시각입니다.
+- 한 명만 SMITE를 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 SMITE 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAtMillis`를 계산해 score를 앞당길 수 있습니다.
+- `naturalDeathAtMillis`는 정산 완료 시각이 아니라 서버가 최종 판정 대상으로 조회하기 시작할 수 있는 시각입니다.
 - `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending` cleanup을 시도하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 이미 등록된 `game:end:pending` member를 제거하고 gameRoom/participants를 `ABORTED` 처리합니다.
-- 후속 game end scheduler는 `settlementDueAtMillis`가 지난 gameRoom을 조회하고, gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
+- 후속 game end scheduler는 `naturalDeathAtMillis`가 지난 gameRoom을 조회하고, gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
 - SMITE로 먼저 `FINISHED`된 gameRoom의 member가 `game:end:pending`에 남아 있어도 정상입니다. DB 상태가 최종 기준이며 scheduler no-op으로 정리합니다.
 
 후속 게임 흐름에서 사용할 예정인 Redis 구조:
@@ -578,4 +577,5 @@ ZADD game:end:pending settlementDueAtMillis gameRoomId
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
 | 2026-05-19 | game waiting timeout Redis ZSET/HASH/lock/PubSub 구조와 participants `ABORTED` 정리 정책 반영 |
 | 2026-05-19 | RTT 측정 Redis `game:rtt:{gameRoomId}` HASH 구조, 300초 TTL, 성공 상태 유지 및 실패 cleanup 정책 반영 |
-| 2026-05-20 | GAME_START 이후 종료 정산 deadline용 `game:end:pending` ZSET과 `settlementDueAt = startAt + durationMs + 2000ms` 정책 반영 |
+| 2026-05-20 | GAME_START 이후 종료 정산 deadline용 `game:end:pending` ZSET 반영 |
+| 2026-05-22 | `game:end:pending` score를 `naturalDeathAt = startAt + durationMs` 기준으로 수정하고 2000ms 입력 유예 제거 |

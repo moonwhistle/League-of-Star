@@ -272,7 +272,8 @@ stateDiagram-v2
 - `GAME_START` 이후 disconnect는 gameRoom을 `ABORTED`로 만들지 않습니다.
 - disconnect 유저는 이후 추가 입력을 할 수 없지만, 이미 서버가 수신한 액션은 유지합니다.
 - WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료합니다.
-- 종료 정산 deadline은 `gameEndAt = startAt + scenario.durationMs`, `settlementDueAt = gameEndAt + 2000ms`로 계산합니다.
+- 종료 정산 deadline은 최초 `naturalDeathAt = startAt + scenario.durationMs`로 계산합니다.
+- 한 명만 SMITE를 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 SMITE 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있습니다.
 - deadline 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 상태 저장소 cleanup을 수행하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 등록된 deadline을 제거하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않습니다.
 - `IN_PROGRESS` 중 클라이언트는 gameRoom WebSocket으로 `SMITE`를 보낼 수 있고, 서버는 클라이언트 timestamp 없이 서버 수신 시각만 저장합니다.
@@ -285,7 +286,7 @@ stateDiagram-v2
 - 양쪽 유저가 모두 SMITE를 사용했는데 처치하지 못한 경우 같은 처리 흐름에서 gameRoom을 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast합니다.
 - 한 명만 SMITE를 사용했고 처치하지 못한 경우 gameRoom은 `IN_PROGRESS`를 유지하며, 이후 상대 SMITE 또는 자연사/제한 시간 종료 정산을 기다립니다.
 - 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 새 action을 저장하지 않고 현재 session에 확정된 `GAME_RESULT`만 재응답합니다.
-- scheduler는 `settlementDueAt`에 도달한 gameRoom을 정산 대상으로 삼고, 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
+- scheduler는 `naturalDeathAt`에 도달한 gameRoom을 정산 대상으로 삼고, 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
 - 서버는 HP scenario와 수신 액션 기준으로 승/패/무승부를 판정하고, 그 결과만 record/LP에 반영합니다.
 
 ## 4. Game WebSocket Session (게임 대기 WebSocket 연결 상태)
