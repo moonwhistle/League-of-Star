@@ -140,17 +140,18 @@
 - `GAME_START` 이전 timeout 후 두 유저는 start 버튼 화면으로 복귀한다. 큐 자동 복귀는 하지 않는다.
 - `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
 - `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
-- 서버 timer/scheduler는 `gameEndAt = startAt + scenario.durationMs` 기준으로 게임의 논리적 종료 시각을 계산한다.
-- 정산 대상 조회 시작 시각은 `settlementDueAt = gameEndAt + inputGraceMs`로 등록한다.
-- `settlementDueAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각이다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
+- 서버 timer/scheduler는 `naturalDeathAt = startAt + scenario.durationMs`를 최초 자연사 deadline으로 등록한다.
+- SMITE 실패 action이 저장되면 원본 scenario HP에서 누적 SMITE 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있다.
+- `naturalDeathAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각이다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
 - 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않는다. 서버 종료 기준은 `startAt + scenario.durationMs`다.
-- `inputGraceMs`는 2000ms로 둔다. 자연사 직전 입력이 서버에 도착할 수 있는 여유 시간이며, SMITE 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리한다.
 - `GAME_START` 확정 후 `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom과 participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않는다. 이 경우 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫으며, record와 LP/티어 변동은 반영하지 않는다.
 - `GAME_START` 메시지 전송에 실패하면 이미 등록된 `game:end:pending` deadline을 제거하고 gameRoom과 participants를 `ABORTED` 처리한다. 이 경우 match user status, RTT 상태, waiting 상태를 정리하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫는다.
-- game end scheduler는 `settlementDueAt`에 도달한 gameRoom만 정산 대상으로 삼고, 정산 시 gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
+- game end scheduler는 `naturalDeathAt`에 도달한 gameRoom만 정산 대상으로 삼고, 정산 시 gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
 - SMITE로 승/패가 확정되거나 두 유저가 모두 SMITE를 소모해 `DRAW`가 확정된 경우에도 `game:end:pending` member cleanup은 필수로 하지 않는다. DB의 `game_rooms.status`가 최종 기준이며, 후속 game end scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
-- `GAME_START` 이후 결과가 승/패로 확정되면 일반 게임 결과처럼 record와 LP를 반영한다.
-- `GAME_START` 이후 결과가 무승부면 record는 무승부로 저장하고 LP는 변동하지 않는다.
+- 자연사 종료 정산은 DB gameRoom 결과 확정을 먼저 수행하고, 연결된 local WebSocket session이 있으면 `GAME_RESULT`를 보낸다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
+- 자연사 종료 후 pending cleanup은 WebSocket 전송 성공의 의미가 아니라 DB 기준으로 정산 완료된 후보를 제거하는 의미다. cleanup을 생략하면 이미 종료된 gameRoom이 scheduler tick마다 반복 조회될 수 있다.
+- `GAME_RESULT.reason`은 종료 사유에 따라 `SMITE_KILL`, `BOTH_SMITES_USED_DRAW`, `NATURAL_DEATH_DRAW`를 사용한다.
+- record/LP/배치/승급전 반영은 gameRoom 결과 확정 및 `GAME_RESULT` 전송 흐름과 분리한다. 현재 서버 종료 보장 범위에서는 `game_rooms`/`game_participants` 결과 확정까지만 수행하고, `game_records` 생성과 LP 반영은 후속 Step 9에서 처리한다.
 
 ### 2.5 서버 권위 타임스탬프 (공정성 핵심)
 
@@ -229,7 +230,7 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 - 결과가 확정되지 않은 SMITE는 중간 응답을 전송하지 않는다.
 - SMITE로 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
 - 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 session에 `GAME_RESULT`만 재응답한다.
-- record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리하고 기존 game end settlement 또는 record 처리 흐름에서 수행한다.
+- record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리한다. `game_records` 생성, LP 반영, 배치/승급전 처리는 후속 Step 9에서 확정된 gameRoom 결과를 기준으로 수행한다.
 
 ### 2.6 조작 방지
 

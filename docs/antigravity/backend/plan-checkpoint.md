@@ -25,8 +25,15 @@ flowchart TD
     R --> S["game_actions 저장"]
     S --> SR{"SMITE 처치?"}
     SR -->|"Yes"| SG["gameRoom FINISHED<br/>GAME_RESULT broadcast"]
-    SR -->|"No"| SA["game_records 생성<br/>rank 반영"]
-    SG --> SA
+    SR -->|"Both failed"| SD["gameRoom FINISHED DRAW<br/>GAME_RESULT broadcast"]
+    SR -->|"One failed / no input"| SE["game:end:pending<br/>effective naturalDeathAt"]
+    SE --> SJ["GameEndScheduler<br/>due 조회 + row lock"]
+    SJ --> SK{"effective HP <= 0?"}
+    SK -->|"Yes"| SL["자연사 DRAW FINISHED<br/>NATURAL_DEATH_DRAW broadcast"]
+    SK -->|"No"| SM["pending score update"]
+    SG --> SA["Step 9<br/>game_records 생성<br/>rank 반영"]
+    SD --> SA
+    SL --> SA
 
     I -->|"실패"| AB["gameRoom/participants ABORTED<br/>Redis status best-effort 정리"]
     AB --> T
@@ -52,7 +59,7 @@ flowchart TD
 - 양쪽 수락 시 `match_response_result` 발행 구현 완료
 - `match_response_result.game` payload는 `gameRoomId`, `videoUrl`, `webSocketUrl`을 포함한다.
 - `game_rooms`, `game_participants`, `game_actions`, `game_records` 도메인과 DDL은 준비됨
-- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, SMITE 입력 저장/판정, SMITE 처치 즉시 GAME_RESULT 반환까지 구현됨
+- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, SMITE 입력 저장/판정, SMITE 즉시 종료, 서버 scheduler 자연사 종료 보장, `NATURAL_DEATH_DRAW` 결과 전송까지 구현됨
 
 ## 2. 핵심 결정
 
@@ -182,11 +189,14 @@ flowchart TD
 
 ### Step 8. 서버 timer/scheduler 기반 게임 종료 보장
 
-- [ ] WebSocket 연결 유무와 무관하게 gameRoom 종료 timer/scheduler 실행
-- [ ] HP scenario의 몬스터 사망 시각 또는 게임 제한 시간 기준 종료 job 등록
-- [ ] 서버 재시작/스케줄러 지연 시에도 종료 대상 gameRoom을 재조회해 마무리하는 복구 정책 정의
-- [ ] 이미 FINISHED/ABORTED 된 gameRoom은 종료 job이 no-op 처리
-- [ ] GAME_START 이후 양쪽 WebSocket이 끊겨도 서버가 승패/무승부 판정을 완료
+- [x] WebSocket 연결 유무와 무관하게 gameRoom 종료 scheduler 실행
+- [x] `GAME_START` 시 최초 `naturalDeathAt = startAt + scenario.durationMs` 기준 종료 후보 등록
+- [x] 실패 SMITE 누적 데미지 기준 effective naturalDeathAt을 계산해 pending score를 앞당김
+- [x] scheduler 지연 시에도 `game:end:pending` due 조회 후 DB row lock 안에서 최종 상태를 재판정
+- [x] 이미 FINISHED/ABORTED 된 gameRoom은 종료 job이 no-op 처리
+- [x] GAME_START 이후 양쪽 WebSocket이 끊겨도 서버가 자연사 DRAW를 확정
+- [x] 자연사 DRAW로 새로 종료된 경우 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)` broadcast
+- [x] 전송 실패/미연결과 DB 결과 확정을 분리하고 pending cleanup은 best-effort로 수행
 
 ### Step 9. 게임 종료와 기록
 
@@ -195,6 +205,49 @@ flowchart TD
 - [ ] `game_participants` 상태 FINISHED
 - [ ] `game_records` 2행 생성
 - [ ] LP/배치/승급전 반영 연결
+
+### Step 10. Apex 티어 매칭 정책 정합성
+
+- [ ] Master+ 유저가 현재 `matching:queue:29+`에 들어갈 수 있는지 확인
+- [ ] 매칭 엔진 스캔 범위가 Apex 큐를 누락하지 않도록 조정
+- [ ] Apex 티어는 단순 division diff가 아니라 LP 근접도 기반 매칭 정책으로 분리
+- [ ] Apex 매칭 범위도 대기 시간에 따라 점진 확장되도록 기준 정의
+- [ ] 일반 티어 `1~28` 매칭과 Apex 매칭이 서로 충돌하지 않도록 queue key/score 정책 정리
+- [ ] Apex 매칭 테스트 추가
+
+### Step 11. 배치 유저 매칭 정책 정합성
+
+- [ ] `RankSeries.type=PLACEMENT` 진행 중인 유저를 큐 진입 시 식별
+- [ ] 배치 유저는 Silver IV ~ Gold IV 구간 유저와 매칭되도록 후보 범위 정책 구현
+- [ ] 배치 유저의 실제 `UserRankInfo.rank` 또는 기본 tierScore와 매칭용 tierScore를 분리할지 결정
+- [ ] 배치 유저와 일반 유저가 매칭될 때 opponent profile/payload에 표시할 rank 정책 확인
+- [ ] 배치 유저 매칭 테스트 추가
+
+### Step 12. 큐 진입 전 진행 중 gameRoom DB 검증
+
+- [ ] `joinQueue` 전에 DB 기준 진행 중 gameRoom 존재 여부를 조회
+- [ ] Redis `match:status:{userId}`만으로 중복 진입을 판단하지 않도록 보강
+- [ ] READY/IN_PROGRESS gameRoom이 있으면 매칭 큐 진입 차단
+- [ ] FINISHED/ABORTED gameRoom은 큐 진입을 막지 않도록 상태 기준 명확화
+- [ ] Redis TTL 만료 또는 cleanup 실패 이후에도 DB source of truth 기준으로 재진입을 막는 테스트 추가
+
+### Step 13. match_found 후처리 실패 복구
+
+- [ ] queue 원자 제거 이후 user status/session/timeout/event 발행 중 실패 가능한 지점 정리
+- [ ] user status `FOUND` 갱신 실패 시 두 유저 큐 복귀 또는 상태 정리 정책 정의
+- [ ] session 저장 실패 시 두 유저 큐 복귀 또는 상태 정리 정책 정의
+- [ ] timeout pending 등록 실패 시 세션/user status/queue 보상 정책 정의
+- [ ] `match_found` Pub/Sub 발행 실패 시 재발행/조회 기반 복구/로그 격리 중 정책 결정
+- [ ] 후처리 실패 복구 테스트 추가
+
+### Step 14. 동일 IP 셀프 매칭 방지
+
+- [ ] 매칭 큐 진입 시 요청 IP 또는 셀프 매칭 방지용 식별자를 ticket에 포함할지 결정
+- [ ] proxy/load balancer 환경에서 신뢰할 IP header 정책 정의
+- [ ] 동일 IP 유저끼리는 후보 매칭에서 제외
+- [ ] 동일 IP 후보 제외로 인해 오래 대기하는 유저의 범위 확장 정책과 충돌하지 않도록 처리
+- [ ] 개인정보/보관 기간 관점에서 Redis ticket에 저장할 IP 값 형태를 결정
+- [ ] 동일 IP 셀프 매칭 방지 테스트 추가
 
 ## 5. MVP 기준
 
@@ -410,8 +463,8 @@ GAME_START 이후 WebSocket disconnect
 -> 게임 clock/scenario는 서버 기준으로 계속 진행
 -> 상대가 유효한 SMITE로 처치하면 서버 최종 판정 결과대로 승/패 확정
 -> 상대가 처치하지 못하고 자연사하면 무승부
--> 최종 결과 기준으로 game_records 생성
--> 승/패면 LP 반영, 무승부면 LP 변동 없음
+-> 자연사 DRAW로 새로 종료되면 연결된 local session에 NATURAL_DEATH_DRAW GAME_RESULT 전송
+-> game_records 생성과 LP/배치/승급전 반영은 Issue 52에서 처리
 ```
 
 따라서 WebSocket 대기 timeout은 URL 만료 정책이 아니라 gameRoom `READY` 상태의 준비 응답 timeout으로 구현한다.
@@ -619,22 +672,24 @@ gameRoom 생성 실패 mapping:
 
 목표:
 
-- WebSocket 연결 유무와 무관하게 서버 기준으로 gameRoom 종료를 보장한다.
+- WebSocket 연결 유무와 무관하게 서버 기준으로 gameRoom 종료를 보장한다. 완료됨.
 
 범위:
 
-- `GAME_START` 시 game end timer/scheduler 등록
-- HP scenario의 몬스터 사망 시각 또는 게임 제한 시간 기준 종료 job 실행
-- 종료 시점에 저장된 `game_actions`와 scenario 기준으로 최종 승패/무승부 판정
-- 양쪽 WebSocket이 모두 끊겨도 gameRoom 종료 처리 계속 진행
-- 이미 `FINISHED`/`ABORTED` 된 gameRoom에 대한 종료 job no-op 처리
-- 서버 재시작/스케줄러 지연 시 종료 대상 gameRoom 재조회 복구 정책 정의
+- [x] `GAME_START` 시 game end pending 등록
+- [x] HP scenario와 실패 SMITE action을 합성한 effective naturalDeathAt 기준 종료 scheduler 실행
+- [x] 종료 시점에 저장된 `game_actions`와 scenario 기준으로 자연사 `DRAW` 판정
+- [x] 양쪽 WebSocket이 모두 끊겨도 gameRoom 종료 처리 계속 진행
+- [x] 이미 `FINISHED`/`ABORTED` 된 gameRoom에 대한 종료 job no-op 처리
+- [x] scheduler 지연 시 종료 대상 gameRoom 재조회 후 row lock 안에서 복구 정산
+- [x] 자연사 `DRAW` 결과를 공용 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`로 전송
+- [x] record/LP/시리즈 반영은 Issue 52 범위로 분리
 
 완료 기준:
 
-- `GAME_START` 이후 WebSocket 연결이 없어도 gameRoom이 서버 기준으로 종료됨
-- scenario 종료 시점 또는 몬스터 사망 시점에 최종 결과가 확정됨
-- 종료 job 중복 실행 시에도 상태가 중복 변경되지 않음
+- [x] `GAME_START` 이후 WebSocket 연결이 없어도 gameRoom이 서버 기준으로 종료됨
+- [x] scenario 종료 시점 또는 effective naturalDeathAt 시점에 자연사 `DRAW` 결과가 확정됨
+- [x] 종료 job 중복 실행 시에도 상태가 중복 변경되지 않음
 
 ### Issue 52. 게임 종료와 record/rank 연결
 
@@ -656,6 +711,108 @@ gameRoom 생성 실패 mapping:
 - 결과에 따라 랭크 관련 상태가 갱신됨
 - 클라이언트가 최종 결과 화면에 필요한 정보를 받을 수 있음
 
+### Issue 53. Apex 티어 매칭 정책 정합성
+
+목표:
+
+- Master+ 유저가 정책대로 LP 근접도 기반으로 매칭되도록 한다.
+
+범위:
+
+- 현재 `Rank.getTierScore()`가 Master+를 29 이상으로 계산하는 점과 `MatchingConstants.TIER_SCORE_MAX=28` 스캔 범위의 불일치 해소
+- Apex용 queue scan/후보 탐색 범위 정의
+- Apex LP 근접도 기준과 대기 시간별 확장 정책 정의
+- 일반 티어 division diff 매칭과 Apex LP 매칭의 경계 분리
+- Apex 매칭 단위 테스트 및 Redis store 테스트 추가
+
+완료 기준:
+
+- Master+ 유저가 큐에 들어간 뒤 매칭 엔진 스캔 대상에서 누락되지 않음
+- Apex 유저끼리는 LP 근접도와 대기 시간 확장 정책에 따라 매칭됨
+- 일반 티어 유저 매칭 결과가 기존 정책과 동일하게 유지됨
+
+### Issue 54. 배치 유저 매칭 정책 정합성
+
+목표:
+
+- 배치 게임 중인 유저가 Silver IV ~ Gold IV 구간과 매칭되도록 한다.
+
+범위:
+
+- `RankSeries.type=PLACEMENT` 진행 중 여부 조회
+- 큐 진입 시 일반 rank tierScore와 배치 매칭용 score/range 분리 여부 결정
+- Silver IV ~ Gold IV 후보 범위 구현
+- opponent profile/payload에서 배치 유저 rank 표시 정책 확인
+- 배치 유저 매칭 테스트 추가
+
+완료 기준:
+
+- 배치 진행 중 유저가 정책 범위 밖 유저와 매칭되지 않음
+- 배치 유저와 일반 유저 매칭이 기존 accept/reject/timeout 흐름과 동일하게 동작함
+- 배치가 아닌 유저의 기존 매칭 범위가 깨지지 않음
+
+### Issue 55. 큐 진입 전 진행 중 gameRoom DB 검증
+
+목표:
+
+- Redis status만이 아니라 DB gameRoom 상태 기준으로 진행 중 게임 유저의 큐 재진입을 차단한다.
+
+범위:
+
+- `joinQueue` 전 userId 기준 활성 gameRoom 조회 유스케이스 추가
+- READY/IN_PROGRESS 상태의 gameRoom이 있으면 큐 진입 차단
+- FINISHED/ABORTED 상태는 큐 진입 차단 대상에서 제외
+- Redis `match:status` TTL 만료 또는 cleanup 실패 케이스 보강
+- API/matching 경계에서 DB 조회 책임 위치 결정
+
+완료 기준:
+
+- Redis status가 비어 있어도 DB에 활성 gameRoom이 있으면 큐 진입 실패
+- 종료/중단된 gameRoom만 있으면 큐 진입 가능
+- 기존 중복 큐 진입 차단 정책이 유지됨
+
+### Issue 56. match_found 후처리 실패 복구
+
+목표:
+
+- queue 원자 제거 이후 `FOUND` 상태/session/timeout/event 발행 중 실패해도 유저가 유실되지 않도록 한다.
+
+범위:
+
+- `MatchFoundService.process`의 실패 지점별 보상 정책 정의
+- user status `FOUND` 갱신 실패 시 복구
+- match session 저장 실패 시 복구
+- timeout pending 등록 실패 시 복구
+- `match_found` Pub/Sub 발행 실패 시 재발행 또는 조회 기반 복구 정책 결정
+- 후처리 실패 복구 테스트 추가
+
+완료 기준:
+
+- 큐에서 제거된 유저가 session 없이 방치되지 않음
+- timeout pending 없는 FOUND session이 생기지 않음
+- 알림 발행 실패가 발생해도 운영자가 복구 가능한 상태와 로그가 남음
+
+### Issue 57. 동일 IP 셀프 매칭 방지
+
+목표:
+
+- 동일 IP 또는 동일 네트워크 식별자로 양쪽 플레이어가 매칭되는 것을 차단한다.
+
+범위:
+
+- 매칭 큐 진입 시 client IP 식별자 수집 위치 결정
+- proxy/load balancer 환경에서 신뢰할 header 정책 정의
+- Redis `MatchTicket`에 저장할 IP/hash 식별자 형태 결정
+- 후보 탐색 시 동일 IP 매칭 제외
+- 개인정보 보관 범위와 TTL 정책 확인
+- 동일 IP 매칭 제외 테스트 추가
+
+완료 기준:
+
+- 동일 IP 유저끼리는 같은 match session으로 묶이지 않음
+- 서로 다른 IP 유저의 기존 매칭 성능과 정책은 유지됨
+- IP 식별자 저장 방식이 운영/개인정보 정책과 충돌하지 않음
+
 ## 8. 변경 이력
 
 | 날짜 | 변경 내용 |
@@ -667,3 +824,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
 | 2026-05-18 | 게임 대기 timeout 정산을 Step 4 / Issue 39로 분리하고, GAME_START 이후 WebSocket 연결 유무와 무관하게 gameRoom 종료를 보장하는 서버 timer/scheduler step을 Issue 42로 정리 |
 | 2026-05-19 | Step 4 게임 대기 timeout 정산 구현 완료 상태, gameRoom `createdAt + 30초`, participants `ABORTED`, Pub/Sub 복귀 이벤트 정책 반영 |
+| 2026-05-22 | 매칭 정책 정합성 후속 항목으로 Step 10~14 및 Issue 53~57 추가. Apex, 배치, 진행 중 gameRoom DB 검증, match_found 후처리 복구, 동일 IP 셀프 매칭 방지 추적 |

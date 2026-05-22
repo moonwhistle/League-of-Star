@@ -1,9 +1,9 @@
-package com.sang.smite.game.smite.service;
+package com.sang.smite.game.result.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sang.smite.domain.game.domain.vo.GameResult;
-import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.result.dto.GameResultPayload;
 import com.sang.smite.game.websocket.dto.GameWebSocketMessageType;
 import com.sang.smite.game.websocket.service.GameRoomWebSocketMessageSender;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSessionRegistry;
@@ -16,11 +16,13 @@ import org.springframework.web.socket.WebSocketSession;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class GameSmiteWebSocketSenderTest {
+class GameResultWebSocketSenderTest {
 
     private static final Long GAME_ROOM_ID = 100L;
     private static final Long USER_ID = 1L;
@@ -32,7 +34,7 @@ class GameSmiteWebSocketSenderTest {
             objectMapper,
             sessionRegistry
     );
-    private final GameSmiteWebSocketSender sender = new GameSmiteWebSocketSender(messageSender);
+    private final GameResultWebSocketSender sender = new GameResultWebSocketSender(messageSender);
 
     @Test
     @DisplayName("sendGameResult - 현재 session에 GAME_RESULT를 전송한다")
@@ -81,6 +83,25 @@ class GameSmiteWebSocketSenderTest {
         assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.GAME_RESULT.name());
         assertThat(message.get("payload").get("result").asText()).isEqualTo(GameResult.PLAYER1_WIN.name());
         assertThat(message.get("payload").get("reason").asText()).isEqualTo("SMITE_KILL");
+    }
+
+    @Test
+    @DisplayName("broadcastGameResult - 연결된 session이 없으면 메시지 전송 없이 완료한다")
+    void broadcastGameResult_NoSession() throws Exception {
+        // given
+        WebSocketSession session = session();
+        GameResultPayload payload = new GameResultPayload(
+                GAME_ROOM_ID,
+                GameResult.DRAW,
+                null,
+                "NATURAL_DEATH_DRAW",
+                20_000L,
+                List.of()
+        );
+
+        // when & then
+        assertDoesNotThrow(() -> sender.broadcastGameResult(GAME_ROOM_ID, payload));
+        verify(session, never()).sendMessage(org.mockito.ArgumentMatchers.any());
     }
 
     private WebSocketSession session() {

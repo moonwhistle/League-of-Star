@@ -2,6 +2,7 @@ package com.sang.smite.domain.game.service;
 
 import com.sang.smite.domain.game.domain.GameParticipant;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.domain.vo.ParticipantStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
@@ -166,5 +167,34 @@ class GameRoomCommandServiceJpaTest {
         assertThat(gameRecordRepository.count()).isZero();
         assertThat(rankSeriesRepository.count()).isZero();
         assertThat(userRankInfoRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomByNaturalDeathDraw - 자연사 DRAW 종료 상태를 DB에 저장한다")
+    void finishInProgressRoomByNaturalDeathDraw_SaveFinishedDrawStatus() {
+        // given
+        GameRoom savedGameRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomCommandService.startReadyRoomIfReady(
+                savedGameRoom.getId(),
+                LocalDateTime.of(2026, 5, 20, 12, 0)
+        );
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        boolean finished = gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(savedGameRoom.getId())
+                .isPresent();
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(finished).isTrue();
+        assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(foundGameRoom.getResult()).isEqualTo(GameResult.DRAW);
+        assertThat(foundGameRoom.getWinnerId()).isNull();
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.FINISHED);
     }
 }

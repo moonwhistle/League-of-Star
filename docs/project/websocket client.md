@@ -314,7 +314,8 @@ sequenceDiagram
 - 위 `PLAYER_LEFT`는 게임 대기 WebSocket의 연결 상태 알림입니다.
 - `GAME_START` 이전에는 gameRoom `createdAt` 기준 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료하지 못하면 `ABORTED` 대상이 됩니다.
 - `GAME_START` 이후에는 WebSocket 연결이 끊겨도 gameRoom을 즉시 중단하지 않고 서버 timer/scheduler가 종료 판정을 완료합니다.
-- 서버는 `GAME_START` 확정 시 `gameEndAt = startAt + scenario.durationMs`, `settlementDueAt = gameEndAt + 2000ms`로 종료 정산 deadline을 등록합니다.
+- 서버는 `GAME_START` 확정 시 최초 `naturalDeathAt = startAt + scenario.durationMs`로 종료 정산 deadline을 등록합니다.
+- 한 명만 SMITE를 사용했고 처치하지 못한 경우 서버는 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 종료 정산 deadline을 앞당길 수 있습니다.
 - deadline 등록 실패 시 서버는 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 상태 저장소 cleanup을 수행합니다. 연결된 클라이언트에는 `GAME_START_FAILED`를 전송하고 record/LP는 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송 실패 시 서버는 `GAME_START_FAILED` 전송 후 WebSocket을 닫고, 클라이언트는 start 버튼 화면으로 복귀합니다.
 
@@ -549,6 +550,40 @@ sequenceDiagram
 | `GAME_RESULT` | gameRoom 승패/무승부 확정 결과 |
 | `ERROR` | 잘못된 메시지 또는 처리 불가 |
 
+`GAME_RESULT.payload.reason`:
+
+| reason | 의미 | 전송 방식 |
+|------|------|------|
+| `SMITE_KILL` | SMITE 적용 후 effective HP가 0 이하가 되어 승패가 확정됨 | gameRoom session broadcast |
+| `BOTH_SMITES_USED_DRAW` | 두 유저가 모두 SMITE를 사용했고 둘 다 처치하지 못해 즉시 DRAW 확정 | gameRoom session broadcast |
+| `NATURAL_DEATH_DRAW` | scheduler가 effective naturalDeathAt 이후 자연사 DRAW를 확정 | 연결된 local gameRoom session broadcast. 연결이 없으면 메시지 없이 DB 결과만 확정 |
+
+`GAME_RESULT` 예시:
+
+```json
+{
+  "type": "GAME_RESULT",
+  "payload": {
+    "gameRoomId": 100,
+    "result": "DRAW",
+    "winnerUserId": null,
+    "reason": "NATURAL_DEATH_DRAW",
+    "finishedAt": 1716192017000,
+    "actions": [
+      {
+        "userId": 1,
+        "serverReceiveTime": 1716192010000,
+        "smiteTimeMs": 6000,
+        "dragonHpAtSmite": 3000,
+        "damage": 1200,
+        "afterHp": 1800,
+        "isKill": false
+      }
+    ]
+  }
+}
+```
+
 SMITE 관련 `ERROR.payload.code`:
 
 | code | 의미 |
@@ -566,6 +601,8 @@ SMITE 관련 `ERROR.payload.code`:
 - `SMITE` payload에는 클라이언트 timestamp를 포함하지 않으며 빈 object `{}` 또는 payload 생략만 허용합니다.
 - 같은 유저가 같은 gameRoom에서 중복 전송하더라도 서버는 첫 action만 유효하게 유지하고 새 중간 응답을 전송하지 않습니다.
 - 결과가 확정되지 않은 SMITE에는 서버 응답이 없으며, 클라이언트는 `GAME_RESULT`를 받을 때만 종료 UI로 전환합니다.
+- 자연사 `DRAW`는 클라이언트 입력 없이 서버 scheduler가 확정할 수 있으므로, 플레이 중에는 SMITE 응답이 없어도 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 받을 수 있습니다.
+- WebSocket이 끊겨 `GAME_RESULT`를 받지 못해도 서버 DB 결과가 최종 기준입니다. 재접속/늦은 SMITE 등으로 이미 `FINISHED`인 gameRoom 결과를 조회하게 되면 현재 session에 확정된 `GAME_RESULT`만 재응답됩니다.
 
 ```json
 {
@@ -631,3 +668,4 @@ stateDiagram-v2
 | 2026-05-18 | gameRoom `createdAt` 기준 30초 waiting timeout, 미연결 유저 이벤트 수신 불가, `GAME_WAITING_TIMEOUT` 클라이언트 복귀 흐름 추가 |
 | 2026-05-19 | RTT_PING/RTT_PONG, 5회 median RTT, 2500ms per-ping timeout, 15초 전체 제한, GAME_START_FAILED 복귀 정책 추가 |
 | 2026-05-20 | `startAt = serverNow + 4000ms`, 프론트 3초 countdown 렌더링, `COUNTDOWN`/`GAME_START` 사전 수신 후 startAt 대기 정책 추가 |
+| 2026-05-22 | `GAME_RESULT.reason=NATURAL_DEATH_DRAW`와 scheduler 자연사 DRAW broadcast 정책 반영 |

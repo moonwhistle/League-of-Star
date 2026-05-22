@@ -9,6 +9,8 @@ import com.sang.smite.domain.game.service.GameActionReadService;
 import com.sang.smite.domain.game.service.GameActionSaveResult;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
 import com.sang.smite.domain.game.service.GameSmiteJudgementService;
+import com.sang.smite.game.end.service.GameEndDeadlineAdvanceService;
+import com.sang.smite.game.result.service.GameResultPayloadFactory;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class GameSmiteServiceTest {
@@ -37,6 +41,8 @@ class GameSmiteServiceTest {
     private final GameActionReadService gameActionReadService = mock(GameActionReadService.class);
     private final GameActionCommandService gameActionCommandService = mock(GameActionCommandService.class);
     private final GameSmiteJudgementService gameSmiteJudgementService = mock(GameSmiteJudgementService.class);
+    private final GameEndDeadlineAdvanceService gameEndDeadlineAdvanceService =
+            mock(GameEndDeadlineAdvanceService.class);
     private final GameResultPayloadFactory gameResultPayloadFactory = new GameResultPayloadFactory();
     private final Clock clock = Clock.fixed(FINISHED_AT, ZoneOffset.UTC);
     private final GameSmiteService service = new GameSmiteService(
@@ -44,6 +50,7 @@ class GameSmiteServiceTest {
             gameActionReadService,
             gameActionCommandService,
             gameSmiteJudgementService,
+            gameEndDeadlineAdvanceService,
             gameResultPayloadFactory,
             clock
     );
@@ -83,7 +90,8 @@ class GameSmiteServiceTest {
         when(gameActionReadService.findByGameRoomIdAndUserId(GAME_ROOM_ID, USER_ID))
                 .thenReturn(Optional.empty());
         when(gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))
-                .thenReturn(List.of());
+                .thenReturn(List.of())
+                .thenReturn(List.of(action));
         when(gameSmiteJudgementService.judge(gameRoom, USER_ID, SERVER_RECEIVE_TIME_MS, List.of()))
                 .thenReturn(Optional.of(action));
         when(gameActionCommandService.saveIfAbsent(action))
@@ -106,6 +114,7 @@ class GameSmiteServiceTest {
         inOrder.verify(gameActionReadService).findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID);
         inOrder.verify(gameSmiteJudgementService).judge(gameRoom, USER_ID, SERVER_RECEIVE_TIME_MS, List.of());
         inOrder.verify(gameActionCommandService).saveIfAbsent(action);
+        verify(gameEndDeadlineAdvanceService).advanceAfterFailedSmite(gameRoom, List.of(action));
     }
 
     @Test
@@ -145,6 +154,7 @@ class GameSmiteServiceTest {
         assertThat(result.get().gameResult().reason()).isEqualTo("SMITE_KILL");
         assertThat(result.get().gameResult().finishedAt()).isEqualTo(FINISHED_AT.toEpochMilli());
         assertThat(result.get().gameResult().actions()).hasSize(1);
+        verify(gameEndDeadlineAdvanceService, never()).advanceAfterFailedSmite(lockedRoom, List.of(action));
     }
 
     @Test
@@ -188,6 +198,8 @@ class GameSmiteServiceTest {
         assertThat(result.get().gameResult().reason()).isEqualTo("BOTH_SMITES_USED_DRAW");
         assertThat(result.get().gameResult().finishedAt()).isEqualTo(FINISHED_AT.toEpochMilli());
         assertThat(result.get().gameResult().actions()).hasSize(2);
+        verify(gameEndDeadlineAdvanceService, never())
+                .advanceAfterFailedSmite(lockedRoom, List.of(firstAction, secondAction));
     }
 
     @Test
@@ -213,6 +225,33 @@ class GameSmiteServiceTest {
         assertThat(result.get().broadcast()).isFalse();
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.PLAYER1_WIN);
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
+        assertThat(result.get().gameResult().reason()).isEqualTo("SMITE_KILL");
+    }
+
+    @Test
+    @DisplayName("handleSmite - 이미 자연사 DRAW로 FINISHED인 gameRoom이면 NATURAL_DEATH_DRAW reason을 반환한다")
+    void handleSmite_AlreadyFinishedNaturalDeathDraw_ReturnCurrentGameResultOnly() {
+        // given
+        GameRoom finishedRoom = mock(GameRoom.class);
+        GameAction action = GameAction.smite(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 200, 3_000);
+        when(gameRoomCommandService.lockSmiteResultRoom(GAME_ROOM_ID, USER_ID))
+                .thenReturn(finishedRoom);
+        when(finishedRoom.getStatus()).thenReturn(GameStatus.FINISHED);
+        when(finishedRoom.getResult()).thenReturn(GameResult.DRAW);
+        when(finishedRoom.getWinnerId()).thenReturn(null);
+        when(gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))
+                .thenReturn(List.of(action));
+
+        // when
+        var result = service.handleSmite(new GameSmiteCommand(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS));
+
+        // then
+        assertThat(result).isPresent();
+        assertThat(result.get().gameResult()).isNotNull();
+        assertThat(result.get().broadcast()).isFalse();
+        assertThat(result.get().gameResult().result()).isEqualTo(GameResult.DRAW);
+        assertThat(result.get().gameResult().winnerUserId()).isNull();
+        assertThat(result.get().gameResult().reason()).isEqualTo("NATURAL_DEATH_DRAW");
     }
 
     @Test

@@ -145,7 +145,7 @@ flowchart TD
 - [x] SMITE action 정렬 기준은 `serverReceiveTimeMs ASC`, 그래도 같으면 `id ASC`로 정의하고 조회 메서드를 준비한다.
 - [x] `smiteTimeMs`는 `serverReceiveTimeMs - startAtMillis`로 계산되므로 winner 정렬과 같은 서버 수신 기준을 따른다.
 - [x] 두 유저가 거의 동시에 SMITE를 누른 경우도 서버 수신 기준으로 winner를 결정한다.
-- [x] 처치 action 발생 시 일반 end scheduler의 `settlementDueAt`까지 기다리지 않는다.
+- [x] 처치 action 발생 시 일반 end scheduler의 `naturalDeathAt`까지 기다리지 않는다.
 - [x] 처치 action 발생 시 같은 transaction 흐름에서 즉시 결과 확정을 시도한다.
 - [x] 결과 확정은 gameRoom row lock 안에서 한 번만 성공하게 한다.
 
@@ -242,7 +242,7 @@ flowchart TD
 - [x] 두 유저가 같은 `serverReceiveTimeMs`로 SMITE를 보냈을 때 `serverReceiveTimeMs`, `id` 정렬 기준으로 조회되고 앞선 action 데미지가 후속 판정에 반영되는지 검증한다.
 - [x] SMITE 적용 후 `afterHp <= 0`이면 gameRoom이 즉시 `FINISHED`로 전환되고 `GAME_RESULT`가 브로드캐스트되는지 검증한다.
 - [x] 두 유저가 모두 SMITE를 사용하고 처치하지 못한 경우 즉시 `DRAW GAME_RESULT`가 반환되는지 검증한다.
-- [x] 두 유저가 모두 SMITE를 사용한 실패 판은 `gameEndAt`/`inputGraceMs`를 기다리지 않는지 검증한다.
+- [x] 두 유저가 모두 SMITE를 사용한 실패 판은 scheduler 자연사 deadline을 기다리지 않는지 검증한다.
 - [x] 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 action 저장 없이 `GAME_RESULT`를 재응답하는지 검증한다.
 - [x] `IN_PROGRESS`가 아닌 gameRoom, participant 아님, scenario 없음 실패 케이스를 검증한다.
 

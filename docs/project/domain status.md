@@ -254,7 +254,7 @@ stateDiagram-v2
     
     SMITE_KILL --> FINISHED: 판정 완료 (Winner Decided)
     BOTH_SMITE_USED --> FINISHED: 즉시 DRAW
-    IN_PROGRESS --> FINISHED: 자연사 또는 제한 시간 종료
+    IN_PROGRESS --> FINISHED: effective naturalDeathAt 도달 후<br/>scheduler 자연사 DRAW 정산
     FINISHED --> RECORDED: 전적 기록 완료
     RECORDED --> [*]
 
@@ -272,7 +272,8 @@ stateDiagram-v2
 - `GAME_START` 이후 disconnect는 gameRoom을 `ABORTED`로 만들지 않습니다.
 - disconnect 유저는 이후 추가 입력을 할 수 없지만, 이미 서버가 수신한 액션은 유지합니다.
 - WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료합니다.
-- 종료 정산 deadline은 `gameEndAt = startAt + scenario.durationMs`, `settlementDueAt = gameEndAt + 2000ms`로 계산합니다.
+- 종료 정산 deadline은 최초 `naturalDeathAt = startAt + scenario.durationMs`로 계산합니다.
+- 한 명만 SMITE를 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 SMITE 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있습니다.
 - deadline 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 상태 저장소 cleanup을 수행하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 등록된 deadline을 제거하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않습니다.
 - `IN_PROGRESS` 중 클라이언트는 gameRoom WebSocket으로 `SMITE`를 보낼 수 있고, 서버는 클라이언트 timestamp 없이 서버 수신 시각만 저장합니다.
@@ -285,8 +286,16 @@ stateDiagram-v2
 - 양쪽 유저가 모두 SMITE를 사용했는데 처치하지 못한 경우 같은 처리 흐름에서 gameRoom을 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast합니다.
 - 한 명만 SMITE를 사용했고 처치하지 못한 경우 gameRoom은 `IN_PROGRESS`를 유지하며, 이후 상대 SMITE 또는 자연사/제한 시간 종료 정산을 기다립니다.
 - 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 새 action을 저장하지 않고 현재 session에 확정된 `GAME_RESULT`만 재응답합니다.
-- scheduler는 `settlementDueAt`에 도달한 gameRoom을 정산 대상으로 삼고, 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
-- 서버는 HP scenario와 수신 액션 기준으로 승/패/무승부를 판정하고, 그 결과만 record/LP에 반영합니다.
+- scheduler는 `naturalDeathAt`에 도달한 gameRoom을 정산 대상으로 삼고, 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
+- scheduler는 due gameRoom을 row lock으로 다시 조회하고, 저장된 action 목록과 원본 scenario를 합성해 effective HP를 재계산합니다.
+- due로 조회됐더라도 effective HP가 아직 `0`보다 크면 종료하지 않고 더 늦은 effective naturalDeathAt으로 `game:end:pending` score를 갱신합니다.
+- 실패 SMITE 직후의 deadline 앞당김과 scheduler due 재조정은 Redis Lua script를 분리합니다. 앞당김은 member가 없으면 등록할 수 있고 기존 deadline보다 빠른 경우만 반영하며, due 재조정은 이미 due인 기존 member만 뒤로 이동합니다.
+- effective HP가 `0` 이하이고 gameRoom이 아직 `IN_PROGRESS`이면 자연사 `DRAW`로 `FINISHED` 전환하고 participants를 `FINISHED`로 전환합니다.
+- 자연사 `DRAW`로 새로 종료된 경우 연결된 local WebSocket session에만 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 broadcast합니다. 연결이 없거나 전송에 실패해도 DB 결과는 유지하며 pending cleanup은 계속 시도합니다.
+- 이미 `FINISHED` 또는 `ABORTED`인 gameRoom은 기존 결과/상태를 유지하고 no-op 처리합니다.
+- 정산 완료 또는 no-op 이후에는 `game:end:pending` member cleanup을 best-effort로 수행합니다.
+- 서버는 HP scenario와 수신 action 기준으로 승/패/무승부를 판정하고, gameRoom 결과를 DB의 source of truth로 둡니다.
+- `game_records` 생성, LP 반영, 배치/승급전 처리는 이 종료 보장 흐름과 분리된 후속 Step 9 범위입니다.
 
 ## 4. Game WebSocket Session (게임 대기 WebSocket 연결 상태)
 

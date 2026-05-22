@@ -51,7 +51,7 @@ erDiagram
         BIGINT game_room_id FK
         BIGINT user_id FK
         BIGINT opponent_id FK
-        BIGINT rank_series_id FK
+        BIGINT promotion_series_id
     }
 ```
 
@@ -148,7 +148,9 @@ stateDiagram-v2
 | 게임 시작 | UPDATE | status=IN_PROGRESS, participants(PLAYING), game_start_time 기록 |
 | GAME_START 이전 timeout | UPDATE | gameRoom `createdAt` 기준 30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 완료되지 않으면 status=ABORTED, participants(ABORTED), game_records/LP 미반영 |
 | GAME_START 이후 disconnect | UPDATE 없음 또는 participant 상태만 DISCONNECTED. gameRoom은 IN_PROGRESS 유지 |
-| 게임 종료 | UPDATE | 서버 timer/scheduler가 scenario와 game_actions 기준으로 status=FINISHED, result/winner_id, participants(FINISHED), finished_at |
+| 게임 종료 | UPDATE | SMITE 즉시 종료 또는 서버 scheduler 자연사 정산이 scenario와 game_actions 기준으로 status=FINISHED, result/winner_id, participants(FINISHED), finished_at 확정 |
+
+> Issue 50의 서버 종료 보장 흐름은 기존 `game_rooms`, `game_participants`, `game_actions` 구조를 사용하며 새 DB 컬럼/테이블을 추가하지 않습니다. 자연사 종료 후보 목록은 Redis `game:end:pending` ZSET으로 관리합니다.
 
 ### 2.6 game_actions — Immutable
 
@@ -169,7 +171,7 @@ stateDiagram-v2
 - **불변(Immutable)**: 전적 기록은 수정하지 않음
 - **항상 2행 생성**: 각 참여자(Participant)의 관점에서 기록
 - **LP/Rank 스냅샷**: lp_before/after와 함께 rank_before/after를 **JSON 스냅샷**으로 저장하여 변동 이력 추적
-- **승급전 연동**: 배치/승급전 경기인 경우 `rank_series_id`를 기록하여 결과 정합성 보장
+- **승급전 연동**: 승급전 경기인 경우 `promotion_series_id`를 기록하여 결과 정합성 보장
 
 ---
 
@@ -442,14 +444,14 @@ CREATE TABLE game_actions (
 | `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 게임 방 |
 | `user_id` | BIGINT | FK → users, NOT NULL | 해당 유저 |
 | `opponent_id` | BIGINT | FK → users, NOT NULL | 상대방 |
-| `rank_series_id` | BIGINT | FK → rank_series, NULLABLE | 연관된 배치/승급전 |
+| `promotion_series_id` | BIGINT | NULLABLE | 연관된 승급전/시리즈 ID |
 | `result` | VARCHAR(10) | NOT NULL | WIN / LOSS / DRAW |
 | `lp_change` | INT | NOT NULL | LP 변동량 |
 | `lp_before` | INT | NOT NULL | 게임 전 LP |
 | `lp_after` | INT | NOT NULL | 게임 후 LP |
 | `rank_before` | JSON | NOT NULL | 게임 전 랭크 스냅샷 (Tier + Division) |
 | `rank_after` | JSON | NOT NULL | 게임 후 랭크 스냅샷 (Tier + Division) |
-| `is_series_game` | BOOLEAN | NOT NULL, DEFAULT FALSE | 배치/승급전 경기 여부 |
+| `is_promotion_game` | BOOLEAN | NOT NULL, DEFAULT FALSE | 승급전 경기 여부 |
 | `created_at` | DATETIME | NOT NULL | 기록일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
 
@@ -459,14 +461,14 @@ CREATE TABLE game_records (
     game_room_id      BIGINT      NOT NULL,
     user_id           BIGINT      NOT NULL,
     opponent_id       BIGINT      NOT NULL,
-    rank_series_id    BIGINT      NULL,
+    promotion_series_id BIGINT    NULL,
     result            VARCHAR(10) NOT NULL,
     lp_change         INT         NOT NULL,
     lp_before         INT         NOT NULL,
     lp_after          INT         NOT NULL,
     rank_before       JSON        NOT NULL,
     rank_after        JSON        NOT NULL,
-    is_series_game    BOOLEAN     NOT NULL DEFAULT FALSE,
+    is_promotion_game BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -474,10 +476,11 @@ CREATE TABLE game_records (
     INDEX idx_user_id_created (user_id, created_at DESC),
     INDEX idx_user_id_result (user_id, result),
     CONSTRAINT fk_game_records_room      FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_records_user      FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_records_series    FOREIGN KEY (rank_series_id) REFERENCES rank_series (id) ON DELETE SET NULL
+    CONSTRAINT fk_game_records_user      FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
+
+> 현재 `GameRecord` 엔티티는 `promotion_series_id`, `is_promotion_game` 컬럼명을 사용하며 `rank_series` FK 제약은 매핑하지 않습니다. Issue 50의 Step 9에서 gameRoom 결과를 `game_records`/LP/시리즈에 반영할 때 이 설계를 다시 검증해야 합니다.
 
 > **인덱스 설명**
 > - `idx_user_id_created`: 유저 전적 최신순 조회 (프로필 페이지)
@@ -504,7 +507,7 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 | `game:waiting:timeout:lock:{gameRoomId}` | Redis Lock | 멀티 인스턴스 scheduler 중복 timeout 정산 방지 | 작업 lease |
 | `game_waiting_timeout` | Pub/Sub Channel | timeout 확정 후 모든 API 인스턴스에 WebSocket 전송 이벤트 전파 | - |
 | `game:rtt:{gameRoomId}` | Hash | `GAME_START` 이전 RTT 품질 검사 결과. `userAId`, `userBId`, `userASamples`, `userBSamples`, `userAStatus`, `userBStatus` | 300초 |
-| `game:end:pending` | Sorted Set | GAME_START 이후 종료 정산 후보. score = `settlementDueAtMillis`, member = `gameRoomId` | - |
+| `game:end:pending` | Sorted Set | GAME_START 이후 종료 정산 후보. score = `naturalDeathAtMillis`, member = `gameRoomId` | - |
 
 > 매칭 응답 완료 전 상태는 Redis가 관리합니다. 양쪽 수락 후 gameRoom `READY` 생성이 완료되면 game waiting timeout 상태도 Redis에 등록합니다.
 
@@ -529,17 +532,19 @@ game:rtt:{gameRoomId}
 게임 종료 정산 deadline은 `game:end:pending` ZSET에 저장합니다.
 
 ```text
-gameEndAtMillis = startAtMillis + scenario.durationMs
-settlementDueAtMillis = gameEndAtMillis + 2000
-ZADD game:end:pending settlementDueAtMillis gameRoomId
+naturalDeathAtMillis = startAtMillis + scenario.durationMs
+ZADD game:end:pending naturalDeathAtMillis gameRoomId
 ```
 
-- `gameEndAtMillis`는 HP scenario 기준 드래곤이 0이 되는 논리적 종료 시각입니다.
-- `settlementDueAtMillis`는 서버가 최종 판정 대상으로 조회하기 시작할 수 있는 시각입니다. 정산 완료 시각이 아닙니다.
-- 2000ms는 자연사 직전 SMITE 입력이 서버에 도착할 수 있게 두는 입력 유예 시간입니다.
+- `naturalDeathAtMillis`는 HP scenario 기준 드래곤이 0이 되는 최초 자연사 후보 시각입니다.
+- 한 명만 SMITE를 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 SMITE 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAtMillis`를 계산해 score를 앞당길 수 있습니다.
+- `naturalDeathAtMillis`는 정산 완료 시각이 아니라 서버가 최종 판정 대상으로 조회하기 시작할 수 있는 시각입니다.
+- scheduler는 `ZRANGEBYSCORE game:end:pending -inf nowMillis` 기준으로 due gameRoomId를 batch 조회합니다.
+- due 조회된 gameRoom이 아직 effective HP가 남아 있으면 현재 score가 due 상태일 때만 더 늦은 effective naturalDeathAt으로 score를 갱신합니다.
+- 자연사 `DRAW`로 새로 `FINISHED`되거나 이미 `FINISHED`/`ABORTED`라 no-op이면 `game:end:pending` member cleanup을 best-effort로 수행합니다.
 - `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending` cleanup을 시도하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 이미 등록된 `game:end:pending` member를 제거하고 gameRoom/participants를 `ABORTED` 처리합니다.
-- 후속 game end scheduler는 `settlementDueAtMillis`가 지난 gameRoom을 조회하고, gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
+- 후속 game end scheduler는 `naturalDeathAtMillis`가 지난 gameRoom을 조회하고, gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
 - SMITE로 먼저 `FINISHED`된 gameRoom의 member가 `game:end:pending`에 남아 있어도 정상입니다. DB 상태가 최종 기준이며 scheduler no-op으로 정리합니다.
 
 후속 게임 흐름에서 사용할 예정인 Redis 구조:
@@ -578,4 +583,6 @@ ZADD game:end:pending settlementDueAtMillis gameRoomId
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
 | 2026-05-19 | game waiting timeout Redis ZSET/HASH/lock/PubSub 구조와 participants `ABORTED` 정리 정책 반영 |
 | 2026-05-19 | RTT 측정 Redis `game:rtt:{gameRoomId}` HASH 구조, 300초 TTL, 성공 상태 유지 및 실패 cleanup 정책 반영 |
-| 2026-05-20 | GAME_START 이후 종료 정산 deadline용 `game:end:pending` ZSET과 `settlementDueAt = startAt + durationMs + 2000ms` 정책 반영 |
+| 2026-05-20 | GAME_START 이후 종료 정산 deadline용 `game:end:pending` ZSET 반영 |
+| 2026-05-22 | `game:end:pending` score를 `naturalDeathAt = startAt + durationMs` 기준으로 수정하고 2000ms 입력 유예 제거 |
+| 2026-05-22 | Issue 50 기준 자연사 scheduler 정산 흐름, DB entity 변경 없음, `game_records` 실제 엔티티 컬럼명 정합성 반영 |
