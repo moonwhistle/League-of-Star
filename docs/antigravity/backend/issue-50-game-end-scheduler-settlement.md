@@ -131,12 +131,14 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 
 ### 6. GAME_RESULT 공용화와 자연사 결과 응답
 
-- [ ] 최종 결과 payload와 sender가 SMITE 전용 패키지에 묶여 있는 구조를 공용 result 패키지로 정리한다.
-- [ ] `GAME_RESULT` reason에 `NATURAL_DEATH_DRAW`를 추가한다.
-- [ ] 자연사 `DRAW`로 새로 `FINISHED`된 경우 연결된 local WebSocket session에만 `GAME_RESULT`를 broadcast한다.
-- [ ] 연결된 session이 없으면 메시지 전송 없이 DB 결과를 최종 기준으로 둔다.
-- [ ] `GAME_RESULT` 전송 실패가 `game:end:pending` cleanup을 막지 않도록 전송과 cleanup 실패 지점을 분리한다.
-- [ ] 이미 `FINISHED` 또는 `ABORTED`인 no-op 케이스에서는 새 `GAME_RESULT`를 보내지 않는다.
+- [x] 최종 결과 payload와 sender가 SMITE 전용 패키지에 묶여 있는 구조를 공용 result 패키지로 정리한다.
+- [x] `GAME_RESULT` reason에 `NATURAL_DEATH_DRAW`를 추가한다.
+- [x] 자연사 `DRAW`로 새로 `FINISHED`된 경우 연결된 local WebSocket session에만 `GAME_RESULT`를 broadcast한다.
+- [x] 연결된 session이 없으면 메시지 전송 없이 DB 결과를 최종 기준으로 둔다.
+- [x] `GAME_RESULT` 전송 실패가 `game:end:pending` cleanup을 막지 않도록 전송과 cleanup 실패 지점을 분리한다.
+- [x] 이미 `FINISHED` 또는 `ABORTED`인 no-op 케이스에서는 새 `GAME_RESULT`를 보내지 않는다.
+
+> `GameResultPayload`, `GameResultPayloadFactory`, `GameResultWebSocketSender`, `GameResultReason`은 API `game/result` 패키지의 공용 결과 영역으로 분리한다. 자연사 `DRAW`로 새로 종료된 경우에만 `GameEndSettlementService`가 `NATURAL_DEATH_DRAW` payload를 만들어 local WebSocket session에 broadcast하고, 전송 실패와 pending cleanup은 분리한다.
 
 ### 7. 테스트
 

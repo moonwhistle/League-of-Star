@@ -1,5 +1,7 @@
 package com.sang.smite.game.smite.dto;
 
+import com.sang.smite.game.result.dto.GameResultPayload;
+
 import java.util.Optional;
 
 public record GameSmiteHandleResponse(

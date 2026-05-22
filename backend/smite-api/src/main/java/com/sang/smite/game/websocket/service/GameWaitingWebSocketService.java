@@ -8,10 +8,10 @@ import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
 import com.sang.smite.game.smite.domain.GameSmiteFailureReason;
-import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.result.dto.GameResultPayload;
 import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
 import com.sang.smite.game.smite.service.GameSmiteService;
-import com.sang.smite.game.smite.service.GameSmiteWebSocketSender;
+import com.sang.smite.game.result.service.GameResultWebSocketSender;
 import com.sang.smite.game.start.domain.GameStartFailureReason;
 import com.sang.smite.game.start.domain.GameStartTransitionResult;
 import com.sang.smite.game.start.dto.GameStartScenarioPayload;
@@ -50,7 +50,7 @@ public class GameWaitingWebSocketService {
     private final GameEndScheduleService gameEndScheduleService;
     private final GameStartWebSocketSender gameStartWebSocketSender;
     private final GameSmiteService gameSmiteService;
-    private final GameSmiteWebSocketSender gameSmiteWebSocketSender;
+    private final GameResultWebSocketSender gameResultWebSocketSender;
 
     public void registerSession(Long gameRoomId, Long userId, WebSocketSession session) throws IOException {
         sessionRegistry.register(gameRoomId, userId, session);
@@ -140,10 +140,10 @@ public class GameWaitingWebSocketService {
                                 boolean broadcast) {
         try {
             if (broadcast) {
-                gameSmiteWebSocketSender.broadcastGameResult(currentSession.getGameRoomId(), payload);
+                gameResultWebSocketSender.broadcastGameResult(currentSession.getGameRoomId(), payload);
                 return;
             }
-            gameSmiteWebSocketSender.sendGameResult(currentSession.getWebSocketSession(), payload);
+            gameResultWebSocketSender.sendGameResult(currentSession.getWebSocketSession(), payload);
         } catch (IOException e) {
             log.warn("Failed to send GAME_RESULT. gameRoomId={}, userId={}, broadcast={}",
                     currentSession.getGameRoomId(), currentSession.getUserId(), broadcast, e);

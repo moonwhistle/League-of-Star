@@ -1,9 +1,9 @@
-package com.sang.smite.game.smite.service;
+package com.sang.smite.game.result.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sang.smite.domain.game.domain.vo.GameResult;
-import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.result.dto.GameResultPayload;
 import com.sang.smite.game.websocket.dto.GameWebSocketMessageType;
 import com.sang.smite.game.websocket.service.GameRoomWebSocketMessageSender;
 import com.sang.smite.game.websocket.session.GameRoomWebSocketSessionRegistry;
@@ -20,7 +20,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class GameSmiteWebSocketSenderTest {
+class GameResultWebSocketSenderTest {
 
     private static final Long GAME_ROOM_ID = 100L;
     private static final Long USER_ID = 1L;
@@ -32,7 +32,7 @@ class GameSmiteWebSocketSenderTest {
             objectMapper,
             sessionRegistry
     );
-    private final GameSmiteWebSocketSender sender = new GameSmiteWebSocketSender(messageSender);
+    private final GameResultWebSocketSender sender = new GameResultWebSocketSender(messageSender);
 
     @Test
     @DisplayName("sendGameResult - 현재 session에 GAME_RESULT를 전송한다")

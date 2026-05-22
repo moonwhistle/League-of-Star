@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.game.start.dto.GameStartScenarioPayload;
-import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.result.dto.GameResultPayload;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

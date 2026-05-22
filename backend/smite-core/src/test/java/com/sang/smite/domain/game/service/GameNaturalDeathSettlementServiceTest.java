@@ -64,6 +64,8 @@ class GameNaturalDeathSettlementServiceTest {
 
         // then
         assertThat(result.status()).isEqualTo(GameNaturalDeathSettlementStatus.FINISHED);
+        assertThat(result.finishedGameRoom()).isSameAs(gameRoom);
+        assertThat(result.actions()).isEmpty();
         assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
         assertThat(gameRoom.getResult()).isEqualTo(GameResult.DRAW);
         assertThat(gameRoom.getWinnerId()).isNull();

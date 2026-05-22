@@ -37,7 +37,7 @@ public class GameNaturalDeathSettlementService {
         int effectiveHp = gameEffectiveNaturalDeathService.calculateEffectiveHpAt(gameRoom, actions, nowMillis);
         if (effectiveHp <= 0) {
             return gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(gameRoom.getId())
-                    .map(finishedRoom -> GameNaturalDeathSettlementResult.finished())
+                    .map(finishedRoom -> GameNaturalDeathSettlementResult.finished(finishedRoom, actions))
                     .orElseGet(GameNaturalDeathSettlementResult::noOp);
         }
 

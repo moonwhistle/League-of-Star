@@ -1,10 +1,11 @@
-package com.sang.smite.game.smite.service;
+package com.sang.smite.game.result.service;
 
 import com.sang.smite.domain.game.domain.GameAction;
+import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.GameRules;
 import com.sang.smite.domain.game.domain.vo.GameResult;
-import com.sang.smite.game.smite.domain.GameSmiteResultReason;
-import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.result.domain.GameResultReason;
+import com.sang.smite.game.result.dto.GameResultPayload;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,15 +18,13 @@ public class GameResultPayloadFactory {
                                        Long winnerUserId,
                                        long finishedAt,
                                        List<GameAction> actions) {
-        return new GameResultPayload(
+        return create(
                 gameRoomId,
                 result,
                 winnerUserId,
-                GameSmiteResultReason.SMITE_KILL.getCode(),
+                GameResultReason.SMITE_KILL,
                 finishedAt,
-                actions.stream()
-                        .map(this::toActionSummary)
-                        .toList()
+                actions
         );
     }
 
@@ -34,15 +33,28 @@ public class GameResultPayloadFactory {
                                                 Long winnerUserId,
                                                 long finishedAt,
                                                 List<GameAction> actions) {
-        return new GameResultPayload(
+        return create(
                 gameRoomId,
                 result,
                 winnerUserId,
-                GameSmiteResultReason.BOTH_SMITES_USED_DRAW.getCode(),
+                GameResultReason.BOTH_SMITES_USED_DRAW,
                 finishedAt,
-                actions.stream()
-                        .map(this::toActionSummary)
-                        .toList()
+                actions
+        );
+    }
+
+    public GameResultPayload naturalDeathDraw(Long gameRoomId,
+                                              GameResult result,
+                                              Long winnerUserId,
+                                              long finishedAt,
+                                              List<GameAction> actions) {
+        return create(
+                gameRoomId,
+                result,
+                winnerUserId,
+                GameResultReason.NATURAL_DEATH_DRAW,
+                finishedAt,
+                actions
         );
     }
 
@@ -51,11 +63,27 @@ public class GameResultPayloadFactory {
                                            Long winnerUserId,
                                            long finishedAt,
                                            List<GameAction> actions) {
+        return create(
+                gameRoomId,
+                result,
+                winnerUserId,
+                resolveCurrentResultReason(winnerUserId, actions),
+                finishedAt,
+                actions
+        );
+    }
+
+    private GameResultPayload create(Long gameRoomId,
+                                     GameResult result,
+                                     Long winnerUserId,
+                                     GameResultReason reason,
+                                     long finishedAt,
+                                     List<GameAction> actions) {
         return new GameResultPayload(
                 gameRoomId,
                 result,
                 winnerUserId,
-                resolveReason(winnerUserId),
+                reason.getCode(),
                 finishedAt,
                 actions.stream()
                         .map(this::toActionSummary)
@@ -63,11 +91,22 @@ public class GameResultPayloadFactory {
         );
     }
 
-    private String resolveReason(Long winnerUserId) {
-        if (winnerUserId == null) {
-            return GameSmiteResultReason.BOTH_SMITES_USED_DRAW.getCode();
+    private GameResultReason resolveCurrentResultReason(Long winnerUserId, List<GameAction> actions) {
+        if (winnerUserId != null) {
+            return GameResultReason.SMITE_KILL;
         }
-        return GameSmiteResultReason.SMITE_KILL.getCode();
+        if (bothUsersUsedSmiteWithoutKill(actions)) {
+            return GameResultReason.BOTH_SMITES_USED_DRAW;
+        }
+        return GameResultReason.NATURAL_DEATH_DRAW;
+    }
+
+    private boolean bothUsersUsedSmiteWithoutKill(List<GameAction> actions) {
+        return actions.stream()
+                .map(GameAction::getUserId)
+                .distinct()
+                .count() == GameRoom.MAX_PARTICIPANTS
+                && actions.stream().noneMatch(GameAction::isKill);
     }
 
     private GameResultPayload.ActionSummary toActionSummary(GameAction action) {

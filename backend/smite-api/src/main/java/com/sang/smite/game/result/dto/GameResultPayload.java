@@ -1,4 +1,4 @@
-package com.sang.smite.game.smite.dto;
+package com.sang.smite.game.result.dto;
 
 import com.sang.smite.domain.game.domain.vo.GameResult;
 

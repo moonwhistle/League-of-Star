@@ -1,6 +1,6 @@
-package com.sang.smite.game.smite.service;
+package com.sang.smite.game.result.service;
 
-import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.result.dto.GameResultPayload;
 import com.sang.smite.game.websocket.dto.GameWebSocketServerMessage;
 import com.sang.smite.game.websocket.service.GameRoomWebSocketMessageSender;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +11,7 @@ import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
-public class GameSmiteWebSocketSender {
+public class GameResultWebSocketSender {
 
     private final GameRoomWebSocketMessageSender messageSender;
 

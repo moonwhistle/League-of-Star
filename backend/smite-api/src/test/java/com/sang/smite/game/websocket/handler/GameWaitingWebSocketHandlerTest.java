@@ -9,10 +9,10 @@ import com.sang.smite.game.end.service.GameEndScheduleService;
 import com.sang.smite.game.rtt.domain.GameRttPongResult;
 import com.sang.smite.game.rtt.service.GameRttMeasurementService;
 import com.sang.smite.game.smite.domain.GameSmiteFailureReason;
-import com.sang.smite.game.smite.dto.GameResultPayload;
+import com.sang.smite.game.result.dto.GameResultPayload;
 import com.sang.smite.game.smite.dto.GameSmiteHandleResponse;
 import com.sang.smite.game.smite.service.GameSmiteService;
-import com.sang.smite.game.smite.service.GameSmiteWebSocketSender;
+import com.sang.smite.game.result.service.GameResultWebSocketSender;
 import com.sang.smite.game.start.domain.GameStartBlockedReason;
 import com.sang.smite.game.start.domain.GameStartFailureReason;
 import com.sang.smite.game.start.domain.GameStartTransitionResult;
@@ -81,7 +81,7 @@ class GameWaitingWebSocketHandlerTest {
     private final GameEndScheduleService gameEndScheduleService = mock(GameEndScheduleService.class);
     private final GameStartWebSocketSender gameStartWebSocketSender = mock(GameStartWebSocketSender.class);
     private final GameSmiteService gameSmiteService = mock(GameSmiteService.class);
-    private final GameSmiteWebSocketSender gameSmiteWebSocketSender = mock(GameSmiteWebSocketSender.class);
+    private final GameResultWebSocketSender gameResultWebSocketSender = mock(GameResultWebSocketSender.class);
     private final GameRoomWebSocketMessageSender messageSender = new GameRoomWebSocketMessageSender(
             objectMapper,
             sessionRegistry
@@ -97,7 +97,7 @@ class GameWaitingWebSocketHandlerTest {
             gameEndScheduleService,
             gameStartWebSocketSender,
             gameSmiteService,
-            gameSmiteWebSocketSender
+            gameResultWebSocketSender
     );
     private final GameWaitingWebSocketHandler handler = new GameWaitingWebSocketHandler(
             objectMapper,
@@ -342,8 +342,8 @@ class GameWaitingWebSocketHandlerTest {
         handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
 
         // then
-        verify(gameSmiteWebSocketSender).broadcastGameResult(GAME_ROOM_ID, gameResult);
-        verify(gameSmiteWebSocketSender, never()).sendGameResult(any(), any());
+        verify(gameResultWebSocketSender).broadcastGameResult(GAME_ROOM_ID, gameResult);
+        verify(gameResultWebSocketSender, never()).sendGameResult(any(), any());
     }
 
     @Test
@@ -368,8 +368,8 @@ class GameWaitingWebSocketHandlerTest {
         handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
 
         // then
-        verify(gameSmiteWebSocketSender).sendGameResult(session, gameResult);
-        verify(gameSmiteWebSocketSender, never()).broadcastGameResult(any(), any());
+        verify(gameResultWebSocketSender).sendGameResult(session, gameResult);
+        verify(gameResultWebSocketSender, never()).broadcastGameResult(any(), any());
     }
 
     @Test

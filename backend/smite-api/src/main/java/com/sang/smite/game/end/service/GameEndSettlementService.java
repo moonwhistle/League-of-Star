@@ -3,10 +3,14 @@ package com.sang.smite.game.end.service;
 import com.sang.smite.domain.game.service.GameNaturalDeathSettlementResult;
 import com.sang.smite.domain.game.service.GameNaturalDeathSettlementService;
 import com.sang.smite.game.end.common.constant.GameEndConstants;
+import com.sang.smite.game.result.dto.GameResultPayload;
+import com.sang.smite.game.result.service.GameResultPayloadFactory;
+import com.sang.smite.game.result.service.GameResultWebSocketSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.util.List;
 
@@ -17,6 +21,8 @@ public class GameEndSettlementService {
 
     private final GameEndScheduleService gameEndScheduleService;
     private final GameNaturalDeathSettlementService gameNaturalDeathSettlementService;
+    private final GameResultPayloadFactory gameResultPayloadFactory;
+    private final GameResultWebSocketSender gameResultWebSocketSender;
     private final Clock clock;
 
     public void processDueEndDeadlines() {
@@ -45,8 +51,28 @@ public class GameEndSettlementService {
             updateEndDeadlineIfDue(gameRoomId, nowMillis, result.nextNaturalDeathAtMillis());
             return;
         }
+        if (result.status().isFinished()) {
+            broadcastNaturalDeathResult(gameRoomId, nowMillis, result);
+        }
         if (result.shouldCleanupEndDeadline()) {
             cleanupEndDeadline(gameRoomId);
+        }
+    }
+
+    private void broadcastNaturalDeathResult(Long gameRoomId,
+                                             long finishedAtMillis,
+                                             GameNaturalDeathSettlementResult result) {
+        try {
+            GameResultPayload payload = gameResultPayloadFactory.naturalDeathDraw(
+                    gameRoomId,
+                    result.finishedGameRoom().getResult(),
+                    result.finishedGameRoom().getWinnerId(),
+                    finishedAtMillis,
+                    result.actions()
+            );
+            gameResultWebSocketSender.broadcastGameResult(gameRoomId, payload);
+        } catch (IOException e) {
+            log.warn("Failed to broadcast natural death GAME_RESULT: gameRoomId={}", gameRoomId, e);
         }
     }
 
