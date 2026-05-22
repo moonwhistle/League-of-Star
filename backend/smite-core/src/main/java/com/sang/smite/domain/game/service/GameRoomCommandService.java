@@ -119,6 +119,16 @@ public class GameRoomCommandService {
                 });
     }
 
+    public Optional<GameRoom> finishInProgressRoomByNaturalDeathDraw(Long gameRoomId) {
+        return gameRoomRepository.findByIdForUpdate(gameRoomId)
+                .filter(gameRoom -> gameRoom.getStatus().isInProgress())
+                .map(gameRoom -> {
+                    validateCompleteParticipants(gameRoom);
+                    gameRoom.finish(GameResult.DRAW, null);
+                    return gameRoom;
+                });
+    }
+
     private void validateSmiteJudgementRoom(GameRoom gameRoom, Long userId) {
         if (!gameRoom.getStatus().isInProgress()
                 || gameRoom.getGameStartTime() == null

@@ -119,13 +119,15 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 
 ### 5. core gameRoom 종료 primitive 보강
 
-- [ ] `GameRoomCommandService`에 자연사 `DRAW` 종료 메서드를 추가한다.
-- [ ] gameRoom row lock을 잡고 DB 상태를 최종 기준으로 판정한다.
-- [ ] `IN_PROGRESS`이면 `GameResult.DRAW`, `winnerId = null`로 `FINISHED` 전환한다.
-- [ ] participants는 `FINISHED`로 전환한다.
-- [ ] 이미 `FINISHED`이면 기존 결과를 유지하고 no-op 처리한다.
-- [ ] `ABORTED`이면 상태를 바꾸지 않고 no-op 처리한다.
-- [ ] 없는 gameRoom은 no-op 처리한다.
+- [x] `GameRoomCommandService`에 자연사 `DRAW` 종료 메서드를 추가한다.
+- [x] gameRoom row lock을 잡고 DB 상태를 최종 기준으로 판정한다.
+- [x] `IN_PROGRESS`이면 `GameResult.DRAW`, `winnerId = null`로 `FINISHED` 전환한다.
+- [x] participants는 `FINISHED`로 전환한다.
+- [x] 이미 `FINISHED`이면 기존 결과를 유지하고 no-op 처리한다.
+- [x] `ABORTED`이면 상태를 바꾸지 않고 no-op 처리한다.
+- [x] 없는 gameRoom은 no-op 처리한다.
+
+> 자연사 `DRAW` 종료는 core `GameRoomCommandService.finishInProgressRoomByNaturalDeathDraw`가 담당한다. `GameNaturalDeathSettlementService`는 due 시점의 effective HP를 판정한 뒤, 종료 확정 시 이 primitive를 호출한다.
 
 ### 6. GAME_RESULT 공용화와 자연사 결과 응답
 

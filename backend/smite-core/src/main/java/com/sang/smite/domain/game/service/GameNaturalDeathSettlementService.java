@@ -2,7 +2,6 @@ package com.sang.smite.domain.game.service;
 
 import com.sang.smite.domain.game.domain.GameAction;
 import com.sang.smite.domain.game.domain.GameRoom;
-import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.repository.GameActionRepository;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +17,7 @@ public class GameNaturalDeathSettlementService {
     private final GameRoomRepository gameRoomRepository;
     private final GameActionRepository gameActionRepository;
     private final GameEffectiveNaturalDeathService gameEffectiveNaturalDeathService;
+    private final GameRoomCommandService gameRoomCommandService;
 
     @Transactional
     public GameNaturalDeathSettlementResult settle(Long gameRoomId, long nowMillis) {
@@ -36,8 +36,9 @@ public class GameNaturalDeathSettlementService {
         );
         int effectiveHp = gameEffectiveNaturalDeathService.calculateEffectiveHpAt(gameRoom, actions, nowMillis);
         if (effectiveHp <= 0) {
-            gameRoom.finish(GameResult.DRAW, null);
-            return GameNaturalDeathSettlementResult.finished();
+            return gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(gameRoom.getId())
+                    .map(finishedRoom -> GameNaturalDeathSettlementResult.finished())
+                    .orElseGet(GameNaturalDeathSettlementResult::noOp);
         }
 
         long nextNaturalDeathAtMillis = gameEffectiveNaturalDeathService.calculateNaturalDeathAtMillis(

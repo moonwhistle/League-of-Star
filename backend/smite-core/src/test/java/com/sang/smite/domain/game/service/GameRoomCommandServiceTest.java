@@ -498,4 +498,85 @@ class GameRoomCommandServiceTest {
         assertThat(result).isEmpty();
         assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.READY);
     }
+
+    @Test
+    @DisplayName("finishInProgressRoomByNaturalDeathDraw - IN_PROGRESS 게임룸을 DRAW로 종료한다")
+    void finishInProgressRoomByNaturalDeathDraw_InProgress() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(100L);
+
+        // then
+        assertThat(result).contains(gameRoom);
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(gameRoom.getResult()).isEqualTo(GameResult.DRAW);
+        assertThat(gameRoom.getWinnerId()).isNull();
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomByNaturalDeathDraw - 이미 FINISHED이면 기존 결과를 유지하고 empty를 반환한다")
+    void finishInProgressRoomByNaturalDeathDraw_Finished() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.now());
+        gameRoom.finish(GameResult.PLAYER1_WIN, FIRST_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(100L);
+
+        // then
+        assertThat(result).isEmpty();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(gameRoom.getResult()).isEqualTo(GameResult.PLAYER1_WIN);
+        assertThat(gameRoom.getWinnerId()).isEqualTo(FIRST_USER_ID);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomByNaturalDeathDraw - ABORTED이면 상태를 바꾸지 않고 empty를 반환한다")
+    void finishInProgressRoomByNaturalDeathDraw_Aborted() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.abortBeforeStart();
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(100L);
+
+        // then
+        assertThat(result).isEmpty();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.ABORTED);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomByNaturalDeathDraw - 없는 게임룸이면 empty를 반환한다")
+    void finishInProgressRoomByNaturalDeathDraw_NotFound() {
+        // given
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.empty());
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(100L);
+
+        // then
+        assertThat(result).isEmpty();
+    }
 }
