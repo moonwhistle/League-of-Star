@@ -85,15 +85,17 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 
 ### 2. 서버 scheduler 추가
 
-- [ ] `game/end/scheduler` 패키지에 `GameEndScheduler`를 추가한다.
-- [ ] `@Scheduled(fixedDelayString = ...)`로 주기적으로 due gameRoom을 정산한다.
-- [ ] scheduler fixed delay는 자연사 결과 체감 지연이 크지 않도록 짧게 둔다.
-- [ ] scheduler 예외가 다음 tick을 막지 않도록 warn log를 남기고 종료한다.
-- [ ] scheduler는 직접 DB 상태를 변경하지 않고 end settlement service로 위임한다.
+- [x] `game/end/scheduler` 패키지에 `GameEndScheduler`를 추가한다.
+- [x] `@Scheduled(fixedDelayString = ...)`로 주기적으로 game end 정산 service를 호출한다.
+- [x] scheduler fixed delay는 자연사 결과 체감 지연이 크지 않도록 짧게 둔다.
+- [x] scheduler 예외가 다음 tick을 막지 않도록 warn log를 남기고 종료한다.
+- [x] scheduler는 직접 DB 상태를 변경하지 않고 end settlement service로 위임한다.
+
+> `GameEndSettlementService.processDueEndDeadlines()`는 Step 3의 정산 진입점이다. 이번 단계에서는 scheduler wiring과 예외 격리까지만 완료하고, due 조회/row lock/자연사 `DRAW` 확정은 Step 3에서 구현한다.
 
 ### 3. 자연사 종료 정산 service 구현
 
-- [ ] `game/end/service` 패키지에 `GameEndSettlementService`를 추가한다.
+- [x] `game/end/service` 패키지에 `GameEndSettlementService` 정산 진입점을 추가한다.
 - [ ] due gameRoomId를 조회하고 gameRoom별 정산을 수행한다.
 - [ ] 정산 시점에 gameRoom row lock 안에서 action 목록을 다시 조회해 effective HP를 재계산한다.
 - [ ] due로 조회됐더라도 effective HP가 아직 `0`보다 크면 더 늦은 naturalDeathAt으로 pending score를 갱신하고 종료하지 않는다.
