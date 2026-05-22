@@ -142,21 +142,23 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 
 ### 7. 테스트
 
-- [ ] Redis store가 `naturalDeathAt <= now`인 gameRoom만 조회하는지 검증한다.
-- [ ] 자연사 deadline이 `startAtMillis + durationMs`로 등록되고 추가 grace가 붙지 않는지 검증한다.
-- [ ] SMITE 실패 action 저장 후 effective naturalDeathAt이 앞당겨지는지 검증한다.
-- [ ] SMITE 실패 action이 여러 개일 때 누적 데미지 기준으로 naturalDeathAt이 계산되는지 검증한다.
-- [ ] effective naturalDeathAt이 scenario step 사이에 있을 때 선형 보간으로 계산되는지 검증한다.
-- [ ] due 조회된 gameRoom의 effective HP가 아직 `0`보다 크면 종료하지 않고 pending score를 갱신하는지 검증한다.
-- [ ] `IN_PROGRESS` gameRoom이 자연사 `DRAW`로 `FINISHED` 되는지 검증한다.
-- [ ] 자연사 `DRAW` 시 participants가 `FINISHED` 되는지 검증한다.
-- [ ] 이미 `FINISHED`인 gameRoom은 결과가 바뀌지 않는지 검증한다.
-- [ ] `ABORTED` gameRoom은 결과가 생기지 않고 상태가 유지되는지 검증한다.
-- [ ] 정산 완료 또는 no-op 이후 `game:end:pending` cleanup이 수행되는지 검증한다.
-- [ ] 같은 gameRoom을 두 번 정산해도 결과가 바뀌지 않는지 검증한다.
-- [ ] 자연사 `DRAW`로 새로 종료된 경우에만 `GAME_RESULT` broadcast가 호출되는지 검증한다.
-- [ ] `GAME_RESULT` broadcast가 실패해도 정산 결과가 rollback 되지 않고 pending cleanup이 시도되는지 검증한다.
-- [ ] WebSocket session이 없어도 DB 정산은 성공하는지 검증한다.
+- [x] Redis store가 `naturalDeathAt <= now`인 gameRoom만 조회하는지 검증한다.
+- [x] 자연사 deadline이 `startAtMillis + durationMs`로 등록되고 추가 grace가 붙지 않는지 검증한다.
+- [x] SMITE 실패 action 저장 후 effective naturalDeathAt이 앞당겨지는지 검증한다.
+- [x] SMITE 실패 action이 여러 개일 때 누적 데미지 기준으로 naturalDeathAt이 계산되는지 검증한다.
+- [x] effective naturalDeathAt이 scenario step 사이에 있을 때 선형 보간으로 계산되는지 검증한다.
+- [x] due 조회된 gameRoom의 effective HP가 아직 `0`보다 크면 종료하지 않고 pending score를 갱신하는지 검증한다.
+- [x] `IN_PROGRESS` gameRoom이 자연사 `DRAW`로 `FINISHED` 되는지 검증한다.
+- [x] 자연사 `DRAW` 시 participants가 `FINISHED` 되는지 검증한다.
+- [x] 이미 `FINISHED`인 gameRoom은 결과가 바뀌지 않는지 검증한다.
+- [x] `ABORTED` gameRoom은 결과가 생기지 않고 상태가 유지되는지 검증한다.
+- [x] 정산 완료 또는 no-op 이후 `game:end:pending` cleanup이 수행되는지 검증한다.
+- [x] 같은 gameRoom을 두 번 정산해도 결과가 바뀌지 않는지 검증한다.
+- [x] 자연사 `DRAW`로 새로 종료된 경우에만 `GAME_RESULT` broadcast가 호출되는지 검증한다.
+- [x] `GAME_RESULT` broadcast가 실패해도 정산 결과가 rollback 되지 않고 pending cleanup이 시도되는지 검증한다.
+- [x] WebSocket session이 없어도 DB 정산은 성공하는지 검증한다.
+
+> Step 7은 Redis store/service, effective naturalDeathAt 계산, core 자연사 정산, API scheduler 정산, 공용 GAME_RESULT sender 테스트로 분산 검증한다. 같은 gameRoom 중복 정산, ABORTED no-op, 다중 SMITE 누적 데미지, WebSocket session 없는 broadcast 경로를 추가로 보강했다.
 
 ### 8. 문서 정합성
 

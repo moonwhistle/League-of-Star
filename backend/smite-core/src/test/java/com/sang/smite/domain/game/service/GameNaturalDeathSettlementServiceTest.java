@@ -123,6 +123,51 @@ class GameNaturalDeathSettlementServiceTest {
     }
 
     @Test
+    @DisplayName("settle - ABORTED이면 상태를 바꾸지 않고 no-op 처리한다")
+    void settle_Aborted_NoOp() {
+        // given
+        GameRoom gameRoom = readyRoom(scenario(
+                new HpStep(0, 10_000),
+                new HpStep(1_000, 0)
+        ));
+        gameRoom.abortBeforeStart();
+        when(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).thenReturn(Optional.of(gameRoom));
+
+        // when
+        GameNaturalDeathSettlementResult result = service.settle(GAME_ROOM_ID, START_AT_MILLIS + 1_000L);
+
+        // then
+        assertThat(result.status()).isEqualTo(GameNaturalDeathSettlementStatus.NO_OP);
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.ABORTED);
+        assertThat(gameRoom.getResult()).isNull();
+        verify(gameActionRepository, never()).findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("settle - 같은 gameRoom을 두 번 정산해도 첫 결과를 유지한다")
+    void settle_SameGameRoomTwice_KeepFirstResult() {
+        // given
+        GameRoom gameRoom = startedRoom(scenario(
+                new HpStep(0, 10_000),
+                new HpStep(1_000, 0)
+        ));
+        when(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).thenReturn(Optional.of(gameRoom));
+        when(gameActionRepository.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))
+                .thenReturn(List.of());
+
+        // when
+        GameNaturalDeathSettlementResult firstResult = service.settle(GAME_ROOM_ID, START_AT_MILLIS + 1_000L);
+        GameNaturalDeathSettlementResult secondResult = service.settle(GAME_ROOM_ID, START_AT_MILLIS + 1_000L);
+
+        // then
+        assertThat(firstResult.status()).isEqualTo(GameNaturalDeathSettlementStatus.FINISHED);
+        assertThat(secondResult.status()).isEqualTo(GameNaturalDeathSettlementStatus.NO_OP);
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(gameRoom.getResult()).isEqualTo(GameResult.DRAW);
+        assertThat(gameRoom.getWinnerId()).isNull();
+    }
+
+    @Test
     @DisplayName("settle - 없는 gameRoom이면 no-op 처리한다")
     void settle_NotFound_NoOp() {
         // given

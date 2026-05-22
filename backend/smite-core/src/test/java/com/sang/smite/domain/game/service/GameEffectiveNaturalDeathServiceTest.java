@@ -65,6 +65,40 @@ class GameEffectiveNaturalDeathServiceTest {
     }
 
     @Test
+    @DisplayName("calculateNaturalDeathAtMillis - 여러 실패 SMITE의 누적 데미지를 반영한다")
+    void calculateNaturalDeathAtMillis_MultipleFailedSmiteDamage() {
+        // given
+        GameRoom gameRoom = startedRoom(scenario(
+                new HpStep(0, 10_000),
+                new HpStep(1_000, 3_000),
+                new HpStep(2_000, 0)
+        ));
+        GameAction firstFailedSmite = GameAction.smite(
+                GAME_ROOM_ID,
+                FIRST_USER_ID,
+                START_AT_MILLIS + 700L,
+                700,
+                4_000
+        );
+        GameAction secondFailedSmite = GameAction.smite(
+                GAME_ROOM_ID,
+                SECOND_USER_ID,
+                START_AT_MILLIS + 900L,
+                900,
+                3_500
+        );
+
+        // when
+        long result = service.calculateNaturalDeathAtMillis(
+                gameRoom,
+                List.of(firstFailedSmite, secondFailedSmite)
+        );
+
+        // then
+        assertThat(result).isEqualTo(START_AT_MILLIS + 1_200L);
+    }
+
+    @Test
     @DisplayName("calculateEffectiveHpAt - 특정 시점 scenario HP에서 누적 SMITE 데미지를 뺀다")
     void calculateEffectiveHpAt() {
         // given
