@@ -10,6 +10,7 @@ import com.sang.smite.domain.rank.domain.vo.Rank;
 import com.sang.smite.domain.rank.domain.vo.Tier;
 import com.sang.smite.domain.record.domain.GameRecord;
 import com.sang.smite.domain.record.domain.vo.GameRecordResult;
+import com.sang.smite.domain.record.domain.vo.GameRecordSeriesType;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -64,5 +65,7 @@ class GameRecordRepositoryTest {
         GameRecord foundRecord = gameRecordRepository.findById(savedRecord.getId()).orElseThrow();
         assertThat(foundRecord.getRankBefore().tier()).isEqualTo(Tier.IRON);
         assertThat(foundRecord.getRankAfter().tier()).isEqualTo(Tier.BRONZE);
+        assertThat(foundRecord.getSeriesType()).isEqualTo(GameRecordSeriesType.RANK);
+        assertThat(foundRecord.getRankSeriesId()).isNull();
     }
 }

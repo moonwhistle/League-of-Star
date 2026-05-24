@@ -222,16 +222,16 @@ flowchart TD
 
 ### 3. GameRecord 생성 service 구현
 
-- [ ] `smite-core` `domain/record/service` 패키지를 추가하고 record 생성 책임을 둔다.
-- [ ] `GameRecordRepository`에 `countByGameRoomId`, `findByGameRoomId` 추가
-- [ ] `game_records`의 `uk_game_records_room_user` unique 제약을 멱등성 보조 장치로 사용
-- [ ] record 생성 전 gameRoom이 `FINISHED`인지 검증
-- [ ] `ABORTED`, `READY`, `IN_PROGRESS` gameRoom은 record 생성 대상에서 제외
-- [ ] 참가자 2명이 아니면 record 생성 실패 처리
-- [ ] 각 participant에 대해 opponentId, result, lpBefore, lpAfter, lpChange, rankBefore, rankAfter 저장
-- [ ] `promotionSeriesId`/`isPromotionGame`을 `rankSeriesId`/`seriesType`으로 전환
-- [ ] `GameRecordSeriesType`은 `RANK`, `PLACEMENT`, `PROMOTION`을 표현
-- [ ] 중복 호출 시 기존 record/rank 결과를 유지하고 no-op 처리
+- [x] `smite-core` `domain/record/service` 패키지를 추가하고 record 생성 책임을 둔다.
+- [x] `GameRecordRepository`에 `countByGameRoomId`, `findByGameRoomId` 추가
+- [x] `game_records`의 `uk_game_records_room_user` unique 제약을 멱등성 보조 장치로 사용
+- [x] record 생성 전 gameRoom이 `FINISHED`인지 검증
+- [x] `ABORTED`, `READY`, `IN_PROGRESS` gameRoom은 record 생성 대상에서 제외
+- [x] 참가자 2명이 아니면 record 생성 실패 처리
+- [x] 각 participant에 대해 opponentId, result, lpBefore, lpAfter, lpChange, rankBefore, rankAfter 저장
+- [x] `promotionSeriesId`/`isPromotionGame`을 `rankSeriesId`/`seriesType`으로 전환
+- [x] `GameRecordSeriesType`은 `RANK`, `PLACEMENT`, `PROMOTION`을 표현
+- [x] 중복 호출 시 기존 record/rank 결과를 유지하고 no-op 처리
 
 ### 4. rank 반영 service 보강
 

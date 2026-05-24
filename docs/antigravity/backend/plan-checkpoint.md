@@ -200,20 +200,20 @@ flowchart TD
 
 ### Step 9. 게임 종료와 기록
 
-- [ ] Step 7/8에서 확정한 `game_rooms.status/result/winnerId`를 record/rank 정산의 source of truth로 사용
-- [ ] gameRoom 종료 확정 transaction과 record/rank 정산 transaction 분리
-- [ ] 새로 `FINISHED` 된 gameRoom에 대해서만 즉시 record/rank 정산 호출
-- [ ] 이미 FINISHED인 current result 재응답, scheduler no-op, ABORTED 흐름에서는 record/rank 정산 미호출
-- [ ] 멀티 인스턴스 환경에서 local memory가 아니라 DB row lock, record count, unique constraint 기준으로 정산 멱등성 보장
-- [ ] `game_records` 2행 생성
-- [ ] `GameRecord`의 `promotionSeriesId`/`isPromotionGame`을 `rankSeriesId`/`seriesType`으로 전환
-- [ ] `seriesType=RANK/PLACEMENT/PROMOTION`으로 일반 랭크, 배치, 승급전을 명시
+- [x] Step 7/8에서 확정한 `game_rooms.status/result/winnerId`를 record/rank 정산의 source of truth로 사용
+- [x] gameRoom 종료 확정 transaction과 record/rank 정산 transaction 분리
+- [x] 새로 `FINISHED` 된 gameRoom에 대해서만 즉시 record/rank 정산 호출
+- [x] 이미 FINISHED인 current result 재응답, scheduler no-op, ABORTED 흐름에서는 record/rank 정산 미호출
+- [x] 멀티 인스턴스 환경에서 local memory가 아니라 DB row lock, record count, unique constraint 기준으로 정산 멱등성 보장
+- [x] `game_records` 2행 생성
+- [x] `GameRecord`의 `promotionSeriesId`/`isPromotionGame`을 `rankSeriesId`/`seriesType`으로 전환
+- [x] `seriesType=RANK/PLACEMENT/PROMOTION`으로 일반 랭크, 배치, 승급전을 명시
 - [ ] `UserRankInfo` 누적 승/패/무 반영
 - [ ] 일반 RANK 게임 WIN/LOSS/DRAW LP 반영
 - [ ] 배치 RankSeries 반영 및 10판 완료 시 최종 rank/LP 배정
 - [ ] 승급전 RankSeries 반영 및 성공/실패 시 rank/LP 확정
 - [ ] record/rank 정산 내부에서 record 생성, 누적 전적, LP, RankSeries 반영을 같은 transaction으로 처리
-- [ ] `countByGameRoomId == 0/2/1` 기준 멱등성 및 불완전 정산 정책 구현
+- [x] `countByGameRoomId == 0/2/1` 기준 멱등성 및 불완전 정산 정책 구현
 - [ ] FINISHED인데 record count가 2가 아닌 gameRoom을 복구하는 scheduler 추가
 - [ ] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, record/rank summary 조회 API는 후속 Step 11로 분리
 
