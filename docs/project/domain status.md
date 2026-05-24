@@ -295,7 +295,8 @@ stateDiagram-v2
 - 이미 `FINISHED` 또는 `ABORTED`인 gameRoom은 기존 결과/상태를 유지하고 no-op 처리합니다.
 - 정산 완료 또는 no-op 이후에는 `game:end:pending` member cleanup을 best-effort로 수행합니다.
 - 서버는 HP scenario와 수신 action 기준으로 승/패/무승부를 판정하고, gameRoom 결과를 DB의 source of truth로 둡니다.
-- `game_records` 생성, LP 반영, 배치/승급전 처리는 이 종료 보장 흐름과 분리된 후속 Step 9 범위입니다.
+- `game_records` 생성, 누적 전적, LP 반영, 배치/승급전 처리는 gameRoom 종료 확정 transaction과 분리된 Step 9 record/rank 정산 범위입니다.
+- `GAME_RESULT`는 종료 즉시 알림으로 유지하고 LP/rank/series delta는 포함하지 않습니다. 최종 결과 화면용 랭크 정보는 별도 record/rank summary 조회 API에서 처리합니다.
 
 ## 4. Game WebSocket Session (게임 대기 WebSocket 연결 상태)
 

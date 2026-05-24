@@ -51,7 +51,8 @@ erDiagram
         BIGINT game_room_id FK
         BIGINT user_id FK
         BIGINT opponent_id FK
-        BIGINT promotion_series_id
+        BIGINT rank_series_id
+        VARCHAR series_type
     }
 ```
 
@@ -171,7 +172,7 @@ stateDiagram-v2
 - **불변(Immutable)**: 전적 기록은 수정하지 않음
 - **항상 2행 생성**: 각 참여자(Participant)의 관점에서 기록
 - **LP/Rank 스냅샷**: lp_before/after와 함께 rank_before/after를 **JSON 스냅샷**으로 저장하여 변동 이력 추적
-- **승급전 연동**: 승급전 경기인 경우 `promotion_series_id`를 기록하여 결과 정합성 보장
+- **시리즈 연동**: 배치/승급전 경기인 경우 `rank_series_id`와 `series_type`을 기록하여 결과 정합성 보장
 
 ---
 
@@ -444,14 +445,14 @@ CREATE TABLE game_actions (
 | `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 게임 방 |
 | `user_id` | BIGINT | FK → users, NOT NULL | 해당 유저 |
 | `opponent_id` | BIGINT | FK → users, NOT NULL | 상대방 |
-| `promotion_series_id` | BIGINT | NULLABLE | 연관된 승급전/시리즈 ID |
+| `rank_series_id` | BIGINT | NULLABLE | 연관된 배치/승급전 RankSeries ID. 일반 랭크 게임은 NULL |
+| `series_type` | VARCHAR(20) | NOT NULL, DEFAULT 'RANK' | RANK / PLACEMENT / PROMOTION |
 | `result` | VARCHAR(10) | NOT NULL | WIN / LOSS / DRAW |
 | `lp_change` | INT | NOT NULL | LP 변동량 |
 | `lp_before` | INT | NOT NULL | 게임 전 LP |
 | `lp_after` | INT | NOT NULL | 게임 후 LP |
 | `rank_before` | JSON | NOT NULL | 게임 전 랭크 스냅샷 (Tier + Division) |
 | `rank_after` | JSON | NOT NULL | 게임 후 랭크 스냅샷 (Tier + Division) |
-| `is_promotion_game` | BOOLEAN | NOT NULL, DEFAULT FALSE | 승급전 경기 여부 |
 | `created_at` | DATETIME | NOT NULL | 기록일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
 
@@ -461,26 +462,28 @@ CREATE TABLE game_records (
     game_room_id      BIGINT      NOT NULL,
     user_id           BIGINT      NOT NULL,
     opponent_id       BIGINT      NOT NULL,
-    promotion_series_id BIGINT    NULL,
+    rank_series_id    BIGINT      NULL,
+    series_type       VARCHAR(20) NOT NULL DEFAULT 'RANK',
     result            VARCHAR(10) NOT NULL,
     lp_change         INT         NOT NULL,
     lp_before         INT         NOT NULL,
     lp_after          INT         NOT NULL,
     rank_before       JSON        NOT NULL,
     rank_after        JSON        NOT NULL,
-    is_promotion_game BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_game_records_room_user (game_room_id, user_id),
     INDEX idx_user_id_created (user_id, created_at DESC),
     INDEX idx_user_id_result (user_id, result),
-    CONSTRAINT fk_game_records_room      FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_records_user      FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT
+    INDEX idx_rank_series_id (rank_series_id),
+    CONSTRAINT fk_game_records_room        FOREIGN KEY (game_room_id)   REFERENCES game_rooms (id)  ON DELETE RESTRICT,
+    CONSTRAINT fk_game_records_user        FOREIGN KEY (user_id)        REFERENCES users (id)       ON DELETE RESTRICT,
+    CONSTRAINT fk_game_records_rank_series FOREIGN KEY (rank_series_id) REFERENCES rank_series (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-> 현재 `GameRecord` 엔티티는 `promotion_series_id`, `is_promotion_game` 컬럼명을 사용하며 `rank_series` FK 제약은 매핑하지 않습니다. Issue 50의 Step 9에서 gameRoom 결과를 `game_records`/LP/시리즈에 반영할 때 이 설계를 다시 검증해야 합니다.
+> Issue 52에서 현재 `GameRecord` 엔티티의 `promotion_series_id`, `is_promotion_game` 구조를 `rank_series_id`, `series_type` 구조로 전환합니다. `series_type=RANK`는 일반 랭크 게임이며 `rank_series_id`를 비워둡니다. `PLACEMENT`와 `PROMOTION`은 진행 중인 `rank_series.id`를 기록합니다.
 
 > **인덱스 설명**
 > - `idx_user_id_created`: 유저 전적 최신순 조회 (프로필 페이지)
@@ -577,7 +580,7 @@ ZADD game:end:pending naturalDeathAtMillis gameRoomId
 | 2026-04-17 | 초안 작성 — 7개 테이블 + Redis 저장 구조 |
 | 2026-04-17 | Mermaid ER 파싱 오류 수정, 객체 생명주기 섹션 추가 |
 | 2026-04-17 | 모든 테이블에 created_at/updated_at 통일, promotion_series.wins 제거, ER 다이어그램 PK/FK만 표시로 축소 |
-| 2026-04-18 | Soft Delete 전환: users에 status/withdrawn_at 추가, 탈퇴 익명화 생명주기 반영, FK ON DELETE RESTRICT 명시, demotion_shield 승리 시 해제 추가 |
+| 2026-04-18 | Soft Delete 전환: users에 status/withdrawn_at 추가, 탈퇴 익명화 생명주기 반영, FK ON DELETE RESTRICT 명시 |
 | 2026-05-13 | 현재 구현 기준으로 rank_series 명칭, Redis 매칭 키, match_response timeout index, game_rooms READY 상태, 테이블 요약 정합성 수정 |
 | 2026-05-18 | GAME_START 이전 timeout은 ABORTED 및 record/LP 미반영, GAME_START 이후 disconnect는 서버 timer/scheduler 기준 FINISHED로 종료하도록 game_rooms 생명주기 수정 |
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
@@ -586,3 +589,4 @@ ZADD game:end:pending naturalDeathAtMillis gameRoomId
 | 2026-05-20 | GAME_START 이후 종료 정산 deadline용 `game:end:pending` ZSET 반영 |
 | 2026-05-22 | `game:end:pending` score를 `naturalDeathAt = startAt + durationMs` 기준으로 수정하고 2000ms 입력 유예 제거 |
 | 2026-05-22 | Issue 50 기준 자연사 scheduler 정산 흐름, DB entity 변경 없음, `game_records` 실제 엔티티 컬럼명 정합성 반영 |
+| 2026-05-24 | Issue 52 기준 `game_records` 시리즈 표현을 `rank_series_id`, `series_type=RANK/PLACEMENT/PROMOTION`으로 정리하고 `promotion_series_id`, `is_promotion_game` 구조 제거 |
