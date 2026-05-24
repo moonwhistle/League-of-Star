@@ -213,12 +213,12 @@ flowchart TD
 
 ### 2. core gameRoom 결과 해석 primitive 추가
 
-- [ ] `smite-core` game domain/service 영역에 FINISHED gameRoom 결과를 참가자 관점 result로 변환하는 로직 추가
-- [ ] `GameResult.PLAYER1_WIN`이면 첫 participant는 `WIN`, 두 번째 participant는 `LOSS`로 변환
-- [ ] `GameResult.PLAYER2_WIN`이면 첫 participant는 `LOSS`, 두 번째 participant는 `WIN`으로 변환
-- [ ] `GameResult.DRAW`이면 두 participant 모두 `DRAW`로 변환
-- [ ] participant 순서가 `PLAYER1_WIN`/`PLAYER2_WIN` 의미와 일치하는지 테스트로 고정
-- [ ] winnerId와 participants 불일치 시 예외 또는 no-op 정책 정의
+- [x] `smite-core` game domain/service 영역에 FINISHED gameRoom 결과를 참가자 관점 result로 변환하는 로직 추가
+- [x] `GameResult.PLAYER1_WIN`이면 첫 participant는 `WIN`, 두 번째 participant는 `LOSS`로 변환
+- [x] `GameResult.PLAYER2_WIN`이면 첫 participant는 `LOSS`, 두 번째 participant는 `WIN`으로 변환
+- [x] `GameResult.DRAW`이면 두 participant 모두 `DRAW`로 변환
+- [x] participant 순서가 `PLAYER1_WIN`/`PLAYER2_WIN` 의미와 일치하는지 테스트로 고정
+- [x] winnerId와 participants 불일치 시 예외 또는 no-op 정책 정의
 
 ### 3. GameRecord 생성 service 구현
 
