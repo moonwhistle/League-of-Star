@@ -208,8 +208,8 @@ flowchart TD
 - [x] `game_records` 2행 생성
 - [x] `GameRecord`의 `promotionSeriesId`/`isPromotionGame`을 `rankSeriesId`/`seriesType`으로 전환
 - [x] `seriesType=RANK/PLACEMENT/PROMOTION`으로 일반 랭크, 배치, 승급전을 명시
-- [ ] `UserRankInfo` 누적 승/패/무 반영
-- [ ] 일반 RANK 게임 WIN/LOSS/DRAW LP 반영
+- [x] `UserRankInfo` 누적 승/패/무 반영
+- [x] 일반 RANK 게임 WIN/LOSS/DRAW LP 반영
 - [ ] 배치 RankSeries 반영 및 10판 완료 시 최종 rank/LP 배정
 - [ ] 승급전 RankSeries 반영 및 성공/실패 시 rank/LP 확정
 - [ ] record/rank 정산 내부에서 record 생성, 누적 전적, LP, RankSeries 반영을 같은 transaction으로 처리

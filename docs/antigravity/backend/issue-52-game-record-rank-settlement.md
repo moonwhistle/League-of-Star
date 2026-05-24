@@ -235,16 +235,16 @@ flowchart TD
 
 ### 4. rank 반영 service 보강
 
-- [ ] 기존 `RankCommandService`는 초기 랭크 생성만 담당하므로 게임 결과 반영 유스케이스 추가
-- [ ] `UserRankInfoRepository`에 userId 기반 lock 조회가 필요한지 검토하고, 동시 정산 중복 반영 방지
-- [ ] `UserRankInfo`에 `applyRecordResult(GameRecordResult result)` primitive를 추가해 totalWins/totalLosses/totalDraws를 캡슐화
-- [ ] `RANK`, `PLACEMENT`, `PROMOTION` 모두 FINISHED record 생성 시 누적 전적을 반영
-- [ ] WIN/LOSS는 `Rank.calculateWinLp`, `Rank.calculateLossLp` 정책을 사용해 LP 변경량 계산
-- [ ] DRAW는 `lpChange=0`, `lpBefore=lpAfter`, `rankBefore=rankAfter`로 처리
-- [ ] LP 변경 후 일반 티어 승급전 진입/강등 정책을 현재 rank 도메인 정책과 맞게 정리
-- [ ] Apex 자동 승급/강등은 후속 Issue 59 범위로 분리하고 이번 이슈에서는 처리하지 않음
-- [ ] rank 변경 전후 snapshot을 record에 저장할 수 있도록 결과 객체 반환
-- [ ] rank 반영 실패 시 record 생성도 rollback되도록 transaction 구성
+- [x] 기존 `RankCommandService`는 초기 랭크 생성만 담당하므로 게임 결과 반영 유스케이스 추가
+- [x] `UserRankInfoRepository`에 userId 기반 lock 조회가 필요한지 검토하고, 동시 정산 중복 반영 방지
+- [x] `UserRankInfo`에 `applyRecordResult(GameRecordResult result)` primitive를 추가해 totalWins/totalLosses/totalDraws를 캡슐화
+- [x] `RANK`, `PLACEMENT`, `PROMOTION` 모두 FINISHED record 생성 시 누적 전적을 반영
+- [x] WIN/LOSS는 `Rank.calculateWinLp`, `Rank.calculateLossLp` 정책을 사용해 LP 변경량 계산
+- [x] DRAW는 `lpChange=0`, `lpBefore=lpAfter`, `rankBefore=rankAfter`로 처리
+- [x] LP 변경 후 일반 티어 승급전 진입/강등 정책을 현재 rank 도메인 정책과 맞게 정리
+- [x] Apex 자동 승급/강등은 후속 Issue 59 범위로 분리하고 이번 이슈에서는 처리하지 않음
+- [x] rank 변경 전후 snapshot을 record에 저장할 수 있도록 결과 객체 반환
+- [x] rank 반영 실패 시 record 생성도 rollback되도록 transaction 구성
 
 ### 5. 배치/승급전 시리즈 반영
 

@@ -7,14 +7,15 @@ import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import com.sang.smite.domain.game.service.GameRoomResultResolver;
 import com.sang.smite.domain.rank.domain.RankSeries;
-import com.sang.smite.domain.rank.domain.UserRankInfo;
 import com.sang.smite.domain.rank.domain.vo.Division;
 import com.sang.smite.domain.rank.domain.vo.Rank;
 import com.sang.smite.domain.rank.domain.vo.SeriesStatus;
 import com.sang.smite.domain.rank.domain.vo.SeriesType;
 import com.sang.smite.domain.rank.domain.vo.Tier;
+import com.sang.smite.domain.rank.service.dto.RankRecordSettlementCommand;
+import com.sang.smite.domain.rank.service.dto.RankRecordSettlementResult;
 import com.sang.smite.domain.rank.repository.RankSeriesRepository;
-import com.sang.smite.domain.rank.repository.UserRankInfoRepository;
+import com.sang.smite.domain.rank.service.RankCommandService;
 import com.sang.smite.domain.record.domain.GameRecord;
 import com.sang.smite.domain.record.domain.vo.GameRecordResult;
 import com.sang.smite.domain.record.domain.vo.GameRecordSeriesType;
@@ -53,7 +54,7 @@ class GameRecordRankSettlementServiceTest {
     private GameRecordRepository gameRecordRepository;
 
     @Mock
-    private UserRankInfoRepository userRankInfoRepository;
+    private RankCommandService rankCommandService;
 
     @Mock
     private RankSeriesRepository rankSeriesRepository;
@@ -71,12 +72,14 @@ class GameRecordRankSettlementServiceTest {
         GameRoom gameRoom = createFinishedGameRoom(GameResult.PLAYER1_WIN, FIRST_USER_ID);
         given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
         given(gameRecordRepository.countByGameRoomId(GAME_ROOM_ID)).willReturn(0L);
-        given(userRankInfoRepository.findByUserId(FIRST_USER_ID)).willReturn(Optional.of(rankInfo(FIRST_USER_ID, 20)));
-        given(userRankInfoRepository.findByUserId(SECOND_USER_ID)).willReturn(Optional.of(rankInfo(SECOND_USER_ID, 30)));
         given(rankSeriesRepository.findByUserIdAndStatus(FIRST_USER_ID, SeriesStatus.IN_PROGRESS))
                 .willReturn(Optional.empty());
         given(rankSeriesRepository.findByUserIdAndStatus(SECOND_USER_ID, SeriesStatus.IN_PROGRESS))
                 .willReturn(Optional.empty());
+        given(rankCommandService.applyRecordResults(anyList())).willReturn(List.of(
+                rankResult(FIRST_USER_ID, 20, 45),
+                rankResult(SECOND_USER_ID, 30, 5)
+        ));
 
         // when
         gameRecordRankSettlementService.settleFinishedGameRoom(GAME_ROOM_ID);
@@ -98,9 +101,22 @@ class GameRecordRankSettlementServiceTest {
                 )
                 .containsExactly(
                         tuple(GAME_ROOM_ID, FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.WIN,
-                                20, 20, 0, GameRecordSeriesType.RANK, null),
+                        20, 45, 25, GameRecordSeriesType.RANK, null),
                         tuple(GAME_ROOM_ID, SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.LOSS,
-                                30, 30, 0, GameRecordSeriesType.RANK, null)
+                                30, 5, -25, GameRecordSeriesType.RANK, null)
+                );
+        ArgumentCaptor<List<RankRecordSettlementCommand>> commandCaptor = rankCommandListCaptor();
+        verify(rankCommandService).applyRecordResults(commandCaptor.capture());
+        assertThat(commandCaptor.getValue())
+                .extracting(
+                        RankRecordSettlementCommand::userId,
+                        RankRecordSettlementCommand::opponentId,
+                        RankRecordSettlementCommand::result,
+                        RankRecordSettlementCommand::seriesType
+                )
+                .containsExactly(
+                        tuple(FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.WIN, GameRecordSeriesType.RANK),
+                        tuple(SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.LOSS, GameRecordSeriesType.RANK)
                 );
     }
 
@@ -124,12 +140,14 @@ class GameRecordRankSettlementServiceTest {
                 .build();
         given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
         given(gameRecordRepository.countByGameRoomId(GAME_ROOM_ID)).willReturn(0L);
-        given(userRankInfoRepository.findByUserId(FIRST_USER_ID)).willReturn(Optional.of(rankInfo(FIRST_USER_ID, 20)));
-        given(userRankInfoRepository.findByUserId(SECOND_USER_ID)).willReturn(Optional.of(rankInfo(SECOND_USER_ID, 30)));
         given(rankSeriesRepository.findByUserIdAndStatus(FIRST_USER_ID, SeriesStatus.IN_PROGRESS))
                 .willReturn(Optional.of(placement));
         given(rankSeriesRepository.findByUserIdAndStatus(SECOND_USER_ID, SeriesStatus.IN_PROGRESS))
                 .willReturn(Optional.of(promotion));
+        given(rankCommandService.applyRecordResults(anyList())).willReturn(List.of(
+                rankResult(FIRST_USER_ID, 20, 20),
+                rankResult(SECOND_USER_ID, 30, 30)
+        ));
 
         // when
         gameRecordRankSettlementService.settleFinishedGameRoom(GAME_ROOM_ID);
@@ -158,7 +176,7 @@ class GameRecordRankSettlementServiceTest {
 
         // then
         verify(gameRecordRepository, never()).saveAll(anyList());
-        verify(userRankInfoRepository, never()).findByUserId(FIRST_USER_ID);
+        verify(rankCommandService, never()).applyRecordResults(anyList());
     }
 
     @Test
@@ -205,16 +223,23 @@ class GameRecordRankSettlementServiceTest {
         return gameRoom;
     }
 
-    private UserRankInfo rankInfo(Long userId, int lp) {
-        return UserRankInfo.builder()
-                .userId(userId)
-                .rank(Rank.of(Tier.IRON, Division.IV))
-                .lp(lp)
-                .build();
+    private RankRecordSettlementResult rankResult(Long userId, int lpBefore, int lpAfter) {
+        return new RankRecordSettlementResult(
+                userId,
+                lpBefore,
+                lpAfter,
+                Rank.of(Tier.IRON, Division.IV),
+                Rank.of(Tier.IRON, Division.IV)
+        );
     }
 
     @SuppressWarnings("unchecked")
     private ArgumentCaptor<List<GameRecord>> gameRecordListCaptor() {
+        return ArgumentCaptor.forClass(List.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ArgumentCaptor<List<RankRecordSettlementCommand>> rankCommandListCaptor() {
         return ArgumentCaptor.forClass(List.class);
     }
 }
