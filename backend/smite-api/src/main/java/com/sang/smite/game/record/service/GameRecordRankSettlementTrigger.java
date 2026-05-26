@@ -40,12 +40,22 @@ public class GameRecordRankSettlementTrigger {
             gameRecordRankSettlementService.settleFinishedGameRoom(command.gameRoomId());
         } catch (RuntimeException e) {
             log.warn(
-                    "Failed to settle game record/rank: gameRoomId={}, result={}, winnerId={}",
+                    "Failed to settle game record/rank: gameRoomId={}, result={}, winnerId={}, recordCount={}",
                     command.gameRoomId(),
                     command.result(),
                     command.winnerId(),
+                    countRecordsSafely(command.gameRoomId()),
                     e
             );
+        }
+    }
+
+    private Long countRecordsSafely(Long gameRoomId) {
+        try {
+            return gameRecordRankSettlementService.countRecordsByGameRoomId(gameRoomId);
+        } catch (RuntimeException e) {
+            log.warn("Failed to count game records after settlement failure: gameRoomId={}", gameRoomId, e);
+            return null;
         }
     }
 }

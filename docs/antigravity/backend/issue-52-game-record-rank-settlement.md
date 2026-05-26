@@ -261,14 +261,14 @@ flowchart TD
 
 ### 6. API 종료 흐름 연결
 
-- [ ] `smite-api` 게임 종료 orchestration 영역에서 record/rank 정산 service를 호출
-- [ ] SMITE kill로 새로 `FINISHED` 된 경우에만 정산 호출
-- [ ] 양쪽 실패 SMITE DRAW로 새로 `FINISHED` 된 경우에만 정산 호출
-- [ ] 자연사 DRAW로 새로 `FINISHED` 된 경우에만 정산 호출
-- [ ] 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE current result 재응답에서는 정산을 다시 호출하지 않음
-- [ ] scheduler no-op 케이스에서는 정산 호출하지 않음
-- [ ] abort 흐름에서는 record/rank 정산을 호출하지 않음
-- [ ] 정산 실패 로그에 gameRoomId, result, winnerId, record count를 포함
+- [x] `smite-api` 게임 종료 orchestration 영역에서 record/rank 정산 service를 호출
+- [x] SMITE kill로 새로 `FINISHED` 된 경우에만 정산 호출
+- [x] 양쪽 실패 SMITE DRAW로 새로 `FINISHED` 된 경우에만 정산 호출
+- [x] 자연사 DRAW로 새로 `FINISHED` 된 경우에만 정산 호출
+- [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE current result 재응답에서는 정산을 다시 호출하지 않음
+- [x] scheduler no-op 케이스에서는 정산 호출하지 않음
+- [x] abort 흐름에서는 record/rank 정산을 호출하지 않음
+- [x] 정산 실패 로그에 gameRoomId, result, winnerId, record count를 포함
 
 ### 7. 멱등성과 실패 복구
 
@@ -303,8 +303,8 @@ flowchart TD
 - [ ] placement 완료 게임의 `rankAfter`/`lpAfter`가 최종 배정 결과로 저장되는지 검증
 - [ ] promotion series 진행 중인 유저의 결과가 일반 LP 계산 없이 series에 반영되는지 검증
 - [ ] promotion 성공/실패 게임의 `rankAfter`/`lpAfter`가 최종 결과로 저장되는지 검증
-- [ ] SMITE kill, both smite draw, natural death draw 경로에서 정산 호출이 연결되는지 API service test로 검증
-- [ ] 이미 FINISHED인 current result 재응답과 scheduler no-op에서는 정산을 호출하지 않는지 검증
+- [x] SMITE kill, both smite draw, natural death draw 경로에서 정산 호출이 연결되는지 API service test로 검증
+- [x] 이미 FINISHED인 current result 재응답과 scheduler no-op에서는 정산을 호출하지 않는지 검증
 - [ ] 복구 scheduler가 FINISHED + record count 0 gameRoom을 재정산하는지 검증
 - [ ] 복구 scheduler가 record count 1 gameRoom을 자동 보정하지 않는지 검증
 

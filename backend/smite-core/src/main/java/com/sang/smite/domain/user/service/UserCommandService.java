@@ -1,5 +1,7 @@
 package com.sang.smite.domain.user.service;
 
+import com.sang.smite.common.exception.CoreErrorCode;
+import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.rank.service.RankCommandService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
@@ -30,5 +32,11 @@ public class UserCommandService {
 
     public User save(User user) {
         return userRepository.save(user);
+    }
+
+    public void updatePasswordByEmail(String email, String encodedPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.USER_NOT_FOUND));
+        user.updatePassword(encodedPassword);
     }
 }

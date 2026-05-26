@@ -68,6 +68,14 @@ public class GameRecordRankSettlementService {
         gameRecordRepository.saveAll(records);
     }
 
+    /**
+     * gameRoom 기준 생성된 record 수를 조회합니다.
+     */
+    @Transactional(readOnly = true)
+    public long countRecordsByGameRoomId(Long gameRoomId) {
+        return gameRecordRepository.countByGameRoomId(gameRoomId);
+    }
+
     private RankRecordSettlementCommand toRankCommand(GameRoomParticipantResult participantResult) {
         return new RankRecordSettlementCommand(
                 participantResult.userId(),

@@ -13,6 +13,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 class GameRecordRankSettlementTriggerTest {
 
@@ -70,12 +71,14 @@ class GameRecordRankSettlementTriggerTest {
         doThrow(new RuntimeException("failed"))
                 .when(gameRecordRankSettlementService)
                 .settleFinishedGameRoom(GAME_ROOM_ID);
+        when(gameRecordRankSettlementService.countRecordsByGameRoomId(GAME_ROOM_ID)).thenReturn(0L);
 
         // when
         trigger.settleFinishedGameRoomAfterCommit(gameRoom);
 
         // then
         verify(gameRecordRankSettlementService).settleFinishedGameRoom(GAME_ROOM_ID);
+        verify(gameRecordRankSettlementService).countRecordsByGameRoomId(GAME_ROOM_ID);
     }
 
     private GameRoom finishedGameRoom() {
