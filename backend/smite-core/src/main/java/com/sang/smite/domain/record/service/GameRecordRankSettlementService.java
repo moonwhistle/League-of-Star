@@ -7,16 +7,11 @@ import com.sang.smite.domain.game.domain.vo.GameParticipantResult;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import com.sang.smite.domain.game.service.GameRoomParticipantResult;
 import com.sang.smite.domain.game.service.GameRoomResultResolver;
-import com.sang.smite.domain.rank.domain.RankSeries;
-import com.sang.smite.domain.rank.domain.vo.SeriesStatus;
-import com.sang.smite.domain.rank.domain.vo.SeriesType;
 import com.sang.smite.domain.rank.service.dto.RankRecordSettlementCommand;
 import com.sang.smite.domain.rank.service.dto.RankRecordSettlementResult;
-import com.sang.smite.domain.rank.repository.RankSeriesRepository;
 import com.sang.smite.domain.rank.service.RankCommandService;
 import com.sang.smite.domain.record.domain.GameRecord;
 import com.sang.smite.domain.record.domain.vo.GameRecordResult;
-import com.sang.smite.domain.record.domain.vo.GameRecordSeriesType;
 import com.sang.smite.domain.record.repository.GameRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,7 +30,6 @@ public class GameRecordRankSettlementService {
     private final GameRoomRepository gameRoomRepository;
     private final GameRecordRepository gameRecordRepository;
     private final RankCommandService rankCommandService;
-    private final RankSeriesRepository rankSeriesRepository;
     private final GameRoomResultResolver gameRoomResultResolver;
 
     /**
@@ -56,41 +49,36 @@ public class GameRecordRankSettlementService {
         }
 
         List<GameRoomParticipantResult> participantResults = gameRoomResultResolver.resolveParticipantResults(gameRoom);
-        List<RecordSettlementTarget> targets = participantResults.stream()
-                .map(this::resolveRecordSettlementTarget)
-                .toList();
         Map<Long, RankRecordSettlementResult> rankResults = rankCommandService.applyRecordResults(
-                        targets.stream()
-                                .map(RecordSettlementTarget::toRankCommand)
+                        participantResults.stream()
+                                .map(this::toRankCommand)
                                 .toList()
                 )
                 .stream()
                 .collect(Collectors.toMap(RankRecordSettlementResult::userId, Function.identity()));
 
-        List<GameRecord> records = targets.stream()
-                .map(target -> createRecord(gameRoomId, target, rankResults.get(target.userId())))
+        List<GameRecord> records = participantResults.stream()
+                .map(participantResult -> createRecord(
+                        gameRoomId,
+                        participantResult,
+                        rankResults.get(participantResult.userId())
+                ))
                 .toList();
 
         gameRecordRepository.saveAll(records);
     }
 
-    private RecordSettlementTarget resolveRecordSettlementTarget(GameRoomParticipantResult participantResult) {
-        Optional<RankSeries> rankSeries = rankSeriesRepository.findByUserIdAndStatus(
-                participantResult.userId(),
-                SeriesStatus.IN_PROGRESS
-        );
-        return new RecordSettlementTarget(
+    private RankRecordSettlementCommand toRankCommand(GameRoomParticipantResult participantResult) {
+        return new RankRecordSettlementCommand(
                 participantResult.userId(),
                 participantResult.opponentId(),
-                rankSeries.map(RankSeries::getId).orElse(null),
-                resolveSeriesType(rankSeries),
                 toRecordResult(participantResult.result())
         );
     }
 
     private GameRecord createRecord(
             Long gameRoomId,
-            RecordSettlementTarget target,
+            GameRoomParticipantResult participantResult,
             RankRecordSettlementResult rankResult
     ) {
         if (rankResult == null) {
@@ -98,30 +86,16 @@ public class GameRecordRankSettlementService {
         }
         return GameRecord.create(
                 gameRoomId,
-                target.userId(),
-                target.opponentId(),
-                target.rankSeriesId(),
-                target.seriesType(),
-                target.result(),
+                participantResult.userId(),
+                participantResult.opponentId(),
+                rankResult.rankSeriesId(),
+                rankResult.seriesType(),
+                toRecordResult(participantResult.result()),
                 rankResult.lpBefore(),
                 rankResult.lpAfter(),
                 rankResult.rankBefore(),
                 rankResult.rankAfter()
         );
-    }
-
-    private GameRecordSeriesType resolveSeriesType(Optional<RankSeries> rankSeries) {
-        return rankSeries
-                .map(RankSeries::getType)
-                .map(this::toRecordSeriesType)
-                .orElse(GameRecordSeriesType.RANK);
-    }
-
-    private GameRecordSeriesType toRecordSeriesType(SeriesType seriesType) {
-        return switch (seriesType) {
-            case PLACEMENT -> GameRecordSeriesType.PLACEMENT;
-            case PROMOTION -> GameRecordSeriesType.PROMOTION;
-        };
     }
 
     private GameRecordResult toRecordResult(GameParticipantResult participantResult) {
@@ -130,17 +104,5 @@ public class GameRecordRankSettlementService {
             case LOSS -> GameRecordResult.LOSS;
             case DRAW -> GameRecordResult.DRAW;
         };
-    }
-
-    private record RecordSettlementTarget(
-            Long userId,
-            Long opponentId,
-            Long rankSeriesId,
-            GameRecordSeriesType seriesType,
-            GameRecordResult result
-    ) {
-        private RankRecordSettlementCommand toRankCommand() {
-            return new RankRecordSettlementCommand(userId, opponentId, result, seriesType);
-        }
     }
 }

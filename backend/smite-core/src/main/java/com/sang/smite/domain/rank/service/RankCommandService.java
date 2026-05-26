@@ -6,6 +6,8 @@ import com.sang.smite.domain.rank.domain.RankSeries;
 import com.sang.smite.domain.rank.domain.UserRankInfo;
 import com.sang.smite.domain.rank.domain.vo.Division;
 import com.sang.smite.domain.rank.domain.vo.Rank;
+import com.sang.smite.domain.rank.domain.vo.SeriesStatus;
+import com.sang.smite.domain.rank.domain.vo.SeriesType;
 import com.sang.smite.domain.rank.domain.vo.Tier;
 import com.sang.smite.domain.rank.service.dto.RankRecordSettlementCommand;
 import com.sang.smite.domain.rank.service.dto.RankRecordSettlementResult;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -54,15 +57,16 @@ public class RankCommandService {
     }
 
     /**
-     * gameRecord 생성 transaction 안에서 참가자별 누적 전적과 일반 RANK LP를 반영합니다.
+     * gameRecord 생성 transaction 안에서 참가자별 누적 전적, LP, 진행 중 RankSeries를 반영합니다.
      */
     public List<RankRecordSettlementResult> applyRecordResults(List<RankRecordSettlementCommand> commands) {
         Map<Long, UserRankInfo> rankInfos = findRankInfosForUpdate(commands);
+        Map<Long, RankSeries> activeRankSeries = findActiveRankSeriesForUpdate(commands);
         Map<Long, RankSnapshot> beforeSnapshots = rankInfos.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> RankSnapshot.from(entry.getValue())));
 
         return commands.stream()
-                .map(command -> applyRecordResult(command, rankInfos, beforeSnapshots))
+                .map(command -> applyRecordResult(command, rankInfos, activeRankSeries, beforeSnapshots))
                 .toList();
     }
 
@@ -80,9 +84,20 @@ public class RankCommandService {
                 .orElseThrow(() -> new CoreException(CoreErrorCode.RANK_NOT_FOUND));
     }
 
+    private Map<Long, RankSeries> findActiveRankSeriesForUpdate(List<RankRecordSettlementCommand> commands) {
+        return commands.stream()
+                .map(RankRecordSettlementCommand::userId)
+                .distinct()
+                .sorted(Comparator.naturalOrder())
+                .map(userId -> rankSeriesRepository.findByUserIdAndStatus(userId, SeriesStatus.IN_PROGRESS))
+                .flatMap(Optional::stream)
+                .collect(Collectors.toMap(RankSeries::getUserId, Function.identity()));
+    }
+
     private RankRecordSettlementResult applyRecordResult(
             RankRecordSettlementCommand command,
             Map<Long, UserRankInfo> rankInfos,
+            Map<Long, RankSeries> activeRankSeries,
             Map<Long, RankSnapshot> beforeSnapshots
     ) {
         UserRankInfo rankInfo = rankInfos.get(command.userId());
@@ -93,17 +108,85 @@ public class RankCommandService {
         }
 
         rankInfo.applyRecordResult(command.result());
-        if (command.seriesType() == GameRecordSeriesType.RANK) {
+        RankSeries rankSeries = activeRankSeries.get(command.userId());
+        if (rankSeries == null) {
             applyRankLp(rankInfo, command.result(), before, opponentBefore);
+        } else {
+            applyRankSeriesResult(rankInfo, rankSeries, command.result(), before);
         }
 
         return new RankRecordSettlementResult(
                 command.userId(),
+                rankSeries == null ? null : rankSeries.getId(),
+                rankSeries == null ? GameRecordSeriesType.RANK : toRecordSeriesType(rankSeries.getType()),
                 before.lp(),
                 rankInfo.getLp(),
                 before.rank(),
                 rankInfo.getRank()
         );
+    }
+
+    private void applyRankSeriesResult(
+            UserRankInfo rankInfo,
+            RankSeries rankSeries,
+            GameRecordResult result,
+            RankSnapshot before
+    ) {
+        applySeriesCount(rankSeries, result);
+        if (rankSeries.getType() == SeriesType.PLACEMENT) {
+            applyPlacementCompletion(rankInfo, rankSeries);
+            return;
+        }
+        applyPromotionCompletion(rankInfo, rankSeries, before);
+    }
+
+    private void applySeriesCount(RankSeries rankSeries, GameRecordResult result) {
+        switch (result) {
+            case WIN -> rankSeries.addWin();
+            case LOSS -> rankSeries.addLoss();
+            case DRAW -> rankSeries.addDraw();
+        }
+    }
+
+    private void applyPlacementCompletion(UserRankInfo rankInfo, RankSeries rankSeries) {
+        if (rankSeries.getStatus() != SeriesStatus.SUCCESS) {
+            return;
+        }
+        rankInfo.updateRankAndLp(resolvePlacementRank(rankSeries.getWins()), 0);
+    }
+
+    private Rank resolvePlacementRank(int wins) {
+        if (wins >= 9) {
+            return Rank.of(Tier.PLATINUM, Division.IV);
+        }
+        if (wins >= 7) {
+            return Rank.of(Tier.GOLD, Division.IV);
+        }
+        if (wins >= 5) {
+            return Rank.of(Tier.SILVER, Division.IV);
+        }
+        if (wins >= 3) {
+            return Rank.of(Tier.BRONZE, Division.IV);
+        }
+        return Rank.of(Tier.IRON, Division.IV);
+    }
+
+    private void applyPromotionCompletion(UserRankInfo rankInfo, RankSeries rankSeries, RankSnapshot before) {
+        if (rankSeries.getStatus() == SeriesStatus.SUCCESS) {
+            if (rankSeries.getTargetRank() == null) {
+                throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+            }
+            rankInfo.updateRankAndLp(rankSeries.getTargetRank(), 0);
+        } else if (rankSeries.getStatus() == SeriesStatus.FAILED) {
+            rankInfo.updateRankAndLp(before.rank(), DEMOTION_LP);
+        }
+    }
+
+    private GameRecordSeriesType toRecordSeriesType(SeriesType seriesType) {
+        return switch (seriesType) {
+            case PLACEMENT -> GameRecordSeriesType.PLACEMENT;
+            case PROMOTION -> GameRecordSeriesType.PROMOTION;
+        };
     }
 
     private void applyRankLp(

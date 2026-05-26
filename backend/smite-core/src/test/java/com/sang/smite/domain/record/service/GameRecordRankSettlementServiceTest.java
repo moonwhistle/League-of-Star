@@ -6,15 +6,11 @@ import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import com.sang.smite.domain.game.service.GameRoomResultResolver;
-import com.sang.smite.domain.rank.domain.RankSeries;
 import com.sang.smite.domain.rank.domain.vo.Division;
 import com.sang.smite.domain.rank.domain.vo.Rank;
-import com.sang.smite.domain.rank.domain.vo.SeriesStatus;
-import com.sang.smite.domain.rank.domain.vo.SeriesType;
 import com.sang.smite.domain.rank.domain.vo.Tier;
 import com.sang.smite.domain.rank.service.dto.RankRecordSettlementCommand;
 import com.sang.smite.domain.rank.service.dto.RankRecordSettlementResult;
-import com.sang.smite.domain.rank.repository.RankSeriesRepository;
 import com.sang.smite.domain.rank.service.RankCommandService;
 import com.sang.smite.domain.record.domain.GameRecord;
 import com.sang.smite.domain.record.domain.vo.GameRecordResult;
@@ -56,9 +52,6 @@ class GameRecordRankSettlementServiceTest {
     @Mock
     private RankCommandService rankCommandService;
 
-    @Mock
-    private RankSeriesRepository rankSeriesRepository;
-
     @Spy
     private GameRoomResultResolver gameRoomResultResolver;
 
@@ -72,10 +65,6 @@ class GameRecordRankSettlementServiceTest {
         GameRoom gameRoom = createFinishedGameRoom(GameResult.PLAYER1_WIN, FIRST_USER_ID);
         given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
         given(gameRecordRepository.countByGameRoomId(GAME_ROOM_ID)).willReturn(0L);
-        given(rankSeriesRepository.findByUserIdAndStatus(FIRST_USER_ID, SeriesStatus.IN_PROGRESS))
-                .willReturn(Optional.empty());
-        given(rankSeriesRepository.findByUserIdAndStatus(SECOND_USER_ID, SeriesStatus.IN_PROGRESS))
-                .willReturn(Optional.empty());
         given(rankCommandService.applyRecordResults(anyList())).willReturn(List.of(
                 rankResult(FIRST_USER_ID, 20, 45),
                 rankResult(SECOND_USER_ID, 30, 5)
@@ -111,42 +100,24 @@ class GameRecordRankSettlementServiceTest {
                 .extracting(
                         RankRecordSettlementCommand::userId,
                         RankRecordSettlementCommand::opponentId,
-                        RankRecordSettlementCommand::result,
-                        RankRecordSettlementCommand::seriesType
+                        RankRecordSettlementCommand::result
                 )
                 .containsExactly(
-                        tuple(FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.WIN, GameRecordSeriesType.RANK),
-                        tuple(SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.LOSS, GameRecordSeriesType.RANK)
+                        tuple(FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.WIN),
+                        tuple(SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.LOSS)
                 );
     }
 
     @Test
-    @DisplayName("settleFinishedGameRoom - 진행 중인 RankSeries가 있으면 rankSeriesId와 seriesType을 저장한다")
-    void settleFinishedGameRoom_WithRankSeries() {
+    @DisplayName("settleFinishedGameRoom - rank 정산 결과의 rankSeriesId와 seriesType을 저장한다")
+    void settleFinishedGameRoom_SaveRankSeriesResult() {
         // given
         GameRoom gameRoom = createFinishedGameRoom(GameResult.DRAW, null);
-        RankSeries placement = RankSeries.builder()
-                .id(10L)
-                .userId(FIRST_USER_ID)
-                .type(SeriesType.PLACEMENT)
-                .totalGamesRequired(10)
-                .build();
-        RankSeries promotion = RankSeries.builder()
-                .id(20L)
-                .userId(SECOND_USER_ID)
-                .type(SeriesType.PROMOTION)
-                .targetRank(Rank.of(Tier.BRONZE, Division.IV))
-                .totalGamesRequired(3)
-                .build();
         given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
         given(gameRecordRepository.countByGameRoomId(GAME_ROOM_ID)).willReturn(0L);
-        given(rankSeriesRepository.findByUserIdAndStatus(FIRST_USER_ID, SeriesStatus.IN_PROGRESS))
-                .willReturn(Optional.of(placement));
-        given(rankSeriesRepository.findByUserIdAndStatus(SECOND_USER_ID, SeriesStatus.IN_PROGRESS))
-                .willReturn(Optional.of(promotion));
         given(rankCommandService.applyRecordResults(anyList())).willReturn(List.of(
-                rankResult(FIRST_USER_ID, 20, 20),
-                rankResult(SECOND_USER_ID, 30, 30)
+                rankResult(FIRST_USER_ID, 10L, GameRecordSeriesType.PLACEMENT, 20, 20),
+                rankResult(SECOND_USER_ID, 20L, GameRecordSeriesType.PROMOTION, 30, 30)
         ));
 
         // when
@@ -224,8 +195,20 @@ class GameRecordRankSettlementServiceTest {
     }
 
     private RankRecordSettlementResult rankResult(Long userId, int lpBefore, int lpAfter) {
+        return rankResult(userId, null, GameRecordSeriesType.RANK, lpBefore, lpAfter);
+    }
+
+    private RankRecordSettlementResult rankResult(
+            Long userId,
+            Long rankSeriesId,
+            GameRecordSeriesType seriesType,
+            int lpBefore,
+            int lpAfter
+    ) {
         return new RankRecordSettlementResult(
                 userId,
+                rankSeriesId,
+                seriesType,
                 lpBefore,
                 lpAfter,
                 Rank.of(Tier.IRON, Division.IV),

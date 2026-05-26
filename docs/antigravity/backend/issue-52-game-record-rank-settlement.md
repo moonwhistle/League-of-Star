@@ -248,16 +248,16 @@ flowchart TD
 
 ### 5. 배치/승급전 시리즈 반영
 
-- [ ] `RankSeriesRepository.findByUserIdAndStatus(userId, IN_PROGRESS)`를 이용해 진행 중 시리즈 조회
-- [ ] LP 계산보다 진행 중 RankSeries 조회와 `seriesType` 결정을 먼저 수행
-- [ ] 진행 중 placement가 있으면 LP를 계산하지 않고 WIN/LOSS/DRAW를 series에 반영
-- [ ] placement 미완료 시 `lpChange=0`, `lpBefore=lpAfter`, 내부 rank snapshot 유지
-- [ ] placement 완료 시 정책 승수표에 따라 최종 rank/LP를 배정하고 마지막 배치 record의 `rankAfter`/`lpAfter`에 반영
-- [ ] 진행 중 promotion이 있으면 일반 LP를 계산하지 않고 WIN/LOSS/DRAW를 series에 반영
-- [ ] promotion 성공 시 `targetRank`와 LP 0을 반영
-- [ ] promotion 실패 시 기존 rank와 LP 75를 반영
-- [ ] record의 `rankSeriesId`, `seriesType` 필드에 series 정보를 저장
-- [ ] `seriesType=PLACEMENT` record는 클라이언트에서 Unranked 표시로 해석하도록 문서화
+- [x] `RankSeriesRepository.findByUserIdAndStatus(userId, IN_PROGRESS)`를 이용해 진행 중 시리즈 조회
+- [x] LP 계산보다 진행 중 RankSeries 조회와 `seriesType` 결정을 먼저 수행
+- [x] 진행 중 placement가 있으면 LP를 계산하지 않고 WIN/LOSS/DRAW를 series에 반영
+- [x] placement 미완료 시 `lpChange=0`, `lpBefore=lpAfter`, 내부 rank snapshot 유지
+- [x] placement 완료 시 정책 승수표에 따라 최종 rank/LP를 배정하고 마지막 배치 record의 `rankAfter`/`lpAfter`에 반영
+- [x] 진행 중 promotion이 있으면 일반 LP를 계산하지 않고 WIN/LOSS/DRAW를 series에 반영
+- [x] promotion 성공 시 `targetRank`와 LP 0을 반영
+- [x] promotion 실패 시 기존 rank와 LP 75를 반영
+- [x] record의 `rankSeriesId`, `seriesType` 필드에 series 정보를 저장
+- [x] `seriesType=PLACEMENT` record는 클라이언트에서 Unranked 표시로 해석하도록 문서화
 
 ### 6. API 종료 흐름 연결
 

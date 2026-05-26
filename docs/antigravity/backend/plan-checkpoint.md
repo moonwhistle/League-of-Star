@@ -210,9 +210,9 @@ flowchart TD
 - [x] `seriesType=RANK/PLACEMENT/PROMOTION`으로 일반 랭크, 배치, 승급전을 명시
 - [x] `UserRankInfo` 누적 승/패/무 반영
 - [x] 일반 RANK 게임 WIN/LOSS/DRAW LP 반영
-- [ ] 배치 RankSeries 반영 및 10판 완료 시 최종 rank/LP 배정
-- [ ] 승급전 RankSeries 반영 및 성공/실패 시 rank/LP 확정
-- [ ] record/rank 정산 내부에서 record 생성, 누적 전적, LP, RankSeries 반영을 같은 transaction으로 처리
+- [x] 배치 RankSeries 반영 및 10판 완료 시 최종 rank/LP 배정
+- [x] 승급전 RankSeries 반영 및 성공/실패 시 rank/LP 확정
+- [x] record/rank 정산 내부에서 record 생성, 누적 전적, LP, RankSeries 반영을 같은 transaction으로 처리
 - [x] `countByGameRoomId == 0/2/1` 기준 멱등성 및 불완전 정산 정책 구현
 - [ ] FINISHED인데 record count가 2가 아닌 gameRoom을 복구하는 scheduler 추가
 - [ ] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, record/rank summary 조회 API는 후속 Step 11로 분리
