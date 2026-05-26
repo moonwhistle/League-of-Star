@@ -284,25 +284,25 @@ flowchart TD
 
 ### 8. 조회/API 후속 분리
 
-- [ ] `GAME_RESULT` payload에는 LP/rank/series 정보를 추가하지 않고 기존 종료 결과 정보만 유지
-- [ ] 클라이언트 최종 결과 화면용 gameRoomId 기준 record/rank summary 조회 endpoint는 후속 Issue 60으로 분리
-- [ ] Issue 52에서는 조회 API 구현 없이 record/rank 정산 저장 완료 상태까지만 보장
+- [x] `GAME_RESULT` payload에는 LP/rank/series 정보를 추가하지 않고 기존 종료 결과 정보만 유지
+- [x] 클라이언트 최종 결과 화면용 gameRoomId 기준 record/rank summary 조회 endpoint는 후속 Issue 60으로 분리
+- [x] Issue 52에서는 조회 API 구현 없이 record/rank 정산 저장 완료 상태까지만 보장
 
 ### 9. 테스트
 
-- [ ] `PLAYER1_WIN` 결과가 두 participant record의 `WIN/LOSS`로 변환되는지 검증
-- [ ] `PLAYER2_WIN` 결과가 두 participant record의 `LOSS/WIN`으로 변환되는지 검증
-- [ ] `DRAW` 결과가 두 participant record의 `DRAW/DRAW`, `lpChange=0`으로 저장되는지 검증
-- [ ] FINISHED가 아닌 gameRoom은 record/rank 정산 대상이 아닌지 검증
+- [x] `PLAYER1_WIN` 결과가 두 participant record의 `WIN/LOSS`로 변환되는지 검증
+- [x] `PLAYER2_WIN` 결과가 두 participant record의 `LOSS/WIN`으로 변환되는지 검증
+- [x] `DRAW` 결과가 두 participant record의 `DRAW/DRAW`, `lpChange=0`으로 저장되는지 검증
+- [x] FINISHED가 아닌 gameRoom은 record/rank 정산 대상이 아닌지 검증
 - [x] 같은 gameRoom을 두 번 정산해도 record/rank가 중복 반영되지 않는지 검증
 - [x] `countByGameRoomId == 1` 불완전 정산 상태에서 예외/복구 대상으로 처리되는지 검증
-- [ ] `RANK`, `PLACEMENT`, `PROMOTION` seriesType과 rankSeriesId 저장 정책을 검증
-- [ ] FINISHED record 생성 시 totalWins/totalLosses/totalDraws가 반영되는지 검증
+- [x] `RANK`, `PLACEMENT`, `PROMOTION` seriesType과 rankSeriesId 저장 정책을 검증
+- [x] FINISHED record 생성 시 totalWins/totalLosses/totalDraws가 반영되는지 검증
 - [x] record 생성과 rank 반영이 같은 transaction으로 rollback되는지 검증
-- [ ] placement series 진행 중인 유저의 결과가 LP 변동 없이 series에 반영되는지 검증
-- [ ] placement 완료 게임의 `rankAfter`/`lpAfter`가 최종 배정 결과로 저장되는지 검증
-- [ ] promotion series 진행 중인 유저의 결과가 일반 LP 계산 없이 series에 반영되는지 검증
-- [ ] promotion 성공/실패 게임의 `rankAfter`/`lpAfter`가 최종 결과로 저장되는지 검증
+- [x] placement series 진행 중인 유저의 결과가 LP 변동 없이 series에 반영되는지 검증
+- [x] placement 완료 게임의 `rankAfter`/`lpAfter`가 최종 배정 결과로 저장되는지 검증
+- [x] promotion series 진행 중인 유저의 결과가 일반 LP 계산 없이 series에 반영되는지 검증
+- [x] promotion 성공/실패 게임의 `rankAfter`/`lpAfter`가 최종 결과로 저장되는지 검증
 - [x] SMITE kill, both smite draw, natural death draw 경로에서 정산 호출이 연결되는지 API service test로 검증
 - [x] 이미 FINISHED인 current result 재응답과 scheduler no-op에서는 정산을 호출하지 않는지 검증
 - [x] 복구 scheduler가 FINISHED + record count 0 gameRoom을 재정산하는지 검증

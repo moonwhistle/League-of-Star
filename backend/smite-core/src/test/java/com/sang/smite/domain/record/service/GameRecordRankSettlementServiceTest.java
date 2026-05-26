@@ -112,6 +112,70 @@ class GameRecordRankSettlementServiceTest {
     }
 
     @Test
+    @DisplayName("settleFinishedGameRoom - PLAYER2_WIN이면 참가자별 LOSS/WIN record를 생성한다")
+    void settleFinishedGameRoom_Player2Win_CreateLossWinRecords() {
+        // given
+        GameRoom gameRoom = createFinishedGameRoom(GameResult.PLAYER2_WIN, SECOND_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+        given(gameRecordRepository.countByGameRoomId(GAME_ROOM_ID)).willReturn(0L);
+        given(rankCommandService.applyRecordResults(anyList())).willReturn(List.of(
+                rankResult(FIRST_USER_ID, 30, 5),
+                rankResult(SECOND_USER_ID, 20, 45)
+        ));
+
+        // when
+        gameRecordRankSettlementService.settleFinishedGameRoom(GAME_ROOM_ID);
+
+        // then
+        ArgumentCaptor<List<GameRecord>> recordsCaptor = gameRecordListCaptor();
+        verify(gameRecordRepository).saveAll(recordsCaptor.capture());
+        assertThat(recordsCaptor.getValue())
+                .extracting(
+                        GameRecord::getUserId,
+                        GameRecord::getOpponentId,
+                        GameRecord::getResult,
+                        GameRecord::getLpChange
+                )
+                .containsExactly(
+                        tuple(FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.LOSS, -25),
+                        tuple(SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.WIN, 25)
+                );
+    }
+
+    @Test
+    @DisplayName("settleFinishedGameRoom - DRAW이면 두 참가자 모두 DRAW, lpChange 0 record를 생성한다")
+    void settleFinishedGameRoom_Draw_CreateDrawRecords() {
+        // given
+        GameRoom gameRoom = createFinishedGameRoom(GameResult.DRAW, null);
+        given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+        given(gameRecordRepository.countByGameRoomId(GAME_ROOM_ID)).willReturn(0L);
+        given(rankCommandService.applyRecordResults(anyList())).willReturn(List.of(
+                rankResult(FIRST_USER_ID, 20, 20),
+                rankResult(SECOND_USER_ID, 30, 30)
+        ));
+
+        // when
+        gameRecordRankSettlementService.settleFinishedGameRoom(GAME_ROOM_ID);
+
+        // then
+        ArgumentCaptor<List<GameRecord>> recordsCaptor = gameRecordListCaptor();
+        verify(gameRecordRepository).saveAll(recordsCaptor.capture());
+        assertThat(recordsCaptor.getValue())
+                .extracting(
+                        GameRecord::getUserId,
+                        GameRecord::getOpponentId,
+                        GameRecord::getResult,
+                        GameRecord::getLpBefore,
+                        GameRecord::getLpAfter,
+                        GameRecord::getLpChange
+                )
+                .containsExactly(
+                        tuple(FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.DRAW, 20, 20, 0),
+                        tuple(SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.DRAW, 30, 30, 0)
+                );
+    }
+
+    @Test
     @DisplayName("settleFinishedGameRoom - rank 정산 결과의 rankSeriesId와 seriesType을 저장한다")
     void settleFinishedGameRoom_SaveRankSeriesResult() {
         // given

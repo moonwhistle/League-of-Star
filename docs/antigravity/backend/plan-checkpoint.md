@@ -215,7 +215,7 @@ flowchart TD
 - [x] record/rank 정산 내부에서 record 생성, 누적 전적, LP, RankSeries 반영을 같은 transaction으로 처리
 - [x] `countByGameRoomId == 0/2/1` 기준 멱등성 및 불완전 정산 정책 구현
 - [x] FINISHED인데 record count가 2가 아닌 gameRoom을 복구하는 scheduler 추가
-- [ ] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, record/rank summary 조회 API는 후속 Step 11로 분리
+- [x] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, record/rank summary 조회 API는 후속 Step 11로 분리
 
 ### Step 10. 정상 종료 후 매칭 점유 상태 cleanup
 
