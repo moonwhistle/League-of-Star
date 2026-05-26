@@ -4,6 +4,7 @@ import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.vo.GameResult;
+import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import com.sang.smite.domain.game.service.GameRoomResultResolver;
 import com.sang.smite.domain.rank.domain.vo.Division;
@@ -24,6 +25,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -178,6 +181,42 @@ class GameRecordRankSettlementServiceTest {
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
         verify(gameRecordRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("settleFinishedGameRoom - rank 반영 중 예외가 발생하면 record를 저장하지 않는다")
+    void settleFinishedGameRoom_RankSettlementFailed_DoNotSaveRecords() {
+        // given
+        GameRoom gameRoom = createFinishedGameRoom(GameResult.PLAYER1_WIN, FIRST_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+        given(gameRecordRepository.countByGameRoomId(GAME_ROOM_ID)).willReturn(0L);
+        willThrow(new CoreException(CoreErrorCode.RANK_NOT_FOUND))
+                .given(rankCommandService)
+                .applyRecordResults(anyList());
+
+        // when & then
+        assertThatThrownBy(() -> gameRecordRankSettlementService.settleFinishedGameRoom(GAME_ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.RANK_NOT_FOUND));
+        verify(gameRecordRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("findUnsettledFinishedGameRoomIds - FINISHED 미정산 후보를 조회한다")
+    void findUnsettledFinishedGameRoomIds() {
+        // given
+        int limit = 100;
+        given(gameRoomRepository.findGameRoomIdsByStatusAndRecordCountNot(
+                GameStatus.FINISHED,
+                GameRoom.MAX_PARTICIPANTS,
+                PageRequest.of(0, limit)
+        )).willReturn(List.of(GAME_ROOM_ID));
+
+        // when
+        List<Long> result = gameRecordRankSettlementService.findUnsettledFinishedGameRoomIds(limit);
+
+        // then
+        assertThat(result).containsExactly(GAME_ROOM_ID);
     }
 
     private GameRoom createFinishedGameRoom(GameResult result, Long winnerId) {

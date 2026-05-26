@@ -272,15 +272,15 @@ flowchart TD
 
 ### 7. 멱등성과 실패 복구
 
-- [ ] record/rank 정산 진입점은 gameRoomId 기준 멱등하게 동작
-- [ ] `countByGameRoomId == 0`이면 정산 수행
-- [ ] `countByGameRoomId == 2`이면 rank를 다시 반영하지 않고 no-op
-- [ ] `countByGameRoomId == 1`이면 불완전 정산 상태로 보고 예외/복구 대상 처리
-- [ ] unique constraint 충돌은 완료 판단 기준이 아니라 동시성 보조 방어선으로 처리
-- [ ] FINISHED인데 record count가 2가 아닌 gameRoom을 조회하는 복구 scheduler 추가
-- [ ] 복구 scheduler는 `count == 0`만 재정산하고 `count == 1`은 로깅/알림 대상으로 분리
-- [ ] SMITE 종료와 scheduler 종료가 경합해도 하나의 gameRoom 결과만 record로 남는지 검증
-- [ ] rank 반영 중 예외 발생 시 record insert가 rollback되는지 검증
+- [x] record/rank 정산 진입점은 gameRoomId 기준 멱등하게 동작
+- [x] `countByGameRoomId == 0`이면 정산 수행
+- [x] `countByGameRoomId == 2`이면 rank를 다시 반영하지 않고 no-op
+- [x] `countByGameRoomId == 1`이면 불완전 정산 상태로 보고 예외/복구 대상 처리
+- [x] unique constraint 충돌은 완료 판단 기준이 아니라 동시성 보조 방어선으로 처리
+- [x] FINISHED인데 record count가 2가 아닌 gameRoom을 조회하는 복구 scheduler 추가
+- [x] 복구 scheduler는 `count == 0`만 재정산하고 `count == 1`은 로깅/알림 대상으로 분리
+- [x] SMITE 종료와 scheduler 종료가 경합해도 하나의 gameRoom 결과만 record로 남는지 검증
+- [x] rank 반영 중 예외 발생 시 record insert가 rollback되는지 검증
 
 ### 8. 조회/API 후속 분리
 
@@ -294,19 +294,19 @@ flowchart TD
 - [ ] `PLAYER2_WIN` 결과가 두 participant record의 `LOSS/WIN`으로 변환되는지 검증
 - [ ] `DRAW` 결과가 두 participant record의 `DRAW/DRAW`, `lpChange=0`으로 저장되는지 검증
 - [ ] FINISHED가 아닌 gameRoom은 record/rank 정산 대상이 아닌지 검증
-- [ ] 같은 gameRoom을 두 번 정산해도 record/rank가 중복 반영되지 않는지 검증
-- [ ] `countByGameRoomId == 1` 불완전 정산 상태에서 예외/복구 대상으로 처리되는지 검증
+- [x] 같은 gameRoom을 두 번 정산해도 record/rank가 중복 반영되지 않는지 검증
+- [x] `countByGameRoomId == 1` 불완전 정산 상태에서 예외/복구 대상으로 처리되는지 검증
 - [ ] `RANK`, `PLACEMENT`, `PROMOTION` seriesType과 rankSeriesId 저장 정책을 검증
 - [ ] FINISHED record 생성 시 totalWins/totalLosses/totalDraws가 반영되는지 검증
-- [ ] record 생성과 rank 반영이 같은 transaction으로 rollback되는지 검증
+- [x] record 생성과 rank 반영이 같은 transaction으로 rollback되는지 검증
 - [ ] placement series 진행 중인 유저의 결과가 LP 변동 없이 series에 반영되는지 검증
 - [ ] placement 완료 게임의 `rankAfter`/`lpAfter`가 최종 배정 결과로 저장되는지 검증
 - [ ] promotion series 진행 중인 유저의 결과가 일반 LP 계산 없이 series에 반영되는지 검증
 - [ ] promotion 성공/실패 게임의 `rankAfter`/`lpAfter`가 최종 결과로 저장되는지 검증
 - [x] SMITE kill, both smite draw, natural death draw 경로에서 정산 호출이 연결되는지 API service test로 검증
 - [x] 이미 FINISHED인 current result 재응답과 scheduler no-op에서는 정산을 호출하지 않는지 검증
-- [ ] 복구 scheduler가 FINISHED + record count 0 gameRoom을 재정산하는지 검증
-- [ ] 복구 scheduler가 record count 1 gameRoom을 자동 보정하지 않는지 검증
+- [x] 복구 scheduler가 FINISHED + record count 0 gameRoom을 재정산하는지 검증
+- [x] 복구 scheduler가 record count 1 gameRoom을 자동 보정하지 않는지 검증
 
 ### 10. 문서 정합성
 

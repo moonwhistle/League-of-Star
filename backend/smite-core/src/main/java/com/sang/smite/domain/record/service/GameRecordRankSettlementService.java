@@ -4,6 +4,7 @@ import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.vo.GameParticipantResult;
+import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import com.sang.smite.domain.game.service.GameRoomParticipantResult;
 import com.sang.smite.domain.game.service.GameRoomResultResolver;
@@ -14,6 +15,7 @@ import com.sang.smite.domain.record.domain.GameRecord;
 import com.sang.smite.domain.record.domain.vo.GameRecordResult;
 import com.sang.smite.domain.record.repository.GameRecordRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class GameRecordRankSettlementService {
+
+    private static final long SETTLED_RECORD_COUNT = GameRoom.MAX_PARTICIPANTS;
 
     private final GameRoomRepository gameRoomRepository;
     private final GameRecordRepository gameRecordRepository;
@@ -41,7 +45,7 @@ public class GameRecordRankSettlementService {
         GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
         long recordCount = gameRecordRepository.countByGameRoomId(gameRoomId);
-        if (recordCount == GameRoom.MAX_PARTICIPANTS) {
+        if (recordCount == SETTLED_RECORD_COUNT) {
             return;
         }
         if (recordCount != 0) {
@@ -74,6 +78,18 @@ public class GameRecordRankSettlementService {
     @Transactional(readOnly = true)
     public long countRecordsByGameRoomId(Long gameRoomId) {
         return gameRecordRepository.countByGameRoomId(gameRoomId);
+    }
+
+    /**
+     * FINISHED 상태지만 참가자 수만큼 record가 생성되지 않은 gameRoom 후보를 조회합니다.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> findUnsettledFinishedGameRoomIds(int limit) {
+        return gameRoomRepository.findGameRoomIdsByStatusAndRecordCountNot(
+                GameStatus.FINISHED,
+                SETTLED_RECORD_COUNT,
+                PageRequest.of(0, limit)
+        );
     }
 
     private RankRecordSettlementCommand toRankCommand(GameRoomParticipantResult participantResult) {
