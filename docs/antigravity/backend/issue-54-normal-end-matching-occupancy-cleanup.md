@@ -162,12 +162,12 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 ### 8. 문서 정합성
 
-- [ ] `plan-checkpoint.md` Step 10 체크리스트를 구현 결과에 맞게 갱신한다.
-- [ ] `docs/project/policy.md`에 정상 종료 후 Redis `IN_GAME` cleanup 정책을 반영한다.
-- [ ] `docs/project/domain status.md`에 정상 종료 후 `match:status` 해제와 DB source of truth 경계를 반영한다.
-- [ ] Redis key별 cleanup 책임을 문서에 분리해 `Redis 전체 정리`로 오해하지 않게 한다.
-- [ ] Issue 52 문서의 후속 이슈 표기와 Issue 54 번호가 충돌하지 않도록 정리한다.
-- [ ] PR 섹션에는 cleanup 시점, 멱등성, record/rank 정산 완료 후 처리하는 이유, 별도 scheduler를 두지 않는 트레이드오프를 중심으로 작성한다.
+- [x] `plan-checkpoint.md` Step 10 체크리스트를 구현 결과에 맞게 갱신한다.
+- [x] `docs/project/policy.md`에 정상 종료 후 Redis `IN_GAME` cleanup 정책을 반영한다.
+- [x] `docs/project/domain status.md`에 정상 종료 후 `match:status` 해제와 DB source of truth 경계를 반영한다.
+- [x] Redis key별 cleanup 책임을 문서에 분리해 `Redis 전체 정리`로 오해하지 않게 한다.
+- [x] Issue 52 문서의 후속 이슈 표기와 Issue 54 번호가 충돌하지 않도록 정리한다.
+- [x] PR 섹션에는 cleanup 시점, 멱등성, record/rank 정산 완료 후 처리하는 이유, 별도 scheduler를 두지 않는 트레이드오프를 중심으로 작성한다.
 
 ## 📝 Note
 
@@ -184,9 +184,74 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 ## 📌 Summary
 
+```mermaid
+flowchart TD
+    A[gameRoom FINISHED] --> B[Step 9<br/>record/rank 정산]
+    B --> C{game_records count}
+    C -->|0| D[record/rank 복구 우선<br/>cleanup 보류]
+    C -->|1| E[불완전 정산<br/>cleanup 금지 + 로그]
+    C -->|2| F[cleanup 가능]
+    F --> G[참가자 2명 조회]
+    G --> H{match:status}
+    H -->|IN_GAME| I[status 제거]
+    H -->|없음 / MATCHING / FOUND / ACCEPTED| J[no-op]
+    I --> K[사용자가 다시 joinQueue 가능]
+    J --> K
+```
+
+정상 종료된 게임의 참가자가 Redis `IN_GAME` 상태에 갇혀 재매칭을 못 하는 문제를 막기 위해, record/rank 정산 완료 이후 `match:status:{userId}=IN_GAME`만 제거하는 후처리를 추가함.
+
+핵심 정책은 Redis 전체 정리가 아니라 **정상 종료된 gameRoom이 남긴 매칭 점유 상태만 해제**하는 것임. 게임 결과와 record/rank 정산은 DB가 기준이고, Redis cleanup은 사용자가 다시 매칭을 시작할 수 있게 하는 후처리임.
+
 ## 📚 Changes
 
+### 1. cleanup 기준을 `FINISHED + game_records 2행`으로 둠
+
+- 정상 종료 cleanup은 `gameRoom FINISHED`만으로 바로 수행하지 않고, record/rank 정산 완료를 뜻하는 `game_records 2행` 확인 뒤 수행함.
+- `record count == 0`은 아직 정산 전이거나 복구 대상이므로 cleanup하지 않음.
+- `record count == 1`은 일부만 정산된 불완전 상태라 cleanup하지 않고 로그/운영 확인 대상으로 둠.
+- 트레이드오프: 유저 재매칭 허용 시점이 record/rank 정산 이후로 조금 늦어질 수 있음. 대신 이전 게임 정산이 애매한 상태에서 유저를 새 매칭으로 풀어 정산 순서와 운영 판단이 꼬이는 상황을 피함.
+
+### 2. Redis cleanup 범위를 `match:status IN_GAME`으로 제한함
+
+- 삭제 대상은 참가자별 `match:status:{userId}=IN_GAME`뿐임.
+- `matching:queue:*`, `match:session:*`, `match:response:timeout:*`, `game:end:pending`, `game:waiting:*`, `game:rtt:*`는 이번 cleanup 대상에서 제외함.
+- `MATCHING`, `FOUND`, `ACCEPTED` 같은 상태는 제거하지 않음. 이미 유저가 새 매칭 흐름에 들어간 상태일 수 있기 때문임.
+- 트레이드오프: Redis에 남은 다른 임시 key를 이 단계에서 모두 지우지는 않음. 대신 정상 종료 cleanup이 새 매칭 상태나 다른 도메인의 Redis 책임을 건드리지 않아 부작용 범위를 작게 유지함.
+
+### 3. 자동 큐 복귀가 아니라 명시적 재진입으로 둠
+
+- cleanup은 유저를 `matching:queue:*`에 자동으로 넣지 않음.
+- 정상 종료 후 재매칭은 사용자가 다시 `joinQueue`를 호출해야 시작됨.
+- `IN_GAME`이 남아 있으면 `joinQueue`는 기존 SETNX 정책상 실패하고, cleanup 이후에만 `MATCHING`으로 새로 진입 가능함.
+- 트레이드오프: 게임이 끝났다고 서버가 임의로 다음 매칭을 시작하지 않음. 사용자가 의도적으로 다시 시작해야 하므로 UX는 한 번 더 클릭이 필요하지만, 원치 않는 자동 재매칭과 큐 오염을 막음.
+
+### 4. cleanup 실패는 결과 정산을 되돌리지 않음
+
+- cleanup 실패는 warn log로 격리하고 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산을 rollback하지 않음.
+- 즉시 정산 trigger는 record/rank 정산이 성공한 뒤 cleanup을 호출함.
+- record/rank recovery 흐름도 정산 성공 또는 이미 완료 확인 시 cleanup을 다시 시도함.
+- 트레이드오프: DB transaction과 Redis cleanup을 하나로 묶지 않기 때문에 cleanup만 실패하는 순간이 생길 수 있음. 대신 게임 결과/전적/LP라는 핵심 데이터는 안정적으로 확정하고, Redis 점유 해제는 멱등한 후처리로 반복 시도 가능하게 둠.
+
+### 5. 별도 cleanup scheduler는 두지 않음
+
+- cleanup 단독 실패를 찾는 전용 scheduler는 추가하지 않음.
+- 기존 record/rank recovery 흐름에 cleanup 재시도를 붙이고, Redis `match:status` TTL 30분을 최후 안전장치로 둠.
+- 트레이드오프: cleanup만 실패한 이미 정산 완료 게임을 별도 탐지하는 능력은 제한됨. 대신 새 scheduler와 넓은 DB/Redis 스캔 비용을 만들지 않고, 기존 복구 흐름 안에서 MVP 복잡도를 낮춤.
+
+### 6. 패키지 책임을 분리함
+
+- API `game/record` 영역은 cleanup 실행 시점과 record count 기준 판단을 담당함.
+- matching command service는 실제 `match:status` 제거를 담당함.
+- core는 gameRoom 상태, 참가자, record count를 service로 제공함.
+- API는 matching Redis repository나 Redis 구현체를 직접 참조하지 않음.
+- 트레이드오프: service 호출 단계가 늘어나지만, Redis key 구조가 API 종료 흐름에 새지 않고 각 모듈의 변경 범위를 좁게 유지함.
+
 ## 📝 Note
+
+- 이번 이슈는 게임 결과, record/rank 정산, LP 계산을 변경하지 않음.
+- 정상 종료 후 `IN_GAME` 점유 해제만 담당하며, 큐 진입 전 DB 기준 active gameRoom 검증은 후속 Step 13 범위로 남김.
+- `game:rtt:{gameRoomId}` 정상 시작 후 cleanup은 별도 후속 논의 대상으로 유지함.
 
 ## 📌 Related Issue
 - Closes #54

@@ -251,6 +251,19 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 - `PLACEMENT` record는 진행 중인 `RankSeries` id를 `rankSeriesId`에 저장하고, LP를 계산하지 않으며 배치 완료 시 최종 rank/LP를 배정한다.
 - `PROMOTION` record는 진행 중인 `RankSeries` id를 `rankSeriesId`에 저장하고, LP를 동결하며 성공 시 `targetRank` LP 0, 실패 시 기존 rank LP 75를 반영한다.
 
+#### Step 10 정상 종료 후 match status cleanup 정책
+
+- 정상 종료된 gameRoom 참가자는 Step 9 record/rank 정산 완료 후 Redis `match:status:{userId}=IN_GAME` 상태를 제거한다.
+- cleanup 대상은 `match:status:{userId}`의 `IN_GAME` 값으로 한정한다. Redis 전체 key 삭제, `matching:queue:*`, `match:session:*`, `match:response:timeout:*`, `game:end:pending`, `game:waiting:*`, `game:rtt:*`는 이번 cleanup 대상이 아니다.
+- `FINISHED + game_records 2행`을 cleanup 가능 기준으로 사용한다.
+- `record count == 0`이면 record/rank 복구를 우선하고 cleanup을 보류한다.
+- `record count == 1`이면 불완전 정산으로 보고 cleanup하지 않으며 운영 로그/알림 대상으로 둔다.
+- cleanup은 유저를 자동으로 `matching:queue:*`에 넣지 않는다. 게임 종료 후 재매칭은 사용자의 명시적 `joinQueue` 요청으로만 시작한다.
+- cleanup은 `IN_GAME` 상태만 제거하고, 이미 새 매칭 플로우에 들어간 `MATCHING`, `FOUND`, `ACCEPTED` 상태는 제거하지 않는다.
+- cleanup 실패는 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산 결과를 rollback하지 않는다.
+- 별도 cleanup 전용 scheduler는 두지 않고, 즉시 cleanup과 기존 record/rank recovery 흐름의 best-effort 재시도를 사용한다. Redis `match:status` TTL 30분은 최후 안전장치다.
+- Redis status cleanup은 중복 게임 방지의 유일한 기준이 아니다. 큐 진입 전 DB 기준 READY/IN_PROGRESS gameRoom 검증은 후속 Step 13에서 보강한다.
+
 ### 2.6 조작 방지
 
 | 규칙 | 내용 |

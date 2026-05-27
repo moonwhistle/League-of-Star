@@ -863,7 +863,7 @@ gameRoom 생성 실패 mapping:
 - Apex 유저끼리는 LP 근접도와 대기 시간 확장 정책에 따라 매칭됨
 - 일반 티어 유저 매칭 결과가 기존 정책과 동일하게 유지됨
 
-### Issue 54. 배치 유저 매칭 정책 정합성
+### Issue 58. 배치 유저 매칭 정책 정합성
 
 목표:
 
@@ -940,3 +940,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-24 | Step 9 / Issue 52 범위를 record/rank 정산 기준으로 상세화. `rankSeriesId`, `seriesType`, 누적 전적, transaction 분리, 멀티 인스턴스 멱등성, 복구 scheduler, `GAME_RESULT` payload 미확장 정책 반영 |
 | 2026-05-24 | 후속 구현 순서 재정리. Step 10 Redis `IN_GAME` cleanup, Step 11 record/rank summary 조회 API, Step 12 Apex rank 자동 승급/강등, Step 13~17 매칭 정책 보강 순서로 분리 |
 | 2026-05-27 | Step 10 정상 종료 후 매칭 점유 상태 cleanup 문서를 Issue 54로 생성하고, cleanup 범위를 Redis 전체 삭제가 아니라 `match:status:{userId}=IN_GAME` 해제로 고정 |
+| 2026-05-27 | Step 10 구현 결과를 policy/domain/matching 문서에 반영하고, 기존 배치 유저 매칭 정책 정합성 번호를 Issue 58로 조정해 Issue 54 중복 제거 |
