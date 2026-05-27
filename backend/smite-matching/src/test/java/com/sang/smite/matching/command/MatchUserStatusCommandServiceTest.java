@@ -49,4 +49,49 @@ class MatchUserStatusCommandServiceTest {
         verify(userStatusStore, never()).removeStatus(USER_A_ID);
         verify(userStatusStore, never()).removeStatus(USER_B_ID);
     }
+
+    @Test
+    @DisplayName("removeFinishedGameStatuses - IN_GAME 상태인 두 유저의 match status를 제거한다")
+    void removeFinishedGameStatuses_InGame() {
+        // given
+        when(userStatusStore.getStatus(USER_A_ID)).thenReturn(Optional.of(MatchStatus.IN_GAME));
+        when(userStatusStore.getStatus(USER_B_ID)).thenReturn(Optional.of(MatchStatus.IN_GAME));
+
+        // when
+        service.removeFinishedGameStatuses(USER_A_ID, USER_B_ID);
+
+        // then
+        verify(userStatusStore).removeStatus(USER_A_ID);
+        verify(userStatusStore).removeStatus(USER_B_ID);
+    }
+
+    @Test
+    @DisplayName("removeFinishedGameStatuses - IN_GAME이 아닌 새 매칭 상태는 제거하지 않는다")
+    void removeFinishedGameStatuses_NotInGame() {
+        // given
+        when(userStatusStore.getStatus(USER_A_ID)).thenReturn(Optional.of(MatchStatus.MATCHING));
+        when(userStatusStore.getStatus(USER_B_ID)).thenReturn(Optional.of(MatchStatus.FOUND));
+
+        // when
+        service.removeFinishedGameStatuses(USER_A_ID, USER_B_ID);
+
+        // then
+        verify(userStatusStore, never()).removeStatus(USER_A_ID);
+        verify(userStatusStore, never()).removeStatus(USER_B_ID);
+    }
+
+    @Test
+    @DisplayName("removeFinishedGameStatuses - 한 유저가 이미 정리되어도 남은 IN_GAME 상태는 제거한다")
+    void removeFinishedGameStatuses_PartialInGame() {
+        // given
+        when(userStatusStore.getStatus(USER_A_ID)).thenReturn(Optional.of(MatchStatus.IN_GAME));
+        when(userStatusStore.getStatus(USER_B_ID)).thenReturn(Optional.empty());
+
+        // when
+        service.removeFinishedGameStatuses(USER_A_ID, USER_B_ID);
+
+        // then
+        verify(userStatusStore).removeStatus(USER_A_ID);
+        verify(userStatusStore, never()).removeStatus(USER_B_ID);
+    }
 }
