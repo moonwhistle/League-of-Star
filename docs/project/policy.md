@@ -238,7 +238,12 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 - gameRoom 종료 확정 transaction과 record/rank 정산 transaction은 분리한다.
 - record/rank 정산 실패는 gameRoom `FINISHED` 확정과 `GAME_RESULT` 전송을 rollback하지 않는다.
 - `GAME_RESULT`는 게임 종료 즉시 알림으로 유지하고 LP/rank/series delta를 포함하지 않는다.
-- 클라이언트 최종 결과 화면의 LP/rank/series 정보는 후속 Step 11의 별도 record/rank summary 조회 API에서 처리한다.
+- 클라이언트 최종 결과 화면의 LP/rank/series 정보는 `GET /api/v1/games/{gameId}/summary`에서 조회한다. 여기서 `gameId`는 현재 구현의 `game_rooms.id`와 동일하다.
+- summary API는 Step 9에서 저장된 `game_rooms`, `game_records`, `users`를 read-only로 조회하며 record/rank 정산이나 복구를 수행하지 않는다.
+- `FINISHED + game_records 0행` 또는 `1행`은 `200 PENDING + retryAfterMillis`로 반환한다. `1행`은 불완전 정산 상태로 서버 warn log를 남긴다.
+- `FINISHED + game_records 2행`만 `200 DONE`으로 반환하고, `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 제공한다.
+- `DRAW` 결과는 `gameResult=DRAW`, `me.result=DRAW`, `opponent.result=DRAW`로 명시한다. `winnerUserId`는 승자 userId 필드이므로 무승부에서는 `null`이다.
+- summary API는 참가자만 조회할 수 있다. 미참가자는 `403`, gameRoom 없음은 `404`, FINISHED가 아닌 gameRoom 또는 record 정합성 오류는 `409`로 처리한다.
 - Step 7/8에서 새로 `FINISHED` 된 gameRoom만 record/rank 정산을 즉시 호출한다.
 - 이미 `FINISHED`였던 current result 재응답, scheduler no-op, `ABORTED` 흐름에서는 record/rank 정산을 호출하지 않는다.
 - 멀티 인스턴스 환경에서 record/rank 정산은 local memory에 의존하지 않고 DB row lock, `countByGameRoomId`, `uk_game_records_room_user` unique constraint를 기준으로 멱등성을 보장한다.

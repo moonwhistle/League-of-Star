@@ -304,7 +304,10 @@ stateDiagram-v2
 - 정상 종료 cleanup은 `IN_GAME`만 제거합니다. 이미 새 매칭 플로우에 들어간 `MATCHING`, `FOUND`, `ACCEPTED`는 이전 gameRoom cleanup이 제거하지 않습니다.
 - 정상 종료 cleanup은 유저를 `matching:queue:*`에 자동 복귀시키지 않으며, 재매칭은 사용자의 명시적 `joinQueue` 요청으로 시작합니다.
 - 정상 종료 cleanup 실패는 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산 결과를 되돌리지 않습니다. 별도 cleanup scheduler는 두지 않고 기존 record/rank recovery 흐름에서 best-effort로 재시도하며, Redis TTL을 최후 안전장치로 둡니다.
-- `GAME_RESULT`는 종료 즉시 알림으로 유지하고 LP/rank/series delta는 포함하지 않습니다. 최종 결과 화면용 랭크 정보는 별도 record/rank summary 조회 API에서 처리합니다.
+- `GAME_RESULT`는 종료 즉시 알림으로 유지하고 LP/rank/series delta는 포함하지 않습니다. 최종 결과 화면용 랭크 정보는 `GET /api/v1/games/{gameId}/summary`에서 조회합니다.
+- 클라이언트는 `GAME_RESULT` 수신 후 summary API를 호출합니다. `FINISHED + game_records 0/1행`이면 `PENDING + retryAfterMillis`를 받고, `FINISHED + game_records 2행`이면 `DONE` summary를 받습니다.
+- summary `DONE`은 `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함합니다. `me`와 `opponent`는 같은 schema로 `result`, `lpBefore`, `lpAfter`, `lpChange`, `rankBefore`, `rankAfter`, `seriesType`, `rankSeriesId`, `nickname`을 제공합니다.
+- `DRAW` 결과는 `gameResult=DRAW`와 양쪽 player `result=DRAW`로 표현하고, 승자가 없으므로 `winnerUserId`만 `null`로 둡니다.
 
 ## 4. Game WebSocket Session (게임 대기 WebSocket 연결 상태)
 

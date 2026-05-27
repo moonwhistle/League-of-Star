@@ -8,9 +8,9 @@ import com.sang.smite.common.path.game.GamePath;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.record.domain.vo.GameRecordResult;
 import com.sang.smite.domain.record.domain.vo.GameRecordSeriesType;
-import com.sang.smite.game.summary.controller.response.GameSummaryDoneResponse;
-import com.sang.smite.game.summary.controller.response.GameSummaryPendingResponse;
-import com.sang.smite.game.summary.controller.response.GameSummaryPlayerResponse;
+import com.sang.smite.game.summary.dto.GameSummaryDoneResponse;
+import com.sang.smite.game.summary.dto.GameSummaryPendingResponse;
+import com.sang.smite.game.summary.dto.GameSummaryPlayerResponse;
 import com.sang.smite.game.summary.service.GameSummaryService;
 import com.sang.smite.global.resolver.annotation.AuthUser;
 import com.sang.smite.global.restdocs.RestDocsSupport;
@@ -147,7 +147,7 @@ class GameSummaryControllerRestDocsTest extends RestDocsSupport {
                                         fieldWithPath("gameId").type(JsonFieldType.NUMBER).description("게임 ID"),
                                         fieldWithPath("gameResult").type(JsonFieldType.STRING)
                                                 .description("게임 결과 enum 문자열"),
-                                        fieldWithPath("winnerUserId").type(JsonFieldType.NUMBER)
+                                        fieldWithPath("winnerUserId").type(JsonFieldType.VARIES)
                                                 .description("승자 userId. 무승부면 null"),
                                         fieldWithPath("finishedAt").type(JsonFieldType.STRING)
                                                 .description("gameRoom 종료 시각"),
@@ -165,7 +165,7 @@ class GameSummaryControllerRestDocsTest extends RestDocsSupport {
                                                 .description("정산 후 rank 문자열"),
                                         fieldWithPath("me.seriesType").type(JsonFieldType.STRING)
                                                 .description("정산 시리즈 타입 enum 문자열"),
-                                        fieldWithPath("me.rankSeriesId").type(JsonFieldType.NULL)
+                                        fieldWithPath("me.rankSeriesId").type(JsonFieldType.VARIES)
                                                 .description("일반 랭크 게임이면 null, 배치/승급전이면 series id"),
                                         fieldWithPath("opponent.userId").type(JsonFieldType.NUMBER)
                                                 .description("상대 userId"),
@@ -185,7 +185,7 @@ class GameSummaryControllerRestDocsTest extends RestDocsSupport {
                                                 .description("상대 정산 후 rank 문자열"),
                                         fieldWithPath("opponent.seriesType").type(JsonFieldType.STRING)
                                                 .description("상대 정산 시리즈 타입 enum 문자열"),
-                                        fieldWithPath("opponent.rankSeriesId").type(JsonFieldType.NULL)
+                                        fieldWithPath("opponent.rankSeriesId").type(JsonFieldType.VARIES)
                                                 .description("일반 랭크 게임이면 null, 배치/승급전이면 series id")
                                 )
                                 .build()

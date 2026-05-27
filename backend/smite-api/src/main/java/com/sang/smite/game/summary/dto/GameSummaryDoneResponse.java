@@ -1,4 +1,4 @@
-package com.sang.smite.game.summary.controller.response;
+package com.sang.smite.game.summary.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.sang.smite.domain.game.domain.vo.GameResult;

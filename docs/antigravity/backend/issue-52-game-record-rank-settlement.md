@@ -148,10 +148,10 @@ flowchart TD
 | 경로 | 책임 | 포함 정보 |
 |------|------|-----------|
 | WebSocket `GAME_RESULT` | 즉시 게임 종료 알림 | `gameRoomId`, `result`, `winnerUserId`, `reason`, `finishedAt`, `actions` |
-| record/rank summary 조회 API | 최종 결과 화면의 랭크/전적 정보 | 후속 Issue 56에서 설계 |
+| record/rank summary 조회 API | 최종 결과 화면의 랭크/전적 정보 | Issue 56에서 `GET /api/v1/games/{gameId}/summary`로 구현 |
 
 - `GAME_RESULT`에는 LP delta, rank delta, series 진행 상태를 포함하지 않는다.
-- 클라이언트가 최종 결과 화면에서 랭크 정보를 보여줘야 하면 후속 Issue 56의 별도 조회 API로 record/rank summary를 조회한다.
+- 클라이언트가 최종 결과 화면에서 랭크 정보를 보여줘야 하면 Issue 56의 별도 조회 API로 record/rank summary를 조회한다.
 - 이번 Issue 52는 record/rank 저장과 정산 멱등성까지 담당하고, 조회 API 구현은 포함하지 않는다.
 
 ### 멱등성 완료 판단 정책
@@ -208,7 +208,7 @@ flowchart TD
 - [x] gameRoom 종료 확정 transaction과 record/rank 정산 transaction을 분리
 - [x] record/rank 정산 실패가 WebSocket 결과 전송과 gameRoom `FINISHED` 확정을 rollback하지 않도록 구성
 - [x] DB outbox/event 기반 비동기 정산은 MVP 범위에서 제외하고 후속 이슈로 분리
-- [x] 이번 이슈에서는 WebSocket `GAME_RESULT` payload를 확장하지 않고 LP/rank/series 정보는 후속 Issue 56 조회 API로 분리
+- [x] 이번 이슈에서는 WebSocket `GAME_RESULT` payload를 확장하지 않고 LP/rank/series 정보는 Issue 56 조회 API로 분리
 - [x] `game_records`/rank 반영은 API WebSocket handler가 아니라 별도 application/core service로 위임
 
 ### 2. core gameRoom 결과 해석 primitive 추가
@@ -285,7 +285,7 @@ flowchart TD
 ### 8. 조회/API 후속 분리
 
 - [x] `GAME_RESULT` payload에는 LP/rank/series 정보를 추가하지 않고 기존 종료 결과 정보만 유지
-- [x] 클라이언트 최종 결과 화면용 gameRoomId 기준 record/rank summary 조회 endpoint는 후속 Issue 56으로 분리
+- [x] 클라이언트 최종 결과 화면용 gameRoomId 기준 record/rank summary 조회 endpoint는 Issue 56으로 분리
 - [x] Issue 52에서는 조회 API 구현 없이 record/rank 정산 저장 완료 상태까지만 보장
 
 ### 9. 테스트
@@ -325,7 +325,7 @@ flowchart TD
 - `UserRankInfo`의 totalWins/totalLosses/totalDraws는 Step 9 정산에서 record 생성과 같은 transaction으로 반영한다.
 - 이번 이슈는 Step 7/8의 종료 결과를 바꾸지 않고, 확정된 결과를 record/rank로 반영하는 후처리다.
 - Step 9 정산은 즉시 호출과 복구 scheduler 조합으로 처리하고, DB outbox/event는 후속 범위로 둔다.
-- Redis `IN_GAME` cleanup은 후속 Issue 54, record/rank summary 조회 API는 후속 Issue 56, Apex 자동 승급/강등은 후속 Issue 59로 분리한다.
+- Redis `IN_GAME` cleanup은 Issue 54, record/rank summary 조회 API는 Issue 56, Apex 자동 승급/강등은 후속 Issue 59로 분리한다.
 - Apex/배치 매칭 정책 정합성은 후속 이슈로 분리한다.
 
 
@@ -349,7 +349,7 @@ flowchart TD
 
 게임 종료 확정 이후 `game_rooms.status/result/winnerId`를 source of truth로 삼아 `game_records` 생성, 누적 전적, LP, 배치/승급전 진행도를 정산하는 흐름을 구현함.
 
-핵심 정책은 gameRoom 종료 transaction과 record/rank 정산 transaction을 분리하고, `GAME_RESULT`는 즉시 종료 알림으로 유지하며, 최종 LP/rank/series 정보는 후속 summary API로 분리하는 것임.
+핵심 정책은 gameRoom 종료 transaction과 record/rank 정산 transaction을 분리하고, `GAME_RESULT`는 즉시 종료 알림으로 유지하며, 최종 LP/rank/series 정보는 Issue 56 summary API로 분리하는 것임.
 
 ## 📚 Changes
 
@@ -407,13 +407,13 @@ flowchart TD
 ### 7. `GAME_RESULT` payload 미확장
 
 - `GAME_RESULT`는 종료 확정 이벤트로 유지하고, record/rank 정산 결과를 payload에 섞지 않음.
-- LP/rank/series 정보는 후속 record/rank summary API에서 DB 정산 완료 상태를 기준으로 조회하도록 분리함.
+- LP/rank/series 정보는 Issue 56 record/rank summary API에서 DB 정산 완료 상태를 기준으로 조회하도록 분리함.
 - 트레이드오프: 클라이언트가 최종 결과 화면에서 추가 조회를 해야 하지만, WebSocket 종료 알림이 record/rank 정산 성공 여부에 종속되지 않음. 또한 정산이 지연되거나 recovery scheduler로 복구되는 경우에도 `GAME_RESULT` 계약이 흔들리지 않음.
 
 ## 📝 Note
 
 - `GAME_RESULT` payload에는 LP/rank/series delta를 추가하지 않음.
-- record/rank summary 조회 API, Redis `IN_GAME` cleanup, Apex 자동 승급/강등은 후속 이슈로 분리함.
+- record/rank summary 조회 API는 Issue 56, Redis `IN_GAME` cleanup은 Issue 54로 분리했고, Apex 자동 승급/강등은 후속 Issue 59로 분리함.
 - 테스트는 결과 변환, 멱등성, RankSeries 반영, API trigger, recovery scheduler, payload 미확장을 기준으로 보강함.
 
 ## 📌 Related Issue

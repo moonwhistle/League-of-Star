@@ -215,7 +215,7 @@ flowchart TD
 - [x] record/rank 정산 내부에서 record 생성, 누적 전적, LP, RankSeries 반영을 같은 transaction으로 처리
 - [x] `countByGameRoomId == 0/2/1` 기준 멱등성 및 불완전 정산 정책 구현
 - [x] FINISHED인데 record count가 2가 아닌 gameRoom을 복구하는 scheduler 추가
-- [x] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, record/rank summary 조회 API는 후속 Step 11로 분리
+- [x] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, Step 11 summary 조회 API에서 read-only로 제공
 
 ### Step 10. 정상 종료 후 매칭 점유 상태 cleanup
 
@@ -755,7 +755,7 @@ gameRoom 생성 실패 mapping:
 - gameRoom 종료 transaction과 record/rank 정산 transaction 분리
 - 새로 FINISHED 된 gameRoom 즉시 정산 및 FINISHED 미정산 gameRoom 복구 scheduler
 - 멀티 인스턴스 환경에서 DB row lock, record count, unique constraint 기반 멱등성 보장
-- `GAME_RESULT` payload 미확장, record/rank summary 조회 API는 후속 Issue 56으로 분리
+- `GAME_RESULT` payload 미확장, record/rank summary 조회 API는 Issue 56에서 read-only 조회로 구현
 
 완료 기준:
 
@@ -892,7 +892,7 @@ gameRoom 생성 실패 mapping:
 - 배치 유저와 일반 유저 매칭이 기존 accept/reject/timeout 흐름과 동일하게 동작함
 - 배치가 아닌 유저의 기존 매칭 범위가 깨지지 않음
 
-### Issue 56. match_found 후처리 실패 복구
+### Issue 60. match_found 후처리 실패 복구
 
 목표:
 
@@ -950,3 +950,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-24 | 후속 구현 순서 재정리. Step 10 Redis `IN_GAME` cleanup, Step 11 record/rank summary 조회 API, Step 12 Apex rank 자동 승급/강등, Step 13~17 매칭 정책 보강 순서로 분리 |
 | 2026-05-27 | Step 10 정상 종료 후 매칭 점유 상태 cleanup 문서를 Issue 54로 생성하고, cleanup 범위를 Redis 전체 삭제가 아니라 `match:status:{userId}=IN_GAME` 해제로 고정 |
 | 2026-05-27 | Step 10 구현 결과를 policy/domain/matching 문서에 반영하고, 기존 배치 유저 매칭 정책 정합성 번호를 Issue 58로 조정해 Issue 54 중복 제거 |
+| 2026-05-27 | Step 11 summary 조회 API 구현 결과를 policy/domain/WebSocket/checkpoint 문서에 반영하고, 중복된 Issue 56 번호를 Issue 60으로 조정 |

@@ -1,4 +1,4 @@
-package com.sang.smite.game.summary.controller.response;
+package com.sang.smite.game.summary.dto;
 
 public enum GameSummaryStatus {
     PENDING,

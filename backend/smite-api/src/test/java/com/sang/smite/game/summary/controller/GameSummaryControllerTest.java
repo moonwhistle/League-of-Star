@@ -1,7 +1,7 @@
 package com.sang.smite.game.summary.controller;
 
 import com.sang.smite.common.path.game.GamePath;
-import com.sang.smite.game.summary.controller.response.GameSummaryPendingResponse;
+import com.sang.smite.game.summary.dto.GameSummaryPendingResponse;
 import com.sang.smite.game.summary.service.GameSummaryService;
 import com.sang.smite.global.resolver.annotation.AuthUser;
 import io.restassured.module.mockmvc.RestAssuredMockMvc;

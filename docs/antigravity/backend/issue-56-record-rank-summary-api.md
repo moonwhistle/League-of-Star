@@ -48,7 +48,8 @@ sequenceDiagram
 - `PENDING` 응답에는 정산 세부 데이터를 섞지 않는다.
 - 클라이언트는 `PENDING`이면 `retryAfterMillis` 기준으로 짧게 polling한다.
 - `DONE` 응답에는 top-level 게임 결과와 `me`, `opponent` summary를 함께 반환한다.
-- `winnerUserId`는 승자가 있으면 userId, 무승부면 `null`이다.
+- `DRAW` 결과 자체는 `gameResult=DRAW`, `me.result=DRAW`, `opponent.result=DRAW`로 명시한다.
+- `winnerUserId`는 승자 userId만 표현하는 필드이므로, `DRAW`처럼 승자가 없는 결과에서는 `null`을 반환한다.
 - `rankBefore`, `rankAfter`는 `"GOLD_IV"`, `"MASTER"` 같은 enum 문자열만 반환한다.
 - `lpChange`는 Step 9 정산 때 `game_records.lp_change`에 저장된 서버 계산값을 반환한다.
 - `gameRecordId`는 결과 화면에 필요하지 않으므로 노출하지 않는다.
@@ -105,8 +106,8 @@ sequenceDiagram
 
 - `finishedAt`은 `game_rooms.finishedAt`을 그대로 사용한다.
 - `summaryStatus`는 `PENDING`, `DONE`만 사용한다.
-- `gameResult`는 `GameResult` enum 문자열을 그대로 반환한다.
-- `result`는 `GameRecordResult` enum 문자열을 그대로 반환한다.
+- `gameResult`는 `GameResult` enum 문자열을 그대로 반환한다. `DRAW` 결과도 `null`이 아니라 `"DRAW"`로 반환한다.
+- `result`는 `GameRecordResult` enum 문자열을 그대로 반환한다. 무승부에서는 `me.result`와 `opponent.result` 모두 `"DRAW"`다.
 - `seriesType`은 `GameRecordSeriesType` enum 문자열을 그대로 반환한다.
 - `rankSeriesId`는 일반 랭크 게임이면 `null`, 배치/승급전이면 연결된 series id다.
 - rank 문자열은 `tier + "_" + division` 형식을 사용하고, division이 없는 Apex rank는 tier만 사용한다.
@@ -116,7 +117,7 @@ sequenceDiagram
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
 | HTTP endpoint | `smite-api` `game/summary/controller` | 인증 유저 주입, path variable 처리, HTTP 응답 반환 |
-| HTTP response DTO | `smite-api` `game/summary/controller/response` | `PENDING`/`DONE` 응답, player summary, summary status 표현 |
+| HTTP response DTO | `smite-api` `game/summary/dto` | `PENDING`/`DONE` 응답, player summary, summary status 표현 |
 | 조회 orchestration | `smite-api` `game/summary/service` | 권한 확인, record count 분기, user nickname 조합, DTO 변환 |
 | gameRoom 조회 | `smite-core` `domain/game/service` | gameRoom 상태/result/winnerId/finishedAt/참가자 조회 제공 |
 | record 조회 | `smite-core` `domain/record/service` | gameRoomId 기준 record count와 record 2행 조회 제공 |
@@ -176,7 +177,7 @@ sequenceDiagram
 
 ### 3. summary API DTO 설계
 
-- [x] `SummaryStatus` enum을 `PENDING`, `DONE`으로 정의한다.
+- [x] `GameSummaryStatus` enum을 `PENDING`, `DONE`으로 정의한다.
 - [x] pending 응답 DTO는 `summaryStatus`, `gameId`, `retryAfterMillis`만 포함한다.
 - [x] done 응답 DTO는 `summaryStatus`, `gameId`, `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함한다.
 - [x] player summary DTO는 `userId`, `nickname`, `result`, `lpBefore`, `lpAfter`, `lpChange`, `rankBefore`, `rankAfter`, `seriesType`, `rankSeriesId`를 포함한다.
@@ -233,10 +234,11 @@ sequenceDiagram
 
 ### 8. 문서 정합성
 
-- [ ] `plan-checkpoint.md` Step 11을 Issue 56 기준으로 정리한다.
-- [ ] `docs/project/policy.md`에 Step 11 summary 조회 정책을 반영한다.
-- [ ] `docs/project/domain status.md`에 `GAME_RESULT -> summary polling -> DONE` 흐름을 반영한다.
-- [ ] Issue 52의 후속 조회 API 표기를 Issue 56으로 맞춘다.
+- [x] `plan-checkpoint.md` Step 11을 Issue 56 기준으로 정리한다.
+- [x] `docs/project/policy.md`에 Step 11 summary 조회 정책을 반영한다.
+- [x] `docs/project/domain status.md`에 `GAME_RESULT -> summary polling -> DONE` 흐름을 반영한다.
+- [x] `docs/project/websocket client.md`에 `GAME_RESULT` 이후 summary polling 계약을 반영한다.
+- [x] Issue 52의 조회 API 표기를 Issue 56 구현 완료 상태로 맞춘다.
 - [ ] PR 섹션에는 WebSocket과 summary API 책임 분리, polling 선택, pending 처리, participant-only 접근 정책, repository 직접 참조를 피한 패키지 경계를 중심으로 작성한다.
 
 ## 📝 Note
