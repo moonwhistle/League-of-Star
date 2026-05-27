@@ -176,14 +176,14 @@ sequenceDiagram
 
 ### 3. summary API DTO 설계
 
-- [ ] `SummaryStatus` enum을 `PENDING`, `DONE`으로 정의한다.
-- [ ] pending 응답 DTO는 `summaryStatus`, `gameId`, `retryAfterMillis`만 포함한다.
-- [ ] done 응답 DTO는 `summaryStatus`, `gameId`, `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함한다.
-- [ ] player summary DTO는 `userId`, `nickname`, `result`, `lpBefore`, `lpAfter`, `lpChange`, `rankBefore`, `rankAfter`, `seriesType`, `rankSeriesId`를 포함한다.
-- [ ] `gameRecordId`는 응답에서 제외한다.
-- [ ] rank는 `Rank` value object를 문자열로 변환해 반환한다.
-- [ ] 일반 rank는 `TIER_DIVISION`, Apex rank는 `TIER` 형식으로 변환한다.
-- [ ] enum 값은 별도 한글 label 없이 문자열 그대로 반환한다.
+- [x] `SummaryStatus` enum을 `PENDING`, `DONE`으로 정의한다.
+- [x] pending 응답 DTO는 `summaryStatus`, `gameId`, `retryAfterMillis`만 포함한다.
+- [x] done 응답 DTO는 `summaryStatus`, `gameId`, `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함한다.
+- [x] player summary DTO는 `userId`, `nickname`, `result`, `lpBefore`, `lpAfter`, `lpChange`, `rankBefore`, `rankAfter`, `seriesType`, `rankSeriesId`를 포함한다.
+- [x] `gameRecordId`는 응답에서 제외한다.
+- [x] rank 응답 필드는 문자열로 설계해 service에서 `Rank` value object를 변환하도록 계약을 고정한다.
+- [x] 일반 rank는 `TIER_DIVISION`, Apex rank는 `TIER` 형식으로 반환하도록 DTO 계약을 고정한다.
+- [x] enum 값은 별도 한글 label 없이 문자열 그대로 반환한다.
 
 ### 4. summary application service 구현
 
