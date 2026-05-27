@@ -116,7 +116,7 @@ sequenceDiagram
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
 | HTTP endpoint | `smite-api` `game/summary/controller` | 인증 유저 주입, path variable 처리, HTTP 응답 반환 |
-| API DTO | `smite-api` `game/summary/dto` | `PENDING`/`DONE` 응답, player summary, summary status 표현 |
+| HTTP response DTO | `smite-api` `game/summary/controller/response` | `PENDING`/`DONE` 응답, player summary, summary status 표현 |
 | 조회 orchestration | `smite-api` `game/summary/service` | 권한 확인, record count 분기, user nickname 조합, DTO 변환 |
 | gameRoom 조회 | `smite-core` `domain/game/service` | gameRoom 상태/result/winnerId/finishedAt/참가자 조회 제공 |
 | record 조회 | `smite-core` `domain/record/service` | gameRoomId 기준 record count와 record 2행 조회 제공 |
@@ -203,12 +203,12 @@ sequenceDiagram
 
 ### 5. HTTP endpoint 연결
 
-- [ ] `GamePath` 같은 경로 상수를 추가해 `/api/v1/games` base path와 `/{gameId}/summary`를 정의한다.
-- [ ] `GameSummaryController`를 추가한다.
-- [ ] controller는 `@AuthUser Long userId`와 `@PathVariable Long gameId`를 받아 service에 위임한다.
-- [ ] 성공 응답은 `200 OK`와 summary DTO를 반환한다.
-- [ ] 미참가자 `403`, gameRoom 없음 `404`, 종료 전 gameRoom `409` 응답을 기존 전역 예외 형식과 맞춘다.
-- [ ] `SecurityPath.AUTH_WHITELIST`에는 추가하지 않고 인증 필수 API로 둔다.
+- [x] `GamePath` 같은 경로 상수를 추가해 `/api/v1/games` base path와 `/{gameId}/summary`를 정의한다.
+- [x] `GameSummaryController`를 추가한다.
+- [x] controller는 `@AuthUser Long userId`와 `@PathVariable Long gameId`를 받아 service에 위임한다.
+- [x] 성공 응답은 `200 OK`와 summary DTO를 반환한다.
+- [x] 미참가자 `403`, gameRoom 없음 `404`, 종료 전 gameRoom `409` 응답을 기존 전역 예외 형식과 맞춘다.
+- [x] `SecurityPath.AUTH_WHITELIST`에는 추가하지 않고 인증 필수 API로 둔다.
 
 ### 6. 문서/API 계약 테스트
 

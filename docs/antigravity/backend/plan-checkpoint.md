@@ -239,6 +239,7 @@ flowchart TD
 - [x] `me/opponent`는 `result`, `lpBefore/After/Change`, `rankBefore/After`, `seriesType`, `rankSeriesId`, `nickname`을 같은 schema로 반환
 - [x] rank는 enum 문자열만 반환하고 record id는 노출하지 않음
 - [x] participant가 아닌 유저의 결과 조회를 `403`으로 차단
+- [x] `/api/v1/games/{gameId}/summary` endpoint를 인증 필수 API로 연결
 - [ ] 클라이언트 최종 결과 화면에 필요한 응답 DTO와 문서 테스트 추가
 
 ### Step 12. Apex rank 자동 승급/강등 정산

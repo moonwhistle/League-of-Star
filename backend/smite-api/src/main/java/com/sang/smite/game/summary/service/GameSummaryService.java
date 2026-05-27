@@ -12,10 +12,11 @@ import com.sang.smite.domain.record.domain.GameRecord;
 import com.sang.smite.domain.record.service.GameRecordReadService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.service.UserReadService;
-import com.sang.smite.game.summary.dto.GameSummaryDoneResponse;
-import com.sang.smite.game.summary.dto.GameSummaryPendingResponse;
-import com.sang.smite.game.summary.dto.GameSummaryPlayerResponse;
-import com.sang.smite.game.summary.dto.GameSummaryResponse;
+import com.sang.smite.game.summary.controller.response.GameSummaryDoneResponse;
+import com.sang.smite.game.summary.controller.response.GameSummaryPendingResponse;
+import com.sang.smite.game.summary.controller.response.GameSummaryPlayerResponse;
+import com.sang.smite.game.summary.controller.response.GameSummaryResponse;
+import java.util.HashSet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -126,8 +127,8 @@ public class GameSummaryService {
         if (recordUserIds.stream().distinct().count() != SETTLED_RECORD_COUNT) {
             throwInvalidRecordState();
         }
-        if (!recordUserIds.containsAll(gameRoom.participantUserIds())
-                || !gameRoom.participantUserIds().containsAll(recordUserIds)) {
+        if (!new HashSet<>(recordUserIds).containsAll(gameRoom.participantUserIds())
+                || !new HashSet<>(gameRoom.participantUserIds()).containsAll(recordUserIds)) {
             throwInvalidRecordState();
         }
     }

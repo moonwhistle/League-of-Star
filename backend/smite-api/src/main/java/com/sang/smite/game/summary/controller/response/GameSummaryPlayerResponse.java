@@ -1,4 +1,4 @@
-package com.sang.smite.game.summary.dto;
+package com.sang.smite.game.summary.controller.response;
 
 import com.sang.smite.domain.record.domain.vo.GameRecordResult;
 import com.sang.smite.domain.record.domain.vo.GameRecordSeriesType;

@@ -1,4 +1,4 @@
-package com.sang.smite.game.summary.dto;
+package com.sang.smite.game.summary.controller.response;
 
 public sealed interface GameSummaryResponse permits GameSummaryPendingResponse, GameSummaryDoneResponse {
 
