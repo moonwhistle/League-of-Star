@@ -187,19 +187,19 @@ sequenceDiagram
 
 ### 4. summary application service 구현
 
-- [ ] `smite-api` `game/summary/service`에 조회 application service를 추가한다.
-- [ ] service는 `gameId`, `requestUserId`를 입력받는다.
-- [ ] gameRoom 참가자 목록에 `requestUserId`가 없으면 `403`으로 차단한다.
-- [ ] 미참가자 `403`은 core의 `INVALID_GAME_PARTICIPANTS(400)`를 그대로 쓰지 않고 API 계층에서 `ApiErrorCode.AUTH_FORBIDDEN`으로 표현한다.
-- [ ] gameRoom status가 `FINISHED`가 아니면 `409 CONFLICT`로 처리한다.
-- [ ] record count가 `0`이면 pending 응답을 반환한다.
-- [ ] record count가 `1`이면 warn log를 남기고 pending 응답을 반환한다.
-- [ ] record count가 `2`이면 record 2행을 조회한다.
-- [ ] record 2행 중 request user record를 `me`, 나머지 record를 `opponent`로 매핑한다.
-- [ ] participant userIds와 record userIds가 일치하지 않으면 정합성 오류로 처리한다.
-- [ ] record count가 `2`를 초과하면 1v1 게임 record 정합성 오류로 보고 `409 CONFLICT`로 처리한다.
-- [ ] `winnerUserId`는 gameRoom result가 `DRAW`이면 `null`, 승패 결과이면 `winnerId`를 반환한다.
-- [ ] 정산 조회 중 예외를 삼키지 않고 전역 예외 응답으로 전달한다.
+- [x] `smite-api` `game/summary/service`에 조회 application service를 추가한다.
+- [x] service는 `gameId`, `requestUserId`를 입력받는다.
+- [x] gameRoom 참가자 목록에 `requestUserId`가 없으면 `403`으로 차단한다.
+- [x] 미참가자 `403`은 core의 `INVALID_GAME_PARTICIPANTS(400)`를 그대로 쓰지 않고 API 계층에서 `ApiErrorCode.AUTH_FORBIDDEN`으로 표현한다.
+- [x] gameRoom status가 `FINISHED`가 아니면 `409 CONFLICT`로 처리한다.
+- [x] record count가 `0`이면 pending 응답을 반환한다.
+- [x] record count가 `1`이면 warn log를 남기고 pending 응답을 반환한다.
+- [x] record count가 `2`이면 record 2행을 조회한다.
+- [x] record 2행 중 request user record를 `me`, 나머지 record를 `opponent`로 매핑한다.
+- [x] participant userIds와 record userIds가 일치하지 않으면 정합성 오류로 처리한다.
+- [x] record count가 `2`를 초과하면 1v1 게임 record 정합성 오류로 보고 `409 CONFLICT`로 처리한다.
+- [x] `winnerUserId`는 gameRoom result가 `DRAW`이면 `null`, 승패 결과이면 `winnerId`를 반환한다.
+- [x] 정산 조회 중 예외를 삼키지 않고 전역 예외 응답으로 전달한다.
 
 ### 5. HTTP endpoint 연결
 

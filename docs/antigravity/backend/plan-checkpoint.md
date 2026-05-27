@@ -234,11 +234,11 @@ flowchart TD
 - [x] 전체 전적 공개 API, record 상세 API, profile API는 이번 Step 11 범위에서 제외
 - [x] core read service로 gameRoom summary read model, gameRecord count/list, user bulk 조회 제공
 - [x] `PENDING`/`DONE` summary 응답 DTO와 player summary DTO 설계
-- [ ] `FINISHED + game_records 0/1행`은 `PENDING`, `2행`은 `DONE`으로 반환
-- [ ] `DONE` 응답은 `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함
-- [ ] `me/opponent`는 `result`, `lpBefore/After/Change`, `rankBefore/After`, `seriesType`, `rankSeriesId`, `nickname`을 같은 schema로 반환
-- [ ] rank는 enum 문자열만 반환하고 record id는 노출하지 않음
-- [ ] participant가 아닌 유저의 결과 조회를 `403`으로 차단
+- [x] `FINISHED + game_records 0/1행`은 `PENDING`, `2행`은 `DONE`으로 반환
+- [x] `DONE` 응답은 `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함
+- [x] `me/opponent`는 `result`, `lpBefore/After/Change`, `rankBefore/After`, `seriesType`, `rankSeriesId`, `nickname`을 같은 schema로 반환
+- [x] rank는 enum 문자열만 반환하고 record id는 노출하지 않음
+- [x] participant가 아닌 유저의 결과 조회를 `403`으로 차단
 - [ ] 클라이언트 최종 결과 화면에 필요한 응답 DTO와 문서 테스트 추가
 
 ### Step 12. Apex rank 자동 승급/강등 정산
