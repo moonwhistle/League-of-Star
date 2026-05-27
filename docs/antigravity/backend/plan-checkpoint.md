@@ -232,6 +232,7 @@ flowchart TD
 - [x] `GAME_RESULT` payload는 확장하지 않고 최종 결과 화면에서 summary API를 polling하도록 계약 정리
 - [x] summary API는 record/rank 정산을 수행하지 않고 Step 9 결과를 read-only로 조회
 - [x] 전체 전적 공개 API, record 상세 API, profile API는 이번 Step 11 범위에서 제외
+- [x] core read service로 gameRoom summary read model, gameRecord count/list, user bulk 조회 제공
 - [ ] `FINISHED + game_records 0/1행`은 `PENDING`, `2행`은 `DONE`으로 반환
 - [ ] `DONE` 응답은 `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함
 - [ ] `me/opponent`는 `result`, `lpBefore/After/Change`, `rankBefore/After`, `seriesType`, `rankSeriesId`, `nickname`을 같은 schema로 반환

@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -17,6 +19,10 @@ public class UserReadService {
 
     public Optional<User> findById(Long userId) {
         return userRepository.findById(userId);
+    }
+
+    public List<User> findByIds(Collection<Long> userIds) {
+        return userRepository.findAllById(userIds);
     }
 
     public Optional<User> findByEmail(String email) {

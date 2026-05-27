@@ -125,6 +125,7 @@ sequenceDiagram
 - API 모듈은 `GameRecordRepository`, `GameRoomRepository`, `UserRepository`를 직접 import하지 않는다.
 - API 모듈은 core read service만 조합한다.
 - core read service는 조회에 필요한 도메인 값만 반환하고 HTTP 응답 DTO를 알지 않는다.
+- core read service가 외부 모듈에 넘기는 read model과 service 결과 모델은 `domain/game/service/dto` 같은 service DTO 패키지에 둔다.
 - summary API는 rank command service, record/rank settlement service를 호출하지 않는다.
 - `smite-matching` Redis 상태는 이번 조회 API와 무관하므로 참조하지 않는다.
 
@@ -165,13 +166,13 @@ sequenceDiagram
 
 ### 2. core read service 보강
 
-- [ ] `GameRoomReadService`에 summary 조회에 필요한 gameRoom read model을 제공한다.
-- [ ] read model에는 `gameRoomId`, `status`, `result`, `winnerId`, `finishedAt`, participant userIds를 포함한다.
-- [ ] gameRoom이 없으면 기존 `GAME_ROOM_NOT_FOUND`로 처리한다.
-- [ ] `GameRecordReadService`를 추가해 `countByGameRoomId`, `findByGameRoomId`를 제공한다.
-- [ ] `GameRecordReadService`는 record repository를 감싸고 API 모듈이 repository를 직접 참조하지 않게 한다.
-- [ ] `UserReadService`에 참가자 nickname 조회에 필요한 메서드를 추가한다.
-- [ ] user 조회 결과가 누락되면 `USER_NOT_FOUND` 또는 정합성 오류로 처리하는 정책을 정한다.
+- [x] `GameRoomReadService`에 summary 조회에 필요한 gameRoom read model을 제공한다.
+- [x] read model에는 `gameRoomId`, `status`, `result`, `winnerId`, `finishedAt`, participant userIds를 포함한다.
+- [x] gameRoom이 없으면 기존 `GAME_ROOM_NOT_FOUND`로 처리한다.
+- [x] `GameRecordReadService`를 추가해 `countByGameRoomId`, `findByGameRoomId`를 제공한다.
+- [x] `GameRecordReadService`는 record repository를 감싸고 API 모듈이 repository를 직접 참조하지 않게 한다.
+- [x] `UserReadService`에 참가자 nickname 조회에 필요한 메서드를 추가한다.
+- [x] user 조회 결과가 누락되면 summary application service에서 `USER_NOT_FOUND` 또는 정합성 오류로 처리한다.
 
 ### 3. summary API DTO 설계
 

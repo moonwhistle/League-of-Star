@@ -4,6 +4,7 @@ import com.sang.smite.domain.game.domain.GameAction;
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.repository.GameActionRepository;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
+import com.sang.smite.domain.game.service.dto.GameNaturalDeathSettlementResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

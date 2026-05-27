@@ -1,7 +1,7 @@
 package com.sang.smite.game.end.service;
 
-import com.sang.smite.domain.game.service.GameNaturalDeathSettlementResult;
 import com.sang.smite.domain.game.service.GameNaturalDeathSettlementService;
+import com.sang.smite.domain.game.service.dto.GameNaturalDeathSettlementResult;
 import com.sang.smite.game.end.common.constant.GameEndConstants;
 import com.sang.smite.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.smite.game.result.dto.GameResultPayload;
