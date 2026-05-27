@@ -151,7 +151,7 @@
 - 자연사 종료 정산은 DB gameRoom 결과 확정을 먼저 수행하고, 연결된 local WebSocket session이 있으면 `GAME_RESULT`를 보낸다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
 - 자연사 종료 후 pending cleanup은 WebSocket 전송 성공의 의미가 아니라 DB 기준으로 정산 완료된 후보를 제거하는 의미다. cleanup을 생략하면 이미 종료된 gameRoom이 scheduler tick마다 반복 조회될 수 있다.
 - `GAME_RESULT.reason`은 종료 사유에 따라 `SMITE_KILL`, `BOTH_SMITES_USED_DRAW`, `NATURAL_DEATH_DRAW`를 사용한다.
-- record/LP/배치/승급전 반영은 gameRoom 결과 확정 및 `GAME_RESULT` 전송 흐름과 분리한다. 현재 서버 종료 보장 범위에서는 `game_rooms`/`game_participants` 결과 확정까지만 수행하고, `game_records` 생성과 LP 반영은 후속 Step 9에서 처리한다.
+- record/LP/배치/승급전 반영은 gameRoom 결과 확정 및 `GAME_RESULT` 전송 흐름과 분리한다. `game_rooms`/`game_participants` 결과 확정 이후 Step 9 record/rank 정산이 `game_records` 생성과 LP/RankSeries 반영을 별도 transaction으로 처리한다.
 
 ### 2.5 서버 권위 타임스탬프 (공정성 핵심)
 
@@ -230,7 +230,7 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 - 결과가 확정되지 않은 SMITE는 중간 응답을 전송하지 않는다.
 - SMITE로 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
 - 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 session에 `GAME_RESULT`만 재응답한다.
-- record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리한다. `game_records` 생성, LP 반영, 배치/승급전 처리는 후속 Step 9에서 확정된 gameRoom 결과를 기준으로 수행한다.
+- record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리한다. `game_records` 생성, LP 반영, 배치/승급전 처리는 Step 9 record/rank 정산에서 확정된 gameRoom 결과를 기준으로 수행한다.
 
 #### Step 9 record/rank 정산 정책
 

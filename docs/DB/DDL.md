@@ -167,12 +167,13 @@ stateDiagram-v2
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| 게임 종료 | INSERT (2행) | 양쪽 플레이어 각 1행 동시 생성 |
+| 게임 종료 후 record/rank 정산 | INSERT (2행) | 양쪽 플레이어 각 1행 동시 생성 |
 
 - **불변(Immutable)**: 전적 기록은 수정하지 않음
 - **항상 2행 생성**: 각 참여자(Participant)의 관점에서 기록
 - **LP/Rank 스냅샷**: lp_before/after와 함께 rank_before/after를 **JSON 스냅샷**으로 저장하여 변동 이력 추적
 - **시리즈 연동**: 배치/승급전 경기인 경우 `rank_series_id`와 `series_type`을 기록하여 결과 정합성 보장
+- **멱등성 기준**: 정상 정산 완료는 gameRoom당 `game_records` 2행이며, `uk_game_records_room_user`는 동시성 보조 방어선입니다. record count가 1인 불완전 정산은 자동 보정하지 않습니다.
 
 ---
 
@@ -483,7 +484,7 @@ CREATE TABLE game_records (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-> Issue 52에서 현재 `GameRecord` 엔티티의 `promotion_series_id`, `is_promotion_game` 구조를 `rank_series_id`, `series_type` 구조로 전환합니다. `series_type=RANK`는 일반 랭크 게임이며 `rank_series_id`를 비워둡니다. `PLACEMENT`와 `PROMOTION`은 진행 중인 `rank_series.id`를 기록합니다.
+> Issue 52 기준 `GameRecord` 엔티티는 `promotion_series_id`, `is_promotion_game` 구조를 사용하지 않고 `rank_series_id`, `series_type` 구조로 표현합니다. `series_type=RANK`는 일반 랭크 게임이며 `rank_series_id`를 비워둡니다. `PLACEMENT`와 `PROMOTION`은 진행 중인 `rank_series.id`를 기록합니다.
 
 > **인덱스 설명**
 > - `idx_user_id_created`: 유저 전적 최신순 조회 (프로필 페이지)

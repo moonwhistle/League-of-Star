@@ -34,6 +34,9 @@ public class GameRecordRankSettlementRecoveryService {
         }
     }
 
+    /**
+     * 복구 정산 실패는 다음 후보 처리를 막지 않도록 로그만 남깁니다.
+     */
     private void settleSafely(Long gameRoomId) {
         try {
             gameRecordRankSettlementService.settleFinishedGameRoom(gameRoomId);

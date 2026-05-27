@@ -35,6 +35,12 @@ public class GameRecordRankSettlementTrigger {
         settleSafely(command);
     }
 
+    /**
+     * record/rank 정산 실패는 이미 확정된 gameRoom 결과와 GAME_RESULT 흐름을 되돌리지 않습니다.
+     *
+     * <p>CoreException을 포함한 RuntimeException은 로그로 남기고,
+     * FINISHED + record count != 2 복구 scheduler가 재시도하도록 둡니다.</p>
+     */
     private void settleSafely(GameRecordRankSettlementCommand command) {
         try {
             gameRecordRankSettlementService.settleFinishedGameRoom(command.gameRoomId());

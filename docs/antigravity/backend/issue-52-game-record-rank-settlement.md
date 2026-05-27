@@ -46,7 +46,7 @@ flowchart TD
 
 ### Record series 표현 정책
 
-`game_records`는 일반 랭크 게임, 배치 게임, 승급전 게임을 모두 표현해야 한다. 기존 `promotionSeriesId`, `isPromotionGame` 구조는 승급전만 표현하는 이름이므로 Step 9 구현 시 다음 구조로 전환한다.
+`game_records`는 일반 랭크 게임, 배치 게임, 승급전 게임을 모두 표현해야 한다. 기존 `promotionSeriesId`, `isPromotionGame` 구조는 승급전만 표현하는 이름이므로 Step 9에서는 다음 구조를 사용한다.
 
 ```java
 public enum GameRecordSeriesType {
@@ -310,20 +310,111 @@ flowchart TD
 
 ### 10. 문서 정합성
 
-- [ ] `docs/project/policy.md`에 gameRoom 종료 후 record/rank 정산 책임과 멱등성 정책 반영
-- [ ] `docs/project/domain status.md`에 `FINISHED -> RECORDED` 흐름과 record/rank 상태 반영
-- [ ] `docs/project/websocket client.md`에 `GAME_RESULT` payload 미확장과 별도 record/rank summary 조회 API 후속 분리 정책 반영
-- [ ] `docs/DB/DDL.md`의 `game_records` unique 제약, `rank_series_id`, `series_type` entity 정합성 재확인
-- [ ] `plan-checkpoint.md` Step 9 / Issue 52 체크 상태를 구현 완료 후 갱신
+- [x] `docs/project/policy.md`에 gameRoom 종료 후 record/rank 정산 책임과 멱등성 정책 반영
+- [x] `docs/project/domain status.md`에 `FINISHED -> RECORDED` 흐름과 record/rank 상태 반영
+- [x] `docs/project/websocket client.md`에 `GAME_RESULT` payload 미확장과 별도 record/rank summary 조회 API 후속 분리 정책 반영
+- [x] `docs/DB/DDL.md`의 `game_records` unique 제약, `rank_series_id`, `series_type` entity 정합성 재확인
+- [x] `plan-checkpoint.md` Step 9 / Issue 52 체크 상태를 구현 완료 후 갱신
 
 ## 📝 Note
 
-- 현재 `GameRecord` entity와 `game_records` unique 제약은 이미 존재한다.
-- 현재 `GameRecord`의 `promotionSeriesId`, `isPromotionGame`은 Step 9 구현 시 `rankSeriesId`, `seriesType`으로 전환한다.
-- 현재 `RankCommandService`는 초기 rank 생성만 담당하므로 게임 결과 반영 책임을 추가해야 한다.
-- 현재 `RankSeries`는 placement/promotion 진행도와 완료 상태 primitive를 일부 갖고 있다.
-- 현재 `UserRankInfo`에는 totalWins/totalLosses/totalDraws가 있으므로 Step 9 정산에서 같이 반영한다.
+- `GameRecord` entity와 `game_records` unique 제약은 Step 9 정산의 멱등성 보조 장치로 사용한다.
+- `GameRecord`는 `rankSeriesId`, `seriesType`으로 일반 랭크/배치/승급전을 표현하며, `promotionSeriesId`, `isPromotionGame` 구조는 사용하지 않는다.
+- `RankCommandService`는 초기 rank 생성뿐 아니라 FINISHED gameRoom 결과의 누적 전적, LP, RankSeries 반영 유스케이스를 담당한다.
+- `RankSeries`는 placement/promotion 진행도와 완료 상태 primitive를 갖고, Step 9 정산에서 결과를 반영한다.
+- `UserRankInfo`의 totalWins/totalLosses/totalDraws는 Step 9 정산에서 record 생성과 같은 transaction으로 반영한다.
 - 이번 이슈는 Step 7/8의 종료 결과를 바꾸지 않고, 확정된 결과를 record/rank로 반영하는 후처리다.
 - Step 9 정산은 즉시 호출과 복구 scheduler 조합으로 처리하고, DB outbox/event는 후속 범위로 둔다.
 - Redis `IN_GAME` cleanup은 후속 Issue 58, record/rank summary 조회 API는 후속 Issue 60, Apex 자동 승급/강등은 후속 Issue 59로 분리한다.
 - Apex/배치 매칭 정책 정합성은 후속 Issue 53/54로 분리한다.
+
+
+-----
+## PR
+
+## 📌 Summary
+
+```mermaid
+flowchart TD
+    A[Step 7/8<br/>gameRoom FINISHED 확정] --> B[GAME_RESULT 전송<br/>LP/rank 미포함]
+    A --> C[Record/Rank Settlement Trigger]
+    C --> D[gameRoom row lock<br/>record count 확인]
+    D -->|0| E[participant 결과 해석]
+    E --> F[UserRankInfo / RankSeries 반영]
+    F --> G[game_records 2행 저장]
+    D -->|2| H[No-op]
+    D -->|1| I[불완전 정산<br/>자동 보정 금지]
+    J[Recovery Scheduler] --> D
+```
+
+게임 종료 확정 이후 `game_rooms.status/result/winnerId`를 source of truth로 삼아 `game_records` 생성, 누적 전적, LP, 배치/승급전 진행도를 정산하는 흐름을 구현함.
+
+핵심 정책은 gameRoom 종료 transaction과 record/rank 정산 transaction을 분리하고, `GAME_RESULT`는 즉시 종료 알림으로 유지하며, 최종 LP/rank/series 정보는 후속 summary API로 분리하는 것임.
+
+## 📚 Changes
+
+### 1. 종료 확정과 record/rank 정산 transaction 분리
+
+- Step 7/8은 gameRoom 결과 확정과 `GAME_RESULT` 전송까지만 책임지도록 유지함.
+- record/rank 정산은 `TransactionSynchronization.afterCommit()` 이후 별도 trigger로 호출함.
+- 종료 transaction 안에서 record/rank까지 같이 처리하면 한 transaction 안에서 사용자에게 보내야 할 종료 결과와 랭크 정산 실패가 강하게 묶임.
+- 이 PR은 `DB gameRoom FINISHED = 게임 결과 확정`을 먼저 보장하고, record/rank는 확정된 결과를 따라가는 후처리로 분리함.
+- 트레이드오프: 즉시 결과 화면에서 LP/rank를 바로 받을 수는 없지만, 게임 결과 확정 안정성, WebSocket 전송 독립성, 정산 재시도 가능성을 우선함.
+
+### 2. DB 기준 멱등성 설계
+
+- 정산 진입점은 `gameRoomId` 하나로 고정하고, 먼저 `game_rooms` row lock을 획득함.
+- lock 이후 `countByGameRoomId`로 정산 상태를 다시 판단함.
+  - `0`: 아직 어떤 record/rank도 반영되지 않은 상태로 보고 정산 수행
+  - `2`: 참가자 2명분 정산 완료로 보고 no-op
+  - `1`: record/rank 반영이 일부만 완료됐을 수 있는 불완전 정산으로 보고 예외/복구 대상 처리
+- `uk_game_records_room_user` unique constraint는 정산 완료 판단 기준이 아니라 동시성 마지막 방어선으로 둠.
+- 이 구조는 SMITE 즉시 종료, 자연사 scheduler, recovery scheduler가 같은 gameRoom을 동시에 보더라도 lock 안에서 같은 완료 판단을 하도록 만든 선택임.
+- 트레이드오프: unique constraint 충돌만으로 멱등성을 처리하면 rank 누적 전적/LP가 이미 반영된 뒤 record insert에서 실패하는 중간 상태를 설명하기 어렵기 때문에, DB row lock + record count를 1차 정책으로 둠. 대신 lock 구간이 생기지만 gameRoom 단위 정산이라 contention 범위를 작게 제한함.
+- `count == 1`을 자동 보정하지 않는 이유는 남은 1행만 채우는 순간 이미 반영됐을 수 있는 rank 변화와 record snapshot의 정합성을 복구하기 어렵기 때문임. 따라서 자동 수정보다 운영 탐지/로그를 선택함.
+
+### 3. RankSeries 우선 판정
+
+- LP 계산보다 진행 중 `RankSeries`를 먼저 lock 조회함.
+- `PLACEMENT`는 LP 계산 없이 series 승/패/무를 반영하고 10판 완료 시 승수표 기준 rank/LP를 배정함.
+- `PROMOTION`은 LP를 동결하고 성공 시 `targetRank + LP 0`, 실패 시 기존 rank `LP 75`를 반영함.
+- Rank snapshot은 record 생성 전에 rank service에서 before/after를 확정해 반환하고, record는 그 결과만 저장함.
+- 트레이드오프: 일반 RANK 계산과 시리즈 계산이 분기되지만, 배치/승급전 정책이 일반 LP 공식과 섞이지 않아 정책 해석이 명확해짐. 또한 `RankSeries`를 먼저 판단하지 않으면 배치/승급전 게임에 일반 LP 공식이 잘못 적용될 수 있어, 조회 순서를 정책으로 고정함.
+
+### 4. rank 반영의 lock 경계와 rollback 경계
+
+- `UserRankInfo`는 userId 기준 pessimistic lock으로 조회하고, 참가자/상대 유저 id를 정렬해 lock 순서를 고정함.
+- 진행 중 `RankSeries`도 정산 transaction 안에서 조회해 series 진행도와 rank snapshot이 같은 transaction 안에서 결정되도록 함.
+- `game_records` 저장은 rank 반영 결과를 받은 뒤 수행하므로, rank 반영 중 예외가 발생하면 record insert도 수행되지 않음.
+- 트레이드오프: lock 범위가 늘어나지만 record, 누적 전적, LP, RankSeries, record snapshot이 서로 다른 시점의 값을 담는 문제를 막기 위해 하나의 정산 transaction으로 묶음. 특히 양 참가자의 before snapshot은 반영 전 상태를 기준으로 계산해야 하므로, lock 순서와 snapshot 시점을 명시적으로 고정함.
+
+### 5. API와 core 관심사 분리
+
+- API 모듈은 종료 흐름 orchestration, trigger, recovery scheduler만 담당함.
+- `game_records`, `RankSeries`, `UserRankInfo` 조회/변경은 core service 내부에서 처리함.
+- API에서 core repository를 직접 참조하지 않도록 정리해 `API -> core service -> repository/domain` 경계를 유지함.
+- 트레이드오프: API에서 repository를 직접 호출하면 코드량은 줄지만, 정산 완료 판단과 record count 정책이 API orchestration에 새어 나감. 이 PR에서는 정책 판단을 core에 모아 후속 API/스케줄러가 같은 정산 규칙을 재사용하게 함.
+
+### 6. Recovery scheduler 추가
+
+- 즉시 정산 trigger가 실패하거나 API 인스턴스가 중간에 죽을 수 있으므로, `FINISHED`인데 `game_records`가 2행이 아닌 gameRoom을 주기적으로 조회함.
+- recovery scheduler도 정산 service를 직접 재사용하고, 후보별 record count를 다시 확인함.
+  - `0`: 자동 재정산
+  - `1`: 자동 보정 금지, 불완전 정산 로그
+  - `2`: 이미 다른 흐름에서 회복된 상태로 no-op
+- 트레이드오프: DB outbox/event 기반 정산은 이벤트 유실과 처리 상태를 더 명확히 모델링할 수 있지만 이번 범위에서는 새 테이블과 운영 복잡도가 커짐. 그래서 MVP에서는 조회 기반 scheduler를 선택하고, 불완전 정산을 자동 수정하지 않는 보수적 복구 정책으로 안정성을 확보함.
+
+### 7. `GAME_RESULT` payload 미확장
+
+- `GAME_RESULT`는 종료 확정 이벤트로 유지하고, record/rank 정산 결과를 payload에 섞지 않음.
+- LP/rank/series 정보는 후속 record/rank summary API에서 DB 정산 완료 상태를 기준으로 조회하도록 분리함.
+- 트레이드오프: 클라이언트가 최종 결과 화면에서 추가 조회를 해야 하지만, WebSocket 종료 알림이 record/rank 정산 성공 여부에 종속되지 않음. 또한 정산이 지연되거나 recovery scheduler로 복구되는 경우에도 `GAME_RESULT` 계약이 흔들리지 않음.
+
+## 📝 Note
+
+- `GAME_RESULT` payload에는 LP/rank/series delta를 추가하지 않음.
+- record/rank summary 조회 API, Redis `IN_GAME` cleanup, Apex 자동 승급/강등은 후속 이슈로 분리함.
+- 테스트는 결과 변환, 멱등성, RankSeries 반영, API trigger, recovery scheduler, payload 미확장을 기준으로 보강함.
+
+## 📌 Related Issue
+- Closes #52
