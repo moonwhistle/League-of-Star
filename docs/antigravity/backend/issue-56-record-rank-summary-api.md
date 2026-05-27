@@ -212,11 +212,11 @@ sequenceDiagram
 
 ### 6. 문서/API 계약 테스트
 
-- [ ] `GameSummaryControllerRestDocsTest`를 추가한다.
-- [ ] `DONE` 응답 필드를 RestDocs에 문서화한다.
-- [ ] `PENDING` 응답 필드를 RestDocs에 문서화한다.
-- [ ] `403`, `404`, `409` 주요 실패 응답 정책을 문서화한다.
-- [ ] 생성된 OpenAPI/RestDocs snippet이 기존 문서 구조와 충돌하지 않는지 확인한다.
+- [x] `GameSummaryControllerRestDocsTest`를 추가한다.
+- [x] `DONE` 응답 필드를 RestDocs에 문서화한다.
+- [x] `PENDING` 응답 필드를 RestDocs에 문서화한다.
+- [x] `403`, `404`, `409` 주요 실패 응답 정책을 문서화한다.
+- [x] 생성된 OpenAPI/RestDocs snippet이 기존 문서 구조와 충돌하지 않는지 확인한다.
 
 ### 7. service 테스트
 

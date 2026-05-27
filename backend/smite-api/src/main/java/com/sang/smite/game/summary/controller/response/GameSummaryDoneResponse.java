@@ -1,5 +1,6 @@
 package com.sang.smite.game.summary.controller.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.sang.smite.domain.game.domain.vo.GameResult;
 
 import java.time.LocalDateTime;
@@ -9,6 +10,7 @@ public record GameSummaryDoneResponse(
         Long gameId,
         GameResult gameResult,
         Long winnerUserId,
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         LocalDateTime finishedAt,
         GameSummaryPlayerResponse me,
         GameSummaryPlayerResponse opponent
