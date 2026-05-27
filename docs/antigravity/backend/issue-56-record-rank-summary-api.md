@@ -239,7 +239,7 @@ sequenceDiagram
 - [x] `docs/project/domain status.md`에 `GAME_RESULT -> summary polling -> DONE` 흐름을 반영한다.
 - [x] `docs/project/websocket client.md`에 `GAME_RESULT` 이후 summary polling 계약을 반영한다.
 - [x] Issue 52의 조회 API 표기를 Issue 56 구현 완료 상태로 맞춘다.
-- [ ] PR 섹션에는 WebSocket과 summary API 책임 분리, polling 선택, pending 처리, participant-only 접근 정책, repository 직접 참조를 피한 패키지 경계를 중심으로 작성한다.
+- [x] PR 섹션에는 WebSocket과 summary API 책임 분리, polling 선택, pending 처리, participant-only 접근 정책, repository 직접 참조를 피한 패키지 경계를 중심으로 작성한다.
 
 ## 📝 Note
 
@@ -254,3 +254,79 @@ sequenceDiagram
 
 -----
 ## PR
+
+## 📌 Summary
+
+```mermaid
+sequenceDiagram
+    participant Game as Game WebSocket
+    participant Client as Client
+    participant API as Summary API
+    participant DB as game_rooms / game_records
+
+    Game-->>Client: GAME_RESULT(gameId)
+    Client->>API: GET /api/v1/games/{gameId}/summary
+    API->>DB: FINISHED 상태와 record count 조회
+    alt record count 0 or 1
+        API-->>Client: 200 PENDING + retryAfterMillis
+    else record count 2
+        API-->>Client: 200 DONE + me/opponent summary
+    else invalid state
+        API-->>Client: 409 CONFLICT
+    end
+```
+
+게임 종료 WebSocket `GAME_RESULT`는 종료 신호만 담당하고, 최종 결과 화면에 필요한 승패/LP/rank/series/nickname 정보는 `GET /api/v1/games/{gameId}/summary`에서 조회하도록 분리함.
+
+핵심 정책은 summary API가 Step 9에서 이미 저장된 `game_rooms`, `game_records`, `users`를 read-only로 조회한다는 점임. 이 API는 record/rank 정산을 새로 수행하지 않으며, 정산 완료 여부를 `PENDING` 또는 `DONE`으로 표현함.
+
+## 📚 Changes
+
+### 1. WebSocket과 최종 결과 조회 책임 분리
+
+- `GAME_RESULT` payload에는 LP/rank/series delta를 추가하지 않음.
+- `GAME_RESULT`는 클라이언트가 결과 화면으로 진입하고 summary 조회를 시작하는 신호로 유지함.
+- 최종 결과 화면의 source of truth는 summary API로 둠.
+- 트레이드오프: 클라이언트는 종료 직후 한 번 더 조회해야 하지만, WebSocket 종료 알림이 record/rank 정산 완료 여부에 묶이지 않음. 정산이 늦거나 recovery로 복구되는 경우에도 종료 이벤트 계약이 흔들리지 않음.
+
+### 2. `PENDING` / `DONE` 조회 정책
+
+- `FINISHED + game_records 0행`은 정산 대기 상태로 보고 `200 PENDING`을 반환함.
+- `FINISHED + game_records 1행`은 불완전 정산 상태지만 외부에는 `200 PENDING`을 반환하고 서버 warn log로 남김.
+- `FINISHED + game_records 2행`만 최종 결과 조회가 가능한 상태로 보고 `200 DONE`을 반환함.
+- `2행 초과` 또는 participant/record 불일치는 1v1 게임 record 정합성 오류로 보고 `409`로 처리함.
+- 트레이드오프: `record count 1`을 클라이언트 오류로 바로 노출하지 않고 pending으로 감싸 결과 화면 UX를 단순하게 유지함. 대신 서버 로그와 Step 9 recovery 책임으로 운영자가 불완전 정산을 추적해야 함.
+
+### 3. read-only API로 정산 책임 격리
+
+- summary API는 rank command service, record/rank settlement service, Redis matching status를 호출하지 않음.
+- 조회 중 record/rank 정산을 재실행하지 않고, 이미 저장된 DB 상태만 읽음.
+- 오래 지속되는 `PENDING`은 Step 9 recovery와 운영 로그에서 다루도록 책임을 분리함.
+- 트레이드오프: API 호출 한 번으로 정산까지 보정하지는 못하지만, 조회 API가 쓰기 side effect를 만들지 않아 재호출/polling이 안전해짐.
+
+### 4. API와 core 패키지 경계 유지
+
+- API 모듈은 `GameRecordRepository`, `GameRoomRepository`, `UserRepository`를 직접 참조하지 않음.
+- `smite-core`의 `GameRoomReadService`, `GameRecordReadService`, `UserReadService`를 조합해 조회함.
+- HTTP 응답 DTO는 `game.summary.dto`에 두어 service가 controller 하위 패키지에 의존하지 않도록 정리함.
+- 트레이드오프: read service와 DTO가 늘어나지만, repository 접근과 HTTP 응답 조립 책임이 섞이지 않음. 이후 summary 조회 정책이 바뀌어도 API orchestration과 core repository 경계를 유지할 수 있음.
+
+### 5. 참가자 전용 조회와 응답 계약
+
+- 요청 유저가 gameRoom 참가자가 아니면 `403`으로 차단함.
+- gameRoom이 없으면 `404`, 아직 `FINISHED`가 아니면 `409`로 처리함.
+- `DONE` 응답은 `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함함.
+- `me`와 `opponent`는 같은 schema로 `result`, `lpBefore/After/Change`, `rankBefore/After`, `seriesType`, `rankSeriesId`, `nickname`을 반환함.
+- `DRAW`는 `gameResult=DRAW`, `me.result=DRAW`, `opponent.result=DRAW`로 명시하고, `winnerUserId`만 승자가 없다는 의미로 `null`을 반환함.
+- `rankSeriesId`는 일반 랭크면 `null`, 배치/승급전이면 series id를 반환할 수 있도록 RestDocs 계약을 `VARIES`로 열어둠.
+- 트레이드오프: 이번 API는 참가자 결과 화면에 필요한 정보만 제공함. 전체 전적 공개, record 상세, profile API를 함께 열지 않아 범위는 좁지만 접근 정책과 응답 목적이 명확해짐.
+
+## 📝 Note
+
+- 이번 이슈는 record/rank 정산 로직을 변경하지 않음.
+- 이번 이슈는 Redis `IN_GAME` cleanup 정책을 변경하지 않음.
+- 전체 전적 공개 API, record 상세 API, profile API는 후속 범위로 분리함.
+- 테스트는 service 단위 테스트, controller 위임 테스트, RestDocs 계약 테스트를 기준으로 보강함.
+
+## 📌 Related Issue
+- Closes #56
