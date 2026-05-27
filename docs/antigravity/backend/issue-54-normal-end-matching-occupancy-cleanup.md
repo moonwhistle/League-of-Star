@@ -121,12 +121,12 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 ### 4. Step 9 정산 성공 이후 cleanup 연결
 
-- [ ] record/rank 정산 성공 후 정상 종료 cleanup을 호출한다.
-- [ ] 이미 정산 완료로 no-op 된 `record count == 2` 케이스에서도 cleanup 재시도가 가능해야 한다.
-- [ ] cleanup 호출은 record/rank 정산 transaction 성공 이후 수행한다.
-- [ ] cleanup 실패가 record/rank 정산 transaction을 rollback하지 않도록 경계를 분리한다.
-- [ ] SMITE kill, both failed SMITE DRAW, natural death DRAW 모두 같은 cleanup 경로를 타게 한다.
-- [ ] 이미 FINISHED인 current result 재응답에서는 즉시 cleanup을 중복 호출하지 않는다.
+- [x] record/rank 정산 성공 후 정상 종료 cleanup을 호출한다.
+- [x] 이미 정산 완료로 no-op 된 `record count == 2` 케이스에서도 cleanup 재시도가 가능해야 한다.
+- [x] cleanup 호출은 record/rank 정산 transaction 성공 이후 수행한다.
+- [x] cleanup 실패가 record/rank 정산 transaction을 rollback하지 않도록 경계를 분리한다.
+- [x] SMITE kill, both failed SMITE DRAW, natural death DRAW 모두 같은 cleanup 경로를 타게 한다.
+- [x] 이미 FINISHED인 current result 재응답에서는 즉시 cleanup을 중복 호출하지 않는다.
 
 ### 5. 기존 record/rank recovery 기반 재시도 연결
 

@@ -10,7 +10,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -22,8 +24,13 @@ class GameRecordRankSettlementTriggerTest {
 
     private final GameRecordRankSettlementService gameRecordRankSettlementService =
             mock(GameRecordRankSettlementService.class);
+    private final FinishedGameMatchStatusCleanupService finishedGameMatchStatusCleanupService =
+            mock(FinishedGameMatchStatusCleanupService.class);
     private final GameRecordRankSettlementTrigger trigger =
-            new GameRecordRankSettlementTrigger(gameRecordRankSettlementService);
+            new GameRecordRankSettlementTrigger(
+                    gameRecordRankSettlementService,
+                    finishedGameMatchStatusCleanupService
+            );
 
     @AfterEach
     void tearDown() {
@@ -33,7 +40,7 @@ class GameRecordRankSettlementTriggerTest {
     }
 
     @Test
-    @DisplayName("settleFinishedGameRoomAfterCommit - transaction synchronization이 없으면 즉시 정산을 요청한다")
+    @DisplayName("settleFinishedGameRoomAfterCommit - transaction synchronization이 없으면 즉시 정산 후 cleanup을 요청한다")
     void settleFinishedGameRoomAfterCommit_NoTransaction_SettleImmediately() {
         // given
         GameRoom gameRoom = finishedGameRoom();
@@ -42,11 +49,13 @@ class GameRecordRankSettlementTriggerTest {
         trigger.settleFinishedGameRoomAfterCommit(gameRoom);
 
         // then
-        verify(gameRecordRankSettlementService).settleFinishedGameRoom(GAME_ROOM_ID);
+        var inOrder = inOrder(gameRecordRankSettlementService, finishedGameMatchStatusCleanupService);
+        inOrder.verify(gameRecordRankSettlementService).settleFinishedGameRoom(GAME_ROOM_ID);
+        inOrder.verify(finishedGameMatchStatusCleanupService).cleanupIfSettled(GAME_ROOM_ID);
     }
 
     @Test
-    @DisplayName("settleFinishedGameRoomAfterCommit - transaction synchronization이 있으면 afterCommit에서 정산을 요청한다")
+    @DisplayName("settleFinishedGameRoomAfterCommit - transaction synchronization이 있으면 afterCommit에서 정산 후 cleanup을 요청한다")
     void settleFinishedGameRoomAfterCommit_WithTransactionSynchronization_SettleAfterCommit() {
         // given
         TransactionSynchronizationManager.initSynchronization();
@@ -56,11 +65,13 @@ class GameRecordRankSettlementTriggerTest {
         trigger.settleFinishedGameRoomAfterCommit(gameRoom);
 
         // then
-        verifyNoInteractions(gameRecordRankSettlementService);
+        verifyNoInteractions(gameRecordRankSettlementService, finishedGameMatchStatusCleanupService);
 
         TransactionSynchronizationManager.getSynchronizations()
                 .forEach(TransactionSynchronization::afterCommit);
-        verify(gameRecordRankSettlementService).settleFinishedGameRoom(GAME_ROOM_ID);
+        var inOrder = inOrder(gameRecordRankSettlementService, finishedGameMatchStatusCleanupService);
+        inOrder.verify(gameRecordRankSettlementService).settleFinishedGameRoom(GAME_ROOM_ID);
+        inOrder.verify(finishedGameMatchStatusCleanupService).cleanupIfSettled(GAME_ROOM_ID);
     }
 
     @Test
@@ -79,6 +90,7 @@ class GameRecordRankSettlementTriggerTest {
         // then
         verify(gameRecordRankSettlementService).settleFinishedGameRoom(GAME_ROOM_ID);
         verify(gameRecordRankSettlementService).countRecordsByGameRoomId(GAME_ROOM_ID);
+        verify(finishedGameMatchStatusCleanupService, never()).cleanupIfSettled(GAME_ROOM_ID);
     }
 
     private GameRoom finishedGameRoom() {

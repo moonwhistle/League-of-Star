@@ -220,8 +220,8 @@ flowchart TD
 ### Step 10. 정상 종료 후 매칭 점유 상태 cleanup
 
 - [x] `FINISHED` gameRoom 참가자의 Redis `match:status:{userId}=IN_GAME` 제거 지점 확정
-- [ ] record/rank 정산 성공 여부와 Redis cleanup transaction/실패 영향을 분리
-- [ ] Redis cleanup 실패가 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산을 rollback하지 않도록 처리
+- [x] record/rank 정산 성공 여부와 Redis cleanup transaction/실패 영향을 분리
+- [x] Redis cleanup 실패가 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산을 rollback하지 않도록 처리
 - [ ] cleanup 실패 시 별도 cleanup scheduler를 추가하지 않고 기존 record/rank recovery 흐름에서 best-effort 재시도
 - [ ] Step 13의 DB 기준 active gameRoom 검증과 충돌하지 않도록 FINISHED/ABORTED 유저 재매칭 허용 기준 정리
 - [ ] 정상 종료 후 유저가 다시 매칭 큐에 진입 가능한지 테스트 추가
