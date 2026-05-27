@@ -21,6 +21,8 @@
 - **유저 매칭 상태 (STRING)**: `match:status:{userId}`
   - *특징*: `MATCHING`, `FOUND`, `ACCEPTED`, `IN_GAME` 등 유저가 매칭/게임 플로우에 묶여 있는지 저장합니다.
   - gameRoom 생성 성공 이후에는 `IN_GAME`으로 전환하여 중복 큐 진입을 막습니다.
+  - 정상 종료 후 `FINISHED + game_records 2행`이 확인되면 `IN_GAME`만 제거해 재매칭 가능 상태로 복구합니다.
+  - cleanup은 유저를 자동으로 큐에 넣지 않고, 이후 사용자의 명시적 `joinQueue` 요청이 있어야 `MATCHING`으로 전환됩니다.
   - 게임의 실제 진행 상태는 Redis가 아니라 DB `game_rooms`, `game_participants`를 기준으로 판단합니다.
 - **매칭 세션 (HASH)**: `match:session:{matchId}`
   - *특징*: 매칭 성사 후 수락/거절 상태를 관리하는 임시 데이터.
@@ -164,6 +166,8 @@ ACCEPTED + ACCEPTED
    action=GO_TO_GAME_WAITING
    game={gameRoomId, videoUrl, webSocketUrl}
 ```
+
+정상 종료 후에는 gameRoom 결과와 record/rank 정산이 DB 기준으로 완료된 뒤 `match:status:{userA/userB}=IN_GAME`만 best-effort로 제거합니다. `matching:queue:*`, `match:session:*`, `match:response:timeout:*`는 정상 종료 cleanup 대상이 아닙니다.
 
 gameRoom 생성에 실패하면 두 유저를 매칭 큐에 자동 복귀시키지 않습니다.
 서버는 실패 이벤트를 보내고, 클라이언트는 `GAME_SETUP_FAILED` reason에 대응하는 안내 문구를 표시한 뒤 start 버튼 화면으로 복귀합니다.

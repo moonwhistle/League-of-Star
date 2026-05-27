@@ -325,8 +325,8 @@ flowchart TD
 - `UserRankInfo`의 totalWins/totalLosses/totalDraws는 Step 9 정산에서 record 생성과 같은 transaction으로 반영한다.
 - 이번 이슈는 Step 7/8의 종료 결과를 바꾸지 않고, 확정된 결과를 record/rank로 반영하는 후처리다.
 - Step 9 정산은 즉시 호출과 복구 scheduler 조합으로 처리하고, DB outbox/event는 후속 범위로 둔다.
-- Redis `IN_GAME` cleanup은 후속 Issue 58, record/rank summary 조회 API는 후속 Issue 60, Apex 자동 승급/강등은 후속 Issue 59로 분리한다.
-- Apex/배치 매칭 정책 정합성은 후속 Issue 53/54로 분리한다.
+- Redis `IN_GAME` cleanup은 후속 Issue 54, record/rank summary 조회 API는 후속 Issue 60, Apex 자동 승급/강등은 후속 Issue 59로 분리한다.
+- Apex/배치 매칭 정책 정합성은 후속 이슈로 분리한다.
 
 
 -----

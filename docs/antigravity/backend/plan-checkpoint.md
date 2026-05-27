@@ -219,12 +219,12 @@ flowchart TD
 
 ### Step 10. 정상 종료 후 매칭 점유 상태 cleanup
 
-- [ ] `FINISHED` gameRoom 참가자의 Redis `match:status:{userId}=IN_GAME` 제거 지점 확정
-- [ ] record/rank 정산 성공 여부와 Redis cleanup transaction/실패 영향을 분리
-- [ ] Redis cleanup 실패가 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산을 rollback하지 않도록 처리
-- [ ] cleanup 실패 시 retry 또는 scheduler 기반 best-effort 복구 정책 정의
-- [ ] Step 13의 DB 기준 active gameRoom 검증과 충돌하지 않도록 FINISHED/ABORTED 유저 재매칭 허용 기준 정리
-- [ ] 정상 종료 후 유저가 다시 매칭 큐에 진입 가능한지 테스트 추가
+- [x] `FINISHED` gameRoom 참가자의 Redis `match:status:{userId}=IN_GAME` 제거 지점 확정
+- [x] record/rank 정산 성공 여부와 Redis cleanup transaction/실패 영향을 분리
+- [x] Redis cleanup 실패가 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산을 rollback하지 않도록 처리
+- [x] cleanup 실패 시 별도 cleanup scheduler를 추가하지 않고 기존 record/rank recovery 흐름에서 best-effort 재시도
+- [x] Step 13의 DB 기준 active gameRoom 검증과 충돌하지 않도록 FINISHED/ABORTED 유저 재매칭 허용 기준 정리
+- [x] 정상 종료 후 유저가 다시 매칭 큐에 진입 가능한지 테스트 추가
 
 ### Step 11. record/rank summary 조회 API
 
@@ -758,7 +758,7 @@ gameRoom 생성 실패 mapping:
 - record/rank 정산 실패가 gameRoom FINISHED 확정과 GAME_RESULT 전송을 rollback하지 않음
 - `GAME_RESULT` payload를 확장하지 않아도 record/rank 정산 저장 책임이 DB 기준으로 완료됨
 
-### Issue 58. 정상 종료 후 매칭 점유 상태 cleanup
+### Issue 54. 정상 종료 후 매칭 점유 상태 cleanup
 
 목표:
 
@@ -769,7 +769,7 @@ gameRoom 생성 실패 mapping:
 - `FINISHED` gameRoom 참가자의 `match:status:{userId}` cleanup 지점 정의
 - cleanup과 record/rank 정산 transaction 분리
 - Redis cleanup 실패가 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산을 rollback하지 않도록 처리
-- cleanup 실패 retry 또는 scheduler 기반 best-effort 복구 정책 정의
+- cleanup 실패 시 별도 cleanup scheduler를 두지 않고 기존 record/rank recovery 흐름에서 best-effort 재시도
 - Step 13의 DB active gameRoom 검증과 함께 FINISHED/ABORTED 유저 재매칭 허용 기준 정리
 - 정상 종료 후 재매칭 가능 여부 테스트 추가
 
@@ -777,7 +777,7 @@ gameRoom 생성 실패 mapping:
 
 - 정상 종료된 게임의 참가자는 Redis `IN_GAME` 상태에 갇히지 않음
 - Redis cleanup 실패가 DB gameRoom 결과와 record/rank 정산을 되돌리지 않음
-- cleanup 실패 이후에도 retry 또는 복구 scheduler로 재매칭 가능 상태가 회복됨
+- cleanup 실패 이후에도 기존 record/rank recovery 재시도 또는 Redis TTL 안전장치로 재매칭 가능 상태가 회복됨
 
 ### Issue 60. record/rank summary 조회 API
 
@@ -863,7 +863,7 @@ gameRoom 생성 실패 mapping:
 - Apex 유저끼리는 LP 근접도와 대기 시간 확장 정책에 따라 매칭됨
 - 일반 티어 유저 매칭 결과가 기존 정책과 동일하게 유지됨
 
-### Issue 54. 배치 유저 매칭 정책 정합성
+### Issue 58. 배치 유저 매칭 정책 정합성
 
 목표:
 
@@ -939,3 +939,5 @@ gameRoom 생성 실패 mapping:
 | 2026-05-22 | 매칭 정책 정합성 후속 항목으로 Step 10~14 및 Issue 53~57 추가. Apex, 배치, 진행 중 gameRoom DB 검증, match_found 후처리 복구, 동일 IP 셀프 매칭 방지 추적 |
 | 2026-05-24 | Step 9 / Issue 52 범위를 record/rank 정산 기준으로 상세화. `rankSeriesId`, `seriesType`, 누적 전적, transaction 분리, 멀티 인스턴스 멱등성, 복구 scheduler, `GAME_RESULT` payload 미확장 정책 반영 |
 | 2026-05-24 | 후속 구현 순서 재정리. Step 10 Redis `IN_GAME` cleanup, Step 11 record/rank summary 조회 API, Step 12 Apex rank 자동 승급/강등, Step 13~17 매칭 정책 보강 순서로 분리 |
+| 2026-05-27 | Step 10 정상 종료 후 매칭 점유 상태 cleanup 문서를 Issue 54로 생성하고, cleanup 범위를 Redis 전체 삭제가 아니라 `match:status:{userId}=IN_GAME` 해제로 고정 |
+| 2026-05-27 | Step 10 구현 결과를 policy/domain/matching 문서에 반영하고, 기존 배치 유저 매칭 정책 정합성 번호를 Issue 58로 조정해 Issue 54 중복 제거 |

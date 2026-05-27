@@ -14,6 +14,7 @@ import java.util.List;
 public class GameRecordRankSettlementRecoveryService {
 
     private final GameRecordRankSettlementService gameRecordRankSettlementService;
+    private final FinishedGameMatchStatusCleanupService finishedGameMatchStatusCleanupService;
 
     public void recoverUnsettledFinishedGameRooms() {
         List<Long> gameRoomIds = gameRecordRankSettlementService.findUnsettledFinishedGameRoomIds(
@@ -28,6 +29,10 @@ public class GameRecordRankSettlementRecoveryService {
             settleSafely(gameRoomId);
             return;
         }
+        if (recordCount == GameRecordConstants.SETTLED_RECORD_COUNT) {
+            cleanupSafely(gameRoomId);
+            return;
+        }
         if (recordCount != GameRecordConstants.SETTLED_RECORD_COUNT) {
             log.warn("Incomplete game record/rank settlement detected: gameRoomId={}, recordCount={}",
                     gameRoomId, recordCount);
@@ -40,8 +45,20 @@ public class GameRecordRankSettlementRecoveryService {
     private void settleSafely(Long gameRoomId) {
         try {
             gameRecordRankSettlementService.settleFinishedGameRoom(gameRoomId);
+            cleanupSafely(gameRoomId);
         } catch (RuntimeException e) {
             log.warn("Failed to recover game record/rank settlement: gameRoomId={}", gameRoomId, e);
+        }
+    }
+
+    /**
+     * match status cleanup 실패는 다음 recovery 후보 처리를 막지 않도록 로그만 남깁니다.
+     */
+    private void cleanupSafely(Long gameRoomId) {
+        try {
+            finishedGameMatchStatusCleanupService.cleanupIfSettled(gameRoomId);
+        } catch (RuntimeException e) {
+            log.warn("Failed to recover finished game match status cleanup: gameRoomId={}", gameRoomId, e);
         }
     }
 }

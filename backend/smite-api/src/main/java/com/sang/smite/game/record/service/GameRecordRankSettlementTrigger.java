@@ -14,6 +14,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class GameRecordRankSettlementTrigger {
 
     private final GameRecordRankSettlementService gameRecordRankSettlementService;
+    private final FinishedGameMatchStatusCleanupService finishedGameMatchStatusCleanupService;
 
     /**
      * gameRoom 종료 transaction commit 이후 record/rank 정산을 요청합니다.
@@ -44,6 +45,7 @@ public class GameRecordRankSettlementTrigger {
     private void settleSafely(GameRecordRankSettlementCommand command) {
         try {
             gameRecordRankSettlementService.settleFinishedGameRoom(command.gameRoomId());
+            finishedGameMatchStatusCleanupService.cleanupIfSettled(command.gameRoomId());
         } catch (RuntimeException e) {
             log.warn(
                     "Failed to settle game record/rank: gameRoomId={}, result={}, winnerId={}, recordCount={}",
