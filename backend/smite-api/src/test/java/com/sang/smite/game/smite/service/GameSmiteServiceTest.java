@@ -10,6 +10,7 @@ import com.sang.smite.domain.game.service.GameActionSaveResult;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
 import com.sang.smite.domain.game.service.GameSmiteJudgementService;
 import com.sang.smite.game.end.service.GameEndDeadlineAdvanceService;
+import com.sang.smite.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.smite.game.result.service.GameResultPayloadFactory;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +44,8 @@ class GameSmiteServiceTest {
     private final GameSmiteJudgementService gameSmiteJudgementService = mock(GameSmiteJudgementService.class);
     private final GameEndDeadlineAdvanceService gameEndDeadlineAdvanceService =
             mock(GameEndDeadlineAdvanceService.class);
+    private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger =
+            mock(GameRecordRankSettlementTrigger.class);
     private final GameResultPayloadFactory gameResultPayloadFactory = new GameResultPayloadFactory();
     private final Clock clock = Clock.fixed(FINISHED_AT, ZoneOffset.UTC);
     private final GameSmiteService service = new GameSmiteService(
@@ -51,6 +54,7 @@ class GameSmiteServiceTest {
             gameActionCommandService,
             gameSmiteJudgementService,
             gameEndDeadlineAdvanceService,
+            gameRecordRankSettlementTrigger,
             gameResultPayloadFactory,
             clock
     );
@@ -115,6 +119,7 @@ class GameSmiteServiceTest {
         inOrder.verify(gameSmiteJudgementService).judge(gameRoom, USER_ID, SERVER_RECEIVE_TIME_MS, List.of());
         inOrder.verify(gameActionCommandService).saveIfAbsent(action);
         verify(gameEndDeadlineAdvanceService).advanceAfterFailedSmite(gameRoom, List.of(action));
+        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(gameRoom);
     }
 
     @Test
@@ -154,6 +159,7 @@ class GameSmiteServiceTest {
         assertThat(result.get().gameResult().reason()).isEqualTo("SMITE_KILL");
         assertThat(result.get().gameResult().finishedAt()).isEqualTo(FINISHED_AT.toEpochMilli());
         assertThat(result.get().gameResult().actions()).hasSize(1);
+        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(finishedRoom);
         verify(gameEndDeadlineAdvanceService, never()).advanceAfterFailedSmite(lockedRoom, List.of(action));
     }
 
@@ -198,6 +204,7 @@ class GameSmiteServiceTest {
         assertThat(result.get().gameResult().reason()).isEqualTo("BOTH_SMITES_USED_DRAW");
         assertThat(result.get().gameResult().finishedAt()).isEqualTo(FINISHED_AT.toEpochMilli());
         assertThat(result.get().gameResult().actions()).hasSize(2);
+        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(finishedRoom);
         verify(gameEndDeadlineAdvanceService, never())
                 .advanceAfterFailedSmite(lockedRoom, List.of(firstAction, secondAction));
     }
@@ -226,6 +233,7 @@ class GameSmiteServiceTest {
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.PLAYER1_WIN);
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
         assertThat(result.get().gameResult().reason()).isEqualTo("SMITE_KILL");
+        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
     }
 
     @Test
@@ -252,6 +260,7 @@ class GameSmiteServiceTest {
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.DRAW);
         assertThat(result.get().gameResult().winnerUserId()).isNull();
         assertThat(result.get().gameResult().reason()).isEqualTo("NATURAL_DEATH_DRAW");
+        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
     }
 
     @Test

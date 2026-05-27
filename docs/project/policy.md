@@ -151,7 +151,7 @@
 - 자연사 종료 정산은 DB gameRoom 결과 확정을 먼저 수행하고, 연결된 local WebSocket session이 있으면 `GAME_RESULT`를 보낸다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
 - 자연사 종료 후 pending cleanup은 WebSocket 전송 성공의 의미가 아니라 DB 기준으로 정산 완료된 후보를 제거하는 의미다. cleanup을 생략하면 이미 종료된 gameRoom이 scheduler tick마다 반복 조회될 수 있다.
 - `GAME_RESULT.reason`은 종료 사유에 따라 `SMITE_KILL`, `BOTH_SMITES_USED_DRAW`, `NATURAL_DEATH_DRAW`를 사용한다.
-- record/LP/배치/승급전 반영은 gameRoom 결과 확정 및 `GAME_RESULT` 전송 흐름과 분리한다. 현재 서버 종료 보장 범위에서는 `game_rooms`/`game_participants` 결과 확정까지만 수행하고, `game_records` 생성과 LP 반영은 후속 Step 9에서 처리한다.
+- record/LP/배치/승급전 반영은 gameRoom 결과 확정 및 `GAME_RESULT` 전송 흐름과 분리한다. `game_rooms`/`game_participants` 결과 확정 이후 Step 9 record/rank 정산이 `game_records` 생성과 LP/RankSeries 반영을 별도 transaction으로 처리한다.
 
 ### 2.5 서버 권위 타임스탬프 (공정성 핵심)
 
@@ -230,7 +230,26 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 - 결과가 확정되지 않은 SMITE는 중간 응답을 전송하지 않는다.
 - SMITE로 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
 - 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 session에 `GAME_RESULT`만 재응답한다.
-- record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리한다. `game_records` 생성, LP 반영, 배치/승급전 처리는 후속 Step 9에서 확정된 gameRoom 결과를 기준으로 수행한다.
+- record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리한다. `game_records` 생성, LP 반영, 배치/승급전 처리는 Step 9 record/rank 정산에서 확정된 gameRoom 결과를 기준으로 수행한다.
+
+#### Step 9 record/rank 정산 정책
+
+- `game_rooms.status/result/winnerId`가 게임 결과의 source of truth다.
+- gameRoom 종료 확정 transaction과 record/rank 정산 transaction은 분리한다.
+- record/rank 정산 실패는 gameRoom `FINISHED` 확정과 `GAME_RESULT` 전송을 rollback하지 않는다.
+- `GAME_RESULT`는 게임 종료 즉시 알림으로 유지하고 LP/rank/series delta를 포함하지 않는다.
+- 클라이언트 최종 결과 화면의 LP/rank/series 정보는 후속 Step 11의 별도 record/rank summary 조회 API에서 처리한다.
+- Step 7/8에서 새로 `FINISHED` 된 gameRoom만 record/rank 정산을 즉시 호출한다.
+- 이미 `FINISHED`였던 current result 재응답, scheduler no-op, `ABORTED` 흐름에서는 record/rank 정산을 호출하지 않는다.
+- 멀티 인스턴스 환경에서 record/rank 정산은 local memory에 의존하지 않고 DB row lock, `countByGameRoomId`, `uk_game_records_room_user` unique constraint를 기준으로 멱등성을 보장한다.
+- record/rank 정산 내부에서는 `game_records` 2행 생성, `UserRankInfo` 누적 승/패/무, LP, `RankSeries` 반영을 같은 transaction으로 처리한다.
+- `countByGameRoomId == 0`이면 정산을 수행하고, `2`이면 완료로 보고 no-op 처리한다.
+- `countByGameRoomId == 1`은 불완전 정산 상태로 보고 자동 보정하지 않으며 로깅/알림 또는 운영 복구 대상으로 둔다.
+- FINISHED인데 record count가 2가 아닌 gameRoom은 복구 scheduler가 재조회한다. 단, 자동 재정산은 `count == 0` 대상에 한정한다.
+- `game_records.seriesType`은 `RANK`, `PLACEMENT`, `PROMOTION`으로 저장한다.
+- `RANK` record는 `rankSeriesId`를 비워두고 일반 LP 계산과 승급전 진입/강등 정책을 적용한다.
+- `PLACEMENT` record는 진행 중인 `RankSeries` id를 `rankSeriesId`에 저장하고, LP를 계산하지 않으며 배치 완료 시 최종 rank/LP를 배정한다.
+- `PROMOTION` record는 진행 중인 `RankSeries` id를 `rankSeriesId`에 저장하고, LP를 동결하며 성공 시 `targetRank` LP 0, 실패 시 기존 rank LP 75를 반영한다.
 
 ### 2.6 조작 방지
 
@@ -314,7 +333,7 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 
 *   **Tier_Level**: Iron(1), Bronze(2), Silver(3), Gold(4), Platinum(5), Emerald(6), Diamond(7)
 *   **Division_Value**: I(1), II(2), III(3), IV(4)
-*   **특이사항**: Master 이상의 Apex 티어는 별도의 LP 기반 점수를 사용합니다.
+*   **특이사항**: Master 이상의 Apex 티어는 디비전 없이 `tierScore` 29 이상을 사용합니다. LP 증감은 일반 공식과 동일하게 계산하고, 매칭 후보 탐색만 LP 근접도 기준을 사용합니다.
 
 **계산 예시:**
 *   **Iron IV**: (1 - 1) * 4 + (4 - 4) + 1 = **1점**
@@ -334,7 +353,7 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 
 | 구간 | LP 계산 |
 |------|---------|
-| **Master** | 동일 공식 적용 (gap은 상대 Master LP와의 차이를 100 LP당 ±1로 환산) |
+| **Master+** | 일반 티어와 동일한 LP 증감 공식 적용 |
 | **LP 200 도달** | Grandmaster 자동 승급 |
 | **LP 500 도달** | Challenger 자동 승급 |
 | **LP 200 미만 하락 (GM)** | Master로 자동 강등 |
@@ -402,15 +421,7 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | **디비전 강등** | LP 0에서 패배 시 이전 디비전 LP 75로 강등 |
 | **티어 강등** | LP 0에서 패배 시 이전 티어 I 디비전 LP 75로 강등 (예: Gold IV → Silver I, LP 75) |
 
-### 4.3 강등 보호
-
-| 규칙 | 내용 |
-|------|------|
-| **승급 직후 보호** | 승급 성공 후 **3패**까지 강등 보호 (LP 0 이하로 내려가도 강등 없음) |
-| **보호 소진** | 3패 소진 또는 다음 승리 시 보호 해제 |
-| **Iron IV 바닥** | Iron IV LP 0에서 패배 시 LP 0 유지 (더 이상 강등 없음) |
-
-### 4.4 Apex 티어 승급
+### 4.3 Apex 티어 승급
 
 | 구간 | 방식 |
 |------|------|
@@ -418,7 +429,7 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | **Master → Grandmaster** | LP 200 도달 시 **자동 승급** (승급전 없음) |
 | **Grandmaster → Challenger** | LP 500 도달 시 **자동 승급** (승급전 없음) |
 
-### 4.5 Apex 티어 강등
+### 4.4 Apex 티어 강등
 
 | 구간 | 조건 |
 |------|------|

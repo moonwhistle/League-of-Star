@@ -2,7 +2,6 @@ package com.sang.smite.domain.rank.domain;
 
 import com.sang.smite.domain.rank.domain.vo.Rank;
 import com.sang.smite.domain.rank.domain.vo.SeriesStatus;
-import com.sang.smite.domain.rank.domain.vo.SeriesType;
 import com.sang.smite.domain.rank.domain.vo.Tier;
 import com.sang.smite.domain.rank.domain.vo.Division;
 import org.junit.jupiter.api.DisplayName;
@@ -67,5 +66,21 @@ class RankSeriesTest {
         // then
         assertThat(series.getStatus()).isEqualTo(SeriesStatus.FAILED);
         assertThat(series.getLosses()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Promotion - 남은 판으로 2승이 불가능하면 FAILED 상태가 된다")
+    void promotion_FailureWhenTwoWinsImpossible() {
+        // given
+        Rank targetRank = Rank.of(Tier.GOLD, Division.IV);
+        RankSeries series = RankSeries.createPromotion(TEST_USER_ID, targetRank);
+
+        // when
+        series.addDraw();
+        series.addDraw();
+
+        // then
+        assertThat(series.getStatus()).isEqualTo(SeriesStatus.FAILED);
+        assertThat(series.getDraws()).isEqualTo(2);
     }
 }

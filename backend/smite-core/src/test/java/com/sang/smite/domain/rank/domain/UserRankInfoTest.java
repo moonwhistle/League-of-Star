@@ -3,6 +3,7 @@ package com.sang.smite.domain.rank.domain;
 import com.sang.smite.domain.rank.domain.vo.Division;
 import com.sang.smite.domain.rank.domain.vo.Rank;
 import com.sang.smite.domain.rank.domain.vo.Tier;
+import com.sang.smite.domain.record.domain.vo.GameRecordResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -54,5 +55,40 @@ class UserRankInfoTest {
 
         // then
         assertThat(score).isEqualTo(12);
+    }
+
+    @Test
+    @DisplayName("applyRecordResult - WIN/LOSS/DRAW 누적 전적을 캡슐화해서 반영한다")
+    void applyRecordResult() {
+        // given
+        UserRankInfo rankInfo = UserRankInfo.builder()
+                .build();
+
+        // when
+        rankInfo.applyRecordResult(GameRecordResult.WIN);
+        rankInfo.applyRecordResult(GameRecordResult.LOSS);
+        rankInfo.applyRecordResult(GameRecordResult.DRAW);
+
+        // then
+        assertThat(rankInfo.getTotalWins()).isEqualTo(1);
+        assertThat(rankInfo.getTotalLosses()).isEqualTo(1);
+        assertThat(rankInfo.getTotalDraws()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("updateRankAndLp - 랭크와 LP를 함께 갱신한다")
+    void updateRankAndLp() {
+        // given
+        UserRankInfo rankInfo = UserRankInfo.builder()
+                .rank(Rank.of(Tier.IRON, Division.IV))
+                .lp(10)
+                .build();
+
+        // when
+        rankInfo.updateRankAndLp(Rank.of(Tier.BRONZE, Division.I), 75);
+
+        // then
+        assertThat(rankInfo.getRank()).isEqualTo(Rank.of(Tier.BRONZE, Division.I));
+        assertThat(rankInfo.getLp()).isEqualTo(75);
     }
 }

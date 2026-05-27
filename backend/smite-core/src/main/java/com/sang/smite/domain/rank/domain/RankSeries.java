@@ -126,10 +126,11 @@ public class RankSeries extends BaseEntity {
         } else if (type == SeriesType.PROMOTION) {
             // 3판 2선승제 계산: (3 / 2) + 1 = 2
             int threshold = (totalGamesRequired / 2) + 1;
+            int remainingGames = totalGamesRequired - currentGames;
             
             if (wins >= threshold) {
                 complete(SeriesStatus.SUCCESS);
-            } else if (losses >= threshold) {
+            } else if (losses >= threshold || wins + remainingGames < threshold) {
                 complete(SeriesStatus.FAILED);
             }
         }

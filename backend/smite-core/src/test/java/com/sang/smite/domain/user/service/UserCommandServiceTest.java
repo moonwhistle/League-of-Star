@@ -1,5 +1,7 @@
 package com.sang.smite.domain.user.service;
 
+import com.sang.smite.common.exception.CoreErrorCode;
+import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.rank.service.RankCommandService;
 import com.sang.smite.domain.user.domain.User;
 import com.sang.smite.domain.user.repository.UserRepository;
@@ -10,7 +12,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
@@ -56,5 +61,36 @@ class UserCommandServiceTest {
         
         verify(userRepository, times(1)).save(any(User.class));
         verify(rankCommandService, times(1)).initializeRank(TEST_USER_ID);
+    }
+
+    @Test
+    @DisplayName("updatePasswordByEmail - 이메일로 유저를 찾아 비밀번호를 변경한다")
+    void updatePasswordByEmail_Success() {
+        // given
+        User user = User.builder()
+                .id(TEST_USER_ID)
+                .email(TEST_EMAIL)
+                .password("oldPassword")
+                .nickname(TEST_NICKNAME)
+                .build();
+        given(userRepository.findByEmail(TEST_EMAIL)).willReturn(Optional.of(user));
+
+        // when
+        userCommandService.updatePasswordByEmail(TEST_EMAIL, ENCODED_PASSWORD);
+
+        // then
+        assertThat(user.getPassword()).isEqualTo(ENCODED_PASSWORD);
+    }
+
+    @Test
+    @DisplayName("updatePasswordByEmail - 유저가 없으면 USER_NOT_FOUND 예외를 던진다")
+    void updatePasswordByEmail_UserNotFound() {
+        // given
+        given(userRepository.findByEmail(TEST_EMAIL)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> userCommandService.updatePasswordByEmail(TEST_EMAIL, ENCODED_PASSWORD))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.USER_NOT_FOUND));
     }
 }

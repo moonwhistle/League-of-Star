@@ -200,13 +200,61 @@ flowchart TD
 
 ### Step 9. 게임 종료와 기록
 
-- [ ] 승패/무승부 확정
-- [ ] `game_rooms` 상태 FINISHED
-- [ ] `game_participants` 상태 FINISHED
-- [ ] `game_records` 2행 생성
-- [ ] LP/배치/승급전 반영 연결
+- [x] Step 7/8에서 확정한 `game_rooms.status/result/winnerId`를 record/rank 정산의 source of truth로 사용
+- [x] gameRoom 종료 확정 transaction과 record/rank 정산 transaction 분리
+- [x] 새로 `FINISHED` 된 gameRoom에 대해서만 즉시 record/rank 정산 호출
+- [x] 이미 FINISHED인 current result 재응답, scheduler no-op, ABORTED 흐름에서는 record/rank 정산 미호출
+- [x] 멀티 인스턴스 환경에서 local memory가 아니라 DB row lock, record count, unique constraint 기준으로 정산 멱등성 보장
+- [x] `game_records` 2행 생성
+- [x] `GameRecord`의 `promotionSeriesId`/`isPromotionGame`을 `rankSeriesId`/`seriesType`으로 전환
+- [x] `seriesType=RANK/PLACEMENT/PROMOTION`으로 일반 랭크, 배치, 승급전을 명시
+- [x] `UserRankInfo` 누적 승/패/무 반영
+- [x] 일반 RANK 게임 WIN/LOSS/DRAW LP 반영
+- [x] 배치 RankSeries 반영 및 10판 완료 시 최종 rank/LP 배정
+- [x] 승급전 RankSeries 반영 및 성공/실패 시 rank/LP 확정
+- [x] record/rank 정산 내부에서 record 생성, 누적 전적, LP, RankSeries 반영을 같은 transaction으로 처리
+- [x] `countByGameRoomId == 0/2/1` 기준 멱등성 및 불완전 정산 정책 구현
+- [x] FINISHED인데 record count가 2가 아닌 gameRoom을 복구하는 scheduler 추가
+- [x] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, record/rank summary 조회 API는 후속 Step 11로 분리
 
-### Step 10. Apex 티어 매칭 정책 정합성
+### Step 10. 정상 종료 후 매칭 점유 상태 cleanup
+
+- [ ] `FINISHED` gameRoom 참가자의 Redis `match:status:{userId}=IN_GAME` 제거 지점 확정
+- [ ] record/rank 정산 성공 여부와 Redis cleanup transaction/실패 영향을 분리
+- [ ] Redis cleanup 실패가 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산을 rollback하지 않도록 처리
+- [ ] cleanup 실패 시 retry 또는 scheduler 기반 best-effort 복구 정책 정의
+- [ ] Step 13의 DB 기준 active gameRoom 검증과 충돌하지 않도록 FINISHED/ABORTED 유저 재매칭 허용 기준 정리
+- [ ] 정상 종료 후 유저가 다시 매칭 큐에 진입 가능한지 테스트 추가
+
+### Step 11. record/rank summary 조회 API
+
+- [ ] gameRoomId 기준 record/rank summary 조회 endpoint 설계
+- [ ] 조회 API는 정산 완료 후 `myResult`, `lpBefore/After/Change`, `rankBefore/After`, `seriesType`, `rankSeriesId`, 배치/승급전 상태를 반환
+- [ ] `GAME_RESULT` payload는 확장하지 않고 최종 결과 화면에서 별도 조회 API를 호출하도록 계약 정리
+- [ ] record/rank 정산 미완료 상태 조회 시 `PENDING` 또는 재시도 가능한 응답 정책 정의
+- [ ] participant가 아닌 유저의 결과 조회를 차단
+- [ ] 클라이언트 최종 결과 화면에 필요한 응답 DTO와 문서 테스트 추가
+
+### Step 12. Apex rank 자동 승급/강등 정산
+
+- [ ] Apex 유저도 LP 증감량은 일반 `Rank.calculateWinLp`, `Rank.calculateLossLp` 공식을 재사용
+- [ ] Master LP 200 도달 시 Grandmaster로 자동 승급
+- [ ] Grandmaster LP 500 도달 시 Challenger로 자동 승급
+- [ ] Challenger LP 500 미만 하락 시 Grandmaster로 자동 강등
+- [ ] Grandmaster LP 200 미만 하락 시 Master로 자동 강등
+- [ ] Master LP 0에서 패배 시 Diamond I LP 75로 강등
+- [ ] Apex 자동 승급/강등 전후 `rankBefore/rankAfter`, `lpBefore/lpAfter` record snapshot 검증
+- [ ] 일반 티어 승급전 정책과 Apex 자동 승급/강등 정책이 충돌하지 않는지 테스트 추가
+
+### Step 13. 큐 진입 전 진행 중 gameRoom DB 검증
+
+- [ ] `joinQueue` 전에 DB 기준 진행 중 gameRoom 존재 여부를 조회
+- [ ] Redis `match:status:{userId}`만으로 중복 진입을 판단하지 않도록 보강
+- [ ] READY/IN_PROGRESS gameRoom이 있으면 매칭 큐 진입 차단
+- [ ] FINISHED/ABORTED gameRoom은 큐 진입을 막지 않도록 상태 기준 명확화
+- [ ] Redis TTL 만료 또는 cleanup 실패 이후에도 DB source of truth 기준으로 재진입을 막는 테스트 추가
+
+### Step 14. Apex 티어 매칭 정책 정합성
 
 - [ ] Master+ 유저가 현재 `matching:queue:29+`에 들어갈 수 있는지 확인
 - [ ] 매칭 엔진 스캔 범위가 Apex 큐를 누락하지 않도록 조정
@@ -215,7 +263,7 @@ flowchart TD
 - [ ] 일반 티어 `1~28` 매칭과 Apex 매칭이 서로 충돌하지 않도록 queue key/score 정책 정리
 - [ ] Apex 매칭 테스트 추가
 
-### Step 11. 배치 유저 매칭 정책 정합성
+### Step 15. 배치 유저 매칭 정책 정합성
 
 - [ ] `RankSeries.type=PLACEMENT` 진행 중인 유저를 큐 진입 시 식별
 - [ ] 배치 유저는 Silver IV ~ Gold IV 구간 유저와 매칭되도록 후보 범위 정책 구현
@@ -223,15 +271,7 @@ flowchart TD
 - [ ] 배치 유저와 일반 유저가 매칭될 때 opponent profile/payload에 표시할 rank 정책 확인
 - [ ] 배치 유저 매칭 테스트 추가
 
-### Step 12. 큐 진입 전 진행 중 gameRoom DB 검증
-
-- [ ] `joinQueue` 전에 DB 기준 진행 중 gameRoom 존재 여부를 조회
-- [ ] Redis `match:status:{userId}`만으로 중복 진입을 판단하지 않도록 보강
-- [ ] READY/IN_PROGRESS gameRoom이 있으면 매칭 큐 진입 차단
-- [ ] FINISHED/ABORTED gameRoom은 큐 진입을 막지 않도록 상태 기준 명확화
-- [ ] Redis TTL 만료 또는 cleanup 실패 이후에도 DB source of truth 기준으로 재진입을 막는 테스트 추가
-
-### Step 13. match_found 후처리 실패 복구
+### Step 16. match_found 후처리 실패 복구
 
 - [ ] queue 원자 제거 이후 user status/session/timeout/event 발행 중 실패 가능한 지점 정리
 - [ ] user status `FOUND` 갱신 실패 시 두 유저 큐 복귀 또는 상태 정리 정책 정의
@@ -240,7 +280,7 @@ flowchart TD
 - [ ] `match_found` Pub/Sub 발행 실패 시 재발행/조회 기반 복구/로그 격리 중 정책 결정
 - [ ] 후처리 실패 복구 테스트 추가
 
-### Step 14. 동일 IP 셀프 매칭 방지
+### Step 17. 동일 IP 셀프 매칭 방지
 
 - [ ] 매칭 큐 진입 시 요청 IP 또는 셀프 매칭 방지용 식별자를 ticket에 포함할지 결정
 - [ ] proxy/load balancer 환경에서 신뢰할 IP header 정책 정의
@@ -556,7 +596,7 @@ gameRoom 생성 실패 mapping:
 - `match_response_result.game.videoUrl`이 같은 URL을 반환
 - 실제 MP4 파일 없이도 테스트 통과
 
-### Issue 38. 게임 대기 WebSocket 연결
+### Issue 40. 게임 대기 WebSocket 연결
 
 목표:
 
@@ -577,7 +617,7 @@ gameRoom 생성 실패 mapping:
 - 양쪽 READY 상태를 서버가 식별 가능
 - 양쪽 READY 상태가 되어도 이번 이슈에서는 GAME_START를 전송하지 않음
 
-### Issue 39. 게임 대기 timeout 정산
+### Issue 42. 게임 대기 timeout 정산
 
 목표:
 
@@ -695,21 +735,113 @@ gameRoom 생성 실패 mapping:
 
 목표:
 
-- 게임 결과를 확정하고 기록/랭크 반영으로 연결한다.
+- Step 7/8에서 이미 확정된 gameRoom 결과를 기준으로 전적 기록과 랭크 정산을 멱등하게 연결한다.
 
 범위:
 
-- 승패/무승부 확정
-- `game_rooms` FINISHED
-- `game_participants` FINISHED
-- `game_records` 2행 생성
-- LP/배치/승급전 반영 유스케이스 연결
+- `FINISHED` gameRoom 결과를 참가자 관점 `WIN`/`LOSS`/`DRAW` record로 변환
+- `game_records` 2행 생성 및 `uk_game_records_room_user` 기반 중복 방어
+- `promotionSeriesId`/`isPromotionGame`을 `rankSeriesId`/`seriesType`으로 전환
+- `seriesType=RANK/PLACEMENT/PROMOTION` 정책 적용
+- `UserRankInfo` totalWins/totalLosses/totalDraws 반영
+- 일반 RANK LP 반영, 배치 완료 rank 배정, 승급전 성공/실패 반영
+- gameRoom 종료 transaction과 record/rank 정산 transaction 분리
+- 새로 FINISHED 된 gameRoom 즉시 정산 및 FINISHED 미정산 gameRoom 복구 scheduler
+- 멀티 인스턴스 환경에서 DB row lock, record count, unique constraint 기반 멱등성 보장
+- `GAME_RESULT` payload 미확장, record/rank summary 조회 API는 후속 Issue 60으로 분리
 
 완료 기준:
 
 - 한 판 종료 후 두 참가자의 game record가 생성됨
-- 결과에 따라 랭크 관련 상태가 갱신됨
-- 클라이언트가 최종 결과 화면에 필요한 정보를 받을 수 있음
+- 같은 gameRoom을 중복 정산해도 record/rank가 중복 반영되지 않음
+- 결과에 따라 누적 전적, LP, 배치/승급전 상태가 정책대로 갱신됨
+- record/rank 정산 실패가 gameRoom FINISHED 확정과 GAME_RESULT 전송을 rollback하지 않음
+- `GAME_RESULT` payload를 확장하지 않아도 record/rank 정산 저장 책임이 DB 기준으로 완료됨
+
+### Issue 58. 정상 종료 후 매칭 점유 상태 cleanup
+
+목표:
+
+- 정상 종료된 gameRoom 참가자의 Redis `IN_GAME` 점유 상태를 해제해 재매칭 가능 상태로 복구한다.
+
+범위:
+
+- `FINISHED` gameRoom 참가자의 `match:status:{userId}` cleanup 지점 정의
+- cleanup과 record/rank 정산 transaction 분리
+- Redis cleanup 실패가 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산을 rollback하지 않도록 처리
+- cleanup 실패 retry 또는 scheduler 기반 best-effort 복구 정책 정의
+- Step 13의 DB active gameRoom 검증과 함께 FINISHED/ABORTED 유저 재매칭 허용 기준 정리
+- 정상 종료 후 재매칭 가능 여부 테스트 추가
+
+완료 기준:
+
+- 정상 종료된 게임의 참가자는 Redis `IN_GAME` 상태에 갇히지 않음
+- Redis cleanup 실패가 DB gameRoom 결과와 record/rank 정산을 되돌리지 않음
+- cleanup 실패 이후에도 retry 또는 복구 scheduler로 재매칭 가능 상태가 회복됨
+
+### Issue 60. record/rank summary 조회 API
+
+목표:
+
+- `GAME_RESULT` payload를 확장하지 않고, 최종 결과 화면에 필요한 record/rank 정보를 별도 조회 API로 제공한다.
+
+범위:
+
+- gameRoomId 기준 record/rank summary 조회 endpoint 설계
+- 참가자 본인 관점 `myResult`, `lpBefore`, `lpAfter`, `lpChange`, `rankBefore`, `rankAfter` 반환
+- `seriesType`, `rankSeriesId`, 배치/승급전 진행 상태 반환
+- record/rank 정산 미완료 상태에 대한 `PENDING` 또는 재시도 가능한 응답 정책 정의
+- participant가 아닌 유저의 결과 조회 차단
+- `docs/project/websocket client.md`와 API 문서에 `GAME_RESULT` 후 별도 조회 흐름 반영
+
+완료 기준:
+
+- 클라이언트가 `GAME_RESULT` 수신 후 별도 API로 최종 결과 화면 정보를 조회할 수 있음
+- 정산 완료 전 조회는 명시적인 pending/재시도 응답으로 처리됨
+- `GAME_RESULT` payload에는 LP/rank/series 정보가 추가되지 않음
+
+### Issue 59. Apex rank 자동 승급/강등 정산
+
+목표:
+
+- Apex 티어의 LP 기준 자동 승급/강등을 game result 정산 이후 랭크 정책으로 반영한다.
+
+범위:
+
+- Apex 유저도 LP 증감량은 일반 `Rank.calculateWinLp`, `Rank.calculateLossLp` 공식 재사용
+- Master LP 200 도달 시 Grandmaster 자동 승급
+- Grandmaster LP 500 도달 시 Challenger 자동 승급
+- Challenger LP 500 미만 하락 시 Grandmaster 자동 강등
+- Grandmaster LP 200 미만 하락 시 Master 자동 강등
+- Master LP 0에서 패배 시 Diamond I LP 75 강등
+- Apex 자동 승급/강등 전후 record snapshot 정합성 검증
+- 일반 티어 승급전 정책과 Apex 자동 승급/강등 정책의 경계 테스트 추가
+
+완료 기준:
+
+- Apex 유저의 LP 변화 후 자동 승급/강등이 정책대로 반영됨
+- Apex LP 증감 공식은 일반 랭크 공식과 동일하게 유지됨
+- record의 `rankBefore/rankAfter`, `lpBefore/lpAfter`가 Apex 자동 변동 결과를 정확히 남김
+
+### Issue 55. 큐 진입 전 진행 중 gameRoom DB 검증
+
+목표:
+
+- Redis status만이 아니라 DB gameRoom 상태 기준으로 진행 중 게임 유저의 큐 재진입을 차단한다.
+
+범위:
+
+- `joinQueue` 전 userId 기준 활성 gameRoom 조회 유스케이스 추가
+- READY/IN_PROGRESS 상태의 gameRoom이 있으면 큐 진입 차단
+- FINISHED/ABORTED 상태는 큐 진입 차단 대상에서 제외
+- Redis `match:status` TTL 만료 또는 cleanup 실패 케이스 보강
+- API/matching 경계에서 DB 조회 책임 위치 결정
+
+완료 기준:
+
+- Redis status가 비어 있어도 DB에 활성 gameRoom이 있으면 큐 진입 실패
+- 종료/중단된 gameRoom만 있으면 큐 진입 가능
+- 기존 중복 큐 진입 차단 정책이 유지됨
 
 ### Issue 53. Apex 티어 매칭 정책 정합성
 
@@ -750,26 +882,6 @@ gameRoom 생성 실패 mapping:
 - 배치 진행 중 유저가 정책 범위 밖 유저와 매칭되지 않음
 - 배치 유저와 일반 유저 매칭이 기존 accept/reject/timeout 흐름과 동일하게 동작함
 - 배치가 아닌 유저의 기존 매칭 범위가 깨지지 않음
-
-### Issue 55. 큐 진입 전 진행 중 gameRoom DB 검증
-
-목표:
-
-- Redis status만이 아니라 DB gameRoom 상태 기준으로 진행 중 게임 유저의 큐 재진입을 차단한다.
-
-범위:
-
-- `joinQueue` 전 userId 기준 활성 gameRoom 조회 유스케이스 추가
-- READY/IN_PROGRESS 상태의 gameRoom이 있으면 큐 진입 차단
-- FINISHED/ABORTED 상태는 큐 진입 차단 대상에서 제외
-- Redis `match:status` TTL 만료 또는 cleanup 실패 케이스 보강
-- API/matching 경계에서 DB 조회 책임 위치 결정
-
-완료 기준:
-
-- Redis status가 비어 있어도 DB에 활성 gameRoom이 있으면 큐 진입 실패
-- 종료/중단된 gameRoom만 있으면 큐 진입 가능
-- 기존 중복 큐 진입 차단 정책이 유지됨
 
 ### Issue 56. match_found 후처리 실패 복구
 
@@ -822,6 +934,8 @@ gameRoom 생성 실패 mapping:
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 및 성공 SSE 발행 금지 정책 반영 |
 | 2026-05-13 | 게임 대기 WebSocket 미접속/READY timeout 정책과 GAME_START 전후 이탈 처리 분리 반영 |
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
-| 2026-05-18 | 게임 대기 timeout 정산을 Step 4 / Issue 39로 분리하고, GAME_START 이후 WebSocket 연결 유무와 무관하게 gameRoom 종료를 보장하는 서버 timer/scheduler step을 Issue 42로 정리 |
+| 2026-05-18 | 게임 대기 timeout 정산을 Step 4 / Issue 42로 분리하고, GAME_START 이후 WebSocket 연결 유무와 무관하게 gameRoom 종료를 보장하는 서버 timer/scheduler step을 Issue 50으로 정리 |
 | 2026-05-19 | Step 4 게임 대기 timeout 정산 구현 완료 상태, gameRoom `createdAt + 30초`, participants `ABORTED`, Pub/Sub 복귀 이벤트 정책 반영 |
 | 2026-05-22 | 매칭 정책 정합성 후속 항목으로 Step 10~14 및 Issue 53~57 추가. Apex, 배치, 진행 중 gameRoom DB 검증, match_found 후처리 복구, 동일 IP 셀프 매칭 방지 추적 |
+| 2026-05-24 | Step 9 / Issue 52 범위를 record/rank 정산 기준으로 상세화. `rankSeriesId`, `seriesType`, 누적 전적, transaction 분리, 멀티 인스턴스 멱등성, 복구 scheduler, `GAME_RESULT` payload 미확장 정책 반영 |
+| 2026-05-24 | 후속 구현 순서 재정리. Step 10 Redis `IN_GAME` cleanup, Step 11 record/rank summary 조회 API, Step 12 Apex rank 자동 승급/강등, Step 13~17 매칭 정책 보강 순서로 분리 |

@@ -3,6 +3,7 @@ package com.sang.smite.game.end.service;
 import com.sang.smite.domain.game.service.GameNaturalDeathSettlementResult;
 import com.sang.smite.domain.game.service.GameNaturalDeathSettlementService;
 import com.sang.smite.game.end.common.constant.GameEndConstants;
+import com.sang.smite.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.smite.game.result.dto.GameResultPayload;
 import com.sang.smite.game.result.service.GameResultPayloadFactory;
 import com.sang.smite.game.result.service.GameResultWebSocketSender;
@@ -23,6 +24,7 @@ public class GameEndSettlementService {
     private final GameNaturalDeathSettlementService gameNaturalDeathSettlementService;
     private final GameResultPayloadFactory gameResultPayloadFactory;
     private final GameResultWebSocketSender gameResultWebSocketSender;
+    private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger;
     private final Clock clock;
 
     public void processDueEndDeadlines() {
@@ -53,6 +55,7 @@ public class GameEndSettlementService {
         }
         if (result.status().isFinished()) {
             broadcastNaturalDeathResult(gameRoomId, nowMillis, result);
+            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(result.finishedGameRoom());
         }
         if (result.shouldCleanupEndDeadline()) {
             cleanupEndDeadline(gameRoomId);

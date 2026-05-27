@@ -1,9 +1,10 @@
 package com.sang.smite.domain.rank.domain;
 
+import com.sang.smite.common.domain.BaseEntity;
 import com.sang.smite.domain.rank.domain.vo.Division;
 import com.sang.smite.domain.rank.domain.vo.Rank;
 import com.sang.smite.domain.rank.domain.vo.Tier;
-import com.sang.smite.common.domain.BaseEntity;
+import com.sang.smite.domain.record.domain.vo.GameRecordResult;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -59,6 +60,19 @@ public class UserRankInfo extends BaseEntity {
     public void updateLp(int amount) {
         this.lp += amount;
         if (this.lp < 0) this.lp = 0;
+    }
+
+    public void updateRankAndLp(Rank rank, int lp) {
+        this.rank = rank;
+        this.lp = Math.max(lp, 0);
+    }
+
+    public void applyRecordResult(GameRecordResult result) {
+        switch (result) {
+            case WIN -> this.totalWins++;
+            case LOSS -> this.totalLosses++;
+            case DRAW -> this.totalDraws++;
+        }
     }
 
     public int getTierScore() {

@@ -255,7 +255,7 @@ stateDiagram-v2
     SMITE_KILL --> FINISHED: 판정 완료 (Winner Decided)
     BOTH_SMITE_USED --> FINISHED: 즉시 DRAW
     IN_PROGRESS --> FINISHED: effective naturalDeathAt 도달 후<br/>scheduler 자연사 DRAW 정산
-    FINISHED --> RECORDED: 전적 기록 완료
+    FINISHED --> RECORDED: Step 9 record/rank 정산 완료
     RECORDED --> [*]
 
     ABORTED --> [*]
@@ -295,7 +295,10 @@ stateDiagram-v2
 - 이미 `FINISHED` 또는 `ABORTED`인 gameRoom은 기존 결과/상태를 유지하고 no-op 처리합니다.
 - 정산 완료 또는 no-op 이후에는 `game:end:pending` member cleanup을 best-effort로 수행합니다.
 - 서버는 HP scenario와 수신 action 기준으로 승/패/무승부를 판정하고, gameRoom 결과를 DB의 source of truth로 둡니다.
-- `game_records` 생성, LP 반영, 배치/승급전 처리는 이 종료 보장 흐름과 분리된 후속 Step 9 범위입니다.
+- `game_records` 생성, 누적 전적, LP 반영, 배치/승급전 처리는 gameRoom 종료 확정 transaction과 분리된 Step 9 record/rank 정산 범위입니다.
+- `RECORDED`는 `game_rooms.status` 값이 아니라 `FINISHED` gameRoom에 대해 참가자 2명분 `game_records`가 생성되고 rank 반영이 완료된 논리적 후처리 상태입니다.
+- Step 9 record/rank 정산은 새로 `FINISHED` 된 gameRoom에 즉시 호출되며, 실패 시 FINISHED 상태를 되돌리지 않고 복구 scheduler가 `FINISHED + record count != 2` 대상을 재조회합니다. 자동 재정산은 `record count == 0`에 한정하고 `1`은 불완전 정산으로 로깅/알림 대상입니다.
+- `GAME_RESULT`는 종료 즉시 알림으로 유지하고 LP/rank/series delta는 포함하지 않습니다. 최종 결과 화면용 랭크 정보는 별도 record/rank summary 조회 API에서 처리합니다.
 
 ## 4. Game WebSocket Session (게임 대기 WebSocket 연결 상태)
 

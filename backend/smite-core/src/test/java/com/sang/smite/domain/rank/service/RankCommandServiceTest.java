@@ -2,9 +2,17 @@ package com.sang.smite.domain.rank.service;
 
 import com.sang.smite.domain.rank.domain.RankSeries;
 import com.sang.smite.domain.rank.domain.UserRankInfo;
+import com.sang.smite.domain.rank.domain.vo.Division;
+import com.sang.smite.domain.rank.domain.vo.Rank;
+import com.sang.smite.domain.rank.domain.vo.SeriesStatus;
 import com.sang.smite.domain.rank.domain.vo.SeriesType;
+import com.sang.smite.domain.rank.domain.vo.Tier;
+import com.sang.smite.domain.rank.service.dto.RankRecordSettlementCommand;
+import com.sang.smite.domain.rank.service.dto.RankRecordSettlementResult;
 import com.sang.smite.domain.rank.repository.RankSeriesRepository;
 import com.sang.smite.domain.rank.repository.UserRankInfoRepository;
+import com.sang.smite.domain.record.domain.vo.GameRecordResult;
+import com.sang.smite.domain.record.domain.vo.GameRecordSeriesType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +21,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -21,6 +36,7 @@ import static org.mockito.Mockito.verify;
 class RankCommandServiceTest {
 
     private static final Long TEST_USER_ID = 1L;
+    private static final Long OPPONENT_USER_ID = 2L;
 
     @InjectMocks
     private RankCommandService rankCommandService;
@@ -54,5 +70,299 @@ class RankCommandServiceTest {
         assertThat(capturedSeries.getUserId()).isEqualTo(TEST_USER_ID);
         assertThat(capturedSeries.getType()).isEqualTo(SeriesType.PLACEMENT);
         assertThat(capturedSeries.getTotalGamesRequired()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - RANK WIN/LOSS는 누적 전적과 LP를 반영하고 before snapshot 기준으로 계산한다")
+    void applyRecordResults_RankWinLoss() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.SILVER, Division.IV), 20);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.SILVER, Division.IV), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID, OPPONENT_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.WIN
+                ),
+                new RankRecordSettlementCommand(
+                        OPPONENT_USER_ID,
+                        TEST_USER_ID,
+                        GameRecordResult.LOSS
+                )
+        ));
+
+        // then
+        assertThat(user.getTotalWins()).isEqualTo(1);
+        assertThat(user.getLp()).isEqualTo(45);
+        assertThat(opponent.getTotalLosses()).isEqualTo(1);
+        assertThat(opponent.getLp()).isEqualTo(5);
+        assertThat(results)
+                .extracting(
+                        RankRecordSettlementResult::userId,
+                        RankRecordSettlementResult::seriesType,
+                        RankRecordSettlementResult::lpBefore,
+                        RankRecordSettlementResult::lpAfter,
+                        RankRecordSettlementResult::rankBefore,
+                        RankRecordSettlementResult::rankAfter
+                )
+                .containsExactly(
+                        tuple(TEST_USER_ID, GameRecordSeriesType.RANK, 20, 45, Rank.of(Tier.SILVER, Division.IV),
+                                Rank.of(Tier.SILVER, Division.IV)),
+                        tuple(OPPONENT_USER_ID, GameRecordSeriesType.RANK, 30, 5, Rank.of(Tier.SILVER, Division.IV),
+                                Rank.of(Tier.SILVER, Division.IV))
+                );
+        verify(rankSeriesRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - DRAW는 누적 무승부만 반영하고 LP를 변경하지 않는다")
+    void applyRecordResults_Draw() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.SILVER, Division.IV), 20);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.SILVER, Division.IV), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.DRAW
+                )
+        ));
+
+        // then
+        assertThat(user.getTotalDraws()).isEqualTo(1);
+        assertThat(user.getLp()).isEqualTo(20);
+        assertThat(results.get(0).lpBefore()).isEqualTo(20);
+        assertThat(results.get(0).lpAfter()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - 진행 중 placement는 LP를 계산하지 않고 RankSeries에 결과를 반영한다")
+    void applyRecordResults_PlacementInProgress() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.SILVER, Division.IV), 20);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.SILVER, Division.IV), 30);
+        RankSeries placement = RankSeries.builder()
+                .id(10L)
+                .userId(TEST_USER_ID)
+                .type(SeriesType.PLACEMENT)
+                .wins(8)
+                .totalGamesRequired(10)
+                .build();
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        given(rankSeriesRepository.findByUserIdAndStatus(TEST_USER_ID, SeriesStatus.IN_PROGRESS))
+                .willReturn(Optional.of(placement));
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.WIN
+                )
+        ));
+
+        // then
+        assertThat(user.getTotalWins()).isEqualTo(1);
+        assertThat(placement.getWins()).isEqualTo(9);
+        assertThat(placement.getStatus()).isEqualTo(SeriesStatus.IN_PROGRESS);
+        assertThat(user.getLp()).isEqualTo(20);
+        assertThat(results.get(0).rankSeriesId()).isEqualTo(10L);
+        assertThat(results.get(0).seriesType()).isEqualTo(GameRecordSeriesType.PLACEMENT);
+        assertThat(results.get(0).lpAfter()).isEqualTo(20);
+        verify(rankSeriesRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - placement 10판 완료 시 승수표 기준 최종 rank/LP를 배정한다")
+    void applyRecordResults_PlacementComplete() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.IRON, Division.IV), 20);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.SILVER, Division.IV), 30);
+        RankSeries placement = RankSeries.builder()
+                .id(10L)
+                .userId(TEST_USER_ID)
+                .type(SeriesType.PLACEMENT)
+                .wins(8)
+                .losses(1)
+                .totalGamesRequired(10)
+                .build();
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        given(rankSeriesRepository.findByUserIdAndStatus(TEST_USER_ID, SeriesStatus.IN_PROGRESS))
+                .willReturn(Optional.of(placement));
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.WIN
+                )
+        ));
+
+        // then
+        assertThat(placement.getStatus()).isEqualTo(SeriesStatus.SUCCESS);
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.PLATINUM, Division.IV));
+        assertThat(user.getLp()).isZero();
+        assertThat(results.get(0).rankAfter()).isEqualTo(Rank.of(Tier.PLATINUM, Division.IV));
+        assertThat(results.get(0).lpBefore()).isEqualTo(20);
+        assertThat(results.get(0).lpAfter()).isZero();
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - promotion 성공 시 targetRank LP 0으로 확정한다")
+    void applyRecordResults_PromotionSuccess() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.SILVER, Division.I), 100);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.SILVER, Division.I), 30);
+        RankSeries promotion = RankSeries.builder()
+                .id(20L)
+                .userId(TEST_USER_ID)
+                .type(SeriesType.PROMOTION)
+                .targetRank(Rank.of(Tier.GOLD, Division.IV))
+                .wins(1)
+                .totalGamesRequired(3)
+                .build();
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        given(rankSeriesRepository.findByUserIdAndStatus(TEST_USER_ID, SeriesStatus.IN_PROGRESS))
+                .willReturn(Optional.of(promotion));
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.WIN
+                )
+        ));
+
+        // then
+        assertThat(promotion.getStatus()).isEqualTo(SeriesStatus.SUCCESS);
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.GOLD, Division.IV));
+        assertThat(user.getLp()).isZero();
+        assertThat(results.get(0).rankSeriesId()).isEqualTo(20L);
+        assertThat(results.get(0).seriesType()).isEqualTo(GameRecordSeriesType.PROMOTION);
+        assertThat(results.get(0).rankAfter()).isEqualTo(Rank.of(Tier.GOLD, Division.IV));
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - promotion에서 2승이 불가능해지면 실패하고 기존 rank LP 75로 확정한다")
+    void applyRecordResults_PromotionFailedWhenTwoWinsImpossible() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.SILVER, Division.I), 100);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.SILVER, Division.I), 30);
+        RankSeries promotion = RankSeries.builder()
+                .id(20L)
+                .userId(TEST_USER_ID)
+                .type(SeriesType.PROMOTION)
+                .targetRank(Rank.of(Tier.GOLD, Division.IV))
+                .draws(1)
+                .totalGamesRequired(3)
+                .build();
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        given(rankSeriesRepository.findByUserIdAndStatus(TEST_USER_ID, SeriesStatus.IN_PROGRESS))
+                .willReturn(Optional.of(promotion));
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.DRAW
+                )
+        ));
+
+        // then
+        assertThat(promotion.getStatus()).isEqualTo(SeriesStatus.FAILED);
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.SILVER, Division.I));
+        assertThat(user.getLp()).isEqualTo(75);
+        assertThat(results.get(0).lpBefore()).isEqualTo(100);
+        assertThat(results.get(0).lpAfter()).isEqualTo(75);
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - 일반 RANK 승리로 99LP 이상이 되면 승급전을 시작하고 LP 100으로 동결한다")
+    void applyRecordResults_StartPromotionSeries() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.SILVER, Division.I), 90);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.SILVER, Division.I), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.WIN
+                )
+        ));
+
+        // then
+        assertThat(user.getLp()).isEqualTo(100);
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.SILVER, Division.I));
+        assertThat(results.get(0).lpBefore()).isEqualTo(90);
+        assertThat(results.get(0).lpAfter()).isEqualTo(100);
+
+        ArgumentCaptor<RankSeries> seriesCaptor = ArgumentCaptor.forClass(RankSeries.class);
+        verify(rankSeriesRepository).save(seriesCaptor.capture());
+        assertThat(seriesCaptor.getValue().getUserId()).isEqualTo(TEST_USER_ID);
+        assertThat(seriesCaptor.getValue().getType()).isEqualTo(SeriesType.PROMOTION);
+        assertThat(seriesCaptor.getValue().getTargetRank()).isEqualTo(Rank.of(Tier.GOLD, Division.IV));
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - LP 0에서 일반 RANK 패배 시 이전 rank LP 75로 강등한다")
+    void applyRecordResults_DemoteOnZeroLpLoss() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.SILVER, Division.IV), 0);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.SILVER, Division.IV), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.LOSS
+                )
+        ));
+
+        // then
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.BRONZE, Division.I));
+        assertThat(user.getLp()).isEqualTo(75);
+        assertThat(results.get(0).rankBefore()).isEqualTo(Rank.of(Tier.SILVER, Division.IV));
+        assertThat(results.get(0).rankAfter()).isEqualTo(Rank.of(Tier.BRONZE, Division.I));
+    }
+
+    private UserRankInfo rankInfo(Long userId, Rank rank, int lp) {
+        return UserRankInfo.builder()
+                .userId(userId)
+                .rank(rank)
+                .lp(lp)
+                .build();
+    }
+
+    private void givenNoActiveSeriesFor(Long... userIds) {
+        for (Long userId : userIds) {
+            given(rankSeriesRepository.findByUserIdAndStatus(userId, SeriesStatus.IN_PROGRESS))
+                    .willReturn(Optional.empty());
+        }
     }
 }

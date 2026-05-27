@@ -86,6 +86,35 @@ class GameResultWebSocketSenderTest {
     }
 
     @Test
+    @DisplayName("broadcastGameResult - GAME_RESULT payload에는 record/rank summary 정보를 포함하지 않는다")
+    void broadcastGameResult_ExcludeRecordRankSummary() throws Exception {
+        // given
+        WebSocketSession session = session();
+        sessionRegistry.register(GAME_ROOM_ID, USER_ID, session);
+        GameResultPayload payload = new GameResultPayload(
+                GAME_ROOM_ID,
+                GameResult.PLAYER1_WIN,
+                USER_ID,
+                "SMITE_KILL",
+                20_000L,
+                List.of()
+        );
+
+        // when
+        sender.broadcastGameResult(GAME_ROOM_ID, payload);
+
+        // then
+        JsonNode payloadNode = sentMessage(session).get("payload");
+        assertThat(payloadNode.has("lpBefore")).isFalse();
+        assertThat(payloadNode.has("lpAfter")).isFalse();
+        assertThat(payloadNode.has("lpChange")).isFalse();
+        assertThat(payloadNode.has("rankBefore")).isFalse();
+        assertThat(payloadNode.has("rankAfter")).isFalse();
+        assertThat(payloadNode.has("seriesType")).isFalse();
+        assertThat(payloadNode.has("rankSeriesId")).isFalse();
+    }
+
+    @Test
     @DisplayName("broadcastGameResult - 연결된 session이 없으면 메시지 전송 없이 완료한다")
     void broadcastGameResult_NoSession() throws Exception {
         // given

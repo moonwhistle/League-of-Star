@@ -9,6 +9,7 @@ import com.sang.smite.domain.game.service.GameActionSaveResult;
 import com.sang.smite.domain.game.service.GameRoomCommandService;
 import com.sang.smite.domain.game.service.GameSmiteJudgementService;
 import com.sang.smite.game.end.service.GameEndDeadlineAdvanceService;
+import com.sang.smite.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.smite.game.result.dto.GameResultPayload;
 import com.sang.smite.game.result.service.GameResultPayloadFactory;
 import com.sang.smite.game.smite.domain.GameSmiteCommand;
@@ -31,6 +32,7 @@ public class GameSmiteService {
     private final GameActionCommandService gameActionCommandService;
     private final GameSmiteJudgementService gameSmiteJudgementService;
     private final GameEndDeadlineAdvanceService gameEndDeadlineAdvanceService;
+    private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger;
     private final GameResultPayloadFactory gameResultPayloadFactory;
     private final Clock clock;
 
@@ -69,9 +71,10 @@ public class GameSmiteService {
                 gameRoomId,
                 saveResult.action().getUserId()
         );
-        return finishedGameRoom.map(finishedRoom -> GameSmiteHandleResponse.broadcast(
-                smiteKillGameResult(gameRoomId, finishedRoom)
-        ));
+        return finishedGameRoom.map(finishedRoom -> {
+            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
+            return GameSmiteHandleResponse.broadcast(smiteKillGameResult(gameRoomId, finishedRoom));
+        });
     }
 
     private Optional<GameSmiteHandleResponse> nonKillResponse(Long gameRoomId, GameRoom gameRoom) {
@@ -86,9 +89,14 @@ public class GameSmiteService {
         Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(
                 gameRoomId
         );
-        return finishedGameRoom.map(finishedRoom -> GameSmiteHandleResponse.broadcast(
-                bothSmitesUsedDrawGameResult(gameRoomId, finishedRoom, currentActions)
-        ));
+        return finishedGameRoom.map(finishedRoom -> {
+            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
+            return GameSmiteHandleResponse.broadcast(bothSmitesUsedDrawGameResult(
+                    gameRoomId,
+                    finishedRoom,
+                    currentActions
+            ));
+        });
     }
 
     private boolean bothUsersUsedSmiteWithoutKill(List<GameAction> actions) {

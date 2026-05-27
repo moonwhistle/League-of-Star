@@ -584,6 +584,13 @@ sequenceDiagram
 }
 ```
 
+`GAME_RESULT` payload 정책:
+
+- `GAME_RESULT`는 게임 종료 즉시 알림이며 LP/rank/series delta를 포함하지 않습니다.
+- 최종 결과 화면에서 랭크 변동, LP 변동, 배치/승급전 진행 상태가 필요하면 후속 Step 11의 gameRoomId 기준 record/rank summary 조회 API를 별도로 호출합니다.
+- record/rank summary 조회 API는 Step 9 정산이 완료된 DB 상태를 기준으로 응답합니다.
+- Step 9 정산이 아직 완료되지 않았다면 클라이언트는 후속 조회 API의 `PENDING` 또는 재시도 가능한 응답 정책을 따라야 합니다.
+
 SMITE 관련 `ERROR.payload.code`:
 
 | code | 의미 |

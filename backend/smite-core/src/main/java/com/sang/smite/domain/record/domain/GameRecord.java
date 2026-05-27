@@ -1,8 +1,9 @@
 package com.sang.smite.domain.record.domain;
 
+import com.sang.smite.common.domain.BaseEntity;
 import com.sang.smite.domain.rank.domain.vo.Rank;
 import com.sang.smite.domain.record.domain.vo.GameRecordResult;
-import com.sang.smite.common.domain.BaseEntity;
+import com.sang.smite.domain.record.domain.vo.GameRecordSeriesType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -46,8 +47,13 @@ public class GameRecord extends BaseEntity {
     @Column(name = "opponent_id", nullable = false)
     private Long opponentId;
 
-    @Column(name = "promotion_series_id")
-    private Long promotionSeriesId;
+    @Column(name = "rank_series_id")
+    private Long rankSeriesId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private GameRecordSeriesType seriesType = GameRecordSeriesType.RANK;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
@@ -70,7 +76,30 @@ public class GameRecord extends BaseEntity {
     @Column(name = "rank_after", nullable = false)
     private Rank rankAfter;
 
-    @Column(nullable = false)
-    @Builder.Default
-    private boolean isPromotionGame = false;
+    public static GameRecord create(
+            Long gameRoomId,
+            Long userId,
+            Long opponentId,
+            Long rankSeriesId,
+            GameRecordSeriesType seriesType,
+            GameRecordResult result,
+            int lpBefore,
+            int lpAfter,
+            Rank rankBefore,
+            Rank rankAfter
+    ) {
+        return GameRecord.builder()
+                .gameRoomId(gameRoomId)
+                .userId(userId)
+                .opponentId(opponentId)
+                .rankSeriesId(rankSeriesId)
+                .seriesType(seriesType)
+                .result(result)
+                .lpChange(lpAfter - lpBefore)
+                .lpBefore(lpBefore)
+                .lpAfter(lpAfter)
+                .rankBefore(rankBefore)
+                .rankAfter(rankAfter)
+                .build();
+    }
 }
