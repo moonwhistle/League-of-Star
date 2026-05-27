@@ -21,7 +21,11 @@ public enum ApiErrorCode implements BaseErrorCode {
     AUTH_NOT_SUPPORTED_PROVIDER(400, "AUTH_007", "지원하지 않는 소셜 로그인 공급자입니다."),
     AUTH_LOGIN_FAILED(401, "AUTH_008", "이메일 또는 비밀번호가 일치하지 않습니다."),
     AUTH_INVALID_REFRESH_TOKEN(401, "AUTH_009", "유효하지 않은 리프레시 토큰입니다."),
-    AUTH_EXPIRED_REFRESH_TOKEN(401, "AUTH_010", "만료된 리프레시 토큰입니다.");
+    AUTH_EXPIRED_REFRESH_TOKEN(401, "AUTH_010", "만료된 리프레시 토큰입니다."),
+
+    // Game Summary (GAME_SUMMARY_001 ~ )
+    GAME_SUMMARY_NOT_FINISHED(409, "GAME_SUMMARY_001", "종료된 게임의 결과만 조회할 수 있습니다."),
+    GAME_SUMMARY_INVALID_RECORD_STATE(409, "GAME_SUMMARY_002", "게임 결과 기록 상태가 올바르지 않습니다.");
 
     private final int httpStatus;
     private final String customCode;

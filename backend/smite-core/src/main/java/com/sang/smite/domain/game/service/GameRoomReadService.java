@@ -7,6 +7,7 @@ import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
+import com.sang.smite.domain.game.service.dto.GameRoomSummaryReadModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,5 +51,21 @@ public class GameRoomReadService {
         return gameRoom.getParticipants().stream()
                 .map(GameParticipant::getUserId)
                 .toList();
+    }
+
+    public GameRoomSummaryReadModel getSummaryReadModel(Long gameRoomId) {
+        GameRoom gameRoom = gameRoomRepository.findById(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+
+        return new GameRoomSummaryReadModel(
+                gameRoom.getId(),
+                gameRoom.getStatus(),
+                gameRoom.getResult(),
+                gameRoom.getWinnerId(),
+                gameRoom.getFinishedAt(),
+                gameRoom.getParticipants().stream()
+                        .map(GameParticipant::getUserId)
+                        .toList()
+        );
     }
 }

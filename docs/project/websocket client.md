@@ -587,9 +587,12 @@ sequenceDiagram
 `GAME_RESULT` payload 정책:
 
 - `GAME_RESULT`는 게임 종료 즉시 알림이며 LP/rank/series delta를 포함하지 않습니다.
-- 최종 결과 화면에서 랭크 변동, LP 변동, 배치/승급전 진행 상태가 필요하면 후속 Step 11의 gameRoomId 기준 record/rank summary 조회 API를 별도로 호출합니다.
-- record/rank summary 조회 API는 Step 9 정산이 완료된 DB 상태를 기준으로 응답합니다.
-- Step 9 정산이 아직 완료되지 않았다면 클라이언트는 후속 조회 API의 `PENDING` 또는 재시도 가능한 응답 정책을 따라야 합니다.
+- 최종 결과 화면에서 랭크 변동, LP 변동, 배치/승급전 진행 상태가 필요하면 `GET /api/v1/games/{gameId}/summary`를 별도로 호출합니다.
+- record/rank summary 조회 API는 Step 9 정산이 완료된 DB 상태를 기준으로 응답하며, 정산을 새로 수행하지 않습니다.
+- Step 9 정산이 아직 완료되지 않았다면 summary API는 `200 PENDING`과 `retryAfterMillis`를 반환합니다. 클라이언트는 이 값 기준으로 짧게 polling합니다.
+- summary API가 `200 DONE`을 반환하면 최종 결과 화면에 `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 표시합니다.
+- summary `DRAW`는 `gameResult=DRAW`, `me.result=DRAW`, `opponent.result=DRAW`로 내려옵니다. `winnerUserId`는 승자 userId 필드라서 `DRAW`에서는 `null`입니다.
+- 참가자가 아닌 유저가 summary를 조회하면 `403`, 아직 `FINISHED`가 아닌 gameRoom이면 `409`로 처리됩니다.
 
 SMITE 관련 `ERROR.payload.code`:
 

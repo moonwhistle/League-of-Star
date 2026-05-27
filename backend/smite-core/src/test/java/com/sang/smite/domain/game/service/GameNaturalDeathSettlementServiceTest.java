@@ -10,6 +10,8 @@ import com.sang.smite.domain.game.domain.vo.HpStep;
 import com.sang.smite.domain.game.domain.vo.ParticipantStatus;
 import com.sang.smite.domain.game.repository.GameActionRepository;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
+import com.sang.smite.domain.game.service.dto.GameNaturalDeathSettlementResult;
+import com.sang.smite.domain.game.service.dto.GameNaturalDeathSettlementStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

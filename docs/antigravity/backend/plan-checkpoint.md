@@ -215,7 +215,7 @@ flowchart TD
 - [x] record/rank 정산 내부에서 record 생성, 누적 전적, LP, RankSeries 반영을 같은 transaction으로 처리
 - [x] `countByGameRoomId == 0/2/1` 기준 멱등성 및 불완전 정산 정책 구현
 - [x] FINISHED인데 record count가 2가 아닌 gameRoom을 복구하는 scheduler 추가
-- [x] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, record/rank summary 조회 API는 후속 Step 11로 분리
+- [x] `GAME_RESULT` payload에는 LP/rank/series delta를 포함하지 않고, Step 11 summary 조회 API에서 read-only로 제공
 
 ### Step 10. 정상 종료 후 매칭 점유 상태 cleanup
 
@@ -228,12 +228,19 @@ flowchart TD
 
 ### Step 11. record/rank summary 조회 API
 
-- [ ] gameRoomId 기준 record/rank summary 조회 endpoint 설계
-- [ ] 조회 API는 정산 완료 후 `myResult`, `lpBefore/After/Change`, `rankBefore/After`, `seriesType`, `rankSeriesId`, 배치/승급전 상태를 반환
-- [ ] `GAME_RESULT` payload는 확장하지 않고 최종 결과 화면에서 별도 조회 API를 호출하도록 계약 정리
-- [ ] record/rank 정산 미완료 상태 조회 시 `PENDING` 또는 재시도 가능한 응답 정책 정의
-- [ ] participant가 아닌 유저의 결과 조회를 차단
-- [ ] 클라이언트 최종 결과 화면에 필요한 응답 DTO와 문서 테스트 추가
+- [x] `GET /api/v1/games/{gameId}/summary` endpoint 설계
+- [x] `GAME_RESULT` payload는 확장하지 않고 최종 결과 화면에서 summary API를 polling하도록 계약 정리
+- [x] summary API는 record/rank 정산을 수행하지 않고 Step 9 결과를 read-only로 조회
+- [x] 전체 전적 공개 API, record 상세 API, profile API는 이번 Step 11 범위에서 제외
+- [x] core read service로 gameRoom summary read model, gameRecord count/list, user bulk 조회 제공
+- [x] `PENDING`/`DONE` summary 응답 DTO와 player summary DTO 설계
+- [x] `FINISHED + game_records 0/1행`은 `PENDING`, `2행`은 `DONE`으로 반환
+- [x] `DONE` 응답은 `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함
+- [x] `me/opponent`는 `result`, `lpBefore/After/Change`, `rankBefore/After`, `seriesType`, `rankSeriesId`, `nickname`을 같은 schema로 반환
+- [x] rank는 enum 문자열만 반환하고 record id는 노출하지 않음
+- [x] participant가 아닌 유저의 결과 조회를 `403`으로 차단
+- [x] `/api/v1/games/{gameId}/summary` endpoint를 인증 필수 API로 연결
+- [x] 클라이언트 최종 결과 화면에 필요한 응답 DTO와 문서 테스트 추가
 
 ### Step 12. Apex rank 자동 승급/강등 정산
 
@@ -748,7 +755,7 @@ gameRoom 생성 실패 mapping:
 - gameRoom 종료 transaction과 record/rank 정산 transaction 분리
 - 새로 FINISHED 된 gameRoom 즉시 정산 및 FINISHED 미정산 gameRoom 복구 scheduler
 - 멀티 인스턴스 환경에서 DB row lock, record count, unique constraint 기반 멱등성 보장
-- `GAME_RESULT` payload 미확장, record/rank summary 조회 API는 후속 Issue 60으로 분리
+- `GAME_RESULT` payload 미확장, record/rank summary 조회 API는 Issue 56에서 read-only 조회로 구현
 
 완료 기준:
 
@@ -779,7 +786,7 @@ gameRoom 생성 실패 mapping:
 - Redis cleanup 실패가 DB gameRoom 결과와 record/rank 정산을 되돌리지 않음
 - cleanup 실패 이후에도 기존 record/rank recovery 재시도 또는 Redis TTL 안전장치로 재매칭 가능 상태가 회복됨
 
-### Issue 60. record/rank summary 조회 API
+### Issue 56. record/rank summary 조회 API
 
 목표:
 
@@ -787,10 +794,12 @@ gameRoom 생성 실패 mapping:
 
 범위:
 
-- gameRoomId 기준 record/rank summary 조회 endpoint 설계
-- 참가자 본인 관점 `myResult`, `lpBefore`, `lpAfter`, `lpChange`, `rankBefore`, `rankAfter` 반환
-- `seriesType`, `rankSeriesId`, 배치/승급전 진행 상태 반환
-- record/rank 정산 미완료 상태에 대한 `PENDING` 또는 재시도 가능한 응답 정책 정의
+- `GET /api/v1/games/{gameId}/summary` endpoint 설계
+- `GAME_RESULT` 수신 후 summary API를 polling하는 결과 화면 계약 정의
+- 정산 미완료 상태는 `PENDING + retryAfterMillis`, 정산 완료 상태는 `DONE`으로 반환
+- `DONE` 응답은 `gameResult`, `winnerUserId`, `finishedAt`, `me`, `opponent`를 포함
+- 참가자별 `result`, `lpBefore`, `lpAfter`, `lpChange`, `rankBefore`, `rankAfter`, `seriesType`, `rankSeriesId`, `nickname` 반환
+- rank는 enum 문자열로 반환하고 record id는 노출하지 않음
 - participant가 아닌 유저의 결과 조회 차단
 - `docs/project/websocket client.md`와 API 문서에 `GAME_RESULT` 후 별도 조회 흐름 반영
 
@@ -883,7 +892,7 @@ gameRoom 생성 실패 mapping:
 - 배치 유저와 일반 유저 매칭이 기존 accept/reject/timeout 흐름과 동일하게 동작함
 - 배치가 아닌 유저의 기존 매칭 범위가 깨지지 않음
 
-### Issue 56. match_found 후처리 실패 복구
+### Issue 60. match_found 후처리 실패 복구
 
 목표:
 
@@ -941,3 +950,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-24 | 후속 구현 순서 재정리. Step 10 Redis `IN_GAME` cleanup, Step 11 record/rank summary 조회 API, Step 12 Apex rank 자동 승급/강등, Step 13~17 매칭 정책 보강 순서로 분리 |
 | 2026-05-27 | Step 10 정상 종료 후 매칭 점유 상태 cleanup 문서를 Issue 54로 생성하고, cleanup 범위를 Redis 전체 삭제가 아니라 `match:status:{userId}=IN_GAME` 해제로 고정 |
 | 2026-05-27 | Step 10 구현 결과를 policy/domain/matching 문서에 반영하고, 기존 배치 유저 매칭 정책 정합성 번호를 Issue 58로 조정해 Issue 54 중복 제거 |
+| 2026-05-27 | Step 11 summary 조회 API 구현 결과를 policy/domain/WebSocket/checkpoint 문서에 반영하고, 중복된 Issue 56 번호를 Issue 60으로 조정 |

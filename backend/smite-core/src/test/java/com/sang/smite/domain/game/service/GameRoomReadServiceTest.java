@@ -3,10 +3,12 @@ package com.sang.smite.domain.game.service;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameResult;
 import com.sang.smite.domain.game.domain.vo.GameScenario;
 import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.domain.vo.HpStep;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
+import com.sang.smite.domain.game.service.dto.GameRoomSummaryReadModel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -172,8 +174,48 @@ class GameRoomReadServiceTest {
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }
 
+    @Test
+    @DisplayName("getSummaryReadModel - summary 조회에 필요한 gameRoom 정보를 반환한다")
+    void getSummaryReadModel() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom(GAME_ROOM_ID);
+        gameRoom.finish(GameResult.PLAYER1_WIN, FIRST_USER_ID);
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when
+        GameRoomSummaryReadModel result = gameRoomReadService.getSummaryReadModel(GAME_ROOM_ID);
+
+        // then
+        assertThat(result.gameRoomId()).isEqualTo(GAME_ROOM_ID);
+        assertThat(result.status()).isEqualTo(GameStatus.FINISHED);
+        assertThat(result.result()).isEqualTo(GameResult.PLAYER1_WIN);
+        assertThat(result.winnerId()).isEqualTo(FIRST_USER_ID);
+        assertThat(result.finishedAt()).isNotNull();
+        assertThat(result.participantUserIds()).containsExactly(FIRST_USER_ID, SECOND_USER_ID);
+    }
+
+    @Test
+    @DisplayName("getSummaryReadModel - gameRoom이 없으면 예외를 던진다")
+    void getSummaryReadModel_NotFound_ThrowException() {
+        // given
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.getSummaryReadModel(GAME_ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
     private GameRoom createReadyGameRoom() {
-        GameRoom gameRoom = GameRoom.builder().build();
+        return createReadyGameRoom(null);
+    }
+
+    private GameRoom createReadyGameRoom(Long gameRoomId) {
+        GameRoom gameRoom = gameRoomId == null
+                ? GameRoom.builder().build()
+                : GameRoom.builder()
+                        .id(gameRoomId)
+                        .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
         return gameRoom;

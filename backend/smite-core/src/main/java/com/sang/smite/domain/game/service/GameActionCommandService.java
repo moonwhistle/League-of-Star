@@ -2,6 +2,7 @@ package com.sang.smite.domain.game.service;
 
 import com.sang.smite.domain.game.domain.GameAction;
 import com.sang.smite.domain.game.repository.GameActionRepository;
+import com.sang.smite.domain.game.service.dto.GameActionSaveResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;

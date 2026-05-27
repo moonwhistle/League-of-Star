@@ -6,6 +6,7 @@ import com.sang.smite.domain.game.domain.GameParticipant;
 import com.sang.smite.domain.game.domain.GameRoom;
 import com.sang.smite.domain.game.domain.vo.GameParticipantResult;
 import com.sang.smite.domain.game.domain.vo.GameResult;
+import com.sang.smite.domain.game.service.dto.GameRoomParticipantResult;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

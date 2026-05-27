@@ -1,4 +1,4 @@
-package com.sang.smite.domain.game.service;
+package com.sang.smite.domain.game.service.dto;
 
 public enum GameNaturalDeathSettlementStatus {
     FINISHED,
