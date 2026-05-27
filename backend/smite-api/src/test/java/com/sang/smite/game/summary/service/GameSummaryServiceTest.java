@@ -27,6 +27,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,7 +39,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class GameSummaryServiceTest {
 
     private static final Long GAME_ID = 100L;
@@ -105,6 +107,66 @@ class GameSummaryServiceTest {
     }
 
     @Test
+    @DisplayName("getSummary - PLAYER2_WIN이면 winnerUserId와 참가자 결과를 반환한다")
+    void getSummary_Player2Win_ReturnWinnerAndPlayerResults() {
+        // given
+        given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(finishedRoom(
+                GameResult.PLAYER2_WIN,
+                SECOND_USER_ID
+        ));
+        given(gameRecordReadService.countByGameRoomId(GAME_ID)).willReturn(2L);
+        given(gameRecordReadService.findByGameRoomId(GAME_ID)).willReturn(List.of(
+                record(FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.LOSS, 40, 24,
+                        rank(Tier.GOLD, Division.IV), rank(Tier.GOLD, Division.IV)),
+                record(SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.WIN, 61, 77,
+                        rank(Tier.GOLD, Division.IV), rank(Tier.GOLD, Division.III))
+        ));
+        given(userReadService.findByIds(List.of(FIRST_USER_ID, SECOND_USER_ID))).willReturn(List.of(
+                user(FIRST_USER_ID, "moon"),
+                user(SECOND_USER_ID, "other")
+        ));
+
+        // when
+        GameSummaryDoneResponse response = (GameSummaryDoneResponse) gameSummaryService.getSummary(GAME_ID, FIRST_USER_ID);
+
+        // then
+        assertThat(response.gameResult()).isEqualTo(GameResult.PLAYER2_WIN);
+        assertThat(response.winnerUserId()).isEqualTo(SECOND_USER_ID);
+        assertThat(response.me().result()).isEqualTo(GameRecordResult.LOSS);
+        assertThat(response.opponent().result()).isEqualTo(GameRecordResult.WIN);
+    }
+
+    @Test
+    @DisplayName("getSummary - DRAW이면 winnerUserId null과 양쪽 DRAW 결과를 반환한다")
+    void getSummary_Draw_ReturnNullWinnerAndDrawResults() {
+        // given
+        given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(finishedRoom(
+                GameResult.DRAW,
+                null
+        ));
+        given(gameRecordReadService.countByGameRoomId(GAME_ID)).willReturn(2L);
+        given(gameRecordReadService.findByGameRoomId(GAME_ID)).willReturn(List.of(
+                record(FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.DRAW, 40, 40,
+                        rank(Tier.GOLD, Division.IV), rank(Tier.GOLD, Division.IV)),
+                record(SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.DRAW, 61, 61,
+                        rank(Tier.GOLD, Division.IV), rank(Tier.GOLD, Division.IV))
+        ));
+        given(userReadService.findByIds(List.of(FIRST_USER_ID, SECOND_USER_ID))).willReturn(List.of(
+                user(FIRST_USER_ID, "moon"),
+                user(SECOND_USER_ID, "other")
+        ));
+
+        // when
+        GameSummaryDoneResponse response = (GameSummaryDoneResponse) gameSummaryService.getSummary(GAME_ID, FIRST_USER_ID);
+
+        // then
+        assertThat(response.gameResult()).isEqualTo(GameResult.DRAW);
+        assertThat(response.winnerUserId()).isNull();
+        assertThat(response.me().result()).isEqualTo(GameRecordResult.DRAW);
+        assertThat(response.opponent().result()).isEqualTo(GameRecordResult.DRAW);
+    }
+
+    @Test
     @DisplayName("getSummary - Apex rank는 tier 문자열만 반환한다")
     void getSummary_ApexRank_ReturnTierOnly() {
         // given
@@ -154,7 +216,7 @@ class GameSummaryServiceTest {
 
     @Test
     @DisplayName("getSummary - record count 1이면 PENDING을 반환한다")
-    void getSummary_RecordCountOne_ReturnPending() {
+    void getSummary_RecordCountOne_ReturnPendingAndWarn(CapturedOutput output) {
         // given
         given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(finishedRoom(
                 GameResult.PLAYER1_WIN,
@@ -167,6 +229,9 @@ class GameSummaryServiceTest {
 
         // then
         assertPending(response);
+        assertThat(output).contains("Incomplete game summary record state");
+        assertThat(output).contains("gameId=100");
+        assertThat(output).contains("recordCount=1");
         verify(gameRecordReadService, never()).findByGameRoomId(GAME_ID);
     }
 
@@ -187,12 +252,52 @@ class GameSummaryServiceTest {
     }
 
     @Test
-    @DisplayName("getSummary - FINISHED가 아니면 409 예외를 던진다")
-    void getSummary_NotFinished_ThrowConflict() {
+    @DisplayName("getSummary - READY이면 409 예외를 던진다")
+    void getSummary_Ready_ThrowConflict() {
+        // given
+        given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(new GameRoomSummaryReadModel(
+                GAME_ID,
+                GameStatus.READY,
+                null,
+                null,
+                null,
+                List.of(FIRST_USER_ID, SECOND_USER_ID)
+        ));
+
+        // when & then
+        assertThatThrownBy(() -> gameSummaryService.getSummary(GAME_ID, FIRST_USER_ID))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ApiErrorCode.GAME_SUMMARY_NOT_FINISHED));
+        verify(gameRecordReadService, never()).countByGameRoomId(GAME_ID);
+    }
+
+    @Test
+    @DisplayName("getSummary - IN_PROGRESS이면 409 예외를 던진다")
+    void getSummary_InProgress_ThrowConflict() {
         // given
         given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(new GameRoomSummaryReadModel(
                 GAME_ID,
                 GameStatus.IN_PROGRESS,
+                null,
+                null,
+                null,
+                List.of(FIRST_USER_ID, SECOND_USER_ID)
+        ));
+
+        // when & then
+        assertThatThrownBy(() -> gameSummaryService.getSummary(GAME_ID, FIRST_USER_ID))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ApiErrorCode.GAME_SUMMARY_NOT_FINISHED));
+        verify(gameRecordReadService, never()).countByGameRoomId(GAME_ID);
+    }
+
+    @Test
+    @DisplayName("getSummary - ABORTED이면 409 예외를 던진다")
+    void getSummary_Aborted_ThrowConflict() {
+        // given
+        given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(new GameRoomSummaryReadModel(
+                GAME_ID,
+                GameStatus.ABORTED,
                 null,
                 null,
                 null,

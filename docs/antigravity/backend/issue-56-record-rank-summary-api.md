@@ -220,16 +220,16 @@ sequenceDiagram
 
 ### 7. service 테스트
 
-- [ ] `FINISHED + record 2행`이면 `DONE` summary가 반환되는지 검증한다.
-- [ ] 요청 유저 기준 `me`와 `opponent`가 올바르게 나뉘는지 검증한다.
-- [ ] `PLAYER1_WIN`, `PLAYER2_WIN`, `DRAW` 각각의 `gameResult`, `winnerUserId`, player result를 검증한다.
-- [ ] `record count == 0`이면 `PENDING`을 반환하는지 검증한다.
-- [ ] `record count == 1`이면 `PENDING`과 warn log 정책을 검증한다.
-- [ ] `READY` 또는 `IN_PROGRESS` gameRoom 조회 시 `409`가 발생하는지 검증한다.
-- [ ] `ABORTED` gameRoom 조회 시 `409`가 발생하는지 검증한다.
-- [ ] 미참가자 조회 시 `403`이 발생하는지 검증한다.
-- [ ] rank 문자열 변환에서 일반 rank와 Apex rank를 모두 검증한다.
-- [ ] API 모듈이 repository 구현체를 직접 import하지 않는지 확인한다.
+- [x] `FINISHED + record 2행`이면 `DONE` summary가 반환되는지 검증한다.
+- [x] 요청 유저 기준 `me`와 `opponent`가 올바르게 나뉘는지 검증한다.
+- [x] `PLAYER1_WIN`, `PLAYER2_WIN`, `DRAW` 각각의 `gameResult`, `winnerUserId`, player result를 검증한다.
+- [x] `record count == 0`이면 `PENDING`을 반환하는지 검증한다.
+- [x] `record count == 1`이면 `PENDING`과 warn log 정책을 검증한다.
+- [x] `READY` 또는 `IN_PROGRESS` gameRoom 조회 시 `409`가 발생하는지 검증한다.
+- [x] `ABORTED` gameRoom 조회 시 `409`가 발생하는지 검증한다.
+- [x] 미참가자 조회 시 `403`이 발생하는지 검증한다.
+- [x] rank 문자열 변환에서 일반 rank와 Apex rank를 모두 검증한다.
+- [x] API 모듈이 repository 구현체를 직접 import하지 않는지 확인한다.
 
 ### 8. 문서 정합성
 
