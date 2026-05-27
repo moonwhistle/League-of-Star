@@ -141,24 +141,24 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 ### 6. 큐 재진입 정책 정합성
 
-- [ ] cleanup 완료 후 유저가 다시 `joinQueue`를 호출할 수 있어야 한다.
-- [ ] cleanup은 유저를 자동으로 `matching:queue:*`에 넣지 않는다.
-- [ ] 게임 종료 후 재매칭은 사용자의 명시적 큐 진입 요청으로만 시작한다.
-- [ ] Redis status cleanup만으로 모든 중복 게임 문제를 해결하려 하지 않는다.
-- [ ] 후속 Step 13에서 `joinQueue` 전 DB 기준 READY/IN_PROGRESS gameRoom 검증을 추가할 수 있도록 문서 경계를 유지한다.
+- [x] cleanup 완료 후 유저가 다시 `joinQueue`를 호출할 수 있어야 한다.
+- [x] cleanup은 유저를 자동으로 `matching:queue:*`에 넣지 않는다.
+- [x] 게임 종료 후 재매칭은 사용자의 명시적 큐 진입 요청으로만 시작한다.
+- [x] Redis status cleanup만으로 모든 중복 게임 문제를 해결하려 하지 않는다.
+- [x] 후속 Step 13에서 `joinQueue` 전 DB 기준 READY/IN_PROGRESS gameRoom 검증을 추가할 수 있도록 문서 경계를 유지한다.
 
 ### 7. 테스트
 
-- [ ] 정상 종료 + record 2행 완료 후 참가자 2명의 `IN_GAME` status가 제거되는지 검증한다.
-- [ ] status가 이미 없는 참가자에 대한 cleanup이 no-op인지 검증한다.
-- [ ] status가 `IN_GAME`이 아닌 경우 제거하지 않는지 검증한다.
-- [ ] record count `0`이면 cleanup하지 않는지 검증한다.
-- [ ] record count `1`이면 cleanup하지 않고 로그/예외 정책을 따르는지 검증한다.
-- [ ] cleanup 실패가 gameRoom `FINISHED`와 record/rank 정산 결과를 rollback하지 않는지 검증한다.
-- [ ] SMITE kill, both failed SMITE DRAW, natural death DRAW 경로에서 cleanup service 연결을 검증한다.
-- [ ] recovery 흐름에서 cleanup이 재시도 가능한지 검증한다.
-- [ ] cleanup 단독 실패를 찾기 위한 별도 scheduler가 추가되지 않았고, 기존 recovery 흐름을 재사용하는지 확인한다.
-- [ ] API 모듈이 matching Redis repository를 직접 import하지 않는지 확인한다.
+- [x] 정상 종료 + record 2행 완료 후 참가자 2명의 `IN_GAME` status가 제거되는지 검증한다.
+- [x] status가 이미 없는 참가자에 대한 cleanup이 no-op인지 검증한다.
+- [x] status가 `IN_GAME`이 아닌 경우 제거하지 않는지 검증한다.
+- [x] record count `0`이면 cleanup하지 않는지 검증한다.
+- [x] record count `1`이면 cleanup하지 않고 로그/예외 정책을 따르는지 검증한다.
+- [x] cleanup 실패가 gameRoom `FINISHED`와 record/rank 정산 결과를 rollback하지 않는지 검증한다.
+- [x] SMITE kill, both failed SMITE DRAW, natural death DRAW 경로에서 cleanup service 연결을 검증한다.
+- [x] recovery 흐름에서 cleanup이 재시도 가능한지 검증한다.
+- [x] cleanup 단독 실패를 찾기 위한 별도 scheduler가 추가되지 않았고, 기존 recovery 흐름을 재사용하는지 확인한다.
+- [x] API 모듈이 matching Redis repository를 직접 import하지 않는지 확인한다.
 
 ### 8. 문서 정합성
 
