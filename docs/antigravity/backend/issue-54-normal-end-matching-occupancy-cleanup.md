@@ -130,14 +130,14 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 ### 5. 기존 record/rank recovery 기반 재시도 연결
 
-- [ ] 별도 cleanup 전용 scheduler는 이번 이슈에서 추가하지 않는다.
-- [ ] 기존 `GameRecordRankSettlementRecoveryService`가 record/rank 정산 성공 후 cleanup service를 호출하게 한다.
-- [ ] recovery 후보가 재조회 시점에 이미 `record count == 2`라면 정산은 no-op으로 두고 cleanup은 재시도할 수 있게 한다.
-- [ ] `record count == 0`은 record/rank 재정산을 먼저 수행하고, 성공 후 cleanup을 호출한다.
-- [ ] `record count == 1`은 불완전 정산 상태이므로 cleanup하지 않고 기존 로그/알림 정책을 따른다.
-- [ ] cleanup 실패는 recovery 후보 처리를 중단하지 않도록 warn log로 격리한다.
-- [ ] cleanup은 Redis 상태 제거라 중복 실행 가능하도록 멱등성을 유지한다.
-- [ ] Redis `match:status` TTL 30분은 즉시 cleanup과 recovery cleanup이 모두 실패한 경우의 최후 안전장치로 문서화한다.
+- [x] 별도 cleanup 전용 scheduler는 이번 이슈에서 추가하지 않는다.
+- [x] 기존 `GameRecordRankSettlementRecoveryService`가 record/rank 정산 성공 후 cleanup service를 호출하게 한다.
+- [x] recovery 후보가 재조회 시점에 이미 `record count == 2`라면 정산은 no-op으로 두고 cleanup은 재시도할 수 있게 한다.
+- [x] `record count == 0`은 record/rank 재정산을 먼저 수행하고, 성공 후 cleanup을 호출한다.
+- [x] `record count == 1`은 불완전 정산 상태이므로 cleanup하지 않고 기존 로그/알림 정책을 따른다.
+- [x] cleanup 실패는 recovery 후보 처리를 중단하지 않도록 warn log로 격리한다.
+- [x] cleanup은 Redis 상태 제거라 중복 실행 가능하도록 멱등성을 유지한다.
+- [x] Redis `match:status` TTL 30분은 즉시 cleanup과 recovery cleanup이 모두 실패한 경우의 최후 안전장치로 문서화한다.
 
 ### 6. 큐 재진입 정책 정합성
 
