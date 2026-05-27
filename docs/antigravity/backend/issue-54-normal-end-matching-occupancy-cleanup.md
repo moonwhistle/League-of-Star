@@ -110,14 +110,14 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 ### 3. 종료 후 cleanup application service 추가
 
-- [ ] `smite-api`에 정상 종료 후 cleanup 전용 service를 추가한다.
-- [ ] service는 gameRoomId 기준으로 참가자 2명을 조회한다.
-- [ ] service는 record count를 조회해 `2`일 때만 matching cleanup을 호출한다.
-- [ ] `FINISHED`가 아닌 gameRoom이면 no-op 또는 warn log로 처리한다.
-- [ ] 참가자 수가 2명이 아니면 cleanup하지 않고 정합성 오류 로그를 남긴다.
-- [ ] cleanup 실패는 catch 후 warn log로 격리한다.
-- [ ] 로그에는 `gameRoomId`, participant userIds, record count, 실패 지점을 포함한다.
-- [ ] cleanup service는 gameRoom/result/record/rank DB 값을 변경하지 않는다.
+- [x] `smite-api`에 정상 종료 후 cleanup 전용 service를 추가한다.
+- [x] service는 gameRoomId 기준으로 참가자 2명을 조회한다.
+- [x] service는 record count를 조회해 `2`일 때만 matching cleanup을 호출한다.
+- [x] `FINISHED`가 아닌 gameRoom이면 no-op 또는 warn log로 처리한다.
+- [x] 참가자 수가 2명이 아니면 cleanup하지 않고 정합성 오류 로그를 남긴다.
+- [x] cleanup 실패는 catch 후 warn log로 격리한다.
+- [x] 로그에는 `gameRoomId`, participant userIds, record count, 실패 지점을 포함한다.
+- [x] cleanup service는 gameRoom/result/record/rank DB 값을 변경하지 않는다.
 
 ### 4. Step 9 정산 성공 이후 cleanup 연결
 
