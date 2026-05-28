@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,6 +47,7 @@ class MatchServiceTest {
         matchService.joinQueue(userId, tierScore);
 
         // then
+        verify(userStatusStore).setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class));
         verify(matchStore).add(any(MatchTicket.class));
     }
 
@@ -60,6 +63,23 @@ class MatchServiceTest {
         assertThatThrownBy(() -> matchService.joinQueue(userId, tierScore))
                 .isInstanceOf(MatchingException.class)
                 .hasFieldOrPropertyWithValue("errorCode", MatchingErrorCode.ALREADY_IN_QUEUE);
+        verify(matchStore, never()).add(any(MatchTicket.class));
+    }
+
+    @Test
+    @DisplayName("대기열 추가에 실패하면 매칭 상태를 롤백한다.")
+    void joinQueue_queueAddFailed_removeStatus() {
+        // given
+        Long userId = 1L;
+        int tierScore = 10;
+        given(userStatusStore.setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class))).willReturn(true);
+        doThrow(new IllegalStateException("queue add failed")).when(matchStore).add(any(MatchTicket.class));
+
+        // when & then
+        assertThatThrownBy(() -> matchService.joinQueue(userId, tierScore))
+                .isInstanceOf(MatchingException.class)
+                .hasFieldOrPropertyWithValue("errorCode", MatchingErrorCode.MATCH_QUEUE_ADD_ERROR);
+        verify(userStatusStore).removeStatus(userId);
     }
 
     @Test

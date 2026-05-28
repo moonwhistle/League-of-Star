@@ -181,21 +181,39 @@ flowchart TD
 
 ### 5. Redis 큐 진입 기존 정책 회귀 방지
 
-- [ ] DB active gameRoom 검증 통과 후 Redis `SETNX` 기반 중복 큐 방지 흐름이 그대로 동작하는지 확인함.
-- [ ] Redis `setStatusIfAbsent` 실패 시 기존 `ALREADY_IN_QUEUE`가 유지되는지 확인함.
-- [ ] Redis queue add 실패 시 `userStatusStore.removeStatus(userId)` rollback 흐름이 유지되는지 확인함.
-- [ ] rank 조회 실패 시 Redis 상태가 생성되지 않는 기존 순서를 유지함.
-- [ ] DB 검증 실패 시 Redis `match:status`와 `matching:queue`에 어떤 값도 쓰지 않는지 검증함.
+- [x] DB active gameRoom 검증 통과 후 Redis `SETNX` 기반 중복 큐 방지 흐름이 그대로 동작하는지 확인함.
+- [x] Redis `setStatusIfAbsent` 실패 시 기존 `ALREADY_IN_QUEUE`가 유지되는지 확인함.
+- [x] Redis queue add 실패 시 `userStatusStore.removeStatus(userId)` rollback 흐름이 유지되는지 확인함.
+- [x] rank 조회 실패 시 Redis 상태가 생성되지 않는 기존 순서를 유지함.
+- [x] DB 검증 실패 시 Redis `match:status`와 `matching:queue`에 어떤 값도 쓰지 않는지 검증함.
+
+검증 내용은 다음과 같음.
+
+- `MatchQueueServiceTest`에서 active gameRoom이 없으면 rank 조회 후 `MatchQueueCommandService.joinQueue`로 위임되는 기존 흐름을 검증함.
+- `MatchQueueServiceTest`에서 active gameRoom이 있으면 rank 조회와 matching command 호출이 모두 발생하지 않음을 검증함.
+- `MatchQueueServiceTest`에서 rank 조회 실패 시 matching command가 호출되지 않음을 검증함.
+- `MatchQueueCommandServiceTest`에서 Redis `setStatusIfAbsent` 실패 시 `ALREADY_IN_QUEUE`가 유지되고 queue add가 호출되지 않음을 검증함.
+- `MatchQueueCommandServiceTest`에서 queue add 실패 시 `MATCH_QUEUE_ADD_ERROR`를 던지고 `userStatusStore.removeStatus(userId)`로 rollback하는 흐름을 검증함.
 
 ### 6. 단위 테스트 추가
 
-- [ ] `MatchQueueServiceTest`에서 active gameRoom 존재 시 `MatchingException`이 발생하는지 검증함.
-- [ ] active gameRoom 존재 시 `RankReadService.getUserRankInfo`가 호출되지 않는지 검증함.
-- [ ] active gameRoom 존재 시 `MatchQueueCommandService.joinQueue`가 호출되지 않는지 검증함.
-- [ ] active gameRoom이 없으면 기존처럼 rank 조회 후 matching command가 호출되는지 검증함.
-- [ ] `leaveQueue`는 active gameRoom 검증 없이 기존 rank 조회와 matching command 이탈 흐름을 유지하는지 검증함.
-- [ ] `GameRoomRepositoryTest` 또는 `GameRoomReadServiceJpaTest`에서 `READY`, `IN_PROGRESS`는 active gameRoom으로 조회되는지 검증함.
-- [ ] `GameRoomRepositoryTest` 또는 `GameRoomReadServiceJpaTest`에서 `FINISHED`, `ABORTED`는 active gameRoom으로 조회되지 않는지 검증함.
+- [x] `MatchQueueServiceTest`에서 active gameRoom 존재 시 `MatchingException`이 발생하는지 검증함.
+- [x] active gameRoom 존재 시 `RankReadService.getUserRankInfo`가 호출되지 않는지 검증함.
+- [x] active gameRoom 존재 시 `MatchQueueCommandService.joinQueue`가 호출되지 않는지 검증함.
+- [x] active gameRoom이 없으면 기존처럼 rank 조회 후 matching command가 호출되는지 검증함.
+- [x] `leaveQueue`는 active gameRoom 검증 없이 기존 rank 조회와 matching command 이탈 흐름을 유지하는지 검증함.
+- [x] `GameRoomRepositoryTest` 또는 `GameRoomReadServiceJpaTest`에서 `READY`, `IN_PROGRESS`는 active gameRoom으로 조회되는지 검증함.
+- [x] `GameRoomRepositoryTest` 또는 `GameRoomReadServiceJpaTest`에서 `FINISHED`, `ABORTED`는 active gameRoom으로 조회되지 않는지 검증함.
+
+추가한 테스트 범위는 다음과 같음.
+
+- `MatchQueueServiceTest.joinQueue_activeGameRoom_exists`에서 active gameRoom 존재 시 `ACTIVE_GAME_ROOM_EXISTS` 예외와 rank/matching command 미호출을 검증함.
+- `MatchQueueServiceTest.joinQueue_success`에서 active gameRoom이 없으면 rank 조회 후 matching command로 위임되는 정상 흐름을 검증함.
+- `MatchQueueServiceTest.joinQueue_rank_not_found`에서 active gameRoom 검증 통과 후 rank 조회 실패 시 matching command가 호출되지 않음을 검증함.
+- `MatchQueueServiceTest.leaveQueue_success`에서 queue leave는 active gameRoom DB 검증 없이 기존 rank 조회와 matching command 이탈 흐름을 유지하는지 검증함.
+- `GameRoomReadServiceTest.existsActiveGameRoomByUserId`에서 read service가 `READY`, `IN_PROGRESS` status 목록으로 repository를 호출하는지 검증함.
+- `GameRoomReadServiceJpaTest.existsActiveGameRoomByUserId_ReadyAndInProgress_ReturnTrue`에서 DB에 저장된 `READY`, `IN_PROGRESS` gameRoom 참가자는 true로 조회되는지 검증함.
+- `GameRoomReadServiceJpaTest.existsActiveGameRoomByUserId_FinishedAndAborted_ReturnFalse`에서 `FINISHED`, `ABORTED`, unknown user는 false로 조회되는지 검증함.
 
 ### 7. 문서 정합성
 

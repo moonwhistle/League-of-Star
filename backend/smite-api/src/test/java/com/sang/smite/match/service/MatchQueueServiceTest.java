@@ -44,6 +44,7 @@ class MatchQueueServiceTest {
         int tierScore = 15;
         UserRankInfo rankInfo = mock(UserRankInfo.class);
         given(rankInfo.getTierScore()).willReturn(tierScore);
+        given(gameRoomReadService.existsActiveGameRoomByUserId(userId)).willReturn(false);
         given(rankReadService.getUserRankInfo(userId)).willReturn(rankInfo);
 
         // when
@@ -76,6 +77,7 @@ class MatchQueueServiceTest {
     void joinQueue_rank_not_found() {
         // given
         Long userId = 1L;
+        given(gameRoomReadService.existsActiveGameRoomByUserId(userId)).willReturn(false);
         given(rankReadService.getUserRankInfo(userId)).willThrow(new CoreException(CoreErrorCode.RANK_NOT_FOUND));
 
         // when & then
