@@ -809,7 +809,7 @@ gameRoom 생성 실패 mapping:
 - 정산 완료 전 조회는 명시적인 pending/재시도 응답으로 처리됨
 - `GAME_RESULT` payload에는 LP/rank/series 정보가 추가되지 않음
 
-### Issue 59. Apex rank 자동 승급/강등 정산
+### Issue 58. Apex rank 자동 승급/강등 정산
 
 목표:
 
@@ -872,7 +872,7 @@ gameRoom 생성 실패 mapping:
 - Apex 유저끼리는 LP 근접도와 대기 시간 확장 정책에 따라 매칭됨
 - 일반 티어 유저 매칭 결과가 기존 정책과 동일하게 유지됨
 
-### Issue 58. 배치 유저 매칭 정책 정합성
+### Issue 59. 배치 유저 매칭 정책 정합성
 
 목표:
 
@@ -951,3 +951,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-27 | Step 10 정상 종료 후 매칭 점유 상태 cleanup 문서를 Issue 54로 생성하고, cleanup 범위를 Redis 전체 삭제가 아니라 `match:status:{userId}=IN_GAME` 해제로 고정 |
 | 2026-05-27 | Step 10 구현 결과를 policy/domain/matching 문서에 반영하고, 기존 배치 유저 매칭 정책 정합성 번호를 Issue 58로 조정해 Issue 54 중복 제거 |
 | 2026-05-27 | Step 11 summary 조회 API 구현 결과를 policy/domain/WebSocket/checkpoint 문서에 반영하고, 중복된 Issue 56 번호를 Issue 60으로 조정 |
+| 2026-05-28 | 현재 작업 브랜치 기준으로 Step 12 Apex rank 자동 승급/강등 정산을 Issue 58로 확정하고, 배치 유저 매칭 정책 정합성을 Issue 59로 조정 |
