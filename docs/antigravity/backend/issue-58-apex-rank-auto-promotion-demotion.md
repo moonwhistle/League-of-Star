@@ -137,53 +137,53 @@ flowchart TD
 
 ### 3. Apex 승리 정산 구현
 
-- [ ] Master 승리 시 `before.lp + before.rank().calculateWinLp(opponentBefore.rank())`로 next LP를 계산함.
-- [ ] Master next LP가 200 이상이면 `Rank.of(Tier.GRANDMASTER, null)`과 next LP로 갱신함.
-- [ ] Master next LP가 200 미만이면 `MASTER`와 next LP로 유지함.
-- [ ] Grandmaster 승리 시 next LP가 500 이상이면 `Rank.of(Tier.CHALLENGER, null)`과 next LP로 갱신함.
-- [ ] Grandmaster next LP가 500 미만이면 `GRANDMASTER`와 next LP로 유지함.
-- [ ] Challenger 승리 시 `CHALLENGER`와 next LP로 유지함.
-- [ ] Apex 승리 정산에서는 `rankSeriesRepository.save(RankSeries.createPromotion(...))`를 호출하지 않음.
+- [x] Master 승리 시 `before.lp + before.rank().calculateWinLp(opponentBefore.rank())`로 next LP를 계산함.
+- [x] Master next LP가 200 이상이면 `Rank.of(Tier.GRANDMASTER, null)`과 next LP로 갱신함.
+- [x] Master next LP가 200 미만이면 `MASTER`와 next LP로 유지함.
+- [x] Grandmaster 승리 시 next LP가 500 이상이면 `Rank.of(Tier.CHALLENGER, null)`과 next LP로 갱신함.
+- [x] Grandmaster next LP가 500 미만이면 `GRANDMASTER`와 next LP로 유지함.
+- [x] Challenger 승리 시 `CHALLENGER`와 next LP로 유지함.
+- [x] Apex 승리 정산에서는 `rankSeriesRepository.save(RankSeries.createPromotion(...))`를 호출하지 않음.
 
 ### 4. Apex 패배 정산 구현
 
-- [ ] Master 패배 시 `before.lp == 0`이면 `Rank.of(Tier.DIAMOND, Division.I)`와 75 LP로 강등함.
-- [ ] Master 패배 시 `before.lp > 0`이면 기존 loss LP 공식으로 차감하고, LP 최소값은 0으로 유지함.
-- [ ] Master가 패배로 0LP가 된 경우에도 rank는 `MASTER`로 유지함.
-- [ ] Grandmaster 패배 시 loss LP를 차감한 after LP가 200 미만이면 `MASTER`로 강등함.
-- [ ] Grandmaster 패배 시 after LP가 200 이상이면 `GRANDMASTER`로 유지함.
-- [ ] Challenger 패배 시 loss LP를 차감한 after LP가 500 미만이면 `GRANDMASTER`로 강등함.
-- [ ] Challenger 패배 시 after LP가 500 이상이면 `CHALLENGER`로 유지함.
-- [ ] 모든 Apex 패배 정산에서 LP는 음수가 되지 않도록 기존 `UserRankInfo` clamp 정책과 일관되게 처리함.
+- [x] Master 패배 시 `before.lp == 0`이면 `Rank.of(Tier.DIAMOND, Division.I)`와 75 LP로 강등함.
+- [x] Master 패배 시 `before.lp > 0`이면 기존 loss LP 공식으로 차감하고, LP 최소값은 0으로 유지함.
+- [x] Master가 패배로 0LP가 된 경우에도 rank는 `MASTER`로 유지함.
+- [x] Grandmaster 패배 시 loss LP를 차감한 after LP가 200 미만이면 `MASTER`로 강등함.
+- [x] Grandmaster 패배 시 after LP가 200 이상이면 `GRANDMASTER`로 유지함.
+- [x] Challenger 패배 시 loss LP를 차감한 after LP가 500 미만이면 `GRANDMASTER`로 강등함.
+- [x] Challenger 패배 시 after LP가 500 이상이면 `CHALLENGER`로 유지함.
+- [x] 모든 Apex 패배 정산에서 LP는 음수가 되지 않도록 기존 `UserRankInfo` clamp 정책과 일관되게 처리함.
 
 ### 5. record snapshot 정합성 유지
 
-- [ ] `RankRecordSettlementResult.rankBefore`는 정산 전 rank를 그대로 반환하는지 검증함.
-- [ ] `RankRecordSettlementResult.rankAfter`는 Apex 자동 승급/강등 후 rank를 반환하는지 검증함.
-- [ ] `RankRecordSettlementResult.lpBefore`는 정산 전 LP를 그대로 반환하는지 검증함.
-- [ ] `RankRecordSettlementResult.lpAfter`는 Apex 자동 승급/강등 후 LP를 반환하는지 검증함.
-- [ ] `GameRecord.create`의 `lpChange = lpAfter - lpBefore` 계산을 그대로 재사용함.
-- [ ] summary API의 `rankBefore/rankAfter` 문자열 변환은 기존 Apex tier-only 반환 정책을 그대로 유지함.
+- [x] `RankRecordSettlementResult.rankBefore`는 정산 전 rank를 그대로 반환하는지 검증함.
+- [x] `RankRecordSettlementResult.rankAfter`는 Apex 자동 승급/강등 후 rank를 반환하는지 검증함.
+- [x] `RankRecordSettlementResult.lpBefore`는 정산 전 LP를 그대로 반환하는지 검증함.
+- [x] `RankRecordSettlementResult.lpAfter`는 Apex 자동 승급/강등 후 LP를 반환하는지 검증함.
+- [x] `GameRecord.create`의 `lpChange = lpAfter - lpBefore` 계산을 그대로 재사용함.
+- [x] summary API의 `rankBefore/rankAfter` 문자열 변환은 기존 Apex tier-only 반환 정책을 그대로 유지함.
 
 ### 6. 기존 정책 회귀 방지
 
-- [ ] Iron ~ Diamond 일반 티어 승리 시 기존 승급전 진입 정책이 유지되는지 확인함.
-- [ ] Diamond I → Master는 자동 승급이 아니라 기존 승급전 성공 후 Master 0LP가 되는지 검증함.
-- [ ] 일반 티어 LP 0 패배 시 이전 rank LP 75 강등 정책이 유지되는지 확인함.
-- [ ] 진행 중 `PLACEMENT` RankSeries가 있으면 Apex LP 자동정산이 개입하지 않는지 확인함.
-- [ ] 진행 중 `PROMOTION` RankSeries가 있으면 Apex LP 자동정산이 개입하지 않는지 확인함.
-- [ ] Apex 정산 추가 후 `RankCommandService.applyRecordResults`가 기존 before snapshot 기준으로 양 참가자의 LP를 계산하는 구조를 유지함.
+- [x] Iron ~ Diamond 일반 티어 승리 시 기존 승급전 진입 정책이 유지되는지 확인함.
+- [x] Diamond I → Master는 자동 승급이 아니라 기존 승급전 성공 후 Master 0LP가 되는지 검증함.
+- [x] 일반 티어 LP 0 패배 시 이전 rank LP 75 강등 정책이 유지되는지 확인함.
+- [x] 진행 중 `PLACEMENT` RankSeries가 있으면 Apex LP 자동정산이 개입하지 않는지 확인함.
+- [x] 진행 중 `PROMOTION` RankSeries가 있으면 Apex LP 자동정산이 개입하지 않는지 확인함.
+- [x] Apex 정산 추가 후 `RankCommandService.applyRecordResults`가 기존 before snapshot 기준으로 양 참가자의 LP를 계산하는 구조를 유지함.
 
 ### 7. 단위 테스트 추가
 
-- [ ] `RankCommandServiceTest`에 Master 190LP 승리 후 Grandmaster 승급 케이스를 추가함.
-- [ ] `RankCommandServiceTest`에 Master 10LP 패배 후 Master 0LP 유지 케이스를 추가함.
-- [ ] `RankCommandServiceTest`에 Master 0LP 패배 후 Diamond I 75LP 강등 케이스를 추가함.
-- [ ] `RankCommandServiceTest`에 Grandmaster 490LP 승리 후 Challenger 승급 케이스를 추가함.
-- [ ] `RankCommandServiceTest`에 Grandmaster 200LP 패배 후 Master 강등 케이스를 추가함.
-- [ ] `RankCommandServiceTest`에 Challenger 500LP 패배 후 Grandmaster 강등 케이스를 추가함.
-- [ ] `RankCommandServiceTest`에 Apex 승리 정산에서 `rankSeriesRepository.save`가 호출되지 않는지 검증함.
-- [ ] 각 테스트에서 `rankBefore/rankAfter`, `lpBefore/lpAfter`, `seriesType=RANK`, `rankSeriesId=null`을 함께 검증함.
+- [x] `RankCommandServiceTest`에 Master 190LP 승리 후 Grandmaster 승급 케이스를 추가함.
+- [x] `RankCommandServiceTest`에 Master 10LP 패배 후 Master 0LP 유지 케이스를 추가함.
+- [x] `RankCommandServiceTest`에 Master 0LP 패배 후 Diamond I 75LP 강등 케이스를 추가함.
+- [x] `RankCommandServiceTest`에 Grandmaster 490LP 승리 후 Challenger 승급 케이스를 추가함.
+- [x] `RankCommandServiceTest`에 Grandmaster 200LP 패배 후 Master 강등 케이스를 추가함.
+- [x] `RankCommandServiceTest`에 Challenger 500LP 패배 후 Grandmaster 강등 케이스를 추가함.
+- [x] `RankCommandServiceTest`에 Apex 승리 정산에서 `rankSeriesRepository.save`가 호출되지 않는지 검증함.
+- [x] 각 테스트에서 `rankBefore/rankAfter`, `lpBefore/lpAfter`, `seriesType=RANK`, `rankSeriesId=null`을 함께 검증함.
 
 ### 8. 문서 정합성
 

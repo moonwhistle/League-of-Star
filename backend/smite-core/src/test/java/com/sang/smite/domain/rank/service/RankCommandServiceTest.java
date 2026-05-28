@@ -258,6 +258,45 @@ class RankCommandServiceTest {
     }
 
     @Test
+    @DisplayName("applyRecordResults - Diamond I 승급전 성공 시 Master 0LP로 확정한다")
+    void applyRecordResults_DiamondToMasterPromotionSuccess() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.DIAMOND, Division.I), 100);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.DIAMOND, Division.I), 30);
+        RankSeries promotion = RankSeries.builder()
+                .id(20L)
+                .userId(TEST_USER_ID)
+                .type(SeriesType.PROMOTION)
+                .targetRank(Rank.of(Tier.MASTER, null))
+                .wins(1)
+                .totalGamesRequired(3)
+                .build();
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        given(rankSeriesRepository.findByUserIdAndStatus(TEST_USER_ID, SeriesStatus.IN_PROGRESS))
+                .willReturn(Optional.of(promotion));
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.WIN
+                )
+        ));
+
+        // then
+        assertThat(promotion.getStatus()).isEqualTo(SeriesStatus.SUCCESS);
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.MASTER, null));
+        assertThat(user.getLp()).isZero();
+        assertThat(results.get(0).rankBefore()).isEqualTo(Rank.of(Tier.DIAMOND, Division.I));
+        assertThat(results.get(0).rankAfter()).isEqualTo(Rank.of(Tier.MASTER, null));
+        assertThat(results.get(0).lpBefore()).isEqualTo(100);
+        assertThat(results.get(0).lpAfter()).isZero();
+        assertThat(results.get(0).seriesType()).isEqualTo(GameRecordSeriesType.PROMOTION);
+    }
+
+    @Test
     @DisplayName("applyRecordResults - promotion에서 2승이 불가능해지면 실패하고 기존 rank LP 75로 확정한다")
     void applyRecordResults_PromotionFailedWhenTwoWinsImpossible() {
         // given
@@ -351,6 +390,194 @@ class RankCommandServiceTest {
         assertThat(results.get(0).rankAfter()).isEqualTo(Rank.of(Tier.BRONZE, Division.I));
     }
 
+    @Test
+    @DisplayName("applyRecordResults - Master 190LP 승리 시 Grandmaster로 자동 승급한다")
+    void applyRecordResults_MasterWinPromotesToGrandmaster() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.MASTER, null), 190);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.MASTER, null), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.WIN
+                )
+        ));
+
+        // then
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.GRANDMASTER, null));
+        assertThat(user.getLp()).isEqualTo(215);
+        assertApexRankResult(
+                results.get(0),
+                190,
+                215,
+                Rank.of(Tier.MASTER, null),
+                Rank.of(Tier.GRANDMASTER, null)
+        );
+        verify(rankSeriesRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - Master 10LP 패배 시 Master 0LP로 유지한다")
+    void applyRecordResults_MasterLossToZeroKeepsMaster() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.MASTER, null), 10);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.MASTER, null), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.LOSS
+                )
+        ));
+
+        // then
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.MASTER, null));
+        assertThat(user.getLp()).isZero();
+        assertApexRankResult(
+                results.get(0),
+                10,
+                0,
+                Rank.of(Tier.MASTER, null),
+                Rank.of(Tier.MASTER, null)
+        );
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - Master 0LP 패배 시 Diamond I 75LP로 강등한다")
+    void applyRecordResults_MasterZeroLpLossDemotesToDiamondI() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.MASTER, null), 0);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.MASTER, null), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.LOSS
+                )
+        ));
+
+        // then
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.DIAMOND, Division.I));
+        assertThat(user.getLp()).isEqualTo(75);
+        assertApexRankResult(
+                results.get(0),
+                0,
+                75,
+                Rank.of(Tier.MASTER, null),
+                Rank.of(Tier.DIAMOND, Division.I)
+        );
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - Grandmaster 490LP 승리 시 Challenger로 자동 승급한다")
+    void applyRecordResults_GrandmasterWinPromotesToChallenger() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.GRANDMASTER, null), 490);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.GRANDMASTER, null), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.WIN
+                )
+        ));
+
+        // then
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.CHALLENGER, null));
+        assertThat(user.getLp()).isEqualTo(515);
+        assertApexRankResult(
+                results.get(0),
+                490,
+                515,
+                Rank.of(Tier.GRANDMASTER, null),
+                Rank.of(Tier.CHALLENGER, null)
+        );
+        verify(rankSeriesRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - Grandmaster 200LP 패배 시 Master로 자동 강등한다")
+    void applyRecordResults_GrandmasterLossDemotesToMaster() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.GRANDMASTER, null), 200);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.GRANDMASTER, null), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.LOSS
+                )
+        ));
+
+        // then
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.MASTER, null));
+        assertThat(user.getLp()).isEqualTo(175);
+        assertApexRankResult(
+                results.get(0),
+                200,
+                175,
+                Rank.of(Tier.GRANDMASTER, null),
+                Rank.of(Tier.MASTER, null)
+        );
+    }
+
+    @Test
+    @DisplayName("applyRecordResults - Challenger 500LP 패배 시 Grandmaster로 자동 강등한다")
+    void applyRecordResults_ChallengerLossDemotesToGrandmaster() {
+        // given
+        UserRankInfo user = rankInfo(TEST_USER_ID, Rank.of(Tier.CHALLENGER, null), 500);
+        UserRankInfo opponent = rankInfo(OPPONENT_USER_ID, Rank.of(Tier.CHALLENGER, null), 30);
+        given(userRankInfoRepository.findByUserIdForUpdate(TEST_USER_ID)).willReturn(Optional.of(user));
+        given(userRankInfoRepository.findByUserIdForUpdate(OPPONENT_USER_ID)).willReturn(Optional.of(opponent));
+        givenNoActiveSeriesFor(TEST_USER_ID);
+
+        // when
+        List<RankRecordSettlementResult> results = rankCommandService.applyRecordResults(List.of(
+                new RankRecordSettlementCommand(
+                        TEST_USER_ID,
+                        OPPONENT_USER_ID,
+                        GameRecordResult.LOSS
+                )
+        ));
+
+        // then
+        assertThat(user.getRank()).isEqualTo(Rank.of(Tier.GRANDMASTER, null));
+        assertThat(user.getLp()).isEqualTo(475);
+        assertApexRankResult(
+                results.get(0),
+                500,
+                475,
+                Rank.of(Tier.CHALLENGER, null),
+                Rank.of(Tier.GRANDMASTER, null)
+        );
+    }
+
     private UserRankInfo rankInfo(Long userId, Rank rank, int lp) {
         return UserRankInfo.builder()
                 .userId(userId)
@@ -364,5 +591,20 @@ class RankCommandServiceTest {
             given(rankSeriesRepository.findByUserIdAndStatus(userId, SeriesStatus.IN_PROGRESS))
                     .willReturn(Optional.empty());
         }
+    }
+
+    private void assertApexRankResult(
+            RankRecordSettlementResult result,
+            int lpBefore,
+            int lpAfter,
+            Rank rankBefore,
+            Rank rankAfter
+    ) {
+        assertThat(result.rankSeriesId()).isNull();
+        assertThat(result.seriesType()).isEqualTo(GameRecordSeriesType.RANK);
+        assertThat(result.lpBefore()).isEqualTo(lpBefore);
+        assertThat(result.lpAfter()).isEqualTo(lpAfter);
+        assertThat(result.rankBefore()).isEqualTo(rankBefore);
+        assertThat(result.rankAfter()).isEqualTo(rankAfter);
     }
 }
