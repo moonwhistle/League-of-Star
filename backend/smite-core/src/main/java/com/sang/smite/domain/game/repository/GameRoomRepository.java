@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,5 +34,17 @@ public interface GameRoomRepository extends JpaRepository<GameRoom, Long> {
             @Param("status") GameStatus status,
             @Param("expectedRecordCount") long expectedRecordCount,
             Pageable pageable
+    );
+
+    @Query("""
+            select case when count(g) > 0 then true else false end
+            from GameRoom g
+            join g.participants p
+            where p.userId = :userId
+              and g.status in :statuses
+            """)
+    boolean existsByParticipantUserIdAndStatusIn(
+            @Param("userId") Long userId,
+            @Param("statuses") Collection<GameStatus> statuses
     );
 }

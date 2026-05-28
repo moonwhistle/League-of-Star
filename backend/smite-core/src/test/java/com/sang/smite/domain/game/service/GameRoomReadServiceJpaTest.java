@@ -3,6 +3,7 @@ package com.sang.smite.domain.game.service;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.game.domain.GameRoom;
+import com.sang.smite.domain.game.domain.vo.GameStatus;
 import com.sang.smite.domain.game.repository.GameRoomRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
@@ -11,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -23,6 +26,8 @@ class GameRoomReadServiceJpaTest {
 
     private static final Long FIRST_USER_ID = 1L;
     private static final Long SECOND_USER_ID = 2L;
+    private static final Long THIRD_USER_ID = 3L;
+    private static final Long FOURTH_USER_ID = 4L;
     private static final Long UNKNOWN_USER_ID = 999L;
 
     @Autowired
@@ -95,5 +100,49 @@ class GameRoomReadServiceJpaTest {
 
         // then
         assertThat(result).containsExactlyInAnyOrder(FIRST_USER_ID, SECOND_USER_ID);
+    }
+
+    @Test
+    @DisplayName("existsActiveGameRoomByUserId - READY/IN_PROGRESS 게임룸 참가자이면 true를 반환한다")
+    void existsActiveGameRoomByUserId_ReadyAndInProgress_ReturnTrue() {
+        // given
+        GameRoom readyRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        GameRoom inProgressRoom = gameRoomCommandService.createReadyRoom(THIRD_USER_ID, FOURTH_USER_ID);
+        gameRoomCommandService.startReadyRoomIfReady(inProgressRoom.getId(), LocalDateTime.now());
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        boolean readyResult = gameRoomReadService.existsActiveGameRoomByUserId(FIRST_USER_ID);
+        boolean inProgressResult = gameRoomReadService.existsActiveGameRoomByUserId(THIRD_USER_ID);
+
+        // then
+        assertThat(readyRoom.getStatus()).isEqualTo(GameStatus.READY);
+        assertThat(readyResult).isTrue();
+        assertThat(inProgressResult).isTrue();
+    }
+
+    @Test
+    @DisplayName("existsActiveGameRoomByUserId - FINISHED/ABORTED 게임룸 참가자이면 false를 반환한다")
+    void existsActiveGameRoomByUserId_FinishedAndAborted_ReturnFalse() {
+        // given
+        GameRoom finishedRoom = gameRoomCommandService.createReadyRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomCommandService.startReadyRoomIfReady(finishedRoom.getId(), LocalDateTime.now());
+        gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(finishedRoom.getId());
+
+        GameRoom abortedRoom = gameRoomCommandService.createReadyRoom(THIRD_USER_ID, FOURTH_USER_ID);
+        gameRoomCommandService.abortReadyRoomIfReady(abortedRoom.getId());
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        boolean finishedResult = gameRoomReadService.existsActiveGameRoomByUserId(FIRST_USER_ID);
+        boolean abortedResult = gameRoomReadService.existsActiveGameRoomByUserId(THIRD_USER_ID);
+        boolean unknownResult = gameRoomReadService.existsActiveGameRoomByUserId(UNKNOWN_USER_ID);
+
+        // then
+        assertThat(finishedResult).isFalse();
+        assertThat(abortedResult).isFalse();
+        assertThat(unknownResult).isFalse();
     }
 }

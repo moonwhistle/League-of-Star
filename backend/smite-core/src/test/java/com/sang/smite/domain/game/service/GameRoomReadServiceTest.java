@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class GameRoomReadServiceTest {
@@ -172,6 +173,27 @@ class GameRoomReadServiceTest {
         assertThatThrownBy(() -> gameRoomReadService.getParticipantUserIds(GAME_ROOM_ID))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("existsActiveGameRoomByUserId - READY/IN_PROGRESS 게임룸 참여 여부를 조회한다")
+    void existsActiveGameRoomByUserId() {
+        // given
+        given(gameRoomRepository.existsByParticipantUserIdAndStatusIn(
+                FIRST_USER_ID,
+                List.of(GameStatus.READY, GameStatus.IN_PROGRESS)
+        )).willReturn(true);
+
+        // when
+        boolean result = gameRoomReadService.existsActiveGameRoomByUserId(FIRST_USER_ID);
+
+        // then
+        assertThat(result).isTrue();
+        then(gameRoomRepository).should()
+                .existsByParticipantUserIdAndStatusIn(
+                        FIRST_USER_ID,
+                        List.of(GameStatus.READY, GameStatus.IN_PROGRESS)
+                );
     }
 
     @Test

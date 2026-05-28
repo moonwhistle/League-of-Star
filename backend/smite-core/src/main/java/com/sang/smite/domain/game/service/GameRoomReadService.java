@@ -19,6 +19,11 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class GameRoomReadService {
 
+    private static final List<GameStatus> ACTIVE_GAME_ROOM_STATUSES = List.of(
+            GameStatus.READY,
+            GameStatus.IN_PROGRESS
+    );
+
     private final GameRoomRepository gameRoomRepository;
 
     public void validateReadyParticipant(Long gameRoomId, Long userId) {
@@ -51,6 +56,10 @@ public class GameRoomReadService {
         return gameRoom.getParticipants().stream()
                 .map(GameParticipant::getUserId)
                 .toList();
+    }
+
+    public boolean existsActiveGameRoomByUserId(Long userId) {
+        return gameRoomRepository.existsByParticipantUserIdAndStatusIn(userId, ACTIVE_GAME_ROOM_STATUSES);
     }
 
     public GameRoomSummaryReadModel getSummaryReadModel(Long gameRoomId) {
