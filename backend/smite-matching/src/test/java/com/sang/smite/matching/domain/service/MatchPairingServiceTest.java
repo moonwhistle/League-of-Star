@@ -144,23 +144,45 @@ class MatchPairingServiceTest {
     }
 
     @Test
-    @DisplayName("Sliding Window: 31초 이상 대기 시 ±8 티어까지 매칭")
+    @DisplayName("Sliding Window: 30초 정확히 대기 시 ±4 티어까지만 매칭")
     void testSlidingWindow_Level4() {
-        long now = System.currentTimeMillis();
+        long now = 100_000L;
         Timer.Sample mockSample = mock(Timer.Sample.class);
         given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
 
-        MatchTicket userA = new MatchTicket(1L, 10, now - 35000); // 35초 대기 (±8)
-        MatchTicket userB = new MatchTicket(2L, 19, now - 4000); // 티어 차이 9 -> 불가
-        MatchTicket userC = new MatchTicket(3L, 18, now - 3000); // 티어 차이 8 -> 매칭 가능
+        MatchTicket userA = new MatchTicket(1L, 10, now - 30_000); // 30초 대기 (±4)
+        MatchTicket userB = new MatchTicket(2L, 15, now - 4000); // 티어 차이 5 -> 불가
+        MatchTicket userC = new MatchTicket(3L, 14, now - 3000); // 티어 차이 4 -> 매칭 가능
 
         given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB, userC)));
-        given(matchStore.atomicPairRemove(1L, 10, 3L, 18)).willReturn(true);
+        given(matchStore.atomicPairRemove(1L, 10, 3L, 14)).willReturn(true);
 
         matchEngineService.processMatching();
 
-        verify(matchStore).atomicPairRemove(1L, 10, 3L, 18);
+        verify(matchStore).atomicPairRemove(1L, 10, 3L, 14);
         verify(matchFoundService).process(userA, userC);
+        verify(matchStore, never()).atomicPairRemove(1L, 10, 2L, 15);
+    }
+
+    @Test
+    @DisplayName("Sliding Window: 30초 초과 대기 시 전체 tierScore 범위 매칭")
+    void testSlidingWindow_FullRangeAfterThirtySeconds() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 1, now - 31_000); // 31초 대기 (전체 허용)
+        MatchTicket userB = new MatchTicket(2L, 37, now - 4000); // 전체 tierScore 차이 36 -> 매칭 가능
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB)));
+        given(matchStore.atomicPairRemove(1L, 1, 2L, 37)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore).atomicPairRemove(1L, 1, 2L, 37);
+        verify(matchFoundService).process(userA, userB);
     }
 
     @Test

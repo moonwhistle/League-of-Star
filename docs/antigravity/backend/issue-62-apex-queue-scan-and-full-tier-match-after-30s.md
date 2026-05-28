@@ -165,11 +165,20 @@ flowchart TD
 
 ### 3. 30초 초과 전체 tierScore 매칭 허용
 
-- [ ] `MatchPairingService.calculateAllowedTierDiff`의 마지막 구간을 `±8`이 아니라 전체 tierScore 차이 허용으로 변경함.
-- [ ] 전체 허용값은 `MatchingConstants.TIER_SCORE_MAX - MatchingConstants.TIER_SCORE_MIN` 기준으로 계산함.
-- [ ] `0~10초`, `10초 초과~20초`, `20초 초과~30초` 구간은 기존 `±1`, `±2`, `±4`를 유지함.
-- [ ] `isMatchable`의 `abs(userA.tierScore - userB.tierScore) <= allowedTierDiff` 구조는 유지함.
-- [ ] userA 대기 시간 기준으로 매칭 범위를 계산하는 기존 구조를 유지함.
+- [x] `MatchPairingService.calculateAllowedTierDiff`의 마지막 구간을 `±8`이 아니라 전체 tierScore 차이 허용으로 변경함.
+- [x] 전체 허용값은 `MatchingConstants.TIER_SCORE_MAX - MatchingConstants.TIER_SCORE_MIN` 기준으로 계산함.
+- [x] `0~10초`, `10초 초과~20초`, `20초 초과~30초` 구간은 기존 `±1`, `±2`, `±4`를 유지함.
+- [x] `isMatchable`의 `abs(userA.tierScore - userB.tierScore) <= allowedTierDiff` 구조는 유지함.
+- [x] userA 대기 시간 기준으로 매칭 범위를 계산하는 기존 구조를 유지함.
+
+구현 내용은 다음과 같음.
+
+- `MatchPairingService`의 30초 초과 허용값을 고정값 `8`에서 `MatchingConstants.TIER_SCORE_MAX - MatchingConstants.TIER_SCORE_MIN`으로 변경함.
+- 현재 상수 기준 `TIER_SCORE_MIN = 1`, `TIER_SCORE_MAX = 37`이므로 30초 초과 시 최대 tierScore 차이 `36`까지 매칭 가능함.
+- `0~10초 ±1`, `10초 초과~20초 ±2`, `20초 초과~30초 ±4` 분기는 변경하지 않음.
+- `isMatchable`은 기존처럼 userA 대기 시간으로 허용 차이를 계산하고, 두 유저의 tierScore 절대 차이를 비교함.
+- 30초 정확히 대기한 경우 `<= 30초` 분기에 남아 `±4`까지만 허용되도록 테스트로 고정함.
+- 30초 초과 대기한 경우 tierScore `1`과 `37`도 매칭되는지 테스트로 고정함.
 
 ### 4. Apex 즉시 매칭 동작 검증
 
