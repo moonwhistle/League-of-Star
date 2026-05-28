@@ -17,7 +17,7 @@ public final class MatchingConstants {
     public static final String TIMEOUT_CLAIM_LUA_SCRIPT_PATH = "scripts/timeout_claim.lua";
     public static final String TIMEOUT_RECLAIM_LUA_SCRIPT_PATH = "scripts/timeout_reclaim.lua";
     public static final int TIER_SCORE_MIN = 1;
-    public static final int TIER_SCORE_MAX = 28;
+    public static final int TIER_SCORE_MAX = 37;
     public static final int MATCH_RESPONSE_TIMEOUT_SECONDS = 10;
     public static final String TIMEOUT_SCHEDULER_FIXED_DELAY_MS = "1000";
     public static final int TIMEOUT_CANDIDATE_BATCH_SIZE = 100;

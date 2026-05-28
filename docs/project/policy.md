@@ -24,13 +24,25 @@
 
 | 대기 시간 | 매칭 범위 |
 |-----------|----------|
-| 0 ~ 10초 | ± 1 디비전 |
-| 10 ~ 20초 | ± 2 디비전 |
-| 20 ~ 30초 | ± 4 디비전 |
-| 30초 ~ | ± 8 디비전 (최대 확장) |
+| 0 ~ 10초 | ± 1 tierScore |
+| 10초 초과 ~ 20초 | ± 2 tierScore |
+| 20초 초과 ~ 30초 | ± 4 tierScore |
+| 30초 초과 | 전체 tierScore 범위 허용 |
 
 - 매칭 범위는 **대기 시간에 비례하여 점진적으로 확장**
-- Apex 티어(Master+)는 **LP 근접도** 기반 매칭 (± 100 LP 이내 → 점진 확장)
+- 매칭 허용 범위는 먼저 큐에 들어온 `userA`의 대기 시간을 기준으로 계산한다.
+- `30초 정확히`는 기존 `<= 30초` 구간으로 보고 `±4 tierScore`까지만 허용한다.
+- `30초 초과`부터는 `TIER_SCORE_MAX - TIER_SCORE_MIN` 기준 전체 tierScore 차이를 허용한다.
+- 현재 매칭 큐 스캔 범위는 `tierScore 1~37`이다.
+  - 일반 티어 Diamond I까지는 `1~28`
+  - Master는 `29`
+  - Grandmaster는 `33`
+  - Challenger는 `37`
+- Apex 티어(Master+)도 기존 `matching:queue:{tierScore}` 구조를 사용하며, 매칭 엔진은 `matching:queue:29`, `matching:queue:33`, `matching:queue:37`을 스캔 대상에 포함한다.
+- 같은 tierScore끼리는 diff `0`이므로 30초 이전에도 즉시 매칭될 수 있다.
+- 30초 초과 시에는 일반 티어와 Apex 티어를 포함한 전체 tierScore 매칭을 허용한다.
+- 이 정책은 사용자 수가 적은 MVP 환경에서 Apex 큐 누락과 장기 대기 실패를 줄이기 위한 보정이다.
+- Apex LP 근접도 기반 후보 정렬/필터링은 이번 MVP 범위에서 구현하지 않고 후속 고도화 범위로 둔다.
 - 배치 게임 중인 유저(`RankSeries.type=PLACEMENT`)는 **Silver IV ~ Gold IV 구간** 유저와 매칭
 
 ### 1.3 매칭 수락
@@ -359,7 +371,7 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 
 *   **Tier_Level**: Iron(1), Bronze(2), Silver(3), Gold(4), Platinum(5), Emerald(6), Diamond(7)
 *   **Division_Value**: I(1), II(2), III(3), IV(4)
-*   **특이사항**: Master 이상의 Apex 티어는 디비전 없이 `tierScore` 29 이상을 사용합니다. LP 증감은 일반 공식과 동일하게 계산하고, 매칭 후보 탐색만 LP 근접도 기준을 사용합니다.
+*   **특이사항**: Master 이상의 Apex 티어는 디비전 없이 Master 29, Grandmaster 33, Challenger 37의 `tierScore`를 사용합니다. LP 증감은 일반 공식과 동일하게 계산하고, 매칭 후보 탐색은 MVP 기준 tierScore 대기 시간 확장 정책을 사용합니다. Apex LP 근접도 기반 후보 정렬/필터링은 후속 고도화 범위입니다.
 
 **계산 예시:**
 *   **Iron IV**: (1 - 1) * 4 + (4 - 4) + 1 = **1점**

@@ -1,6 +1,7 @@
 package com.sang.smite.matching.domain.service;
 
 import com.sang.smite.domain.match.domain.MatchTicket;
+import com.sang.smite.matching.common.constant.MatchingConstants;
 import com.sang.smite.matching.metrics.MatchEngineMetrics;
 import com.sang.smite.matching.repository.MatchQueueStore;
 import io.micrometer.core.instrument.Timer;
@@ -34,7 +35,8 @@ public class MatchPairingService {
     private static final int TIER_DIFF_FIRST_STEP = 1;
     private static final int TIER_DIFF_SECOND_STEP = 2;
     private static final int TIER_DIFF_THIRD_STEP = 4;
-    private static final int TIER_DIFF_MAX = 8;
+    private static final int TIER_DIFF_FULL_RANGE =
+            MatchingConstants.TIER_SCORE_MAX - MatchingConstants.TIER_SCORE_MIN;
 
     private final MatchQueueStore matchStore;
     private final MatchFoundService matchFoundService;
@@ -208,6 +210,6 @@ public class MatchPairingService {
             return TIER_DIFF_THIRD_STEP;
         }
 
-        return TIER_DIFF_MAX;
+        return TIER_DIFF_FULL_RANGE;
     }
 }

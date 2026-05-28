@@ -47,6 +47,29 @@ class RedisMatchQueueStoreTest extends AbstractRedisTest {
     }
 
     @Test
+    @DisplayName("Apex tierScore 대기열도 전체 조회 대상에 포함된다")
+    void addAndFindAll_ApexTierScores() {
+        // given
+        MatchTicket master = new MatchTicket(1L, 29, System.currentTimeMillis());
+        MatchTicket grandmaster = new MatchTicket(2L, 33, System.currentTimeMillis() + 100);
+        MatchTicket challenger = new MatchTicket(3L, 37, System.currentTimeMillis() + 200);
+
+        // when
+        matchStore.add(master);
+        matchStore.add(grandmaster);
+        matchStore.add(challenger);
+
+        // then
+        List<MatchTicket> all = matchStore.findAll();
+        assertThat(all)
+                .extracting(MatchTicket::tierScore)
+                .containsExactlyInAnyOrder(29, 33, 37);
+        assertThat(all)
+                .extracting(MatchTicket::userId)
+                .containsExactlyInAnyOrder(1L, 2L, 3L);
+    }
+
+    @Test
     @DisplayName("루아 스크립트를 사용하여 두 명의 유저를 원자적으로 제거할 수 있다")
     void atomicPairRemove() {
         // given
@@ -61,6 +84,25 @@ class RedisMatchQueueStoreTest extends AbstractRedisTest {
         // then
         assertThat(result).isTrue();
         assertThat(matchStore.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("루아 스크립트를 사용하여 Apex tierScore 유저도 원자적으로 제거할 수 있다")
+    void atomicPairRemove_ApexTierScores() {
+        // given
+        MatchTicket master = new MatchTicket(101L, 29, System.currentTimeMillis());
+        MatchTicket challenger = new MatchTicket(102L, 37, System.currentTimeMillis());
+        matchStore.add(master);
+        matchStore.add(challenger);
+
+        // when
+        boolean result = matchStore.atomicPairRemove(101L, 29, 102L, 37);
+
+        // then
+        assertThat(result).isTrue();
+        assertThat(matchStore.findAll()).isEmpty();
+        assertThat(matchStore.countByTierScore(29)).isZero();
+        assertThat(matchStore.countByTierScore(37)).isZero();
     }
 
     @Test
@@ -102,6 +144,24 @@ class RedisMatchQueueStoreTest extends AbstractRedisTest {
         assertThat(countTier10).isEqualTo(2);
         assertThat(countTier12).isEqualTo(1);
         assertThat(countTier15).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("countByTierScore는 Apex tierScore 대기 인원도 정확히 반환한다")
+    void countByTierScore_ApexTierScores() {
+        // given
+        MatchTicket master = new MatchTicket(1L, 29, System.currentTimeMillis());
+        MatchTicket grandmaster = new MatchTicket(2L, 33, System.currentTimeMillis() + 100);
+        MatchTicket challenger = new MatchTicket(3L, 37, System.currentTimeMillis() + 200);
+
+        matchStore.add(master);
+        matchStore.add(grandmaster);
+        matchStore.add(challenger);
+
+        // when & then
+        assertThat(matchStore.countByTierScore(29)).isEqualTo(1);
+        assertThat(matchStore.countByTierScore(33)).isEqualTo(1);
+        assertThat(matchStore.countByTierScore(37)).isEqualTo(1);
     }
 
     @Test
