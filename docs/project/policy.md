@@ -549,3 +549,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-18 | 게임 대기 WebSocket 미연결 유저는 timeout 전까지 저장 상태 없음, timeout 후 이벤트 수신 불가 및 late handshake 거절 정책 명시 |
 | 2026-05-19 | RTT 5회 median 측정, 2500ms per-ping timeout, 15초 전체 제한, RTT 실패/초과 시 GAME_START 이전 `ABORTED` 정책 추가 |
 | 2026-05-20 | GAME_START 진입 조건, `startAt = serverNow + 4000ms`, 프론트 3초 countdown 렌더링, COUNTDOWN/GAME_START 사전 전송 정책 추가 |
+| 2026-05-28 | Apex rank 자동 승급/강등 정산 구현 완료. Master/Grandmaster/Challenger LP band와 Master 0LP 강등 정책을 record/rank 정산에 반영 |
