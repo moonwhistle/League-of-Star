@@ -42,9 +42,9 @@ flowchart TD
 - 이번 이슈는 Apex LP 근접도 기반 정교 매칭을 구현하지 않음.
 - 이번 이슈는 사용자 수가 적은 MVP 환경에서 Apex 누락과 장기 대기를 줄이는 보정 작업임.
 
-### Current Implementation Analysis
+### Issue Start Implementation Analysis
 
-현재 구현 상태는 다음과 같음.
+이슈 시작 시점의 구현 상태는 다음과 같음.
 
 - `MatchQueueService.joinQueue`는 `UserRankInfo.getTierScore()`를 계산해 `MatchQueueCommandService.joinQueue(userId, tierScore)`로 위임함.
 - `MatchQueueCommandService.joinQueue`는 `MatchTicket(userId, tierScore, entryTime)`을 생성해 Redis queue에 저장함.
@@ -247,11 +247,20 @@ flowchart TD
 
 ### 8. 문서 정합성
 
-- [ ] `docs/project/policy.md`의 매칭 범위를 30초 초과 전체 tierScore 허용 기준으로 갱신함.
-- [ ] `docs/project/policy.md`에 Apex queue scan 누락 방지와 MVP 보정임을 명시함.
-- [ ] `docs/antigravity/backend/plan-checkpoint.md` Step 14 체크리스트를 구현 결과에 맞게 갱신함.
-- [ ] Issue 문서에 구현 결과, 테스트 범위, 제외 범위를 반영함.
-- [ ] Apex LP 근접도 기반 정교화는 후속 고도화 범위로 문서에 남김.
+- [x] `docs/project/policy.md`의 매칭 범위를 30초 초과 전체 tierScore 허용 기준으로 갱신함.
+- [x] `docs/project/policy.md`에 Apex queue scan 누락 방지와 MVP 보정임을 명시함.
+- [x] `docs/antigravity/backend/plan-checkpoint.md` Step 14 체크리스트를 구현 결과에 맞게 갱신함.
+- [x] Issue 문서에 구현 결과, 테스트 범위, 제외 범위를 반영함.
+- [x] Apex LP 근접도 기반 정교화는 후속 고도화 범위로 문서에 남김.
+
+구현 내용은 다음과 같음.
+
+- `docs/project/policy.md`의 매칭 범위를 기존 `30초 이후 ±8 디비전`에서 `30초 초과 전체 tierScore 범위 허용`으로 갱신함.
+- 정책 문서에 `30초 정확히`는 `<= 30초` 구간으로 보고 `±4 tierScore`를 유지한다고 명시함.
+- 정책 문서에 Redis scan range가 `tierScore 1~37`이며 Master 29, Grandmaster 33, Challenger 37 queue를 포함한다고 명시함.
+- 정책 문서에 이번 변경이 사용자 수가 적은 MVP 환경에서 Apex 큐 누락과 장기 대기 실패를 줄이기 위한 보정임을 명시함.
+- `plan-checkpoint.md` Step 14를 구현 결과 기준으로 갱신하고, Apex LP 근접도 기반 후보 정렬/필터링은 후속 고도화 범위로 남김.
+- Issue 문서의 구현 전 분석 섹션을 `Issue Start Implementation Analysis`로 명확히 해 최종 구현 결과와 혼동되지 않도록 정리함.
 
 ## 📝 Note
 
@@ -261,3 +270,101 @@ flowchart TD
 - 이 트레이드오프는 매칭 실패와 과도한 대기 시간을 줄이기 위해 의도적으로 수용함.
 - 유저 수가 늘면 Apex LP 근접도 기반 후보 정렬/필터링을 별도 이슈로 고도화할 수 있음.
 - queue key, MatchTicket schema, Redis Lua atomic remove, match_found 후처리는 이번 이슈에서 변경하지 않음.
+
+## 📌 Summary
+
+```mermaid
+flowchart TD
+    A[MatchEngineScheduler] --> B[Redis queue scan]
+    B --> C[matching:queue:1 ~ 37 조회]
+    C --> D[entryTime 기준 FIFO 정렬]
+    D --> E[가장 오래 기다린 userA 선택]
+    E --> F{userA 대기 시간}
+
+    F -->|0~10초| G[허용 차이 ±1]
+    F -->|10초 초과~20초| H[허용 차이 ±2]
+    F -->|20초 초과~30초| I[허용 차이 ±4]
+    F -->|30초 초과| J[전체 tierScore 허용]
+
+    G --> K{tierScore 차이 허용?}
+    H --> K
+    I --> K
+    J --> K
+
+    K -->|Yes| L[Redis atomicPairRemove]
+    L --> M[MatchFoundService 후처리]
+    K -->|No| N[다음 후보 탐색]
+```
+
+Apex 티어가 매칭 엔진 scan 대상에서 누락되지 않도록 Redis queue scan 범위를 `tierScore 1~37`로 확장함.
+또한 사용자 수가 적은 MVP 환경에서 장기 대기 매칭 실패를 줄이기 위해 `30초 초과` 대기 시 전체 tierScore 범위 매칭을 허용함.
+
+현재 `Rank.getTierScore()` 기준 tierScore는 다음과 같음.
+
+| 구간 | tierScore |
+|------|-----------|
+| Iron IV ~ Diamond I | `1 ~ 28` |
+| Master | `29` |
+| Grandmaster | `33` |
+| Challenger | `37` |
+
+기존 scan 범위는 `1~28`이라 Diamond I까지만 조회했고, Master 이상 queue인 `matching:queue:29`, `matching:queue:33`, `matching:queue:37`은 매칭 엔진 후보 목록에서 빠질 수 있었음.
+그래서 Challenger 기준 tierScore인 `37`까지 scan 범위를 확장함.
+
+## 📚 Changes
+
+- `MatchingConstants.TIER_SCORE_MAX`를 `28`에서 `37`로 확장함.
+  - Master `29`, Grandmaster `33`, Challenger `37` queue가 scan 대상에 포함됨.
+  - 기존 `matching:queue:{tierScore}` key 구조는 유지함.
+
+- `MatchPairingService`의 30초 초과 허용 범위를 변경함.
+  - 기존: 30초 초과 `±8`
+  - 변경: `TIER_SCORE_MAX - TIER_SCORE_MIN` 기준 전체 tierScore 허용
+  - `0~10초 ±1`, `10초 초과~20초 ±2`, `20초 초과~30초 ±4`는 유지함.
+  - `30초 정확히`는 기존 `<= 30초` 분기로 남겨 `±4` 유지함.
+
+- Apex 즉시 매칭 동작을 테스트로 고정함.
+  - Master vs Master
+  - Grandmaster vs Grandmaster
+  - Challenger vs Challenger
+  - 동일 tierScore diff `0`이면 30초 이전에도 즉시 매칭 가능함.
+
+- Redis queue store 테스트를 보강함.
+  - Apex `29/33/37`이 `findAll` scan 대상에 포함되는지 검증함.
+  - `countByTierScore(29/33/37)` 검증함.
+  - Apex tierScore key에서도 `atomicPairRemove`가 정상 동작하는지 검증함.
+
+- 문서 정합성을 갱신함.
+  - `docs/project/policy.md`
+  - `docs/antigravity/backend/plan-checkpoint.md`
+  - `docs/antigravity/backend/issue-62-apex-queue-scan-and-full-tier-match-after-30s.md`
+
+## 📝 Note
+
+- Apex LP 근접도 기반 정교 매칭은 구현하지 않음.
+  - 현재는 사용자 수가 적은 MVP 환경이므로 매칭 성사율과 Apex queue 누락 방지를 우선함.
+  - LP 근접도 후보 정렬/필터링은 후속 고도화 범위로 둠.
+
+- Apex 전용 queue를 분리하지 않음.
+  - 기존 `matching:queue:{tierScore}` 구조를 유지해 Redis schema 변경을 피함.
+  - Master/Grandmaster/Challenger도 tierScore 기반 queue로 동일하게 처리함.
+
+- 30초 초과부터는 실력 차이가 큰 매칭이 가능함.
+  - 30초 이전에는 기존 품질 정책을 유지함.
+  - 30초 초과 이후에는 장기 대기와 매칭 실패를 줄이는 쪽을 선택함.
+
+- `MatchTicket` schema는 변경하지 않음.
+- Redis Lua atomic remove 구조는 변경하지 않음.
+- `match_found`, accept/reject/timeout, gameRoom 생성, record/rank 정산 흐름은 변경하지 않음.
+- Apex LP 근접도 기반 매칭은 후속 이슈에서 고도화 가능함.
+
+검증:
+
+- `./gradlew :smite-matching:test --tests com.sang.smite.matching.domain.service.MatchPairingServiceTest`
+- `./gradlew :smite-matching:test --tests com.sang.smite.matching.infrastructure.redis.RedisMatchQueueStoreTest`
+- `./gradlew :smite-matching:test`
+- `git diff --check`
+
+## 📌 Related Issue
+
+- Closes #62

@@ -263,12 +263,15 @@ flowchart TD
 
 ### Step 14. Apex 티어 매칭 정책 정합성
 
-- [ ] Master+ 유저가 현재 `matching:queue:29+`에 들어갈 수 있는지 확인
-- [ ] 매칭 엔진 스캔 범위가 Apex 큐를 누락하지 않도록 조정
-- [ ] Apex 티어는 단순 division diff가 아니라 LP 근접도 기반 매칭 정책으로 분리
-- [ ] Apex 매칭 범위도 대기 시간에 따라 점진 확장되도록 기준 정의
-- [ ] 일반 티어 `1~28` 매칭과 Apex 매칭이 서로 충돌하지 않도록 queue key/score 정책 정리
-- [ ] Apex 매칭 테스트 추가
+- [x] Master+ 유저가 `Rank.getTierScore()` 기준 Master 29, Grandmaster 33, Challenger 37로 큐에 들어가는지 확인
+- [x] 매칭 엔진 스캔 범위를 `matching:queue:1`부터 `matching:queue:37`까지 확장해 Apex 큐 누락 방지
+- [x] 같은 Apex tierScore끼리는 기존 diff 0 정책으로 30초 이전에도 즉시 매칭되도록 검증
+- [x] 30초 이전 매칭 범위는 기존 `±1 / ±2 / ±4 tierScore` 정책 유지
+- [x] 30초 정확히는 `<= 30초` 구간으로 보고 `±4 tierScore` 유지
+- [x] 30초 초과부터는 `TIER_SCORE_MAX - TIER_SCORE_MIN` 기준 전체 tierScore 범위 허용
+- [x] 일반 티어 `1~28`과 Apex `29/33/37`이 기존 `matching:queue:{tierScore}` key 구조를 공유하도록 정리
+- [x] Redis `findAll`, `countByTierScore`, `atomicPairRemove`가 Apex tierScore key에서도 동작하는지 테스트 추가
+- [x] Apex LP 근접도 기반 후보 정렬/필터링은 MVP 범위에서 제외하고 후속 고도화 범위로 문서화
 
 ### Step 15. 배치 유저 매칭 정책 정합성
 
@@ -852,25 +855,29 @@ gameRoom 생성 실패 mapping:
 - 종료/중단된 gameRoom만 있으면 큐 진입 가능
 - 기존 중복 큐 진입 차단 정책이 유지됨
 
-### Issue 53. Apex 티어 매칭 정책 정합성
+### Issue 62. Apex 큐 스캔 포함 및 30초 이후 전체 티어 매칭 허용
 
 목표:
 
-- Master+ 유저가 정책대로 LP 근접도 기반으로 매칭되도록 한다.
+- Apex 유저가 매칭 엔진 스캔 대상에서 누락되지 않도록 하고, 사용자 수가 적은 MVP 환경에서 30초 초과 대기 시 전체 tierScore 범위 매칭을 허용한다.
 
 범위:
 
-- 현재 `Rank.getTierScore()`가 Master+를 29 이상으로 계산하는 점과 `MatchingConstants.TIER_SCORE_MAX=28` 스캔 범위의 불일치 해소
-- Apex용 queue scan/후보 탐색 범위 정의
-- Apex LP 근접도 기준과 대기 시간별 확장 정책 정의
-- 일반 티어 division diff 매칭과 Apex LP 매칭의 경계 분리
-- Apex 매칭 단위 테스트 및 Redis store 테스트 추가
+- `Rank.getTierScore()` 기준 Master 29, Grandmaster 33, Challenger 37과 기존 `MatchingConstants.TIER_SCORE_MAX=28` 스캔 범위의 불일치 해소
+- Redis queue scan range를 `matching:queue:1`부터 `matching:queue:37`까지 확장
+- 30초 이전 `±1 / ±2 / ±4 tierScore` 정책 유지
+- 30초 정확히는 `<= 30초` 구간으로 보고 `±4 tierScore` 유지
+- 30초 초과부터 전체 tierScore 범위 매칭 허용
+- 같은 Apex tierScore끼리는 diff 0 기준으로 30초 이전에도 즉시 매칭 가능하게 검증
+- Apex LP 근접도 기반 후보 정렬/필터링은 이번 MVP 범위에서 제외
 
 완료 기준:
 
 - Master+ 유저가 큐에 들어간 뒤 매칭 엔진 스캔 대상에서 누락되지 않음
-- Apex 유저끼리는 LP 근접도와 대기 시간 확장 정책에 따라 매칭됨
+- Master/Grandmaster/Challenger 동일 tierScore끼리는 즉시 매칭될 수 있음
+- 30초 초과 대기 시 일반 티어와 Apex 티어를 포함한 전체 tierScore 매칭이 가능함
 - 일반 티어 유저 매칭 결과가 기존 정책과 동일하게 유지됨
+- Redis `findAll`, `countByTierScore`, `atomicPairRemove`가 Apex tierScore key에서도 정상 동작함
 
 ### Issue 59. 배치 유저 매칭 정책 정합성
 
