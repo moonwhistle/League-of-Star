@@ -255,11 +255,11 @@ flowchart TD
 
 ### Step 13. 큐 진입 전 진행 중 gameRoom DB 검증
 
-- [ ] `joinQueue` 전에 DB 기준 진행 중 gameRoom 존재 여부를 조회
-- [ ] Redis `match:status:{userId}`만으로 중복 진입을 판단하지 않도록 보강
-- [ ] READY/IN_PROGRESS gameRoom이 있으면 매칭 큐 진입 차단
-- [ ] FINISHED/ABORTED gameRoom은 큐 진입을 막지 않도록 상태 기준 명확화
-- [ ] Redis TTL 만료 또는 cleanup 실패 이후에도 DB source of truth 기준으로 재진입을 막는 테스트 추가
+- [x] `joinQueue` 전에 DB 기준 진행 중 gameRoom 존재 여부를 조회
+- [x] Redis `match:status:{userId}`만으로 중복 진입을 판단하지 않도록 보강
+- [x] READY/IN_PROGRESS gameRoom이 있으면 매칭 큐 진입 차단
+- [x] FINISHED/ABORTED gameRoom은 큐 진입을 막지 않도록 상태 기준 명확화
+- [x] Redis TTL 만료 또는 cleanup 실패 이후에도 DB source of truth 기준으로 재진입을 막는 테스트 추가
 
 ### Step 14. Apex 티어 매칭 정책 정합성
 
@@ -832,7 +832,7 @@ gameRoom 생성 실패 mapping:
 - Apex LP 증감 공식은 일반 랭크 공식과 동일하게 유지됨
 - record의 `rankBefore/rankAfter`, `lpBefore/lpAfter`가 Apex 자동 변동 결과를 정확히 남김
 
-### Issue 55. 큐 진입 전 진행 중 gameRoom DB 검증
+### Issue 60. 큐 진입 전 진행 중 gameRoom DB 검증
 
 목표:
 
@@ -953,3 +953,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-27 | Step 11 summary 조회 API 구현 결과를 policy/domain/WebSocket/checkpoint 문서에 반영하고, 중복된 Issue 56 번호를 Issue 60으로 조정 |
 | 2026-05-28 | 현재 작업 브랜치 기준으로 Step 12 Apex rank 자동 승급/강등 정산을 Issue 58로 확정하고, 배치 유저 매칭 정책 정합성을 Issue 59로 조정 |
 | 2026-05-28 | Step 12 Apex rank 자동 승급/강등 정산 구현 완료. Apex LP band 자동 승급/강등, Master 0LP 강등, record snapshot, 일반 승급전 경계 테스트 반영 |
+| 2026-05-28 | Step 13 큐 진입 전 진행 중 gameRoom DB 검증 구현 완료. READY/IN_PROGRESS 차단, FINISHED/ABORTED 허용, Redis 큐 진입 회귀 테스트 반영 |

@@ -34,19 +34,21 @@ flowchart TD
 
 ### Current Implementation Analysis
 
-현재 구현 상태는 다음과 같음.
+최종 구현 상태는 다음과 같음.
 
 - `MatchController`는 인증 유저의 queue join 요청을 `smite-api`의 `MatchQueueService.joinQueue(userId)`로 위임함.
-- `MatchQueueService`는 `RankReadService`로 유저의 현재 rank를 조회하고, `tierScore`를 계산한 뒤 `MatchQueueCommandService.joinQueue(userId, tierScore)`로 위임함.
+- `MatchQueueService`는 `GameRoomReadService.existsActiveGameRoomByUserId(userId)`를 먼저 호출해 DB active gameRoom 여부를 확인함.
+- active gameRoom이 있으면 `MatchingException(ACTIVE_GAME_ROOM_EXISTS)`를 던지고, rank 조회와 Redis queue command 호출을 수행하지 않음.
+- active gameRoom이 없으면 `RankReadService`로 유저의 현재 rank를 조회하고, `tierScore`를 계산한 뒤 `MatchQueueCommandService.joinQueue(userId, tierScore)`로 위임함.
 - `MatchQueueService` 주석에는 JPA 기반 `smite-core`와 Redis 도메인 로직 `smite-matching`의 경계를 이 클래스가 맡는다고 명시되어 있음.
 - `MatchQueueCommandService.joinQueue`는 Redis `match:status:{userId}`에 `MATCHING` 상태를 `SETNX` 방식으로 저장하고, 성공 시 `matching:queue:{tierScore}`에 `MatchTicket`을 추가함.
 - Redis 상태 설정에 실패하면 기존 `ALREADY_IN_QUEUE`로 큐 중복 진입을 차단함.
 - 큐 추가 중 예외가 발생하면 Redis user status를 제거해 롤백함.
-- `GameRoomReadService`는 현재 gameRoom 단건 상태, scenario, participant 목록, summary read model 조회를 제공하지만, 특정 유저가 active gameRoom에 참여 중인지 조회하는 메서드는 없음.
-- `GameRoomRepository`는 gameRoom 단건 lock 조회와 record 정산 복구용 조회만 제공하며, participant userId와 gameRoom status를 조합한 exists query는 없음.
+- `GameRoomReadService`는 gameRoom 단건 상태, scenario, participant 목록, summary read model 조회와 함께 active gameRoom 존재 여부 조회를 제공함.
+- `GameRoomRepository`는 participant userId와 gameRoom status 목록을 조합한 `existsByParticipantUserIdAndStatusIn` query를 제공함.
 - `GameRoom`은 `participants`를 `@OneToMany`로 보유하고, `GameParticipant.userId`로 참여 유저를 식별함.
 - `GameStatus`는 `READY`, `IN_PROGRESS`, `FINISHED`, `ABORTED`를 제공함.
-- 정책 문서의 큐 진입 조건은 "로그인 상태 + 진행 중인 게임 없음"으로 정의되어 있으나, 현재 큐 진입 구현은 Redis 상태만 먼저 검증하므로 DB active gameRoom이 남은 경우를 방어하지 못함.
+- 정책 문서의 큐 진입 조건인 "로그인 상태 + 진행 중인 게임 없음"은 DB 기준 `READY`, `IN_PROGRESS` gameRoom 미참여로 구현됨.
 
 ### Package Boundary
 
@@ -217,11 +219,19 @@ flowchart TD
 
 ### 7. 문서 정합성
 
-- [ ] `plan-checkpoint.md` Step 13 체크리스트를 구현 결과에 맞게 갱신함.
-- [ ] `docs/project/policy.md`에 큐 진입 전 DB active gameRoom 검증 기준을 반영함.
-- [ ] Issue 문서에 최종 구현 결과, 패키지 경계, 테스트 범위를 갱신함.
-- [ ] Redis 상태와 DB gameRoom 상태의 source of truth 경계를 문서에 명확히 유지함.
-- [ ] 후속 범위인 Apex 매칭 정책, 배치 유저 매칭 정책은 Step 14/15로 남겨 이번 작업과 섞지 않음.
+- [x] `plan-checkpoint.md` Step 13 체크리스트를 구현 결과에 맞게 갱신함.
+- [x] `docs/project/policy.md`에 큐 진입 전 DB active gameRoom 검증 기준을 반영함.
+- [x] Issue 문서에 최종 구현 결과, 패키지 경계, 테스트 범위를 갱신함.
+- [x] Redis 상태와 DB gameRoom 상태의 source of truth 경계를 문서에 명확히 유지함.
+- [x] 후속 범위인 Apex 매칭 정책, 배치 유저 매칭 정책은 Step 14/15로 남겨 이번 작업과 섞지 않음.
+
+문서 반영 내용은 다음과 같음.
+
+- `docs/project/policy.md`의 큐 진입 조건에 DB 기준 `READY`, `IN_PROGRESS` gameRoom 검증 기준을 명시함.
+- `plan-checkpoint.md` Step 13 체크리스트를 구현 완료 상태로 갱신함.
+- `plan-checkpoint.md` 변경 이력에 Step 13 구현 완료를 기록함.
+- Issue 문서의 구현 분석을 구현 전 상태가 아니라 최종 구현 상태 기준으로 갱신함.
+- Step 14 Apex 매칭 정책과 Step 15 배치 유저 매칭 정책은 후속 범위로 유지함.
 
 ## 📝 Note
 
@@ -231,3 +241,80 @@ flowchart TD
 - DB 검증은 stale Redis 또는 Redis cleanup 누락을 방어하고, Redis `SETNX`는 동시 queue join 요청을 방어함.
 - DB와 Redis를 하나의 transaction으로 묶지 않으며, 이번 범위에서는 queue join 시작 전에 DB를 읽는 방식으로 보강함.
 - 큐 진입 전 DB read가 1회 추가되지만, 게임 중복 진입을 막는 정책 안정성을 우선함.
+
+-----
+
+## PR
+
+## 📌 Summary
+
+```mermaid
+flowchart TD
+    A[POST /api/v1/matches/queue] --> B[MatchQueueService.joinQueue]
+    B --> C[DB active gameRoom 검증]
+    C --> D{READY 또는 IN_PROGRESS 존재}
+    D -->|존재함| E[409 ACTIVE_GAME_ROOM_EXISTS]
+    D -->|없음| F[RankReadService tierScore 조회]
+    F --> G[MatchQueueCommandService.joinQueue]
+    G --> H[Redis match status SETNX MATCHING]
+    H --> I{SETNX 성공}
+    I -->|실패| J[409 ALREADY_IN_QUEUE]
+    I -->|성공| K[matching queue 추가]
+```
+
+큐 진입 전 DB 기준 active gameRoom 검증을 추가함.
+
+Redis `match:status`가 TTL 만료, cleanup 실패, 서버 재시작 등으로 유실되어도 DB에 `READY` 또는 `IN_PROGRESS` gameRoom이 남아 있으면 새 매칭 큐 진입을 차단함. DB active gameRoom 검증을 통과한 경우에만 기존 rank 조회와 Redis `SETNX` 기반 큐 진입 흐름으로 진행함.
+
+## 📚 Changes
+
+### 1. DB active gameRoom 검증을 API orchestration에 둠
+
+- `MatchQueueService.joinQueue` 시작 지점에서 `GameRoomReadService.existsActiveGameRoomByUserId`를 먼저 호출함.
+- active gameRoom이 있으면 `ACTIVE_GAME_ROOM_EXISTS`로 즉시 차단하고, rank 조회와 Redis queue command를 호출하지 않음.
+- 트레이드오프: queue join마다 DB read가 1회 추가됨. 대신 Redis 상태 유실이나 cleanup 지연이 있어도 실제 게임 생명주기의 source of truth인 DB 기준으로 중복 게임 진입을 막을 수 있음.
+
+### 2. `smite-matching`에는 DB 의존성을 추가하지 않음
+
+- `smite-api`가 core read service와 matching command를 조합하는 기존 application service 경계를 유지함.
+- `smite-core`는 active gameRoom 존재 여부를 boolean으로 제공하고, HTTP 응답이나 Redis queue 정책을 알지 않음.
+- `smite-matching`은 기존처럼 Redis `match:status` `SETNX`, queue add/remove, rollback 책임만 유지함.
+- 트레이드오프: 검증 로직이 matching command 내부에 완전히 캡슐화되지는 않음. 대신 JPA 의존성이 Redis matching 모듈로 번지지 않아 모듈 관심사가 더 선명하게 유지됨.
+
+### 3. active gameRoom 기준을 `READY` / `IN_PROGRESS`로 고정함
+
+- `GameRoomRepository.existsByParticipantUserIdAndStatusIn`으로 participant userId와 status 목록을 조합해 조회함.
+- `GameRoomReadService`는 `READY`, `IN_PROGRESS`만 active status로 사용함.
+- `FINISHED`, `ABORTED`는 종료 또는 실패 정산된 과거 gameRoom으로 보고 큐 진입을 허용함.
+- 트레이드오프: participant 상태까지 함께 조합하지 않고 gameRoom status를 기준으로 단순화함. 현재 정책상 큐 진입 가능 여부는 방의 생명주기 기준으로 결정되므로, participant 개별 상태를 추가 조건으로 두지 않아도 정책 표현이 충분함.
+
+### 4. DB 차단 에러와 Redis 중복 큐 에러를 분리함
+
+- `MatchingErrorCode.ACTIVE_GAME_ROOM_EXISTS`를 추가함.
+- 기존 `ALREADY_IN_QUEUE`는 Redis `match:status`가 이미 존재하는 중복 큐/매칭 플로우 점유 상태 의미로 유지함.
+- 트레이드오프: 409 에러가 하나 늘어나지만, 클라이언트와 로그에서 "이미 큐에 있음"과 "이미 게임 대기/진행 중임"을 구분할 수 있음.
+
+### 5. Redis queue 기존 정책을 테스트로 고정함
+
+- DB 검증 통과 후 기존 Redis `SETNX` 기반 중복 큐 방지 흐름이 유지되는지 검증함.
+- `setStatusIfAbsent` 실패 시 `ALREADY_IN_QUEUE`를 유지하고 queue add를 호출하지 않음을 검증함.
+- queue add 실패 시 `MATCH_QUEUE_ADD_ERROR`를 던지고 `userStatusStore.removeStatus`로 rollback하는 흐름을 검증함.
+- rank 조회 실패 또는 DB active gameRoom 차단 시 matching command가 호출되지 않음을 검증함.
+
+## ✅ Tests
+
+```bash
+./gradlew :smite-core:test --tests com.sang.smite.domain.game.service.GameRoomReadServiceTest --tests com.sang.smite.domain.game.service.GameRoomReadServiceJpaTest
+./gradlew :smite-api:test --tests com.sang.smite.match.service.MatchQueueServiceTest
+./gradlew :smite-api:test --tests com.sang.smite.match.service.MatchQueueServiceTest :smite-matching:test --tests com.sang.smite.matching.command.MatchServiceTest
+```
+
+결과는 모두 `BUILD SUCCESSFUL`임.
+
+## 📝 Notes
+
+- queue leave 정책은 변경하지 않음.
+- gameRoom cleanup scheduler를 추가하지 않음.
+- record/rank 정산 흐름은 변경하지 않음.
+- Apex 매칭 정책과 배치 유저 매칭 정책은 후속 Step 14/15 범위로 유지함.
+- DB DDL은 변경하지 않음.
