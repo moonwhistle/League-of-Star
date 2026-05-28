@@ -182,28 +182,53 @@ flowchart TD
 
 ### 4. Apex 즉시 매칭 동작 검증
 
-- [ ] Master vs Master는 0~10초 구간에도 diff 0으로 매칭되는지 테스트함.
-- [ ] Grandmaster vs Grandmaster는 0~10초 구간에도 diff 0으로 매칭되는지 테스트함.
-- [ ] Challenger vs Challenger는 0~10초 구간에도 diff 0으로 매칭되는지 테스트함.
-- [ ] Apex ticket도 `atomicPairRemove`에 원래 tierScore로 전달되는지 검증함.
-- [ ] Apex 매칭 성공 시 기존 `MatchFoundService.process(userA, userB)` 후처리 호출 구조가 유지되는지 검증함.
+- [x] Master vs Master는 0~10초 구간에도 diff 0으로 매칭되는지 테스트함.
+- [x] Grandmaster vs Grandmaster는 0~10초 구간에도 diff 0으로 매칭되는지 테스트함.
+- [x] Challenger vs Challenger는 0~10초 구간에도 diff 0으로 매칭되는지 테스트함.
+- [x] Apex ticket도 `atomicPairRemove`에 원래 tierScore로 전달되는지 검증함.
+- [x] Apex 매칭 성공 시 기존 `MatchFoundService.process(userA, userB)` 후처리 호출 구조가 유지되는지 검증함.
+
+구현 내용은 다음과 같음.
+
+- `MatchPairingServiceTest`에 Master 29, Grandmaster 33, Challenger 37 동일 tierScore 즉시 매칭 parameterized test를 추가함.
+- 각 Apex 케이스는 userA 대기 시간을 5초로 설정해 `0~10초 ±1` 구간에서도 diff 0으로 매칭되는지 검증함.
+- `atomicPairRemove` 호출 시 Apex ticket의 원래 tierScore `29`, `33`, `37`이 그대로 전달되는지 검증함.
+- 매칭 성공 후 기존 후처리인 `MatchFoundService.process(userA, userB)`가 호출되는지 검증함.
+- pairing 정책 코드와 Redis queue key 구조는 변경하지 않고 테스트로 기존 흐름을 고정함.
 
 ### 5. 30초 이전 기존 정책 회귀 방지
 
-- [ ] 0~10초 구간에서 tierScore 차이 2는 매칭되지 않는지 검증함.
-- [ ] 10초 초과~20초 구간에서 tierScore 차이 2는 매칭되는지 검증함.
-- [ ] 10초 초과~20초 구간에서 tierScore 차이 3은 매칭되지 않는지 검증함.
-- [ ] 20초 초과~30초 구간에서 tierScore 차이 4는 매칭되는지 검증함.
-- [ ] 20초 초과~30초 구간에서 tierScore 차이 5는 매칭되지 않는지 검증함.
-- [ ] 30초 정확히 대기한 유저는 `±4`까지만 매칭되는지 검증함.
+- [x] 0~10초 구간에서 tierScore 차이 2는 매칭되지 않는지 검증함.
+- [x] 10초 초과~20초 구간에서 tierScore 차이 2는 매칭되는지 검증함.
+- [x] 10초 초과~20초 구간에서 tierScore 차이 3은 매칭되지 않는지 검증함.
+- [x] 20초 초과~30초 구간에서 tierScore 차이 4는 매칭되는지 검증함.
+- [x] 20초 초과~30초 구간에서 tierScore 차이 5는 매칭되지 않는지 검증함.
+- [x] 30초 정확히 대기한 유저는 `±4`까지만 매칭되는지 검증함.
+
+구현 내용은 다음과 같음.
+
+- 기존 `MatchPairingServiceTest`의 0~10초, 10초 초과~20초, 20초 초과~30초, 30초 정확히 경계 테스트를 회귀 방지 기준으로 정리함.
+- 0~10초 구간은 5초 대기 userA 기준 tierScore 차이 2 후보가 `atomicPairRemove` 대상이 되지 않고, 차이 1 후보만 매칭되는지 검증함.
+- 10초 초과~20초 구간은 15초 대기 userA 기준 tierScore 차이 3 후보가 제외되고, 차이 2 후보만 매칭되는지 검증함.
+- 20초 초과~30초 구간은 25초 대기 userA 기준 tierScore 차이 5 후보가 제외되고, 차이 4 후보만 매칭되는지 검증함.
+- 30초 정확히 대기한 경우에는 Step 3 테스트와 동일하게 `<= 30초` 분기에 남아 차이 5 후보가 제외되고, 차이 4 후보만 매칭되는지 검증함.
+- 시간 계산은 고정 `Clock` 기준으로 정리해 테스트 실행 시각에 흔들리지 않도록 함.
 
 ### 6. 30초 초과 전체 매칭 테스트 추가
 
-- [ ] userA가 30초 초과 대기하면 tierScore 1과 37도 매칭되는지 검증함.
-- [ ] 30초 초과 대기 시 일반 티어와 Apex 티어가 매칭될 수 있음을 테스트로 고정함.
-- [ ] 30초 초과 대기 시 기존 `±8` 제한으로 인해 누락되던 후보가 매칭되는지 검증함.
-- [ ] 전체 허용이 userA 대기 시간 기준으로만 적용되는지 확인함.
-- [ ] matching command, match_found, Redis atomic remove 흐름은 변경되지 않는지 기존 테스트로 회귀 확인함.
+- [x] userA가 30초 초과 대기하면 tierScore 1과 37도 매칭되는지 검증함.
+- [x] 30초 초과 대기 시 일반 티어와 Apex 티어가 매칭될 수 있음을 테스트로 고정함.
+- [x] 30초 초과 대기 시 기존 `±8` 제한으로 인해 누락되던 후보가 매칭되는지 검증함.
+- [x] 전체 허용이 userA 대기 시간 기준으로만 적용되는지 확인함.
+- [x] matching command, match_found, Redis atomic remove 흐름은 변경되지 않는지 기존 테스트로 회귀 확인함.
+
+구현 내용은 다음과 같음.
+
+- `MatchPairingServiceTest`의 30초 초과 전체 범위 테스트에서 userA tierScore `1`, userB tierScore `37`이 매칭되는지 검증함.
+- 해당 케이스는 일반 티어와 Apex 티어가 30초 초과 후 매칭될 수 있음을 고정함.
+- userA는 31초 대기, userB는 4초 대기로 두어 전체 허용이 기존 구조처럼 userA 대기 시간 기준으로 적용되는지 검증함.
+- 기존 `±8` 제한이면 매칭되지 않던 tierScore `10`과 `19` 차이 9 케이스가 30초 초과 후 매칭되는지 테스트를 추가함.
+- 두 테스트 모두 기존 `atomicPairRemove`와 `MatchFoundService.process(userA, userB)` 흐름을 그대로 검증함.
 
 ### 7. Redis queue store 테스트 보강
 

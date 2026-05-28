@@ -8,6 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -85,9 +87,10 @@ class MatchPairingServiceTest {
     @Test
     @DisplayName("Sliding Window: 0~10초 대기 시 ±1 티어만 매칭")
     void testSlidingWindow_Level1() {
-        long now = System.currentTimeMillis();
+        long now = 100_000L;
         Timer.Sample mockSample = mock(Timer.Sample.class);
         given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
 
         MatchTicket userA = new MatchTicket(1L, 10, now - 5000); // 5초 대기 (±1)
         MatchTicket userB = new MatchTicket(2L, 12, now - 4000); // 티어 차이 2 -> 불가
@@ -106,9 +109,10 @@ class MatchPairingServiceTest {
     @Test
     @DisplayName("Sliding Window: 11~20초 대기 시 ±2 티어까지 매칭")
     void testSlidingWindow_Level2() {
-        long now = System.currentTimeMillis();
+        long now = 100_000L;
         Timer.Sample mockSample = mock(Timer.Sample.class);
         given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
 
         MatchTicket userA = new MatchTicket(1L, 10, now - 15000); // 15초 대기 (±2)
         MatchTicket userB = new MatchTicket(2L, 13, now - 4000); // 티어 차이 3 -> 불가
@@ -121,14 +125,16 @@ class MatchPairingServiceTest {
 
         verify(matchStore).atomicPairRemove(1L, 10, 3L, 12);
         verify(matchFoundService).process(userA, userC);
+        verify(matchStore, never()).atomicPairRemove(1L, 10, 2L, 13);
     }
 
     @Test
     @DisplayName("Sliding Window: 21~30초 대기 시 ±4 티어까지 매칭")
     void testSlidingWindow_Level3() {
-        long now = System.currentTimeMillis();
+        long now = 100_000L;
         Timer.Sample mockSample = mock(Timer.Sample.class);
         given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
 
         MatchTicket userA = new MatchTicket(1L, 10, now - 25000); // 25초 대기 (±4)
         MatchTicket userB = new MatchTicket(2L, 15, now - 4000); // 티어 차이 5 -> 불가
@@ -141,6 +147,7 @@ class MatchPairingServiceTest {
 
         verify(matchStore).atomicPairRemove(1L, 10, 3L, 14);
         verify(matchFoundService).process(userA, userC);
+        verify(matchStore, never()).atomicPairRemove(1L, 10, 2L, 15);
     }
 
     @Test
@@ -182,6 +189,50 @@ class MatchPairingServiceTest {
         matchEngineService.processMatching();
 
         verify(matchStore).atomicPairRemove(1L, 1, 2L, 37);
+        verify(matchFoundService).process(userA, userB);
+    }
+
+    @Test
+    @DisplayName("Sliding Window: 30초 초과 대기 시 기존 ±8 초과 후보도 매칭")
+    void testSlidingWindow_MatchesCandidateBeyondPreviousMaxAfterThirtySeconds() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 10, now - 31_000); // 31초 대기 (전체 허용)
+        MatchTicket userB = new MatchTicket(2L, 19, now - 4_000); // 기존 ±8 초과 차이 9 -> 매칭 가능
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB)));
+        given(matchStore.atomicPairRemove(1L, 10, 2L, 19)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore).atomicPairRemove(1L, 10, 2L, 19);
+        verify(matchFoundService).process(userA, userB);
+    }
+
+    @ParameterizedTest(name = "{0} 동일 tierScore는 0~10초 구간에도 즉시 매칭")
+    @CsvSource({
+            "Master, 29",
+            "Grandmaster, 33",
+            "Challenger, 37"
+    })
+    void matchApexSameTierScoreImmediately(String tierName, int tierScore) {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, tierScore, now - 5_000);
+        MatchTicket userB = new MatchTicket(2L, tierScore, now - 4_000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB)));
+        given(matchStore.atomicPairRemove(1L, tierScore, 2L, tierScore)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore).atomicPairRemove(1L, tierScore, 2L, tierScore);
         verify(matchFoundService).process(userA, userB);
     }
 
