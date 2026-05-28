@@ -22,7 +22,8 @@ public enum MatchingErrorCode implements BaseErrorCode {
     MATCH_SESSION_ALREADY_COMPLETED(409, "MATCH_009", "이미 완료된 매칭입니다."),
     MATCH_SESSION_ALREADY_DECLINED(409, "MATCH_010", "이미 거절된 매칭입니다."),
     MATCH_SESSION_TIMEOUT(409, "MATCH_011", "이미 응답 시간이 초과된 매칭입니다."),
-    MATCH_RESPONSE_LOCK_FAILED(409, "MATCH_012", "매칭 응답 처리 중입니다. 잠시 후 다시 시도해주세요.");
+    MATCH_RESPONSE_LOCK_FAILED(409, "MATCH_012", "매칭 응답 처리 중입니다. 잠시 후 다시 시도해주세요."),
+    ACTIVE_GAME_ROOM_EXISTS(409, "MATCH_013", "진행 중인 게임이 있어 매칭 큐에 진입할 수 없습니다.");
 
     private final int httpStatus;
     private final String customCode;

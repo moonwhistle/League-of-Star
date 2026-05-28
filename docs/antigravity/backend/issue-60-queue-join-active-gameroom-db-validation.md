@@ -156,20 +156,28 @@ flowchart TD
 
 ### 3. `MatchQueueService` queue join 분기 추가
 
-- [ ] `smite-api`의 `MatchQueueService`에 `GameRoomReadService` 의존성을 추가함.
-- [ ] `joinQueue(Long userId)` 시작 지점에서 active gameRoom 존재 여부를 먼저 확인함.
-- [ ] active gameRoom이 있으면 rank 조회와 Redis queue command 호출을 수행하지 않음.
-- [ ] active gameRoom이 없으면 기존처럼 `RankReadService`로 `tierScore`를 조회하고 `MatchQueueCommandService.joinQueue`로 위임함.
-- [ ] `leaveQueue(Long userId)`는 기존 Redis queue 이탈 책임만 유지하고 DB active gameRoom 검증을 추가하지 않음.
-- [ ] 기존 `MatchQueueService` 주석을 DB gameRoom 검증, rank 조회, Redis command 조합 책임에 맞게 갱신함.
+- [x] `smite-api`의 `MatchQueueService`에 `GameRoomReadService` 의존성을 추가함.
+- [x] `joinQueue(Long userId)` 시작 지점에서 active gameRoom 존재 여부를 먼저 확인함.
+- [x] active gameRoom이 있으면 rank 조회와 Redis queue command 호출을 수행하지 않음.
+- [x] active gameRoom이 없으면 기존처럼 `RankReadService`로 `tierScore`를 조회하고 `MatchQueueCommandService.joinQueue`로 위임함.
+- [x] `leaveQueue(Long userId)`는 기존 Redis queue 이탈 책임만 유지하고 DB active gameRoom 검증을 추가하지 않음.
+- [x] 기존 `MatchQueueService` 주석을 DB gameRoom 검증, rank 조회, Redis command 조합 책임에 맞게 갱신함.
+
+구현 내용은 다음과 같음.
+
+- `MatchQueueService.joinQueue`가 `GameRoomReadService.existsActiveGameRoomByUserId(userId)`를 먼저 호출함.
+- active gameRoom이 있으면 `MatchingException(ACTIVE_GAME_ROOM_EXISTS)`를 던지고 rank 조회와 Redis queue command를 호출하지 않음.
+- active gameRoom이 없으면 기존처럼 `RankReadService.getUserRankInfo(userId)`로 tierScore를 얻고 `MatchQueueCommandService.joinQueue(userId, tierScore)`로 위임함.
+- `leaveQueue`는 기존처럼 rank 조회 후 `MatchQueueCommandService.leaveQueue`로 위임하며 DB active gameRoom 검증을 수행하지 않음.
+- `MatchQueueService`는 core read service와 matching command를 조합하는 API layer orchestration 책임을 유지함.
 
 ### 4. active gameRoom 에러 코드 추가
 
-- [ ] `MatchingErrorCode`에 active gameRoom 차단용 409 에러를 추가함.
-- [ ] 에러 메시지는 "진행 중인 게임이 있어 매칭 큐에 진입할 수 없습니다."와 같이 사용자 행동 원인을 명확히 표현함.
-- [ ] 기존 `ALREADY_IN_QUEUE`는 Redis `match:status` 중복 상태 의미로 유지함.
-- [ ] `MatchQueueService`는 active gameRoom 존재 시 새 `MatchingException`을 던지도록 처리함.
-- [ ] 에러 코드 번호는 기존 `MATCH_012` 이후 순서를 유지해 충돌 없이 추가함.
+- [x] `MatchingErrorCode`에 active gameRoom 차단용 409 에러를 추가함.
+- [x] 에러 메시지는 "진행 중인 게임이 있어 매칭 큐에 진입할 수 없습니다."와 같이 사용자 행동 원인을 명확히 표현함.
+- [x] 기존 `ALREADY_IN_QUEUE`는 Redis `match:status` 중복 상태 의미로 유지함.
+- [x] `MatchQueueService`는 active gameRoom 존재 시 새 `MatchingException`을 던지도록 처리함.
+- [x] 에러 코드 번호는 기존 `MATCH_012` 이후 순서를 유지해 충돌 없이 추가함.
 
 ### 5. Redis 큐 진입 기존 정책 회귀 방지
 
