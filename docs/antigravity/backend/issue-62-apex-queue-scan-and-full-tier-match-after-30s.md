@@ -232,10 +232,18 @@ flowchart TD
 
 ### 7. Redis queue store 테스트 보강
 
-- [ ] `RedisMatchQueueStoreTest`에서 Apex tierScore 29, 33, 37 ticket을 추가하고 `findAll`로 조회되는지 검증함.
-- [ ] `countByTierScore(29)`, `countByTierScore(33)`, `countByTierScore(37)`가 정상 동작하는지 검증함.
-- [ ] `atomicPairRemove`가 Apex tierScore key에서도 정상 동작하는지 검증함.
-- [ ] 일반 tierScore queue 조회와 제거 동작은 기존 테스트를 유지함.
+- [x] `RedisMatchQueueStoreTest`에서 Apex tierScore 29, 33, 37 ticket을 추가하고 `findAll`로 조회되는지 검증함.
+- [x] `countByTierScore(29)`, `countByTierScore(33)`, `countByTierScore(37)`가 정상 동작하는지 검증함.
+- [x] `atomicPairRemove`가 Apex tierScore key에서도 정상 동작하는지 검증함.
+- [x] 일반 tierScore queue 조회와 제거 동작은 기존 테스트를 유지함.
+
+구현 내용은 다음과 같음.
+
+- `RedisMatchQueueStoreTest`에서 Master 29, Grandmaster 33, Challenger 37 ticket이 `findAll` 조회 대상에 포함되는지 검증함.
+- `countByTierScore(29)`, `countByTierScore(33)`, `countByTierScore(37)`가 각각 Apex queue 대기 인원을 반환하는지 검증함.
+- `atomicPairRemove`가 Master 29와 Challenger 37 queue key에서도 두 유저를 원자적으로 제거하는지 테스트를 추가함.
+- Apex atomic remove 성공 후 `findAll`이 비어 있고, 각 Apex queue count가 0으로 내려가는지 검증함.
+- 일반 tierScore의 add, findAll, count, atomic remove, 실패 시 롤백성 테스트는 기존 테스트로 유지함.
 
 ### 8. 문서 정합성
 

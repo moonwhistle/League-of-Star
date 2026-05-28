@@ -87,6 +87,25 @@ class RedisMatchQueueStoreTest extends AbstractRedisTest {
     }
 
     @Test
+    @DisplayName("루아 스크립트를 사용하여 Apex tierScore 유저도 원자적으로 제거할 수 있다")
+    void atomicPairRemove_ApexTierScores() {
+        // given
+        MatchTicket master = new MatchTicket(101L, 29, System.currentTimeMillis());
+        MatchTicket challenger = new MatchTicket(102L, 37, System.currentTimeMillis());
+        matchStore.add(master);
+        matchStore.add(challenger);
+
+        // when
+        boolean result = matchStore.atomicPairRemove(101L, 29, 102L, 37);
+
+        // then
+        assertThat(result).isTrue();
+        assertThat(matchStore.findAll()).isEmpty();
+        assertThat(matchStore.countByTierScore(29)).isZero();
+        assertThat(matchStore.countByTierScore(37)).isZero();
+    }
+
+    @Test
     @DisplayName("한 명이라도 존재하지 않으면 루아 스크립트 삭제가 실패하고 아무도 삭제되지 않는다")
     void atomicPairRemoveFail() {
         // given
