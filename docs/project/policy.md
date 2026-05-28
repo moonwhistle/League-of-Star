@@ -8,9 +8,17 @@
 
 | 규칙 | 내용 |
 |------|------|
-| **큐 진입 조건** | 로그인 상태 + 진행 중인 게임 없음 |
+| **큐 진입 조건** | 로그인 상태 + DB 기준 진행 중 gameRoom 없음 |
 | **큐 취소** | 매칭 성사 전까지 자유롭게 취소 가능 |
 | **중복 큐** | 불가 — 이미 큐에 있는 상태에서 재진입 차단 |
+
+- 큐 진입 전 DB의 `game_rooms` / `game_participants` 기준으로 유저가 참여 중인 active gameRoom을 먼저 검증한다.
+- active gameRoom은 `READY`, `IN_PROGRESS` 상태를 의미한다.
+- `READY` gameRoom은 게임 대기 화면 또는 WebSocket 준비 단계이므로 새 큐 진입을 차단한다.
+- `IN_PROGRESS` gameRoom은 실제 게임 진행 중 상태이므로 새 큐 진입을 차단한다.
+- `FINISHED`, `ABORTED` gameRoom은 종료 또는 실패 정산된 과거 gameRoom으로 보고 큐 진입을 차단하지 않는다.
+- DB active gameRoom 검증을 통과한 뒤 Redis `match:status:{userId}` `SETNX`로 기존 중복 큐 진입 방지 정책을 적용한다.
+- Redis TTL 만료, cleanup 실패, 서버 재시작 등으로 Redis 유저 점유 상태가 유실되어도 DB에 active gameRoom이 남아 있으면 큐 진입을 차단한다.
 
 ### 1.2 매칭 범위
 
@@ -267,7 +275,7 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 - cleanup은 `IN_GAME` 상태만 제거하고, 이미 새 매칭 플로우에 들어간 `MATCHING`, `FOUND`, `ACCEPTED` 상태는 제거하지 않는다.
 - cleanup 실패는 gameRoom `FINISHED`, `GAME_RESULT`, record/rank 정산 결과를 rollback하지 않는다.
 - 별도 cleanup 전용 scheduler는 두지 않고, 즉시 cleanup과 기존 record/rank recovery 흐름의 best-effort 재시도를 사용한다. Redis `match:status` TTL 30분은 최후 안전장치다.
-- Redis status cleanup은 중복 게임 방지의 유일한 기준이 아니다. 큐 진입 전 DB 기준 READY/IN_PROGRESS gameRoom 검증은 후속 Step 13에서 보강한다.
+- Redis status cleanup은 중복 게임 방지의 유일한 기준이 아니다. 큐 진입 전 DB 기준 `READY` / `IN_PROGRESS` gameRoom 검증으로 Redis 상태 유실 상황을 방어한다.
 
 ### 2.6 조작 방지
 
@@ -550,3 +558,4 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 2026-05-19 | RTT 5회 median 측정, 2500ms per-ping timeout, 15초 전체 제한, RTT 실패/초과 시 GAME_START 이전 `ABORTED` 정책 추가 |
 | 2026-05-20 | GAME_START 진입 조건, `startAt = serverNow + 4000ms`, 프론트 3초 countdown 렌더링, COUNTDOWN/GAME_START 사전 전송 정책 추가 |
 | 2026-05-28 | Apex rank 자동 승급/강등 정산 구현 완료. Master/Grandmaster/Challenger LP band와 Master 0LP 강등 정책을 record/rank 정산에 반영 |
+| 2026-05-28 | 큐 진입 전 DB active gameRoom 검증 구현 완료. `READY`/`IN_PROGRESS` gameRoom 참가자는 큐 진입 차단하고 `FINISHED`/`ABORTED`는 허용 |
