@@ -244,14 +244,14 @@ flowchart TD
 
 ### Step 12. Apex rank 자동 승급/강등 정산
 
-- [ ] Apex 유저도 LP 증감량은 일반 `Rank.calculateWinLp`, `Rank.calculateLossLp` 공식을 재사용
-- [ ] Master LP 200 도달 시 Grandmaster로 자동 승급
-- [ ] Grandmaster LP 500 도달 시 Challenger로 자동 승급
-- [ ] Challenger LP 500 미만 하락 시 Grandmaster로 자동 강등
-- [ ] Grandmaster LP 200 미만 하락 시 Master로 자동 강등
-- [ ] Master LP 0에서 패배 시 Diamond I LP 75로 강등
-- [ ] Apex 자동 승급/강등 전후 `rankBefore/rankAfter`, `lpBefore/lpAfter` record snapshot 검증
-- [ ] 일반 티어 승급전 정책과 Apex 자동 승급/강등 정책이 충돌하지 않는지 테스트 추가
+- [x] Apex 유저도 LP 증감량은 일반 `Rank.calculateWinLp`, `Rank.calculateLossLp` 공식을 재사용
+- [x] Master LP 200 도달 시 Grandmaster로 자동 승급
+- [x] Grandmaster LP 500 도달 시 Challenger로 자동 승급
+- [x] Challenger LP 500 미만 하락 시 Grandmaster로 자동 강등
+- [x] Grandmaster LP 200 미만 하락 시 Master로 자동 강등
+- [x] Master LP 0에서 패배 시 Diamond I LP 75로 강등
+- [x] Apex 자동 승급/강등 전후 `rankBefore/rankAfter`, `lpBefore/lpAfter` record snapshot 검증
+- [x] 일반 티어 승급전 정책과 Apex 자동 승급/강등 정책이 충돌하지 않는지 테스트 추가
 
 ### Step 13. 큐 진입 전 진행 중 gameRoom DB 검증
 
@@ -809,7 +809,7 @@ gameRoom 생성 실패 mapping:
 - 정산 완료 전 조회는 명시적인 pending/재시도 응답으로 처리됨
 - `GAME_RESULT` payload에는 LP/rank/series 정보가 추가되지 않음
 
-### Issue 59. Apex rank 자동 승급/강등 정산
+### Issue 58. Apex rank 자동 승급/강등 정산
 
 목표:
 
@@ -872,7 +872,7 @@ gameRoom 생성 실패 mapping:
 - Apex 유저끼리는 LP 근접도와 대기 시간 확장 정책에 따라 매칭됨
 - 일반 티어 유저 매칭 결과가 기존 정책과 동일하게 유지됨
 
-### Issue 58. 배치 유저 매칭 정책 정합성
+### Issue 59. 배치 유저 매칭 정책 정합성
 
 목표:
 
@@ -951,3 +951,5 @@ gameRoom 생성 실패 mapping:
 | 2026-05-27 | Step 10 정상 종료 후 매칭 점유 상태 cleanup 문서를 Issue 54로 생성하고, cleanup 범위를 Redis 전체 삭제가 아니라 `match:status:{userId}=IN_GAME` 해제로 고정 |
 | 2026-05-27 | Step 10 구현 결과를 policy/domain/matching 문서에 반영하고, 기존 배치 유저 매칭 정책 정합성 번호를 Issue 58로 조정해 Issue 54 중복 제거 |
 | 2026-05-27 | Step 11 summary 조회 API 구현 결과를 policy/domain/WebSocket/checkpoint 문서에 반영하고, 중복된 Issue 56 번호를 Issue 60으로 조정 |
+| 2026-05-28 | 현재 작업 브랜치 기준으로 Step 12 Apex rank 자동 승급/강등 정산을 Issue 58로 확정하고, 배치 유저 매칭 정책 정합성을 Issue 59로 조정 |
+| 2026-05-28 | Step 12 Apex rank 자동 승급/강등 정산 구현 완료. Apex LP band 자동 승급/강등, Master 0LP 강등, record snapshot, 일반 승급전 경계 테스트 반영 |

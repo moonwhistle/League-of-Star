@@ -34,6 +34,8 @@ public class RankCommandService {
 
     private static final int PROMOTION_ENTRY_LP = 100;
     private static final int DEMOTION_LP = 75;
+    private static final int GRANDMASTER_ENTRY_LP = 200;
+    private static final int CHALLENGER_ENTRY_LP = 500;
 
     private final UserRankInfoRepository userRankInfoRepository;
     private final RankSeriesRepository rankSeriesRepository;
@@ -206,6 +208,10 @@ public class RankCommandService {
 
     private void applyRankWin(UserRankInfo rankInfo, RankSnapshot before, RankSnapshot opponentBefore) {
         int nextLp = before.lp() + before.rank().calculateWinLp(opponentBefore.rank());
+        if (isApexRank(before.rank())) {
+            applyApexRankWin(rankInfo, before.rank(), nextLp);
+            return;
+        }
         if (shouldEnterPromotionSeries(before.rank(), nextLp)) {
             rankInfo.updateRankAndLp(before.rank(), PROMOTION_ENTRY_LP);
             rankSeriesRepository.save(RankSeries.createPromotion(rankInfo.getUserId(), nextRank(before.rank())));
@@ -216,6 +222,10 @@ public class RankCommandService {
     }
 
     private void applyRankLoss(UserRankInfo rankInfo, RankSnapshot before, RankSnapshot opponentBefore) {
+        if (isApexRank(before.rank())) {
+            applyApexRankLoss(rankInfo, before, opponentBefore);
+            return;
+        }
         if (shouldDemote(before)) {
             rankInfo.updateRankAndLp(previousRank(before.rank()), DEMOTION_LP);
             return;
@@ -223,6 +233,67 @@ public class RankCommandService {
 
         int lpChange = before.rank().calculateLossLp(opponentBefore.rank());
         rankInfo.updateLp(-lpChange);
+    }
+
+    private void applyApexRankWin(UserRankInfo rankInfo, Rank beforeRank, int nextLp) {
+        rankInfo.updateRankAndLp(resolveApexRankAfterWin(beforeRank, nextLp), nextLp);
+    }
+
+    private Rank resolveApexRankAfterWin(Rank beforeRank, int nextLp) {
+        return switch (beforeRank.tier()) {
+            case MASTER -> {
+                if (nextLp >= GRANDMASTER_ENTRY_LP) {
+                    yield apexRank(Tier.GRANDMASTER);
+                }
+                yield apexRank(Tier.MASTER);
+            }
+            case GRANDMASTER -> {
+                if (nextLp >= CHALLENGER_ENTRY_LP) {
+                    yield apexRank(Tier.CHALLENGER);
+                }
+                yield apexRank(Tier.GRANDMASTER);
+            }
+            case CHALLENGER -> apexRank(Tier.CHALLENGER);
+            default -> beforeRank;
+        };
+    }
+
+    private void applyApexRankLoss(UserRankInfo rankInfo, RankSnapshot before, RankSnapshot opponentBefore) {
+        if (before.rank().tier() == Tier.MASTER && before.lp() == 0) {
+            rankInfo.updateRankAndLp(Rank.of(Tier.DIAMOND, Division.I), DEMOTION_LP);
+            return;
+        }
+
+        int lpChange = before.rank().calculateLossLp(opponentBefore.rank());
+        int nextLp = Math.max(before.lp() - lpChange, 0);
+        rankInfo.updateRankAndLp(resolveApexRankAfterLoss(before.rank(), nextLp), nextLp);
+    }
+
+    private Rank resolveApexRankAfterLoss(Rank beforeRank, int nextLp) {
+        return switch (beforeRank.tier()) {
+            case MASTER -> apexRank(Tier.MASTER);
+            case GRANDMASTER -> {
+                if (nextLp < GRANDMASTER_ENTRY_LP) {
+                    yield apexRank(Tier.MASTER);
+                }
+                yield apexRank(Tier.GRANDMASTER);
+            }
+            case CHALLENGER -> {
+                if (nextLp < CHALLENGER_ENTRY_LP) {
+                    yield apexRank(Tier.GRANDMASTER);
+                }
+                yield apexRank(Tier.CHALLENGER);
+            }
+            default -> beforeRank;
+        };
+    }
+
+    private boolean isApexRank(Rank rank) {
+        return rank.tier().getLevel() >= Tier.MASTER.getLevel();
+    }
+
+    private Rank apexRank(Tier tier) {
+        return Rank.of(tier, null);
     }
 
     private boolean shouldEnterPromotionSeries(Rank rank, int nextLp) {
