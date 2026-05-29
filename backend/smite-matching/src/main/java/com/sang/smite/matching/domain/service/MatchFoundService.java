@@ -73,8 +73,15 @@ public class MatchFoundService {
             throw e;
         }
 
-        userStatusStore.updateStatus(userA.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        userStatusStore.updateStatus(userB.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        try {
+            userStatusStore.updateStatus(userA.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+            userStatusStore.updateStatus(userB.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        } catch (RuntimeException e) {
+            cleanupTimeout(matchId);
+            deleteSession(matchId);
+            restoreUsersToQueue(userA, userB);
+            throw e;
+        }
 
         eventPublisher.publishEvent(new MatchFoundEvent(
                 matchId,
@@ -94,6 +101,14 @@ public class MatchFoundService {
     private void deleteSession(String matchId) {
         try {
             sessionStore.delete(matchId);
+        } catch (RuntimeException ignored) {
+            // Best-effort compensation. Other recovery steps must continue.
+        }
+    }
+
+    private void cleanupTimeout(String matchId) {
+        try {
+            timeoutStore.cleanup(matchId);
         } catch (RuntimeException ignored) {
             // Best-effort compensation. Other recovery steps must continue.
         }

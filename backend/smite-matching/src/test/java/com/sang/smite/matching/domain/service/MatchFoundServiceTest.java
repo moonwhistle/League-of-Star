@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -222,6 +223,100 @@ class MatchFoundServiceTest {
         assertThatThrownBy(() -> matchFoundService.process(userA, userB))
                 .isSameAs(cause);
 
+        verify(sessionStore).delete(any());
+        verify(matchQueueStore).add(userA);
+        verify(matchQueueStore).add(userB);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("userA FOUND 갱신에 실패하면 timeout과 세션을 정리하고 두 유저를 queue와 MATCHING 상태로 복구한다")
+    void processWhenUserAFoundStatusFails() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        RuntimeException cause = new RuntimeException("userA found failed");
+        when(clock.millis()).thenReturn(1_000L);
+        doThrow(cause)
+                .when(userStatusStore)
+                .updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
+                .isSameAs(cause);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        MatchSession savedSession = sessionCaptor.getValue();
+
+        verify(timeoutStore).cleanup(savedSession.matchId());
+        verify(sessionStore).delete(savedSession.matchId());
+        verify(matchQueueStore).add(userA);
+        verify(matchQueueStore).add(userB);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("userB FOUND 갱신에 실패하면 userA까지 포함해 두 유저를 queue와 MATCHING 상태로 복구한다")
+    void processWhenUserBFoundStatusFails() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        RuntimeException cause = new RuntimeException("userB found failed");
+        when(clock.millis()).thenReturn(1_000L);
+        doAnswer(invocation -> {
+            Long userId = invocation.getArgument(0, Long.class);
+            MatchStatus status = invocation.getArgument(1, MatchStatus.class);
+            if (userId.equals(2L) && status == MatchStatus.FOUND) {
+                throw cause;
+            }
+            return null;
+        })
+                .when(userStatusStore)
+                .updateStatus(any(Long.class), any(MatchStatus.class), anyLong());
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
+                .isSameAs(cause);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        MatchSession savedSession = sessionCaptor.getValue();
+
+        verify(userStatusStore).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(timeoutStore).cleanup(savedSession.matchId());
+        verify(sessionStore).delete(savedSession.matchId());
+        verify(matchQueueStore).add(userA);
+        verify(matchQueueStore).add(userB);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("FOUND 갱신 실패 보상 중 timeout cleanup과 세션 삭제가 실패해도 queue 복귀와 status 복구를 계속 시도한다")
+    void processWhenFoundStatusFailsAndCleanupDeleteFail() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        RuntimeException cause = new RuntimeException("userA found failed");
+        when(clock.millis()).thenReturn(1_000L);
+        doThrow(cause)
+                .when(userStatusStore)
+                .updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        doThrow(new RuntimeException("timeout cleanup failed")).when(timeoutStore).cleanup(any());
+        doThrow(new RuntimeException("session delete failed")).when(sessionStore).delete(any());
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
+                .isSameAs(cause);
+
+        verify(timeoutStore).cleanup(any());
         verify(sessionStore).delete(any());
         verify(matchQueueStore).add(userA);
         verify(matchQueueStore).add(userB);
