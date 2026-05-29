@@ -84,6 +84,25 @@ flowchart TD
 - 동일 userId 후보 제외는 복구 흐름이 아니므로 `MatchFoundService` 보상 helper를 호출하지 않는다.
 - 동일 userId 후보가 skip되어도 userA는 같은 scan cycle 안에서 다음 후보를 계속 탐색한다.
 
+### Architecture Decision
+
+왜 queue 단계에서 중복 제거를 하지 않고 pairing 단계에서 필터링하는가.
+
+- 정상 queue 진입 중복은 이미 `MatchQueueCommandService.joinQueue`의 `setStatusIfAbsent`가 차단한다.
+- 같은 tier queue 안의 동일 userId 중복은 Redis ZSET member 구조상 중복 row처럼 쌓이지 않는다.
+- 서로 다른 tier queue에 같은 userId ticket이 보이는 상황은 정상 진입 정책의 실패라기보다 Redis queue 데이터 오염, stale ticket 잔존, 복구/재큐잉과 외부 데이터 불일치가 겹친 비정상 snapshot에 가깝다.
+- queue 단계에서 dedup/정리를 수행하려면 어떤 ticket을 원본으로 볼지, 어떤 tier queue 값을 삭제할지, status와 queue 불일치를 어떻게 복구할지 결정해야 한다.
+- 이번 이슈의 목표는 원인 복구가 아니라 match session 생성 전 마지막 방어선을 추가하는 것이므로, 기존 queue 구조는 유지하고 `isMatchable`에서 후보 부적합으로 처리한다.
+
+성능과 관측 트레이드오프는 다음과 같음.
+
+- `userId.equals` 검사는 후보마다 O(1)이라 일반적인 scan 비용에는 의미 있는 부담을 주지 않는다.
+- 별도 dedup pass를 추가하지 않아 기존 FIFO 정렬, tier range 계산, `atomicPairRemove` 흐름을 유지한다.
+- 동일 userId 중복 ticket이 대량으로 쌓이면 scan loop가 더 많은 부적합 후보를 지나갈 수 있다.
+- 이 경우는 매칭 정책 문제가 아니라 Redis queue 데이터 오염 또는 운영 관측 문제로 보고 별도 cleanup/metric 이슈에서 다루는 것이 맞다.
+- 현재 `recordPairsPerScan(0)`만으로는 “정상적으로 매칭 가능한 후보가 없음”과 “동일 userId 후보만 skip됨”을 구분할 수 없다.
+- self-match skip count, stale ticket cleanup, queue/status consistency metric은 이번 이슈 범위에서 제외한다.
+
 ### Scope Boundary
 
 이번 이슈에 포함함.
@@ -106,6 +125,9 @@ flowchart TD
 - `MatchFoundService` 후처리 복구 정책 변경
 - metric 추가
 - Grafana dashboard 수정
+- stale ticket cleanup
+- queue/status consistency metric
+- self-match skip count metric
 
 ## 📚 Tasks
 
@@ -295,6 +317,8 @@ flowchart TD
 - 동일 userId 후보만 있으면 해당 scheduler tick에서 매칭 성사 없이 종료하고 `recordPairsPerScan(0)`을 기록함.
 - 정상 queue 진입 중복 방지 정책, Redis queue key 구조, Lua `atomic_pair_remove`, Issue 66 match found 후처리 복구 정책은 변경하지 않음.
 - 동일 IP 기반 어뷰징 방지, client IP 수집, proxy/load balancer header 신뢰 정책, metric/Grafana 추가는 이번 이슈에서 제외함.
+- queue 단계 dedup/cleanup은 stale ticket 삭제 기준, status 복구 정책, 운영 관측 지표가 필요하므로 이번 이슈에서 제외함.
+- 현재 metric만으로는 동일 userId skip으로 인한 `recordPairsPerScan(0)`과 일반적인 후보 부족을 구분하지 않으며, self-match skip metric은 후속 범위로 분리함.
 - 검증 결과 신규 `MatchPairingServiceTest.sameUserIdCandidateSkippedAndNextCandidateMatched`, `sameUserIdOnlyCandidatesDoNotMatch`, 기존 `MatchPairingServiceTest`, `:smite-matching:test`, 전체 `./gradlew test`, `./gradlew build`가 통과함.
 
 ## 변경 이력
@@ -303,6 +327,7 @@ flowchart TD
 |------|-----------|
 | 2026-05-29 | Issue 68 셀프 매칭 방지 정책, 구현 흐름, task 초안 작성 |
 | 2026-05-30 | 동일 userId 후보 제외 구현 결과, 회귀 테스트, 문서/checkpoint 정합성 반영 |
+| 2026-05-30 | queue 단계 dedup 대신 pairing 단계 skip을 선택한 architectural decision과 metric 해석 한계 보강 |
 
 ## PR Message
 
@@ -367,7 +392,38 @@ flowchart LR
 | `findMatchableCandidates`에서 직접 제외 | 조건이 루프에서 바로 보임 | 후보 부적합 조건이 루프와 helper로 분산 | 미선택 |
 | `isMatchable()`에서 제외 | matchable 판단을 한 곳에 유지 | helper 내부를 봐야 조건 확인 가능 | 선택 |
 
-### 2. 동일 IP가 아니라 동일 userId만 처리
+### 2. queue 단계 dedup 대신 pairing 단계 skip으로 처리
+
+queue는 정상 진입 중복 방지 책임 유지.
+pairing은 비정상 snapshot 방어 책임 추가.
+
+```mermaid
+flowchart TD
+    A[정상 queue 진입] --> B[setStatusIfAbsent로 중복 차단]
+    C[비정상 queue snapshot] --> D[동일 userId ticket 2개 조회 가능]
+    D --> E{queue에서 정리할까?}
+    E -->|No| F[기존 queue 구조 유지]
+    F --> G[isMatchable에서 후보 skip]
+    E -->|Yes| H[tier 선택/status 정합성/cleanup 정책 필요]
+    H --> I[후속 운영 이슈]
+```
+
+선택 이유.
+
+- 정상 중복 진입은 이미 queue 진입 단계에서 차단
+- 서로 다른 tier queue에 같은 userId가 보이는 상황은 stale ticket 또는 데이터 오염에 가까움
+- queue 단계 dedup은 어떤 ticket을 삭제할지, status와 queue 불일치를 어떻게 복구할지 추가 정책 필요
+- 이번 PR은 원인 복구가 아니라 match session 생성 전 방어선 추가가 목적
+- 기존 Redis queue key, Lua script, `atomicPairRemove` 계약 유지
+
+트레이드오프.
+
+| 선택지 | 장점 | 비용/한계 | 결론 |
+|--------|------|-----------|------|
+| queue scan 시 dedup/cleanup | 오염 ticket 정리 가능 | 삭제 기준, status 복구, 운영 metric 필요 | 후속 범위 |
+| pairing 단계 skip | 구현 범위 작고 기존 구조 유지 | 오염 ticket 자체는 남을 수 있음 | 이번 PR 선택 |
+
+### 3. 동일 IP가 아니라 동일 userId만 처리
 
 동일 IP 기반 차단은 이번 범위에서 제외.
 
@@ -387,7 +443,7 @@ flowchart TD
 - 동일 IP 처리는 client IP 추출, proxy/load balancer header 신뢰, 개인정보 보관 정책 필요
 - 현재 이슈 목적은 queue snapshot 오염에 대한 최소 방어선 추가
 
-### 3. 실패/보상이 아니라 후보 skip으로 처리
+### 4. 실패/보상이 아니라 후보 skip으로 처리
 
 동일 `userId` 후보는 시스템 실패로 보지 않음.
 
@@ -407,7 +463,24 @@ flowchart TD
 - 로그/metric 없이 기존 scan loop 흐름 유지
 - 후보 하나가 부적합해도 scheduler 전체를 중단하지 않음
 
-### 4. 회귀 테스트 추가
+### 5. 성능과 metric 해석 한계 명시
+
+성능 판단.
+
+- `userId.equals` 검사는 후보당 O(1)
+- 별도 dedup pass 없음
+- 기존 FIFO 정렬, tier range 계산, `atomicPairRemove` 흐름 유지
+- 동일 userId 중복 ticket이 대량으로 쌓이면 부적합 후보 skip이 늘어 scan 효율 저하 가능
+- 대량 중복은 매칭 정책보다 Redis queue 데이터 오염/운영 관측 문제로 분리
+
+metric 해석 한계.
+
+- 동일 userId 후보만 남으면 `recordPairsPerScan(0)` 기록
+- 현재 metric만으로는 “정상적으로 매칭 가능한 후보 없음”과 “동일 userId 후보만 skip됨”을 구분하지 못함
+- 이번 PR은 새 로그/metric/Grafana 추가 제외
+- 필요 시 후속으로 `self_match_skip_count`, stale ticket cleanup, queue/status consistency metric 검토
+
+### 6. 회귀 테스트 추가
 
 추가 테스트.
 
