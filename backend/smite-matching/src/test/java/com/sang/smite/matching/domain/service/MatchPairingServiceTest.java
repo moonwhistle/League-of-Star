@@ -389,6 +389,26 @@ class MatchPairingServiceTest {
     }
 
     @Test
+    @DisplayName("동일 userId 후보만 있으면 매칭이 성사되지 않음")
+    void sameUserIdOnlyCandidatesDoNotMatch() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 10, now - 5_000);
+        MatchTicket sameUser = new MatchTicket(1L, 11, now - 4_000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, sameUser)));
+
+        matchEngineService.processMatching();
+
+        verify(matchStore, never()).atomicPairRemove(anyLong(), anyInt(), anyLong(), anyInt());
+        verify(matchFoundService, never()).process(any(), any());
+        verify(matchEngineMetrics).recordPairsPerScan(0);
+    }
+
+    @Test
     @DisplayName("한 스캔에서 이미 매칭된 유저는 중복 매칭되지 않음")
     void testAlreadyPairedUserIgnored() {
         long now = System.currentTimeMillis();

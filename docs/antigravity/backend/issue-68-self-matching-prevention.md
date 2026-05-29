@@ -209,15 +209,22 @@ flowchart TD
 
 ### 6. 동일 userId 후보만 있을 때 매칭 미발생 테스트 추가
 
-- [ ] queue snapshot에 동일 userId 후보만 존재하는 테스트 추가
-- [ ] `MatchQueueStore.atomicPairRemove`가 호출되지 않는지 검증
-- [ ] `MatchFoundService.process`가 호출되지 않는지 검증
-- [ ] scan 결과 pair count가 `0`으로 기록되는지 검증
+- [x] queue snapshot에 동일 userId 후보만 존재하는 테스트 추가
+- [x] `MatchQueueStore.atomicPairRemove`가 호출되지 않는지 검증
+- [x] `MatchFoundService.process`가 호출되지 않는지 검증
+- [x] scan 결과 pair count가 `0`으로 기록되는지 검증
 
 완료 기준은 다음과 같음.
 
 - 동일 userId끼리는 match session으로 묶이지 않음.
 - 후보가 없으면 해당 scheduler tick에서 매칭 성사 없이 종료됨.
+
+구현 결과는 다음과 같음.
+
+- `MatchPairingServiceTest.sameUserIdOnlyCandidatesDoNotMatch`를 추가함.
+- queue snapshot에 `userA(userId=1)`와 `sameUser(userId=1)`만 배치함.
+- 동일 userId 후보만 있을 때 `MatchQueueStore.atomicPairRemove`와 `MatchFoundService.process`가 호출되지 않음을 검증함.
+- 매칭 성사가 없으므로 `recordPairsPerScan(0)`이 기록되는지 검증함.
 
 ### 7. 기존 매칭 정책 회귀 확인
 
