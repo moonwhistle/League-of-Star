@@ -281,8 +281,10 @@ flowchart TD
 - [x] 배치 유저끼리는 tierScore `9` diff `0` 기준으로 즉시 매칭 가능하도록 확정
 - [x] 배치 유저와 일반 유저가 매칭될 때 opponent profile/payload의 rank 표시는 `Unranked`로 확정
 - [x] core read service에서 `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중 여부를 조회할 수 있도록 구현
-- [ ] `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중인 유저를 큐 진입/취소 시 식별
-- [ ] 배치 유저는 queue join/leave에서 매칭용 tierScore `9`를 사용하도록 구현
+- [x] `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중인 유저를 queue join 시 식별
+- [x] 배치 유저는 queue join에서 매칭용 tierScore `9`를 사용하도록 구현
+- [ ] `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중인 유저를 queue leave 시 식별
+- [ ] 배치 유저는 queue leave에서 매칭용 tierScore `9`를 사용하도록 구현
 - [ ] 배치 유저 매칭 테스트 추가
 
 ### Step 16. match_found 후처리 실패 복구

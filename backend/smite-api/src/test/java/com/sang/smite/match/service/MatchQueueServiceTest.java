@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -53,7 +54,29 @@ class MatchQueueServiceTest {
         // then
         verify(gameRoomReadService).existsActiveGameRoomByUserId(userId);
         verify(rankReadService).getUserRankInfo(userId);
+        verify(rankReadService).isPlacementInProgress(userId);
         verify(matchService).joinQueue(userId, tierScore);
+    }
+
+    @Test
+    @DisplayName("배치 진행 중 유저는 Silver IV 기준 tierScore 9로 대기열에 진입한다.")
+    void joinQueue_placementInProgress_usesPlacementTierScore() {
+        // given
+        Long userId = 1L;
+        int placementTierScore = 9;
+        UserRankInfo rankInfo = mock(UserRankInfo.class);
+        given(gameRoomReadService.existsActiveGameRoomByUserId(userId)).willReturn(false);
+        given(rankReadService.getUserRankInfo(userId)).willReturn(rankInfo);
+        given(rankReadService.isPlacementInProgress(userId)).willReturn(true);
+
+        // when
+        matchQueueService.joinQueue(userId);
+
+        // then
+        verify(gameRoomReadService).existsActiveGameRoomByUserId(userId);
+        verify(rankReadService).getUserRankInfo(userId);
+        verify(rankReadService).isPlacementInProgress(userId);
+        verify(matchService).joinQueue(userId, placementTierScore);
     }
 
     @Test
@@ -85,6 +108,7 @@ class MatchQueueServiceTest {
                 .isInstanceOf(CoreException.class)
                 .hasFieldOrPropertyWithValue("errorCode", CoreErrorCode.RANK_NOT_FOUND);
         verify(gameRoomReadService).existsActiveGameRoomByUserId(userId);
+        verify(rankReadService, never()).isPlacementInProgress(userId);
         verifyNoInteractions(matchService);
     }
 

@@ -159,11 +159,19 @@ Step 2 구현 결과는 다음과 같음.
 
 ### 3. `MatchQueueService` queue join tierScore 보정
 
-- [ ] `joinQueue`에서 active gameRoom 검증 순서를 유지함.
-- [ ] `joinQueue`에서 `UserRankInfo`와 active placement 여부를 조회함.
-- [ ] 배치 진행 중이면 실제 rank tierScore 대신 `9`를 `MatchQueueCommandService.joinQueue`에 전달함.
-- [ ] 배치 진행 중이 아니면 기존처럼 `UserRankInfo.getTierScore()`를 전달함.
-- [ ] Redis 중복 큐 진입 방지 정책은 기존 순서를 유지함.
+- [x] `joinQueue`에서 active gameRoom 검증 순서를 유지함.
+- [x] `joinQueue`에서 `UserRankInfo`와 active placement 여부를 조회함.
+- [x] 배치 진행 중이면 실제 rank tierScore 대신 `9`를 `MatchQueueCommandService.joinQueue`에 전달함.
+- [x] 배치 진행 중이 아니면 기존처럼 `UserRankInfo.getTierScore()`를 전달함.
+- [x] Redis 중복 큐 진입 방지 정책은 기존 순서를 유지함.
+
+Step 3 구현 결과는 다음과 같음.
+
+- `MatchQueueService.joinQueue`에서 active gameRoom 검증을 가장 먼저 수행하는 흐름을 유지함.
+- rank 정보가 없으면 기존처럼 `CoreException(RANK_NOT_FOUND)`가 먼저 발생하고 placement 조회는 수행하지 않음.
+- active placement면 `PLACEMENT_MATCHING_TIER_SCORE=9`를 matching module에 전달함.
+- active placement가 아니면 기존 실제 rank tierScore를 matching module에 전달함.
+- Redis status 기반 중복 큐 진입 차단은 기존처럼 `MatchQueueCommandService.joinQueue` 내부 정책을 그대로 사용함.
 
 ### 4. `MatchQueueService` queue leave tierScore 보정
 
