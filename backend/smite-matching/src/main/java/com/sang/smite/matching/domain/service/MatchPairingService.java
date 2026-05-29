@@ -140,6 +140,10 @@ public class MatchPairingService {
     }
 
     private boolean isMatchable(MatchTicket userA, MatchTicket userB, long now) {
+        if (userA.userId().equals(userB.userId())) {
+            return false;
+        }
+
         long waitTimeSeconds = userA.getWaitTimeSeconds(now);
         int allowedTierDiff = calculateAllowedTierDiff(waitTimeSeconds);
         int tierDiff = Math.abs(userA.tierScore() - userB.tierScore());
