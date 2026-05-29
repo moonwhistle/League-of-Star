@@ -275,10 +275,14 @@ flowchart TD
 
 ### Step 15. 배치 유저 매칭 정책 정합성
 
-- [ ] `RankSeries.type=PLACEMENT` 진행 중인 유저를 큐 진입 시 식별
-- [ ] 배치 유저는 Silver IV ~ Gold IV 구간 유저와 매칭되도록 후보 범위 정책 구현
-- [ ] 배치 유저의 실제 `UserRankInfo.rank` 또는 기본 tierScore와 매칭용 tierScore를 분리할지 결정
-- [ ] 배치 유저와 일반 유저가 매칭될 때 opponent profile/payload에 표시할 rank 정책 확인
+- [x] 배치 진행 중 기준을 `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS`로 확정
+- [x] 배치 유저의 실제 `UserRankInfo.rank`와 매칭용 tierScore를 분리하고, 매칭용 tierScore를 Silver IV 기준 `9`로 확정
+- [x] 배치 유저도 기존 `±1 / ±2 / ±4 / 30초 초과 전체` 매칭 범위 확장 정책을 재사용하도록 확정
+- [x] 배치 유저끼리는 tierScore `9` diff `0` 기준으로 즉시 매칭 가능하도록 확정
+- [x] 배치 유저와 일반 유저가 매칭될 때 opponent profile/payload의 rank 표시는 `Unranked`로 확정
+- [x] core read service에서 `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중 여부를 조회할 수 있도록 구현
+- [ ] `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중인 유저를 큐 진입/취소 시 식별
+- [ ] 배치 유저는 queue join/leave에서 매칭용 tierScore `9`를 사용하도록 구현
 - [ ] 배치 유저 매칭 테스트 추가
 
 ### Step 16. match_found 후처리 실패 복구
@@ -879,23 +883,27 @@ gameRoom 생성 실패 mapping:
 - 일반 티어 유저 매칭 결과가 기존 정책과 동일하게 유지됨
 - Redis `findAll`, `countByTierScore`, `atomicPairRemove`가 Apex tierScore key에서도 정상 동작함
 
-### Issue 59. 배치 유저 매칭 정책 정합성
+### Issue 64. 배치 유저 매칭 정책 정합성
 
 목표:
 
-- 배치 게임 중인 유저가 Silver IV ~ Gold IV 구간과 매칭되도록 한다.
+- 배치 게임 중인 유저가 사용자 수가 적은 MVP 환경에서도 매칭될 수 있도록 매칭용 tierScore를 Silver IV 기준 `9`로 보정하고, 기존 대기 시간별 매칭 범위 확장 정책을 그대로 적용한다.
 
 범위:
 
-- `RankSeries.type=PLACEMENT` 진행 중 여부 조회
-- 큐 진입 시 일반 rank tierScore와 배치 매칭용 score/range 분리 여부 결정
-- Silver IV ~ Gold IV 후보 범위 구현
-- opponent profile/payload에서 배치 유저 rank 표시 정책 확인
+- `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중 여부 조회
+- 큐 진입/취소 시 실제 `UserRankInfo.rank` tierScore와 배치 매칭용 tierScore `9` 분리
+- 기존 `±1 / ±2 / ±4 / 30초 초과 전체` 매칭 범위 확장 정책 재사용
+- 배치 유저끼리 tierScore `9` diff `0` 기준 즉시 매칭 가능 검증
+- opponent profile/payload에서 배치 진행 중 유저를 `Unranked`로 표시
 - 배치 유저 매칭 테스트 추가
 
 완료 기준:
 
-- 배치 진행 중 유저가 정책 범위 밖 유저와 매칭되지 않음
+- 배치 진행 중 유저가 queue join/leave에서 같은 매칭용 tierScore `9`를 사용함
+- 배치 유저끼리 즉시 매칭될 수 있음
+- 배치 유저도 30초 초과 시 전체 tierScore 범위 매칭 정책을 따름
+- 배치 진행 중 유저가 opponent profile/payload에서 `Unranked`로 표시됨
 - 배치 유저와 일반 유저 매칭이 기존 accept/reject/timeout 흐름과 동일하게 동작함
 - 배치가 아닌 유저의 기존 매칭 범위가 깨지지 않음
 

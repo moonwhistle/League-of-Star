@@ -3,6 +3,9 @@ package com.sang.smite.domain.rank.service;
 import com.sang.smite.common.exception.CoreErrorCode;
 import com.sang.smite.common.exception.CoreException;
 import com.sang.smite.domain.rank.domain.UserRankInfo;
+import com.sang.smite.domain.rank.domain.vo.SeriesStatus;
+import com.sang.smite.domain.rank.domain.vo.SeriesType;
+import com.sang.smite.domain.rank.repository.RankSeriesRepository;
 import com.sang.smite.domain.rank.repository.UserRankInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RankReadService {
 
     private final UserRankInfoRepository userRankInfoRepository;
+    private final RankSeriesRepository rankSeriesRepository;
 
     /**
      * 유저 ID를 기반으로 랭크 정보를 조회합니다.
@@ -29,5 +33,16 @@ public class RankReadService {
     public UserRankInfo getUserRankInfo(Long userId) {
         return userRankInfoRepository.findByUserId(userId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.RANK_NOT_FOUND));
+    }
+
+    /**
+     * 진행 중인 배치 시리즈가 있는지 조회합니다.
+     */
+    public boolean isPlacementInProgress(Long userId) {
+        return rankSeriesRepository.existsByUserIdAndStatusAndType(
+                userId,
+                SeriesStatus.IN_PROGRESS,
+                SeriesType.PLACEMENT
+        );
     }
 }

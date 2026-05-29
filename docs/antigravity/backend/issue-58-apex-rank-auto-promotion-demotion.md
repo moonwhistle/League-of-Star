@@ -105,7 +105,7 @@ flowchart TD
 - Apex 매칭 정책 정합성
 - `matching:queue:{tierScore}` scan 범위 확장
 - Apex LP 근접도 기반 후보 탐색
-- 배치 유저 Silver IV ~ Gold IV 매칭 보정
+- 배치 유저 매칭 정책 보정
 - summary API 응답 schema 변경
 - DDL 변경
 
