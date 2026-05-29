@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,8 +23,8 @@ import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class MatchFoundServiceTest {
@@ -47,7 +48,7 @@ class MatchFoundServiceTest {
     private Clock clock;
 
     @Test
-    @DisplayName("매칭 성사 시 상태 변경, 세션 생성, 이벤트 발행이 모두 정상 수행된다")
+    @DisplayName("매칭 성사 시 세션과 timeout을 먼저 준비한 뒤 상태 변경과 이벤트 발행을 수행한다")
     void process() {
         // given
         MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
@@ -58,15 +59,14 @@ class MatchFoundServiceTest {
         matchFoundService.process(userA, userB);
 
         // then
-        // 1. 유저 상태 변경 검증
-        verify(userStatusStore).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-
-        // 2. 세션 생성 검증
+        InOrder inOrder = inOrder(sessionStore, timeoutStore, userStatusStore, eventPublisher);
         ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
-        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS)); // TTL 정책 확인
+        inOrder.verify(sessionStore).save(
+                sessionCaptor.capture(),
+                eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS)
+        );
         MatchSession savedSession = sessionCaptor.getValue();
-        
+
         assertThat(savedSession.userA()).isEqualTo(1L);
         assertThat(savedSession.userB()).isEqualTo(2L);
         assertThat(savedSession.userATierScore()).isEqualTo(userA.tierScore());
@@ -78,17 +78,17 @@ class MatchFoundServiceTest {
         assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.PENDING);
         assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.PENDING);
 
-        // 3. timeout index 등록 검증
-        verify(timeoutStore).addPending(
+        inOrder.verify(timeoutStore).addPending(
                 savedSession.matchId(),
                 1_000L + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
         );
+        inOrder.verify(userStatusStore).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        inOrder.verify(userStatusStore).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
 
-        // 4. 이벤트 발행 검증
         ArgumentCaptor<MatchFoundEvent> eventCaptor = ArgumentCaptor.forClass(MatchFoundEvent.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        inOrder.verify(eventPublisher).publishEvent(eventCaptor.capture());
         MatchFoundEvent publishedEvent = eventCaptor.getValue();
-        
+
         assertThat(publishedEvent.userA()).isEqualTo(1L);
         assertThat(publishedEvent.userB()).isEqualTo(2L);
         assertThat(publishedEvent.matchId()).isEqualTo(savedSession.matchId());

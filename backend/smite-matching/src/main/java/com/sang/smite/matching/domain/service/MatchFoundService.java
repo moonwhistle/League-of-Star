@@ -19,8 +19,9 @@ import java.util.UUID;
  * 매칭 성사 후처리를 담당하는 컴포넌트입니다.
  *
  * <p>매칭 엔진이 두 유저를 Redis 대기열에서 원자적으로 제거한 뒤 호출되며,
- * 유저 상태를 {@link MatchStatus#FOUND}로 변경하고 수락 대기 세션을 생성한 다음
- * 후속 알림 처리를 위한 {@link MatchFoundEvent}를 발행합니다.</p>
+ * 수락 대기 세션과 timeout 정산 경로를 먼저 생성한 뒤 유저 상태를
+ * {@link MatchStatus#FOUND}로 변경하고 후속 알림 처리를 위한
+ * {@link MatchFoundEvent}를 발행합니다.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -35,16 +36,13 @@ public class MatchFoundService {
     /**
      * 매칭 성사 상태를 저장하고 매칭 성사 이벤트를 발행합니다.
      *
-     * <p>현재 단계에서는 상태 변경, 세션 저장, 이벤트 발행을 별도 원자 작업으로 묶지 않습니다.
-     * 호출자는 이 메서드에서 발생한 예외를 로깅하고 후속 복구 정책을 결정해야 합니다.</p>
+     * <p>유저에게 {@link MatchStatus#FOUND} 상태를 노출하기 전에 응답 가능한
+     * {@link MatchSession}과 timeout pending을 먼저 준비합니다.</p>
      *
      * @param userA 매칭된 첫 번째 유저 티켓
      * @param userB 매칭된 두 번째 유저 티켓
      */
     public void process(MatchTicket userA, MatchTicket userB) {
-        userStatusStore.updateStatus(userA.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        userStatusStore.updateStatus(userB.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-
         String matchId = UUID.randomUUID().toString();
         MatchSession session = MatchSession.create(
                 matchId,
@@ -60,6 +58,9 @@ public class MatchFoundService {
                 matchId,
                 clock.millis() + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
         );
+
+        userStatusStore.updateStatus(userA.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        userStatusStore.updateStatus(userB.userId(), MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
 
         eventPublisher.publishEvent(new MatchFoundEvent(
                 matchId,
