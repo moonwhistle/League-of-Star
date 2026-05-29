@@ -224,12 +224,20 @@ Step 6 구현 결과는 다음과 같음.
 
 ### 7. 단위 테스트 추가
 
-- [ ] 배치 유저 `joinQueue`가 tierScore `9`로 matching module에 위임되는지 테스트함.
-- [ ] 배치 유저 `leaveQueue`가 tierScore `9`로 matching module에 위임되는지 테스트함.
-- [ ] 비배치 유저는 실제 rank tierScore로 join/leave 되는지 테스트함.
-- [ ] active placement 조회 조건이 `IN_PROGRESS + PLACEMENT`만 true인지 테스트함.
-- [ ] promotion 또는 완료된 placement는 배치 매칭용 tierScore를 적용하지 않는지 테스트함.
-- [ ] opponent profile에서 배치 유저가 `Unranked`로 표시되는지 테스트함.
+- [x] 배치 유저 `joinQueue`가 tierScore `9`로 matching module에 위임되는지 테스트함.
+- [x] 배치 유저 `leaveQueue`가 tierScore `9`로 matching module에 위임되는지 테스트함.
+- [x] 비배치 유저는 실제 rank tierScore로 join/leave 되는지 테스트함.
+- [x] active placement 조회 조건이 `IN_PROGRESS + PLACEMENT`만 true인지 테스트함.
+- [x] promotion 또는 완료된 placement는 배치 매칭용 tierScore를 적용하지 않는지 테스트함.
+- [x] opponent profile에서 배치 유저가 `Unranked`로 표시되는지 테스트함.
+
+Step 7 구현 결과는 다음과 같음.
+
+- `MatchQueueServiceTest`에서 배치 join/leave는 tierScore `9`, 비배치 join/leave는 실제 rank tierScore를 사용하는지 검증함.
+- `RankReadServiceTest`에서 active placement 조회가 `IN_PROGRESS + PLACEMENT` 조건으로 위임되는지 검증함.
+- `RankSeriesRepositoryTest`를 추가해 완료된 placement와 진행 중 promotion은 active placement로 조회되지 않는지 JPA 파생 쿼리 기준으로 검증함.
+- `MatchPairingServiceTest`에서 배치 tierScore `9`가 기존 대기 시간별 매칭 정책을 재사용하는지 검증함.
+- `MatchResponseResultNotificationFactoryTest`에서 opponent profile의 `Unranked` 표시와 fallback tierScore 사용을 검증함.
 
 ### 8. 기존 정책 회귀 방지
 
