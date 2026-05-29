@@ -96,7 +96,7 @@ flowchart TD
 | userA `FOUND` 갱신 실패 | timeout cleanup, session 삭제, 두 유저 queue 복귀, status `MATCHING` 강제 복구 |
 | userB `FOUND` 갱신 실패 | timeout cleanup, session 삭제, 두 유저 queue 복귀, status `MATCHING` 강제 복구 |
 | event 발행 실패 | session/timeout/status 유지, queue 복귀 없음, 10초 timeout 정산에 위임 |
-| 보상 작업 일부 실패 | 나머지 보상은 계속 시도하고 기존 스타일 로그를 남김 |
+| 보상 작업 일부 실패 | 나머지 보상은 계속 시도하고 새 로그/metric 추가는 이번 이슈에서 보류 |
 
 보상 정책 세부 기준은 다음과 같음.
 
@@ -179,13 +179,13 @@ flowchart TD
 
 ### 3. session 저장 실패 보상 구현
 
-- [ ] `sessionStore.save` 실패를 `MatchFoundService` 내부에서 감지함.
-- [ ] session 저장 실패 시 timeout cleanup이나 session delete를 시도하지 않음.
-- [ ] session 저장 실패 시 userA/userB를 원래 `MatchTicket`으로 queue에 복귀시킴.
-- [ ] queue 복귀 후 userA/userB status를 `MATCHING`으로 강제 복구함.
-- [ ] userA queue 복귀 실패와 userB queue 복귀 실패를 각각 격리해 나머지 보상을 계속 시도함.
-- [ ] userA status 복구 실패와 userB status 복구 실패를 각각 격리해 나머지 보상을 계속 시도함.
-- [ ] session 저장 실패 시 `MatchFoundEvent`를 발행하지 않음.
+- [x] `sessionStore.save` 실패를 `MatchFoundService` 내부에서 감지함.
+- [x] session 저장 실패 시 timeout cleanup이나 session delete를 시도하지 않음.
+- [x] session 저장 실패 시 userA/userB를 원래 `MatchTicket`으로 queue에 복귀시킴.
+- [x] queue 복귀 후 userA/userB status를 `MATCHING`으로 강제 복구함.
+- [x] userA queue 복귀 실패와 userB queue 복귀 실패를 각각 격리해 나머지 보상을 계속 시도함.
+- [x] userA status 복구 실패와 userB status 복구 실패를 각각 격리해 나머지 보상을 계속 시도함.
+- [x] session 저장 실패 시 `MatchFoundEvent`를 발행하지 않음.
 
 완료 기준은 다음과 같음.
 
@@ -237,7 +237,7 @@ flowchart TD
 - [ ] event 발행 실패 시 timeout pending을 cleanup하지 않음.
 - [ ] event 발행 실패 시 user status `FOUND`를 유지함.
 - [ ] event 발행 실패 시 userA/userB를 queue에 복귀시키지 않음.
-- [ ] event 발행 실패 시 기존 스타일 로그만 남기고 metric은 추가하지 않음.
+- [ ] event 발행 실패 시 session/status/timeout 결과를 되돌리지 않고 새 로그/metric은 추가하지 않음.
 - [ ] event 발행 실패 후 응답이 없으면 기존 timeout scheduler가 정산한다는 정책을 문서화함.
 
 완료 기준은 다음과 같음.
@@ -260,7 +260,7 @@ flowchart TD
 
 - session/timeout/status 생성 단계의 실패 처리만 보상 helper를 사용함.
 - event 발행 실패는 보상 helper를 호출하지 않음.
-- 로그 문구는 기존 matching module 스타일을 따르고, metric 호출은 추가하지 않음.
+- 이번 이슈에서는 새 로그 문구와 metric 호출을 추가하지 않음.
 
 ### 8. `MatchFoundServiceTest` 정상/실패 케이스 추가
 

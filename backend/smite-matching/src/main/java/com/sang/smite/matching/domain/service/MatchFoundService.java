@@ -5,6 +5,7 @@ import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.domain.match.event.MatchFoundEvent;
 import com.sang.smite.matching.common.constant.MatchingConstants;
+import com.sang.smite.matching.repository.MatchQueueStore;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchTimeoutStore;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
@@ -27,6 +28,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MatchFoundService {
 
+    private final MatchQueueStore matchQueueStore;
     private final MatchUserStatusStore userStatusStore;
     private final MatchSessionStore sessionStore;
     private final MatchTimeoutStore timeoutStore;
@@ -53,7 +55,13 @@ public class MatchFoundService {
                 userA.entryTime(),
                 userB.entryTime()
         );
-        sessionStore.save(session, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
+        try {
+            sessionStore.save(session, MatchingConstants.MATCH_SESSION_TTL_SECONDS);
+        } catch (RuntimeException e) {
+            restoreUsersToQueue(userA, userB);
+            throw e;
+        }
+
         timeoutStore.addPending(
                 matchId,
                 clock.millis() + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
@@ -68,5 +76,28 @@ public class MatchFoundService {
                 userB.userId(),
                 MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS
         ));
+    }
+
+    private void restoreUsersToQueue(MatchTicket userA, MatchTicket userB) {
+        restoreUserToQueue(userA);
+        restoreUserToQueue(userB);
+        restoreMatchingStatus(userA.userId());
+        restoreMatchingStatus(userB.userId());
+    }
+
+    private void restoreUserToQueue(MatchTicket ticket) {
+        try {
+            matchQueueStore.add(ticket);
+        } catch (RuntimeException ignored) {
+            // Best-effort compensation. Other recovery steps must continue.
+        }
+    }
+
+    private void restoreMatchingStatus(Long userId) {
+        try {
+            userStatusStore.updateStatus(userId, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        } catch (RuntimeException ignored) {
+            // Best-effort compensation. Other recovery steps must continue.
+        }
     }
 }

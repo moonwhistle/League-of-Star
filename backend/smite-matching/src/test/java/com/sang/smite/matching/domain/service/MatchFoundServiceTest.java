@@ -6,6 +6,7 @@ import com.sang.smite.domain.match.domain.MatchResponseStatus;
 import com.sang.smite.domain.match.domain.MatchTicket;
 import com.sang.smite.domain.match.event.MatchFoundEvent;
 import com.sang.smite.matching.common.constant.MatchingConstants;
+import com.sang.smite.matching.repository.MatchQueueStore;
 import com.sang.smite.matching.repository.MatchSessionStore;
 import com.sang.smite.matching.repository.MatchTimeoutStore;
 import com.sang.smite.matching.repository.MatchUserStatusStore;
@@ -22,8 +23,15 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +39,9 @@ class MatchFoundServiceTest {
 
     @InjectMocks
     private MatchFoundService matchFoundService;
+
+    @Mock
+    private MatchQueueStore matchQueueStore;
 
     @Mock
     private MatchUserStatusStore userStatusStore;
@@ -93,5 +104,73 @@ class MatchFoundServiceTest {
         assertThat(publishedEvent.userB()).isEqualTo(2L);
         assertThat(publishedEvent.matchId()).isEqualTo(savedSession.matchId());
         assertThat(publishedEvent.acceptTimeoutSeconds()).isEqualTo(MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS);
+        verifyNoInteractions(matchQueueStore);
+    }
+
+    @Test
+    @DisplayName("세션 저장에 실패하면 두 유저를 기존 티켓으로 queue에 복귀시키고 MATCHING 상태로 복구한다")
+    void processWhenSessionSaveFails() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        RuntimeException cause = new RuntimeException("session save failed");
+        doThrow(cause).when(sessionStore).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
+                .isSameAs(cause);
+
+        verify(matchQueueStore).add(userA);
+        verify(matchQueueStore).add(userB);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(sessionStore, never()).delete(any());
+        verify(timeoutStore, never()).addPending(any(), anyLong());
+        verify(timeoutStore, never()).cleanup(any());
+        verify(eventPublisher, never()).publishEvent(any());
+        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+    }
+
+    @Test
+    @DisplayName("세션 저장 실패 보상 중 한 유저 queue 복귀가 실패해도 나머지 보상을 계속 시도한다")
+    void processWhenSessionSaveFailsAndQueueRestorePartiallyFails() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        RuntimeException cause = new RuntimeException("session save failed");
+        doThrow(cause).when(sessionStore).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        doThrow(new RuntimeException("queue restore failed")).when(matchQueueStore).add(userA);
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
+                .isSameAs(cause);
+
+        verify(matchQueueStore).add(userA);
+        verify(matchQueueStore).add(userB);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+    }
+
+    @Test
+    @DisplayName("세션 저장 실패 보상 중 한 유저 status 복구가 실패해도 나머지 보상을 계속 시도한다")
+    void processWhenSessionSaveFailsAndStatusRestorePartiallyFails() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        RuntimeException cause = new RuntimeException("session save failed");
+        doThrow(cause).when(sessionStore).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        doThrow(new RuntimeException("status restore failed"))
+                .when(userStatusStore)
+                .updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
+                .isSameAs(cause);
+
+        verify(matchQueueStore).add(userA);
+        verify(matchQueueStore).add(userB);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
     }
 }
