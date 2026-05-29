@@ -173,4 +173,60 @@ class MatchFoundServiceTest {
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
     }
+
+    @Test
+    @DisplayName("timeout pending 등록에 실패하면 저장된 세션을 삭제하고 두 유저를 queue와 MATCHING 상태로 복구한다")
+    void processWhenTimeoutPendingFails() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        RuntimeException cause = new RuntimeException("timeout pending failed");
+        when(clock.millis()).thenReturn(1_000L);
+        doThrow(cause).when(timeoutStore).addPending(any(), anyLong());
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
+                .isSameAs(cause);
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        MatchSession savedSession = sessionCaptor.getValue();
+
+        verify(timeoutStore).addPending(
+                savedSession.matchId(),
+                1_000L + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
+        );
+        verify(sessionStore).delete(savedSession.matchId());
+        verify(matchQueueStore).add(userA);
+        verify(matchQueueStore).add(userB);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(timeoutStore, never()).cleanup(any());
+        verify(eventPublisher, never()).publishEvent(any());
+        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+    }
+
+    @Test
+    @DisplayName("timeout pending 등록 실패 보상 중 세션 삭제가 실패해도 queue 복귀와 status 복구를 계속 시도한다")
+    void processWhenTimeoutPendingFailsAndSessionDeleteFails() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        RuntimeException cause = new RuntimeException("timeout pending failed");
+        when(clock.millis()).thenReturn(1_000L);
+        doThrow(cause).when(timeoutStore).addPending(any(), anyLong());
+        doThrow(new RuntimeException("session delete failed")).when(sessionStore).delete(any());
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
+                .isSameAs(cause);
+
+        verify(sessionStore).delete(any());
+        verify(matchQueueStore).add(userA);
+        verify(matchQueueStore).add(userB);
+        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(eventPublisher, never()).publishEvent(any());
+    }
 }

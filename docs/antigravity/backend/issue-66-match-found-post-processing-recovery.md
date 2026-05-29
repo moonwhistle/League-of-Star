@@ -195,13 +195,13 @@ flowchart TD
 
 ### 4. timeout pending 등록 실패 보상 구현
 
-- [ ] `timeoutStore.addPending` 실패를 `MatchFoundService` 내부에서 감지함.
-- [ ] timeout 등록 실패 시 저장된 `MatchSession`을 삭제함.
-- [ ] timeout 등록 실패 시 userA/userB를 원래 `MatchTicket`으로 queue에 복귀시킴.
-- [ ] queue 복귀 후 userA/userB status를 `MATCHING`으로 강제 복구함.
-- [ ] session 삭제 실패가 발생해도 queue 복귀와 status 복구를 계속 시도함.
-- [ ] timeout 등록 실패 시 user status `FOUND` 갱신을 수행하지 않음.
-- [ ] timeout 등록 실패 시 `MatchFoundEvent`를 발행하지 않음.
+- [x] `timeoutStore.addPending` 실패를 `MatchFoundService` 내부에서 감지함.
+- [x] timeout 등록 실패 시 저장된 `MatchSession`을 삭제함.
+- [x] timeout 등록 실패 시 userA/userB를 원래 `MatchTicket`으로 queue에 복귀시킴.
+- [x] queue 복귀 후 userA/userB status를 `MATCHING`으로 강제 복구함.
+- [x] session 삭제 실패가 발생해도 queue 복귀와 status 복구를 계속 시도함.
+- [x] timeout 등록 실패 시 user status `FOUND` 갱신을 수행하지 않음.
+- [x] timeout 등록 실패 시 `MatchFoundEvent`를 발행하지 않음.
 
 완료 기준은 다음과 같음.
 
@@ -264,11 +264,11 @@ flowchart TD
 
 ### 8. `MatchFoundServiceTest` 정상/실패 케이스 추가
 
-- [ ] 정상 흐름에서 session 저장, timeout 등록, userA/userB `FOUND` 갱신, event 발행 순서를 검증함.
-- [ ] session 저장 실패 시 queue 복귀와 `MATCHING` status 복구를 검증함.
-- [ ] session 저장 실패 시 timeout 등록과 event 발행이 호출되지 않는지 검증함.
-- [ ] timeout pending 등록 실패 시 session 삭제, queue 복귀, `MATCHING` status 복구를 검증함.
-- [ ] timeout pending 등록 실패 시 user status `FOUND` 갱신과 event 발행이 호출되지 않는지 검증함.
+- [x] 정상 흐름에서 session 저장, timeout 등록, userA/userB `FOUND` 갱신, event 발행 순서를 검증함.
+- [x] session 저장 실패 시 queue 복귀와 `MATCHING` status 복구를 검증함.
+- [x] session 저장 실패 시 timeout 등록과 event 발행이 호출되지 않는지 검증함.
+- [x] timeout pending 등록 실패 시 session 삭제, queue 복귀, `MATCHING` status 복구를 검증함.
+- [x] timeout pending 등록 실패 시 user status `FOUND` 갱신과 event 발행이 호출되지 않는지 검증함.
 - [ ] userA `FOUND` 갱신 실패 시 timeout cleanup, session 삭제, queue 복귀, `MATCHING` status 복구를 검증함.
 - [ ] userB `FOUND` 갱신 실패 시 userA까지 포함해 두 유저 모두 queue 복귀와 `MATCHING` status 복구 대상인지 검증함.
 - [ ] event 발행 실패 시 session/timeout/status를 유지하고 queue 복귀가 호출되지 않는지 검증함.
