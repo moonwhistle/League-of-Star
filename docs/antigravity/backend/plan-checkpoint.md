@@ -293,12 +293,14 @@ flowchart TD
 
 ### Step 16. match_found 후처리 실패 복구
 
-- [ ] queue 원자 제거 이후 user status/session/timeout/event 발행 중 실패 가능한 지점 정리
-- [ ] user status `FOUND` 갱신 실패 시 두 유저 큐 복귀 또는 상태 정리 정책 정의
-- [ ] session 저장 실패 시 두 유저 큐 복귀 또는 상태 정리 정책 정의
-- [ ] timeout pending 등록 실패 시 세션/user status/queue 보상 정책 정의
-- [ ] `match_found` Pub/Sub 발행 실패 시 재발행/조회 기반 복구/로그 격리 중 정책 결정
-- [ ] 후처리 실패 복구 테스트 추가
+- [x] queue 원자 제거 이후 session 저장, timeout 등록, user status 갱신, event 발행 실패 지점을 구분
+- [x] `FOUND` 노출 전에 session과 timeout pending을 먼저 생성하도록 처리 순서 재구성
+- [x] session 저장 실패 시 두 유저를 기존 `MatchTicket.entryTime`/`tierScore`로 queue 복귀하고 `MATCHING` status 복구
+- [x] timeout pending 등록 실패 시 저장된 session 삭제 후 두 유저 queue 복귀와 `MATCHING` status 복구
+- [x] user status `FOUND` 갱신 실패 시 timeout cleanup, session 삭제, 두 유저 queue 복귀와 `MATCHING` status 복구
+- [x] `MatchFoundEvent` 발행 실패 시 session/status/timeout을 유지하고 기존 timeout scheduler 정산에 위임
+- [x] 후처리 보상은 Redis best-effort helper로 처리하고 outbox/saga, metric/Grafana는 후속 범위로 분리
+- [x] 후처리 실패 복구와 `MatchPairingService` scan loop 회귀 테스트 추가
 
 ### Step 17. 동일 IP 셀프 매칭 방지
 
@@ -913,28 +915,30 @@ gameRoom 생성 실패 mapping:
 - 배치 유저와 일반 유저 매칭이 기존 accept/reject/timeout 흐름과 동일하게 동작함
 - 배치가 아닌 유저의 기존 매칭 범위가 깨지지 않음
 
-### Issue 60. match_found 후처리 실패 복구
+### Issue 66. match_found 후처리 실패 복구
 
 목표:
 
-- queue 원자 제거 이후 `FOUND` 상태/session/timeout/event 발행 중 실패해도 유저가 유실되지 않도록 한다.
+- queue 원자 제거 이후 session/timeout/status/event 후처리 실패가 발생해도 유저가 유실되거나 불완전 `FOUND` 상태에 갇히지 않도록 한다.
 
 범위:
 
-- `MatchFoundService.process`의 실패 지점별 보상 정책 정의
-- user status `FOUND` 갱신 실패 시 복구
-- match session 저장 실패 시 복구
-- timeout pending 등록 실패 시 복구
-- `match_found` Pub/Sub 발행 실패 시 재발행 또는 조회 기반 복구 정책 결정
+- `MatchFoundService.process` 처리 순서를 session 저장, timeout 등록, user status `FOUND`, event 발행 순서로 재구성
+- match session 저장 실패 시 두 유저 queue 복귀와 `MATCHING` status 복구
+- timeout pending 등록 실패 시 session 삭제 후 두 유저 queue 복귀와 `MATCHING` status 복구
+- user status `FOUND` 갱신 실패 시 timeout cleanup, session 삭제, 두 유저 queue 복귀와 `MATCHING` status 복구
+- event 발행 실패 시 session/status/timeout을 유지하고 기존 timeout scheduler 정산에 위임
+- 보상 작업은 Redis best-effort helper로 격리하고 새 로그/metric은 추가하지 않음
 - 후처리 실패 복구 테스트 추가
 
 완료 기준:
 
 - 큐에서 제거된 유저가 session 없이 방치되지 않음
 - timeout pending 없는 FOUND session이 생기지 않음
-- 알림 발행 실패가 발생해도 운영자가 복구 가능한 상태와 로그가 남음
+- 알림 발행 실패가 발생해도 session/status/timeout은 유지되어 10초 timeout scheduler가 정산 가능함
+- 같은 scan cycle에서 이미 paired 처리된 유저는 재매칭되지 않고 다음 scheduler tick에서 다시 후보가 됨
 
-### Issue 57. 동일 IP 셀프 매칭 방지
+### Issue 67. 동일 IP 셀프 매칭 방지
 
 목표:
 
@@ -975,3 +979,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-28 | 현재 작업 브랜치 기준으로 Step 12 Apex rank 자동 승급/강등 정산을 Issue 58로 확정하고, 배치 유저 매칭 정책 정합성을 Issue 59로 조정 |
 | 2026-05-28 | Step 12 Apex rank 자동 승급/강등 정산 구현 완료. Apex LP band 자동 승급/강등, Master 0LP 강등, record snapshot, 일반 승급전 경계 테스트 반영 |
 | 2026-05-28 | Step 13 큐 진입 전 진행 중 gameRoom DB 검증 구현 완료. READY/IN_PROGRESS 차단, FINISHED/ABORTED 허용, Redis 큐 진입 회귀 테스트 반영 |
+| 2026-05-29 | Step 16 / Issue 66 match_found 후처리 실패 복구 구현 결과 반영. session/timeout/status 실패는 queue 복귀 보상, event 실패는 timeout 정산 위임으로 확정 |

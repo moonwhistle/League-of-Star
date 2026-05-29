@@ -298,22 +298,274 @@ flowchart TD
 
 ### 10. 문서와 checkpoint 갱신
 
-- [ ] `docs/antigravity/backend/plan-checkpoint.md` Step 16 체크리스트를 이번 이슈 정책에 맞게 갱신함.
-- [ ] Step 16 완료 후 구현 결과를 이 문서의 task 체크 상태와 Implementation Result 섹션에 반영함.
-- [ ] 동일 IP 셀프 매칭 방지는 Step 17 또는 별도 이슈로 분리되어 있음을 checkpoint에 유지함.
-- [ ] metric/Grafana 제외 정책을 문서에 남김.
-- [ ] outbox/saga 기반 보장형 복구는 후속 이슈 범위로 남김.
+- [x] `docs/antigravity/backend/plan-checkpoint.md` Step 16 체크리스트를 이번 이슈 정책에 맞게 갱신함.
+- [x] Step 16 완료 후 구현 결과를 이 문서의 task 체크 상태와 Implementation Result 섹션에 반영함.
+- [x] 동일 IP 셀프 매칭 방지는 Step 17 또는 별도 이슈로 분리되어 있음을 checkpoint에 유지함.
+- [x] metric/Grafana 제외 정책을 문서에 남김.
+- [x] outbox/saga 기반 보장형 복구는 후속 이슈 범위로 남김.
 
 ### 11. 검증
 
-- [ ] `./gradlew :smite-matching:test`를 실행함.
-- [ ] `./gradlew test`를 실행함.
-- [ ] 신규 `MatchFoundServiceTest`가 정상/실패/보상 경로를 모두 통과하는지 확인함.
-- [ ] 기존 `MatchPairingServiceTest`, `MatchResponseResultServiceTest`, timeout scheduler 테스트가 통과하는지 확인함.
-- [ ] 테스트 결과를 이 문서 Implementation Result에 기록함.
+- [x] `./gradlew :smite-matching:test`를 실행함.
+- [x] `./gradlew test`를 실행함.
+- [x] 신규 `MatchFoundServiceTest`가 정상/실패/보상 경로를 모두 통과하는지 확인함.
+- [x] 기존 `MatchPairingServiceTest`, `MatchResponseResultServiceTest`, timeout scheduler 테스트가 통과하는지 확인함.
+- [x] 테스트 결과를 이 문서 Implementation Result에 기록함.
+
+## Implementation Result
+
+- `MatchFoundService.process`는 session 저장, timeout pending 등록, userA/userB `FOUND` 갱신, `MatchFoundEvent` 발행 순서로 처리함.
+- session 저장 실패 시 두 유저를 기존 `MatchTicket.entryTime`과 `tierScore`로 queue에 복귀시키고 `MATCHING` status를 best-effort로 복구함.
+- timeout pending 등록 실패 시 저장된 session을 삭제한 뒤 두 유저 queue 복귀와 `MATCHING` status 복구를 best-effort로 수행함.
+- user status `FOUND` 갱신 실패 시 timeout cleanup, session 삭제, 두 유저 queue 복귀와 `MATCHING` status 복구를 best-effort로 수행함.
+- `MatchFoundEvent` 발행 실패는 session/status/timeout을 되돌리지 않고 기존 timeout scheduler 정산에 위임함.
+- `MatchPairingService`는 기존처럼 `atomicPairRemove` 성공 즉시 paired 처리하고, 후처리 실패가 발생해도 scan loop를 계속 진행함.
+- 동일 IP 셀프 매칭 방지, metric/Grafana 추가, outbox/saga 기반 보장형 복구는 이번 이슈에서 제외함.
+- 검증 결과 `MatchFoundServiceTest`, `MatchPairingServiceTest`, `MatchResponseResultServiceTest`, `MatchResponseTimeoutSchedulerTest`, `:smite-matching:test`, 전체 `./gradlew test`가 통과함.
 
 ## 변경 이력
 
 | 날짜 | 변경 내용 |
 | :--- | :--- |
 | 2026-05-29 | Issue 66 match_found 후처리 실패 복구 정책, 구현 흐름, task 초안 작성 |
+| 2026-05-29 | Step 10 문서/checkpoint 갱신 및 Issue 66 구현 결과 정리 |
+| 2026-05-29 | Step 11 검증 완료 및 테스트 통과 결과 기록 |
+
+## PR Message
+
+````md
+## 📌 Summary
+
+이번 PR은 `atomicPairRemove` 이후 `match_found` 후처리 중간 단계에서 실패가 발생해도 유저가 큐에서 사라지거나 `FOUND` 상태에 갇히지 않도록 복구 흐름 정리.
+
+핵심 정책.
+
+- 유저에게 `FOUND`를 보여주기 전에 `MatchSession`과 timeout pending을 먼저 만든다.
+- session 또는 timeout을 만들 수 없으면 매칭은 성립하지 않은 것으로 보고 두 유저를 queue에 되돌린다.
+- queue 복귀 시 기존 `entryTime`, `tierScore`를 유지해 대기 시간과 매칭 범위가 깨지지 않게 한다.
+- 한 명만 `FOUND`가 된 불완전 상태는 허용하지 않고, session/timeout을 정리한 뒤 두 유저 모두 `MATCHING`으로 복구한다.
+- event 발행 실패는 이미 session/status/timeout이 완성된 상태이므로 되돌리지 않고 기존 10초 timeout 정산에 맡긴다.
+- 동일 IP 셀프 매칭 방지, metric/Grafana, outbox/saga는 이번 이슈 범위에서 제외한다.
+
+```mermaid
+flowchart TD
+    A[MatchPairingService] --> B{atomicPairRemove 성공?}
+    B -->|No| C[다음 후보 탐색]
+    B -->|Yes| D[pairedUserIds 등록]
+    D --> E[MatchFoundService.process]
+
+    E --> F[1. MatchSession 저장]
+    F --> G[2. timeout pending 등록]
+    G --> H[3. userA FOUND 갱신]
+    H --> I[4. userB FOUND 갱신]
+    I --> J[5. MatchFoundEvent 발행]
+
+    F -. 실패 .-> R1[두 유저 queue 복귀 + MATCHING 복구]
+    G -. 실패 .-> R2[session 삭제 + 두 유저 queue 복귀 + MATCHING 복구]
+    H -. 실패 .-> R3[timeout cleanup + session 삭제 + 두 유저 queue 복귀 + MATCHING 복구]
+    I -. 실패 .-> R3
+    J -. 실패 .-> R4[session/status/timeout 유지]
+
+    R1 --> N[다음 scheduler tick에서 재매칭 가능]
+    R2 --> N
+    R3 --> N
+    R4 --> T[기존 10초 timeout scheduler가 정산]
+```
+
+## 📚 Changes
+
+### 1. 정상 match_found 흐름을 먼저 안전하게 재정렬
+
+기존 흐름은 `FOUND` 상태를 먼저 노출한 뒤 session과 timeout을 준비할 수 있었음.
+
+이러면 중간에 실패했을 때 유저 입장에서는 매칭된 것처럼 보이지만, 서버에는 응답할 session이나 timeout 정산 경로가 없을 수 있음.
+
+그래서 정상 흐름을 아래처럼 변경.
+
+```mermaid
+sequenceDiagram
+    participant Pairing as MatchPairingService
+    participant Found as MatchFoundService
+    participant Session as MatchSessionStore
+    participant Timeout as MatchTimeoutStore
+    participant Status as MatchUserStatusStore
+    participant Event as ApplicationEventPublisher
+
+    Pairing->>Found: process(userA, userB)
+    Found->>Session: save(MatchSession)
+    Found->>Timeout: addPending(matchId)
+    Found->>Status: userA = FOUND
+    Found->>Status: userB = FOUND
+    Found->>Event: publish MatchFoundEvent
+```
+
+선택 기준.
+
+- `FOUND`는 유저에게 “이제 응답할 수 있다”는 의미.
+- 그러려면 `FOUND`보다 먼저 응답 대상인 session과 자동 정산용 timeout이 필요.
+- 그래서 session/timeout을 먼저 만들고, 그 다음에 status를 `FOUND`로 변경.
+
+### 2. session 저장 실패는 “매칭 미성립”으로 처리
+
+session 저장에 실패하면 matchId는 있어도 실제 응답할 match session이 없음.
+
+이 상태에서 유저를 `FOUND`로 두거나 queue에서 제거된 채로 두면 유저가 사라진 것처럼 됨.
+
+```mermaid
+flowchart LR
+    A[session 저장 실패] --> B[MatchSession 없음]
+    B --> C[응답 불가능]
+    C --> D[두 유저 queue 복귀]
+    D --> E[status MATCHING 복구]
+```
+
+다른 선택지도 있었지만 제외.
+
+- 로그만 남기기: 유저가 queue에도 없고 session도 없는 상태가 될 수 있어 제외
+- 즉시 재시도 반복: Redis 저장 실패 상황에서 같은 실패를 반복할 수 있어 제외
+- queue 복귀: 기존 매칭 흐름으로 되돌아가므로 가장 단순하고 안전함
+
+### 3. timeout pending 실패는 session을 삭제하고 queue 복귀
+
+session 저장은 성공했지만 timeout pending 등록이 실패하면, 유저가 응답하지 않았을 때 10초 후 정산할 방법이 없음.
+
+즉 “매칭은 됐는데 자동 종료가 안 되는 session”이 됨.
+
+```mermaid
+flowchart LR
+    A[session 저장 성공] --> B[timeout pending 등록 실패]
+    B --> C[10초 timeout 정산 불가능]
+    C --> D[session 삭제]
+    D --> E[두 유저 queue 복귀]
+    E --> F[status MATCHING 복구]
+```
+
+그래서 timeout이 없으면 해당 match session은 유지하지 않음.
+
+`FOUND`를 아직 노출하기 전 단계이므로, 이 시점에는 되돌리는 것이 가장 자연스러움.
+
+### 4. user status FOUND 실패는 부분 성공도 실패로 처리
+
+userA는 `FOUND`가 됐는데 userB는 실패하는 식의 부분 성공은 허용하지 않음.
+
+매칭은 두 명이 같은 session을 바라봐야 하는데, 한 명만 `FOUND`인 상태는 UX와 서버 상태가 모두 애매해짐.
+
+```mermaid
+flowchart TD
+    A[userA FOUND 성공] --> B{userB FOUND 성공?}
+    B -->|Yes| C[event 발행 단계로 진행]
+    B -->|No| D[부분 FOUND 상태 발생]
+    D --> E[timeout cleanup]
+    E --> F[session 삭제]
+    F --> G[두 유저 queue 복귀]
+    G --> H[두 유저 MATCHING 복구]
+```
+
+여기서 `setStatusIfAbsent`를 쓰지 않고 `updateStatus(..., MATCHING)`으로 강제 복구.
+
+이유는 간단함. 한 명이라도 이미 `FOUND`가 되어 있을 수 있으므로, “없을 때만 설정”으로는 불완전 상태를 고칠 수 없음.
+
+### 5. event 발행 실패는 되돌리지 않고 timeout 정산에 위임
+
+event 발행은 session, timeout, status가 모두 준비된 뒤 마지막에 발생.
+
+이 단계에서 실패했다고 바로 queue 복귀하면 더 위험할 수 있음.
+
+```mermaid
+flowchart TD
+    A[session 있음] --> D[event 발행 실패]
+    B[timeout pending 있음] --> D
+    C[두 유저 FOUND 상태] --> D
+
+    D --> E{queue 복귀할까?}
+    E -->|No| F[session/status/timeout 유지]
+    F --> G[클라이언트 응답 없으면 10초 timeout 정산]
+```
+
+queue 복귀를 하지 않은 이유.
+
+- 일부 listener나 클라이언트가 이미 이벤트를 받았을 수 있음.
+- 이때 session을 삭제하면 “알림은 받았는데 응답할 session은 없는 상태”가 됨.
+- 이미 timeout pending이 있으므로, 응답이 없으면 기존 scheduler가 정리 가능.
+
+그래서 event 실패는 복구 대상이 아니라 격리 대상으로 판단.
+
+### 6. 보상 로직은 best-effort helper로 제한
+
+이번 이슈의 목표는 완전한 분산 트랜잭션이 아니라, Redis 후처리 실패로 유저가 유실되는 상황을 줄이는 것.
+
+그래서 outbox/saga 같은 큰 구조는 넣지 않고, 현재 `MatchFoundService` 안에서 필요한 보상만 독립적으로 시도.
+
+```mermaid
+flowchart TD
+    A[후처리 실패] --> B[session 삭제 시도]
+    A --> C[timeout cleanup 시도]
+    A --> D[userA queue 복귀 시도]
+    A --> E[userB queue 복귀 시도]
+    A --> F[userA MATCHING 복구 시도]
+    A --> G[userB MATCHING 복구 시도]
+
+    B -. 실패해도 .-> H[나머지 보상 계속]
+    C -. 실패해도 .-> H
+    D -. 실패해도 .-> H
+    E -. 실패해도 .-> H
+    F -. 실패해도 .-> H
+    G -. 실패해도 .-> H
+```
+
+트레이드오프.
+
+- outbox/saga: 더 강한 보장은 가능하지만 구현 범위가 커지고 이번 이슈의 목적을 넘어감
+- metric/Grafana: 운영 관측에는 좋지만, 먼저 정책과 복구 흐름을 고정하는 것이 우선이라 제외
+- best-effort helper: 완전 보장은 아니지만 현재 구조 안에서 유저 유실 위험을 가장 작게 줄일 수 있음
+
+### 7. MatchPairingService 흐름은 유지
+
+`MatchPairingService`는 여전히 queue scan, 후보 선택, `atomicPairRemove`, paired set 관리를 담당.
+
+후처리 실패 보상은 `MatchFoundService` 책임으로 유지.
+
+```mermaid
+flowchart LR
+    A[atomicPairRemove 성공] --> B[pairedUserIds 등록]
+    B --> C[MatchFoundService.process]
+    C -. 실패 .-> D[MatchFoundService 내부 보상]
+    D --> E[같은 scan cycle에서는 재매칭 안 함]
+    E --> F[다음 scheduler tick에서 다시 후보]
+```
+
+이렇게 한 이유는 역할을 섞지 않기 위함.
+
+- PairingService는 “누구와 누구를 매칭할지”만 결정.
+- FoundService는 “매칭 성사 후 상태를 어떻게 만들고 실패 시 어떻게 되돌릴지”를 책임.
+- 같은 scan cycle에서 바로 재매칭하지 않게 해서 중복 매칭 위험 방지.
+
+### 8. 테스트와 CI 리포트 보강
+
+테스트는 정상 흐름뿐 아니라 실패 지점별 보상 흐름을 나눠 추가.
+
+- 정상 흐름 순서 검증
+- session 저장 실패 보상
+- timeout pending 실패 보상
+- userA/userB `FOUND` 실패 보상
+- event 발행 실패 격리
+- 보상 작업 일부 실패 시 나머지 보상 계속 시도
+- `MatchPairingService` scan loop 회귀 확인
+
+추가로 CI에서 테스트가 간헐적으로 실패할 때 원인을 바로 볼 수 있도록 실패 시 테스트 리포트 artifact 업로드.
+
+## 📝 Note
+
+검증한 명령.
+
+- `./gradlew :smite-matching:test`
+- `./gradlew test`
+- `./gradlew build`
+- `./gradlew clean build --parallel --no-build-cache`
+- `git diff --check`
+
+빌드 중 자동 갱신되는 `openapi3.yaml` timestamp 변경은 Issue 66 범위가 아니므로 미포함.
+
+## 📌 Related Issue
+- Closes #66
+````
