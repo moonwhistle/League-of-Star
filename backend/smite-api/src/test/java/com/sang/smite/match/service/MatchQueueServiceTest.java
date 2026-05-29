@@ -128,6 +128,27 @@ class MatchQueueServiceTest {
         // then
         verifyNoInteractions(gameRoomReadService);
         verify(rankReadService).getUserRankInfo(userId);
+        verify(rankReadService).isPlacementInProgress(userId);
         verify(matchService).leaveQueue(userId, tierScore);
+    }
+
+    @Test
+    @DisplayName("배치 진행 중 유저는 Silver IV 기준 tierScore 9로 대기열에서 나간다.")
+    void leaveQueue_placementInProgress_usesPlacementTierScore() {
+        // given
+        Long userId = 1L;
+        int placementTierScore = 9;
+        UserRankInfo rankInfo = mock(UserRankInfo.class);
+        given(rankReadService.getUserRankInfo(userId)).willReturn(rankInfo);
+        given(rankReadService.isPlacementInProgress(userId)).willReturn(true);
+
+        // when
+        matchQueueService.leaveQueue(userId);
+
+        // then
+        verifyNoInteractions(gameRoomReadService);
+        verify(rankReadService).getUserRankInfo(userId);
+        verify(rankReadService).isPlacementInProgress(userId);
+        verify(matchService).leaveQueue(userId, placementTierScore);
     }
 }

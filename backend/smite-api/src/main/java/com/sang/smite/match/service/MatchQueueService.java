@@ -34,7 +34,7 @@ public class MatchQueueService {
      */
     public void joinQueue(Long userId) {
         validateNoActiveGameRoom(userId);
-        int tierScore = resolveJoinTierScore(userId);
+        int tierScore = resolveQueueTierScore(userId);
         matchService.joinQueue(userId, tierScore);
     }
 
@@ -45,7 +45,7 @@ public class MatchQueueService {
      * @param userId 취소 요청한 유저의 ID
      */
     public void leaveQueue(Long userId) {
-        int tierScore = getRankInfo(userId).getTierScore();
+        int tierScore = resolveQueueTierScore(userId);
         matchService.leaveQueue(userId, tierScore);
     }
 
@@ -57,7 +57,7 @@ public class MatchQueueService {
         return rankReadService.getUserRankInfo(userId);
     }
 
-    private int resolveJoinTierScore(Long userId) {
+    private int resolveQueueTierScore(Long userId) {
         UserRankInfo rankInfo = getRankInfo(userId);
         if (rankReadService.isPlacementInProgress(userId)) {
             return PLACEMENT_MATCHING_TIER_SCORE;

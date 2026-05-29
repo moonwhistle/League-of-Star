@@ -175,11 +175,19 @@ Step 3 구현 결과는 다음과 같음.
 
 ### 4. `MatchQueueService` queue leave tierScore 보정
 
-- [ ] `leaveQueue`에서도 active placement 여부를 조회함.
-- [ ] 배치 진행 중이면 `9`로 `MatchQueueCommandService.leaveQueue`를 호출함.
-- [ ] 배치 진행 중이 아니면 기존처럼 실제 rank tierScore로 제거함.
-- [ ] join과 leave의 tierScore 결정 기준을 같은 helper로 통일함.
-- [ ] 배치 유저가 queue에 들어간 뒤 취소할 때 Redis queue key 불일치가 발생하지 않도록 검증함.
+- [x] `leaveQueue`에서도 active placement 여부를 조회함.
+- [x] 배치 진행 중이면 `9`로 `MatchQueueCommandService.leaveQueue`를 호출함.
+- [x] 배치 진행 중이 아니면 기존처럼 실제 rank tierScore로 제거함.
+- [x] join과 leave의 tierScore 결정 기준을 같은 helper로 통일함.
+- [x] 배치 유저가 queue에 들어간 뒤 취소할 때 Redis queue key 불일치가 발생하지 않도록 검증함.
+
+Step 4 구현 결과는 다음과 같음.
+
+- `MatchQueueService`의 tierScore 결정 helper를 `resolveQueueTierScore`로 통일함.
+- `joinQueue`와 `leaveQueue`가 모두 같은 helper를 사용하므로 배치 유저는 진입/취소 모두 tierScore `9`를 사용함.
+- 비배치 유저는 기존처럼 실제 `UserRankInfo.getTierScore()`를 사용함.
+- `leaveQueue`는 기존처럼 active gameRoom 검증을 수행하지 않고 queue 취소만 위임함.
+- Redis queue key `matching:queue:{tierScore}` 기준 join/leave 불일치를 방지함.
 
 ### 5. 기존 `MatchPairingService` 정책 재사용 검증
 

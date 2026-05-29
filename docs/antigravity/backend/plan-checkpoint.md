@@ -283,8 +283,8 @@ flowchart TD
 - [x] core read service에서 `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중 여부를 조회할 수 있도록 구현
 - [x] `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중인 유저를 queue join 시 식별
 - [x] 배치 유저는 queue join에서 매칭용 tierScore `9`를 사용하도록 구현
-- [ ] `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중인 유저를 queue leave 시 식별
-- [ ] 배치 유저는 queue leave에서 매칭용 tierScore `9`를 사용하도록 구현
+- [x] `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중인 유저를 queue leave 시 식별
+- [x] 배치 유저는 queue leave에서 매칭용 tierScore `9`를 사용하도록 구현
 - [ ] 배치 유저 매칭 테스트 추가
 
 ### Step 16. match_found 후처리 실패 복구
