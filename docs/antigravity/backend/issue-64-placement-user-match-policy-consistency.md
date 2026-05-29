@@ -191,20 +191,36 @@ Step 4 구현 결과는 다음과 같음.
 
 ### 5. 기존 `MatchPairingService` 정책 재사용 검증
 
-- [ ] 배치 유저끼리 `tierScore 9` diff `0`으로 즉시 매칭되는지 테스트함.
-- [ ] 배치 유저가 0~10초 구간에서 `9 ± 1` 정책을 따르는지 검증함.
-- [ ] 배치 유저가 10초 초과~20초 구간에서 `9 ± 2` 정책을 따르는지 검증함.
-- [ ] 배치 유저가 20초 초과~30초 구간에서 `9 ± 4` 정책을 따르는지 검증함.
-- [ ] 배치 유저가 30초 초과 시 전체 tierScore 매칭 정책을 따르는지 기존 테스트로 회귀 확인함.
-- [ ] `MatchTicket`, Redis key, Lua atomic remove 구조가 변경되지 않는지 확인함.
+- [x] 배치 유저끼리 `tierScore 9` diff `0`으로 즉시 매칭되는지 테스트함.
+- [x] 배치 유저가 0~10초 구간에서 `9 ± 1` 정책을 따르는지 검증함.
+- [x] 배치 유저가 10초 초과~20초 구간에서 `9 ± 2` 정책을 따르는지 검증함.
+- [x] 배치 유저가 20초 초과~30초 구간에서 `9 ± 4` 정책을 따르는지 검증함.
+- [x] 배치 유저가 30초 초과 시 전체 tierScore 매칭 정책을 따르는지 기존 테스트로 회귀 확인함.
+- [x] `MatchTicket`, Redis key, Lua atomic remove 구조가 변경되지 않는지 확인함.
+
+Step 5 검증 결과는 다음과 같음.
+
+- `MatchPairingService`는 배치 여부를 직접 조회하지 않고 `MatchTicket.tierScore()`만 기준으로 후보를 판정함.
+- 배치 유저는 API 계층에서 tierScore `9`로 보정되므로 matching 엔진에서는 기존 일반 티어와 동일한 diff 계산 경로를 사용함.
+- 배치 유저끼리 `9 ↔ 9`는 0~10초 구간에도 diff `0`으로 즉시 매칭됨.
+- 배치 유저 기준 `0~10초`, `10초 초과~20초`, `20초 초과~30초`, `30초 초과` 구간을 모두 테스트로 고정함.
+- `MatchTicket`, Redis queue key, Lua atomic remove 구조는 변경하지 않았음.
 
 ### 6. match 응답 상대 프로필 `Unranked` 표시
 
-- [ ] `MatchOpponentProfileProvider`에서 상대 유저의 active placement 여부를 조회함.
-- [ ] 상대가 배치 진행 중이면 tierName을 `Unranked`로 응답함.
-- [ ] 배치 유저의 opponent tierScore 표시값을 정책에 맞게 정리함.
-- [ ] 일반 유저와 Apex 유저의 rank 표시 정책은 기존대로 유지함.
-- [ ] rank 조회 실패 fallback `UNKNOWN` 정책과 `Unranked` 정책이 충돌하지 않도록 분리함.
+- [x] `MatchOpponentProfileProvider`에서 상대 유저의 active placement 여부를 조회함.
+- [x] 상대가 배치 진행 중이면 tierName을 `Unranked`로 응답함.
+- [x] 배치 유저의 opponent tierScore 표시값을 정책에 맞게 정리함.
+- [x] 일반 유저와 Apex 유저의 rank 표시 정책은 기존대로 유지함.
+- [x] rank 조회 실패 fallback `UNKNOWN` 정책과 `Unranked` 정책이 충돌하지 않도록 분리함.
+
+Step 6 구현 결과는 다음과 같음.
+
+- `MatchOpponentProfileProvider`가 상대의 `UserRankInfo` 조회 후 active placement 여부를 확인함.
+- 상대가 배치 진행 중이면 실제 rank tierName 대신 `Unranked`를 응답함.
+- 배치 진행 중 상대의 `tierScore`는 실제 rank tierScore가 아니라 match session/event에 저장된 fallback tierScore를 사용함.
+- 일반/Apex 상대는 기존처럼 실제 rank tierName과 `UserRankInfo.getTierScore()`를 응답함.
+- rank/profile 조회 실패 fallback `UNKNOWN` 경로는 기존대로 유지함.
 
 ### 7. 단위 테스트 추가
 

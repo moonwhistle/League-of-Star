@@ -285,6 +285,8 @@ flowchart TD
 - [x] 배치 유저는 queue join에서 매칭용 tierScore `9`를 사용하도록 구현
 - [x] `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 진행 중인 유저를 queue leave 시 식별
 - [x] 배치 유저는 queue leave에서 매칭용 tierScore `9`를 사용하도록 구현
+- [x] 기존 `MatchPairingService`가 배치 tierScore `9`를 기존 대기 시간별 diff 정책으로 처리하는지 검증
+- [x] match 응답 상대 프로필에서 배치 진행 중 유저를 `Unranked`로 표시
 - [ ] 배치 유저 매칭 테스트 추가
 
 ### Step 16. match_found 후처리 실패 복구
