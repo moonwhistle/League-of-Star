@@ -307,8 +307,8 @@ flowchart TD
 - [x] 현재 queue 진입 단계의 동일 userId 중복 방지 정책 확인
 - [x] Redis queue snapshot에 동일 userId 티켓이 중복 포함될 수 있는 비정상 경로 정리
 - [x] `MatchPairingService` 후보 판정에서 동일 userId 후보를 매칭 제외
-- [ ] 동일 userId 후보 제외 시 다음 후보 탐색이 계속되는지 검증
-- [ ] `MatchPairingServiceTest` 동일 userId 셀프 매칭 방지 회귀 테스트 추가
+- [x] 동일 userId 후보 제외 시 다음 후보 탐색이 계속되는지 검증
+- [x] `MatchPairingServiceTest` 동일 userId 셀프 매칭 방지 회귀 테스트 추가
 - [ ] 관련 문서와 checkpoint 갱신
 - [ ] 전체 테스트 및 빌드 검증
 

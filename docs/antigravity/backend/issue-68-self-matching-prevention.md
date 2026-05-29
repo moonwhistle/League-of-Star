@@ -191,14 +191,21 @@ flowchart TD
 
 ### 5. 동일 userId 후보 skip 후 다음 후보 탐색 테스트 추가
 
-- [ ] 동일 userId 후보가 먼저 있어도 다음 matchable 후보를 탐색하는 테스트 추가
-- [ ] 동일 userId 후보에 대해 `atomicPairRemove`가 호출되지 않는지 검증
-- [ ] 다음 후보에 대해 `atomicPairRemove`와 `MatchFoundService.process`가 호출되는지 검증
+- [x] 동일 userId 후보가 먼저 있어도 다음 matchable 후보를 탐색하는 테스트 추가
+- [x] 동일 userId 후보에 대해 `atomicPairRemove`가 호출되지 않는지 검증
+- [x] 다음 후보에 대해 `atomicPairRemove`와 `MatchFoundService.process`가 호출되는지 검증
 
 완료 기준은 다음과 같음.
 
 - 동일 userId 후보 제외가 scan 중단으로 이어지지 않음.
 - 가능한 다음 후보와 기존처럼 매칭이 성사됨.
+
+구현 결과는 다음과 같음.
+
+- `MatchPairingServiceTest.sameUserIdCandidateSkippedAndNextCandidateMatched`를 추가함.
+- queue snapshot에 `userA(userId=1)`, `sameUser(userId=1)`, `userB(userId=2)`를 배치함.
+- 동일 userId 후보인 `sameUser`에 대해서는 `atomicPairRemove(1, 10, 1, 11)`와 `MatchFoundService.process(userA, sameUser)`가 호출되지 않음을 검증함.
+- 다음 후보인 `userB`에 대해서는 `atomicPairRemove(1, 10, 2, 10)`와 `MatchFoundService.process(userA, userB)`가 호출됨을 검증함.
 
 ### 6. 동일 userId 후보만 있을 때 매칭 미발생 테스트 추가
 

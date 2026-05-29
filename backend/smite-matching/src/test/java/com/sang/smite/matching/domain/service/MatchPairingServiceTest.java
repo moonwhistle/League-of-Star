@@ -366,6 +366,29 @@ class MatchPairingServiceTest {
     }
 
     @Test
+    @DisplayName("동일 userId 후보는 건너뛰고 다음 매칭 가능한 후보를 탐색함")
+    void sameUserIdCandidateSkippedAndNextCandidateMatched() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 10, now - 5_000);
+        MatchTicket sameUser = new MatchTicket(1L, 11, now - 4_000);
+        MatchTicket userB = new MatchTicket(2L, 10, now - 3_000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, sameUser, userB)));
+        given(matchStore.atomicPairRemove(1L, 10, 2L, 10)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore, never()).atomicPairRemove(1L, 10, 1L, 11);
+        verify(matchStore).atomicPairRemove(1L, 10, 2L, 10);
+        verify(matchFoundService, never()).process(userA, sameUser);
+        verify(matchFoundService).process(userA, userB);
+    }
+
+    @Test
     @DisplayName("한 스캔에서 이미 매칭된 유저는 중복 매칭되지 않음")
     void testAlreadyPairedUserIgnored() {
         long now = System.currentTimeMillis();
