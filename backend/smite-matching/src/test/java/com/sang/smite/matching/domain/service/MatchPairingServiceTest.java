@@ -212,6 +212,112 @@ class MatchPairingServiceTest {
         verify(matchFoundService).process(userA, userB);
     }
 
+    @Test
+    @DisplayName("Placement: 배치 유저끼리는 tierScore 9 diff 0으로 즉시 매칭")
+    void matchPlacementUsersImmediately() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 9, now - 5_000);
+        MatchTicket userB = new MatchTicket(2L, 9, now - 4_000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB)));
+        given(matchStore.atomicPairRemove(1L, 9, 2L, 9)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore).atomicPairRemove(1L, 9, 2L, 9);
+        verify(matchFoundService).process(userA, userB);
+    }
+
+    @Test
+    @DisplayName("Placement: 0~10초 대기 시 tierScore 9 기준 ±1 정책 재사용")
+    void matchPlacementUserWithFirstStepRange() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 9, now - 5_000);
+        MatchTicket userB = new MatchTicket(2L, 11, now - 4_000);
+        MatchTicket userC = new MatchTicket(3L, 8, now - 3_000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB, userC)));
+        given(matchStore.atomicPairRemove(1L, 9, 3L, 8)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore).atomicPairRemove(1L, 9, 3L, 8);
+        verify(matchFoundService).process(userA, userC);
+        verify(matchStore, never()).atomicPairRemove(1L, 9, 2L, 11);
+    }
+
+    @Test
+    @DisplayName("Placement: 10초 초과~20초 대기 시 tierScore 9 기준 ±2 정책 재사용")
+    void matchPlacementUserWithSecondStepRange() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 9, now - 15_000);
+        MatchTicket userB = new MatchTicket(2L, 12, now - 4_000);
+        MatchTicket userC = new MatchTicket(3L, 7, now - 3_000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB, userC)));
+        given(matchStore.atomicPairRemove(1L, 9, 3L, 7)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore).atomicPairRemove(1L, 9, 3L, 7);
+        verify(matchFoundService).process(userA, userC);
+        verify(matchStore, never()).atomicPairRemove(1L, 9, 2L, 12);
+    }
+
+    @Test
+    @DisplayName("Placement: 20초 초과~30초 대기 시 tierScore 9 기준 ±4 정책 재사용")
+    void matchPlacementUserWithThirdStepRange() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 9, now - 25_000);
+        MatchTicket userB = new MatchTicket(2L, 14, now - 4_000);
+        MatchTicket userC = new MatchTicket(3L, 5, now - 3_000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB, userC)));
+        given(matchStore.atomicPairRemove(1L, 9, 3L, 5)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore).atomicPairRemove(1L, 9, 3L, 5);
+        verify(matchFoundService).process(userA, userC);
+        verify(matchStore, never()).atomicPairRemove(1L, 9, 2L, 14);
+    }
+
+    @Test
+    @DisplayName("Placement: 30초 초과 대기 시 tierScore 9 기준 전체 tierScore 매칭 정책 재사용")
+    void matchPlacementUserWithFullRangeAfterThirtySeconds() {
+        long now = 100_000L;
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+        given(clock.millis()).willReturn(now);
+
+        MatchTicket userA = new MatchTicket(1L, 9, now - 31_000);
+        MatchTicket userB = new MatchTicket(2L, 37, now - 4_000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB)));
+        given(matchStore.atomicPairRemove(1L, 9, 2L, 37)).willReturn(true);
+
+        matchEngineService.processMatching();
+
+        verify(matchStore).atomicPairRemove(1L, 9, 2L, 37);
+        verify(matchFoundService).process(userA, userB);
+    }
+
     @ParameterizedTest(name = "{0} 동일 tierScore는 0~10초 구간에도 즉시 매칭")
     @CsvSource({
             "Master, 29",

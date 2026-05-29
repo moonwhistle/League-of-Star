@@ -1,7 +1,6 @@
 package com.sang.smite.matching.infrastructure.redis;
 
 import com.sang.smite.matching.common.constant.MatchingConstants;
-import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,16 +8,12 @@ import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class RedisMatchTimeoutStoreTest extends AbstractRedisTest {
+class RedisMatchTimeoutStoreTest extends MatchingRedisIntegrationTest {
 
     @Autowired
     private RedisMatchTimeoutStore timeoutStore;

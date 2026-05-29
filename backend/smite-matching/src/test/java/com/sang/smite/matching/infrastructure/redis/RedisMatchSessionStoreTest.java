@@ -4,23 +4,18 @@ import com.sang.smite.domain.match.domain.MatchSession;
 import com.sang.smite.domain.match.domain.MatchResponseStatus;
 import com.sang.smite.domain.match.domain.MatchStatus;
 import com.sang.smite.matching.common.constant.MatchingConstants;
-import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class RedisMatchSessionStoreTest extends AbstractRedisTest {
+class RedisMatchSessionStoreTest extends MatchingRedisIntegrationTest {
 
     @Autowired
     private RedisMatchSessionStore matchSessionStore;

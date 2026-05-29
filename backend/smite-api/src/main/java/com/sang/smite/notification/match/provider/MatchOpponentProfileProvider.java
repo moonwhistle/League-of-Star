@@ -20,6 +20,7 @@ public class MatchOpponentProfileProvider {
 
     private static final String UNKNOWN_NICKNAME = "unknown";
     private static final String UNKNOWN_TIER = "UNKNOWN";
+    private static final String UNRANKED_TIER = "Unranked";
 
     private final UserReadService userReadService;
     private final RankReadService rankReadService;
@@ -31,6 +32,14 @@ public class MatchOpponentProfileProvider {
 
         try {
             UserRankInfo rankInfo = rankReadService.getUserRankInfo(opponentUserId);
+            if (rankReadService.isPlacementInProgress(opponentUserId)) {
+                return new MatchResponseResultNotification.Opponent(
+                        opponentUserId,
+                        nickname,
+                        UNRANKED_TIER,
+                        fallbackTierScore
+                );
+            }
             return new MatchResponseResultNotification.Opponent(
                     opponentUserId,
                     nickname,

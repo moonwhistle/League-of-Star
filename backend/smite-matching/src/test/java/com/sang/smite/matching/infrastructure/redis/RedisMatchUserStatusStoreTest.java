@@ -1,19 +1,15 @@
 package com.sang.smite.matching.infrastructure.redis;
 
 import com.sang.smite.domain.match.domain.MatchStatus;
-import com.sang.smite.matching.TestMatchingApplication;
-import com.sang.smite.redis.AbstractRedisTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(classes = TestMatchingApplication.class)
-class RedisMatchUserStatusStoreTest extends AbstractRedisTest {
+class RedisMatchUserStatusStoreTest extends MatchingRedisIntegrationTest {
 
     @Autowired
     private RedisMatchUserStatusStore statusStore;

@@ -107,6 +107,30 @@ class MatchResponseResultNotificationFactoryTest {
     }
 
     @Test
+    @DisplayName("상대가 배치 진행 중이면 실제 rank 대신 Unranked와 매칭용 tierScore를 표시한다")
+    void createResultWithPlacementOpponentProfile() {
+        MatchResponseResultEvent event = new MatchResponseResultEvent(
+                "match-1",
+                1L,
+                2L,
+                12,
+                9,
+                MatchStatus.ACCEPTED,
+                MatchResponseStatus.ACCEPTED,
+                MatchResponseStatus.ACCEPTED
+        );
+        givenUser(1L, "userA", Tier.SILVER, Division.I);
+        givenUser(2L, "placement", Tier.IRON, Division.IV);
+        when(rankReadService.isPlacementInProgress(2L)).thenReturn(true);
+
+        MatchResponseResultPubSubMessage userAMessage = factory.createForUserA(event);
+
+        assertThat(userAMessage.notification().opponent().nickname()).isEqualTo("placement");
+        assertThat(userAMessage.notification().opponent().tier()).isEqualTo("Unranked");
+        assertThat(userAMessage.notification().opponent().tierScore()).isEqualTo(9);
+    }
+
+    @Test
     @DisplayName("수락 유저와 timeout 유저에게 유저 관점별 실패 메시지를 생성한다")
     void createAcceptAndTimeoutResult() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(

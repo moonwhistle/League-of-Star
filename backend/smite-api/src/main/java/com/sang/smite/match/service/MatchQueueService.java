@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MatchQueueService {
 
+    private static final int PLACEMENT_MATCHING_TIER_SCORE = 9;
+
     private final MatchQueueCommandService matchService;
     private final RankReadService rankReadService;
     private final GameRoomReadService gameRoomReadService;
@@ -32,7 +34,7 @@ public class MatchQueueService {
      */
     public void joinQueue(Long userId) {
         validateNoActiveGameRoom(userId);
-        int tierScore = getRankInfo(userId).getTierScore();
+        int tierScore = resolveQueueTierScore(userId);
         matchService.joinQueue(userId, tierScore);
     }
 
@@ -43,7 +45,7 @@ public class MatchQueueService {
      * @param userId 취소 요청한 유저의 ID
      */
     public void leaveQueue(Long userId) {
-        int tierScore = getRankInfo(userId).getTierScore();
+        int tierScore = resolveQueueTierScore(userId);
         matchService.leaveQueue(userId, tierScore);
     }
 
@@ -53,6 +55,14 @@ public class MatchQueueService {
      */
     private UserRankInfo getRankInfo(Long userId) {
         return rankReadService.getUserRankInfo(userId);
+    }
+
+    private int resolveQueueTierScore(Long userId) {
+        UserRankInfo rankInfo = getRankInfo(userId);
+        if (rankReadService.isPlacementInProgress(userId)) {
+            return PLACEMENT_MATCHING_TIER_SCORE;
+        }
+        return rankInfo.getTierScore();
     }
 
     private void validateNoActiveGameRoom(Long userId) {
