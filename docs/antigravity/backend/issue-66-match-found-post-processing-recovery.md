@@ -124,7 +124,8 @@ flowchart TD
 
 이번 이슈에서 제외함.
 
-- 동일 IP 셀프 매칭 방지
+- 동일 userId 셀프 매칭 방지
+- 동일 IP 기반 어뷰징 방지 정책
 - client IP 추출 및 proxy/load balancer header 신뢰 정책
 - `MatchTicket` IP/hash 필드 추가
 - Redis queue key 또는 Lua atomic remove 구조 변경
@@ -148,7 +149,7 @@ flowchart TD
 - [x] queue 복귀 시 기존 `entryTime`과 `tierScore`를 유지하는 것으로 확정함.
 - [x] queue 복귀 보상 시 status는 `MATCHING`으로 강제 복구하는 것으로 확정함.
 - [x] 같은 scan cycle에서 재매칭하지 않고 다음 scheduler tick에서 재매칭하는 것으로 확정함.
-- [x] metric/Grafana와 동일 IP 셀프 매칭 방지는 이번 이슈 범위에서 제외함.
+- [x] metric/Grafana와 동일 userId 셀프 매칭 방지는 이번 이슈 범위에서 제외함.
 
 확정한 구현 경계는 다음과 같음.
 
@@ -158,7 +159,7 @@ flowchart TD
 - notification Pub/Sub/SSE 계층은 event 발행 이후의 fan-out만 담당하고, 이번 이슈에서는 변경하지 않음.
 - `atomicPairRemove` 성공 후 session/timeout/status 생성 단계에서 실패하면 `MatchFoundService`가 두 유저 queue 복귀와 `MATCHING` status 복구를 best-effort로 수행함.
 - `MatchFoundEvent` 발행 실패는 일부 클라이언트 수신 가능성을 고려해 복귀 보상을 수행하지 않고 기존 timeout 정산에 맡김.
-- 동일 IP 셀프 매칭 방지와 운영 metric은 Issue 66 구현 완료 후 별도 이슈에서 다룸.
+- 동일 userId 셀프 매칭 방지와 운영 metric은 Issue 66 구현 완료 후 별도 이슈에서 다룸.
 
 ### 2. `MatchFoundService` 처리 순서 재구성
 
@@ -300,7 +301,7 @@ flowchart TD
 
 - [x] `docs/antigravity/backend/plan-checkpoint.md` Step 16 체크리스트를 이번 이슈 정책에 맞게 갱신함.
 - [x] Step 16 완료 후 구현 결과를 이 문서의 task 체크 상태와 Implementation Result 섹션에 반영함.
-- [x] 동일 IP 셀프 매칭 방지는 Step 17 또는 별도 이슈로 분리되어 있음을 checkpoint에 유지함.
+- [x] 동일 userId 셀프 매칭 방지는 Step 17 또는 별도 이슈로 분리되어 있음을 checkpoint에 유지함.
 - [x] metric/Grafana 제외 정책을 문서에 남김.
 - [x] outbox/saga 기반 보장형 복구는 후속 이슈 범위로 남김.
 
@@ -320,7 +321,7 @@ flowchart TD
 - user status `FOUND` 갱신 실패 시 timeout cleanup, session 삭제, 두 유저 queue 복귀와 `MATCHING` status 복구를 best-effort로 수행함.
 - `MatchFoundEvent` 발행 실패는 session/status/timeout을 되돌리지 않고 기존 timeout scheduler 정산에 위임함.
 - `MatchPairingService`는 기존처럼 `atomicPairRemove` 성공 즉시 paired 처리하고, 후처리 실패가 발생해도 scan loop를 계속 진행함.
-- 동일 IP 셀프 매칭 방지, metric/Grafana 추가, outbox/saga 기반 보장형 복구는 이번 이슈에서 제외함.
+- 동일 userId 셀프 매칭 방지, metric/Grafana 추가, outbox/saga 기반 보장형 복구는 이번 이슈에서 제외함.
 - 검증 결과 `MatchFoundServiceTest`, `MatchPairingServiceTest`, `MatchResponseResultServiceTest`, `MatchResponseTimeoutSchedulerTest`, `:smite-matching:test`, 전체 `./gradlew test`가 통과함.
 
 ## 변경 이력
@@ -345,7 +346,7 @@ flowchart TD
 - queue 복귀 시 기존 `entryTime`, `tierScore`를 유지해 대기 시간과 매칭 범위가 깨지지 않게 한다.
 - 한 명만 `FOUND`가 된 불완전 상태는 허용하지 않고, session/timeout을 정리한 뒤 두 유저 모두 `MATCHING`으로 복구한다.
 - event 발행 실패는 이미 session/status/timeout이 완성된 상태이므로 되돌리지 않고 기존 10초 timeout 정산에 맡긴다.
-- 동일 IP 셀프 매칭 방지, metric/Grafana, outbox/saga는 이번 이슈 범위에서 제외한다.
+- 동일 userId 셀프 매칭 방지, metric/Grafana, outbox/saga는 이번 이슈 범위에서 제외한다.
 
 ```mermaid
 flowchart TD

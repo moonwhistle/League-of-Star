@@ -302,14 +302,15 @@ flowchart TD
 - [x] 후처리 보상은 Redis best-effort helper로 처리하고 outbox/saga, metric/Grafana는 후속 범위로 분리
 - [x] 후처리 실패 복구와 `MatchPairingService` scan loop 회귀 테스트 추가
 
-### Step 17. 동일 IP 셀프 매칭 방지
+### Step 17. 셀프 매칭 방지 기능 구현
 
-- [ ] 매칭 큐 진입 시 요청 IP 또는 셀프 매칭 방지용 식별자를 ticket에 포함할지 결정
-- [ ] proxy/load balancer 환경에서 신뢰할 IP header 정책 정의
-- [ ] 동일 IP 유저끼리는 후보 매칭에서 제외
-- [ ] 동일 IP 후보 제외로 인해 오래 대기하는 유저의 범위 확장 정책과 충돌하지 않도록 처리
-- [ ] 개인정보/보관 기간 관점에서 Redis ticket에 저장할 IP 값 형태를 결정
-- [ ] 동일 IP 셀프 매칭 방지 테스트 추가
+- [x] 현재 queue 진입 단계의 동일 userId 중복 방지 정책 확인
+- [x] Redis queue snapshot에 동일 userId 티켓이 중복 포함될 수 있는 비정상 경로 정리
+- [x] `MatchPairingService` 후보 판정에서 동일 userId 후보를 매칭 제외
+- [ ] 동일 userId 후보 제외 시 다음 후보 탐색이 계속되는지 검증
+- [ ] `MatchPairingServiceTest` 동일 userId 셀프 매칭 방지 회귀 테스트 추가
+- [ ] 관련 문서와 checkpoint 갱신
+- [ ] 전체 테스트 및 빌드 검증
 
 ## 5. MVP 기준
 
@@ -938,26 +939,26 @@ gameRoom 생성 실패 mapping:
 - 알림 발행 실패가 발생해도 session/status/timeout은 유지되어 10초 timeout scheduler가 정산 가능함
 - 같은 scan cycle에서 이미 paired 처리된 유저는 재매칭되지 않고 다음 scheduler tick에서 다시 후보가 됨
 
-### Issue 67. 동일 IP 셀프 매칭 방지
+### Issue 68. 셀프 매칭 방지 기능 구현
 
 목표:
 
-- 동일 IP 또는 동일 네트워크 식별자로 양쪽 플레이어가 매칭되는 것을 차단한다.
+- 비정상적으로 같은 userId의 매칭 티켓이 queue snapshot에 중복 포함되더라도 동일 userId끼리는 매칭되지 않도록 차단한다.
 
 범위:
 
-- 매칭 큐 진입 시 client IP 식별자 수집 위치 결정
-- proxy/load balancer 환경에서 신뢰할 header 정책 정의
-- Redis `MatchTicket`에 저장할 IP/hash 식별자 형태 결정
-- 후보 탐색 시 동일 IP 매칭 제외
-- 개인정보 보관 범위와 TTL 정책 확인
-- 동일 IP 매칭 제외 테스트 추가
+- 현재 queue 진입 단계의 동일 userId 중복 방지 정책 확인
+- Redis queue snapshot에 동일 userId 티켓이 중복 포함될 수 있는 비정상 경로 정리
+- 후보 탐색 시 동일 userId 후보 매칭 제외
+- 동일 userId 후보 제외 후 다음 후보 탐색 흐름 유지
+- 동일 userId 셀프 매칭 방지 회귀 테스트 추가
+- 관련 문서와 checkpoint 갱신
 
 완료 기준:
 
-- 동일 IP 유저끼리는 같은 match session으로 묶이지 않음
-- 서로 다른 IP 유저의 기존 매칭 성능과 정책은 유지됨
-- IP 식별자 저장 방식이 운영/개인정보 정책과 충돌하지 않음
+- 동일 userId 티켓끼리는 같은 match session으로 묶이지 않음
+- 동일 userId 후보를 제외해도 다른 후보 탐색은 계속됨
+- 서로 다른 userId의 기존 FIFO, tier range, scan loop 정책은 유지됨
 
 ## 8. 변경 이력
 
@@ -970,7 +971,7 @@ gameRoom 생성 실패 mapping:
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
 | 2026-05-18 | 게임 대기 timeout 정산을 Step 4 / Issue 42로 분리하고, GAME_START 이후 WebSocket 연결 유무와 무관하게 gameRoom 종료를 보장하는 서버 timer/scheduler step을 Issue 50으로 정리 |
 | 2026-05-19 | Step 4 게임 대기 timeout 정산 구현 완료 상태, gameRoom `createdAt + 30초`, participants `ABORTED`, Pub/Sub 복귀 이벤트 정책 반영 |
-| 2026-05-22 | 매칭 정책 정합성 후속 항목으로 Step 10~14 및 Issue 53~57 추가. Apex, 배치, 진행 중 gameRoom DB 검증, match_found 후처리 복구, 동일 IP 셀프 매칭 방지 추적 |
+| 2026-05-22 | 매칭 정책 정합성 후속 항목으로 Step 10~14 및 Issue 53~57 추가. Apex, 배치, 진행 중 gameRoom DB 검증, match_found 후처리 복구, 동일 userId 셀프 매칭 방지 추적 |
 | 2026-05-24 | Step 9 / Issue 52 범위를 record/rank 정산 기준으로 상세화. `rankSeriesId`, `seriesType`, 누적 전적, transaction 분리, 멀티 인스턴스 멱등성, 복구 scheduler, `GAME_RESULT` payload 미확장 정책 반영 |
 | 2026-05-24 | 후속 구현 순서 재정리. Step 10 Redis `IN_GAME` cleanup, Step 11 record/rank summary 조회 API, Step 12 Apex rank 자동 승급/강등, Step 13~17 매칭 정책 보강 순서로 분리 |
 | 2026-05-27 | Step 10 정상 종료 후 매칭 점유 상태 cleanup 문서를 Issue 54로 생성하고, cleanup 범위를 Redis 전체 삭제가 아니라 `match:status:{userId}=IN_GAME` 해제로 고정 |
@@ -980,3 +981,4 @@ gameRoom 생성 실패 mapping:
 | 2026-05-28 | Step 12 Apex rank 자동 승급/강등 정산 구현 완료. Apex LP band 자동 승급/강등, Master 0LP 강등, record snapshot, 일반 승급전 경계 테스트 반영 |
 | 2026-05-28 | Step 13 큐 진입 전 진행 중 gameRoom DB 검증 구현 완료. READY/IN_PROGRESS 차단, FINISHED/ABORTED 허용, Redis 큐 진입 회귀 테스트 반영 |
 | 2026-05-29 | Step 16 / Issue 66 match_found 후처리 실패 복구 구현 결과 반영. session/timeout/status 실패는 queue 복귀 보상, event 실패는 timeout 정산 위임으로 확정 |
+| 2026-05-29 | Step 17 셀프 매칭 방지 기능 구현 문서를 Issue 68로 생성하고, 동일 IP가 아니라 동일 userId 후보 제외 방어선으로 범위 조정 |
