@@ -25,6 +25,7 @@ import java.time.Clock;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -122,8 +124,14 @@ class MatchFoundServiceTest {
         assertThatThrownBy(() -> matchFoundService.process(userA, userB))
                 .isSameAs(cause);
 
-        verify(matchQueueStore).add(userA);
-        verify(matchQueueStore).add(userB);
+        ArgumentCaptor<MatchTicket> ticketCaptor = ArgumentCaptor.forClass(MatchTicket.class);
+        verify(matchQueueStore, times(2)).add(ticketCaptor.capture());
+        assertThat(ticketCaptor.getAllValues())
+                .extracting(MatchTicket::userId, MatchTicket::tierScore, MatchTicket::entryTime)
+                .containsExactly(
+                        tuple(userA.userId(), userA.tierScore(), userA.entryTime()),
+                        tuple(userB.userId(), userB.tierScore(), userB.entryTime())
+                );
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(sessionStore, never()).delete(any());

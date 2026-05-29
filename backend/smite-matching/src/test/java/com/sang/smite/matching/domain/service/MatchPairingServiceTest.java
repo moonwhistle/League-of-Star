@@ -393,6 +393,33 @@ class MatchPairingServiceTest {
     }
 
     @Test
+    @DisplayName("매칭 후처리 실패가 발생해도 스캔을 중단하지 않고 다음 후보 처리를 계속함")
+    void postProcessFailureDoesNotStopScan() {
+        long now = System.currentTimeMillis();
+        Timer.Sample mockSample = mock(Timer.Sample.class);
+        given(matchEngineMetrics.startScanTimer()).willReturn(mockSample);
+
+        MatchTicket userA = new MatchTicket(1L, 10, now - 5000);
+        MatchTicket userB = new MatchTicket(2L, 10, now - 4000);
+        MatchTicket userC = new MatchTicket(3L, 10, now - 3000);
+        MatchTicket userD = new MatchTicket(4L, 10, now - 2000);
+
+        given(matchStore.findAll()).willReturn(new ArrayList<>(List.of(userA, userB, userC, userD)));
+        given(matchStore.atomicPairRemove(1L, 10, 2L, 10)).willReturn(true);
+        given(matchStore.atomicPairRemove(3L, 10, 4L, 10)).willReturn(true);
+        doThrow(new RuntimeException("post process failed")).when(matchFoundService).process(userA, userB);
+
+        matchEngineService.processMatching();
+
+        verify(matchFoundService).process(userA, userB);
+        verify(matchFoundService).process(userC, userD);
+        verify(matchStore, never()).atomicPairRemove(1L, 10, 3L, 10);
+        verify(matchStore, never()).atomicPairRemove(2L, 10, 3L, 10);
+        verify(matchEngineMetrics, times(2)).incrementPairs();
+        verify(matchEngineMetrics).recordPairsPerScan(2);
+    }
+
+    @Test
     @DisplayName("매칭 대기 시간은 스캔 시작 시각이 아니라 페어별 매칭 성사 시각 기준으로 기록")
     void recordMatchedUserWaitUsesPairMatchedAt() {
         long entryTime = 100_000L;

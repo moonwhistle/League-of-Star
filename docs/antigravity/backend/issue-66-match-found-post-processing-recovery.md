@@ -248,13 +248,13 @@ flowchart TD
 
 ### 7. best-effort 보상 helper 정리
 
-- [ ] queue 복귀 helper를 추가해 `matchQueueStore.add(originalTicket)` 호출을 한 곳에서 처리함.
-- [ ] status 복구 helper를 추가해 `userStatusStore.updateStatus(userId, MATCHING, STATUS_TTL_SECONDS)` 호출을 한 곳에서 처리함.
-- [ ] session 삭제 helper를 추가해 `sessionStore.delete(matchId)` 실패를 격리함.
-- [ ] timeout cleanup helper를 추가해 `timeoutStore.cleanup(matchId)` 실패를 격리함.
-- [ ] 한 보상 작업 실패가 다른 보상 작업을 중단하지 않도록 각 보상 단위를 별도 try-catch로 분리함.
-- [ ] 새 helper는 `MatchFoundService` 내부 private method로 유지하고 외부 API로 노출하지 않음.
-- [ ] 불필요한 추상화나 새 service 분리는 하지 않고 현재 `smite-matching` 패키지 경계를 유지함.
+- [x] queue 복귀 helper를 추가해 `matchQueueStore.add(originalTicket)` 호출을 한 곳에서 처리함.
+- [x] status 복구 helper를 추가해 `userStatusStore.updateStatus(userId, MATCHING, STATUS_TTL_SECONDS)` 호출을 한 곳에서 처리함.
+- [x] session 삭제 helper를 추가해 `sessionStore.delete(matchId)` 실패를 격리함.
+- [x] timeout cleanup helper를 추가해 `timeoutStore.cleanup(matchId)` 실패를 격리함.
+- [x] 한 보상 작업 실패가 다른 보상 작업을 중단하지 않도록 각 보상 단위를 별도 try-catch로 분리함.
+- [x] 새 helper는 `MatchFoundService` 내부 private method로 유지하고 외부 API로 노출하지 않음.
+- [x] 불필요한 추상화나 새 service 분리는 하지 않고 현재 `smite-matching` 패키지 경계를 유지함.
 
 구현 기준은 다음과 같음.
 
@@ -277,18 +277,18 @@ flowchart TD
 테스트 기준은 다음과 같음.
 
 - `ArgumentCaptor<MatchSession>`으로 저장된 session의 userId, tierScore, entryTime, status, response status를 검증함.
-- `matchQueueStore.add(originalTicket)` 호출로 queue 복귀 ticket이 원래 `entryTime`과 `tierScore`를 유지하는지 검증함.
+- `ArgumentCaptor<MatchTicket>`으로 queue 복귀 ticket이 원래 `entryTime`과 `tierScore`를 유지하는지 검증함.
 - Mockito `InOrder`를 사용해 정상 흐름의 session, timeout, status, event 순서를 검증함.
 - event 발행 실패 테스트는 `RuntimeException`을 던지게 하고 보상 호출이 없는지 검증함.
 - metric 검증은 추가하지 않음.
 
 ### 9. `MatchPairingService` 회귀 확인
 
-- [ ] `atomicPairRemove` 성공 즉시 paired 처리하는 기존 흐름을 유지함.
-- [ ] 후처리 실패로 queue 복귀한 유저가 같은 scan cycle에서 재매칭되지 않고 다음 scheduler tick에서 처리되는 정책을 문서화함.
-- [ ] `MatchPairingService`에서 후처리 실패 예외를 catch하고 다음 후보 처리를 계속하는 기존 흐름을 유지함.
-- [ ] `MatchPairingServiceTest` 기존 paired 중복 방지 테스트가 깨지지 않는지 확인함.
-- [ ] 필요 시 후처리 실패 발생 시에도 scan loop가 중단되지 않는 회귀 테스트를 보강함.
+- [x] `atomicPairRemove` 성공 즉시 paired 처리하는 기존 흐름을 유지함.
+- [x] 후처리 실패로 queue 복귀한 유저가 같은 scan cycle에서 재매칭되지 않고 다음 scheduler tick에서 처리되는 정책을 문서화함.
+- [x] `MatchPairingService`에서 후처리 실패 예외를 catch하고 다음 후보 처리를 계속하는 기존 흐름을 유지함.
+- [x] `MatchPairingServiceTest` 기존 paired 중복 방지 테스트가 깨지지 않는지 확인함.
+- [x] 필요 시 후처리 실패 발생 시에도 scan loop가 중단되지 않는 회귀 테스트를 보강함.
 
 완료 기준은 다음과 같음.
 
