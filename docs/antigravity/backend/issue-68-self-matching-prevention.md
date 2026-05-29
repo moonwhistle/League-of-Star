@@ -228,43 +228,231 @@ flowchart TD
 
 ### 7. 기존 매칭 정책 회귀 확인
 
-- [ ] FIFO 정렬 후 오래 기다린 유저부터 후보를 탐색하는 기존 테스트 통과 확인
-- [ ] tier range 단계별 테스트 통과 확인
-- [ ] Apex/placement 매칭 정책 테스트 통과 확인
-- [ ] `atomicPairRemove` 실패 시 다음 후보 탐색 테스트 통과 확인
-- [ ] Issue 66 후처리 실패 scan loop 회귀 테스트 통과 확인
+- [x] FIFO 정렬 후 오래 기다린 유저부터 후보를 탐색하는 기존 테스트 통과 확인
+- [x] tier range 단계별 테스트 통과 확인
+- [x] Apex/placement 매칭 정책 테스트 통과 확인
+- [x] `atomicPairRemove` 실패 시 다음 후보 탐색 테스트 통과 확인
+- [x] Issue 66 후처리 실패 scan loop 회귀 테스트 통과 확인
 
 완료 기준은 다음과 같음.
 
 - 동일 userId 방어 조건 추가 후에도 기존 매칭 정책이 유지됨.
 - match found 후처리 복구 정책과 충돌하지 않음.
 
+검증 결과는 다음과 같음.
+
+- `./gradlew :smite-matching:cleanTest :smite-matching:test --tests '*MatchPairingServiceTest'` 통과.
+- `testFifoOrdering`으로 FIFO 정렬 후 오래 기다린 유저 우선 탐색 정책을 확인함.
+- `testSlidingWindow_*`, `matchPlacementUserWith*`, `matchApexSameTierScoreImmediately`로 tier range, placement, Apex 매칭 정책을 확인함.
+- `testAtomicRemoveFailContinues`로 `atomicPairRemove` 실패 시 후처리 없이 다음 후보 탐색이 유지되는지 확인함.
+- `postProcessFailureDoesNotStopScan`으로 Issue 66 후처리 실패가 scan loop를 중단하지 않는지 확인함.
+
 ### 8. 문서와 checkpoint 갱신
 
-- [ ] `docs/antigravity/backend/plan-checkpoint.md` Step 17과 Issue 68 항목을 구현 결과에 맞게 갱신
-- [ ] 이 문서의 task 체크 상태와 구현 결과를 반영
-- [ ] 동일 IP 기반 어뷰징 방지는 이번 이슈 범위에서 제외함을 유지
+- [x] `docs/antigravity/backend/plan-checkpoint.md` Step 17과 Issue 68 항목을 구현 결과에 맞게 갱신
+- [x] 이 문서의 task 체크 상태와 구현 결과를 반영
+- [x] 동일 IP 기반 어뷰징 방지는 이번 이슈 범위에서 제외함을 유지
 
 완료 기준은 다음과 같음.
 
 - issue 문서와 checkpoint 문서의 제목, 범위, task가 일치함.
 - Issue 66 문서의 후속 범위 설명과 충돌하지 않음.
 
+갱신 결과는 다음과 같음.
+
+- `Issue 68. 셀프 매칭 방지 기능 구현` 제목과 `Step 17. 셀프 매칭 방지 기능 구현` 제목을 일치시킴.
+- Issue 68 문서의 Step 1~8 task 상태와 구현 결과를 현재 진행 상태에 맞게 반영함.
+- `plan-checkpoint.md`의 Step 17 task 상태와 Issue 68 목표/범위/완료 기준이 동일 userId 후보 제외 정책을 가리키도록 유지함.
+- Issue 66 문서의 후속 범위는 동일 userId 셀프 매칭 방지를 Issue 68 범위로 분리하고, 동일 IP 기반 어뷰징 방지는 별도 제외 정책으로 유지함.
+
 ### 9. 검증
 
-- [ ] `./gradlew :smite-matching:test --tests '*MatchPairingServiceTest'` 실행
-- [ ] `./gradlew :smite-matching:test` 실행
-- [ ] 필요 시 전체 `./gradlew test` 실행
-- [ ] 신규 self matching 방지 테스트가 통과하는지 확인
-- [ ] 기존 pairing, match found 후처리 회귀 테스트가 통과하는지 확인
+- [x] `./gradlew :smite-matching:test --tests '*MatchPairingServiceTest'` 실행
+- [x] `./gradlew :smite-matching:test` 실행
+- [x] 필요 시 전체 `./gradlew test` 실행
+- [x] 신규 self matching 방지 테스트가 통과하는지 확인
+- [x] 기존 pairing, match found 후처리 회귀 테스트가 통과하는지 확인
 
 완료 기준은 다음과 같음.
 
 - 신규 테스트와 기존 smite-matching 테스트가 통과함.
 - 문서 변경은 `git diff --check`를 통과함.
 
+검증 결과는 다음과 같음.
+
+- `./gradlew :smite-matching:cleanTest :smite-matching:test --tests '*MatchPairingServiceTest'` 통과.
+- `./gradlew :smite-matching:test` 통과.
+- `./gradlew test` 통과.
+- `./gradlew build` 통과.
+- `git diff --check` 통과.
+- `./gradlew build` 중 생성된 `openapi3.yaml` 변경은 이번 이슈와 무관한 생성물이라 원복함.
+
+## Implementation Result
+
+- `MatchPairingService.isMatchable`은 동일 userId 후보를 먼저 제외하고, 서로 다른 userId 후보에 대해서만 기존 대기 시간 기반 tier range 계산을 수행함.
+- 동일 userId 후보는 `findMatchableCandidates`의 candidates 목록에 추가되지 않아 `atomicPairRemove`와 `MatchFoundService.process`로 넘어가지 않음.
+- 동일 userId 후보 뒤에 다른 matchable 후보가 있으면 scan을 중단하지 않고 다음 후보와 매칭을 시도함.
+- 동일 userId 후보만 있으면 해당 scheduler tick에서 매칭 성사 없이 종료하고 `recordPairsPerScan(0)`을 기록함.
+- 정상 queue 진입 중복 방지 정책, Redis queue key 구조, Lua `atomic_pair_remove`, Issue 66 match found 후처리 복구 정책은 변경하지 않음.
+- 동일 IP 기반 어뷰징 방지, client IP 수집, proxy/load balancer header 신뢰 정책, metric/Grafana 추가는 이번 이슈에서 제외함.
+- 검증 결과 신규 `MatchPairingServiceTest.sameUserIdCandidateSkippedAndNextCandidateMatched`, `sameUserIdOnlyCandidatesDoNotMatch`, 기존 `MatchPairingServiceTest`, `:smite-matching:test`, 전체 `./gradlew test`, `./gradlew build`가 통과함.
+
 ## 변경 이력
 
 | 날짜 | 변경 내용 |
 |------|-----------|
 | 2026-05-29 | Issue 68 셀프 매칭 방지 정책, 구현 흐름, task 초안 작성 |
+| 2026-05-30 | 동일 userId 후보 제외 구현 결과, 회귀 테스트, 문서/checkpoint 정합성 반영 |
+
+## PR Message
+
+````md
+## 📌 Summary
+
+동일 `userId` 티켓이 비정상적으로 queue snapshot에 중복 포함되더라도 자기 자신과 매칭되지 않도록 pairing 단계 방어선 추가.
+
+정상 queue 진입은 기존처럼 `setStatusIfAbsent`로 중복 진입 차단.
+이번 PR은 그 다음 단계인 `MatchPairingService`에서 동일 `userId` 후보를 matchable 후보로 보지 않도록 처리.
+
+```mermaid
+flowchart TD
+    A[매칭 시작 요청] --> B[setStatusIfAbsent MATCHING]
+    B -->|실패| C[ALREADY_IN_QUEUE]
+    B -->|성공| D[Redis queue 저장]
+    D --> E[MatchPairingService queue snapshot 조회]
+    E --> F[userA 기준 후보 탐색]
+    F --> G{userA.userId == userB.userId?}
+    G -->|Yes| H[동일 userId 후보 skip]
+    H --> I[다음 후보 탐색]
+    G -->|No| J{tier range 충족?}
+    J -->|No| I
+    J -->|Yes| K[atomicPairRemove]
+    K --> L[MatchFoundService.process]
+```
+
+핵심 정책.
+
+- 정상 queue 진입 중복 방지는 기존 `setStatusIfAbsent` 유지
+- 비정상 queue snapshot 방어는 `MatchPairingService`에서 처리
+- 동일 `userId` 후보는 실패가 아니라 후보 부적합으로 skip
+- 동일 `userId` 후보 뒤에 다른 후보가 있으면 다음 후보 탐색 유지
+- 동일 `userId` 후보만 있으면 해당 scheduler tick에서 매칭 미성사
+
+## 📚 Changes
+
+### 1. 동일 userId 후보 제외 위치를 `isMatchable()`로 결정
+
+후보 탐색 흐름은 기존 구조 유지.
+
+```mermaid
+flowchart LR
+    A[findMatchableCandidates] --> B[pairedUserIds 제외]
+    B --> C[isMatchable 호출]
+    C --> D{동일 userId?}
+    D -->|Yes| E[false]
+    D -->|No| F[tier range 계산]
+```
+
+선택 이유.
+
+- `findMatchableCandidates`: 후보 순회와 paired user 제외 책임 유지
+- `isMatchable`: 두 티켓이 서로 매칭 가능한지 판단하는 책임 유지
+- 동일 `userId`도 matchable 여부에 속하므로 `isMatchable()` 첫 조건으로 배치
+- `atomicPairRemove` 전에 제외되어 Redis queue 제거, session 생성, event 발행까지 진행되지 않음
+
+대안 비교.
+
+| 선택지 | 장점 | 단점 | 결론 |
+|--------|------|------|------|
+| `findMatchableCandidates`에서 직접 제외 | 조건이 루프에서 바로 보임 | 후보 부적합 조건이 루프와 helper로 분산 | 미선택 |
+| `isMatchable()`에서 제외 | matchable 판단을 한 곳에 유지 | helper 내부를 봐야 조건 확인 가능 | 선택 |
+
+### 2. 동일 IP가 아니라 동일 userId만 처리
+
+동일 IP 기반 차단은 이번 범위에서 제외.
+
+```mermaid
+flowchart TD
+    A[셀프 매칭 방지] --> B[동일 userId 방지]
+    A --> C[동일 IP 기반 어뷰징 방지]
+    B --> D[이번 PR 구현]
+    C --> E[IP 수집/header 신뢰/개인정보 정책 필요]
+    E --> F[이번 PR 제외]
+```
+
+선택 이유.
+
+- 동일 `userId`끼리 매칭되는 것은 명확한 오류
+- 동일 IP는 가족, 회사, 학교, PC방 등 실제 다른 유저 가능성 존재
+- 동일 IP 처리는 client IP 추출, proxy/load balancer header 신뢰, 개인정보 보관 정책 필요
+- 현재 이슈 목적은 queue snapshot 오염에 대한 최소 방어선 추가
+
+### 3. 실패/보상이 아니라 후보 skip으로 처리
+
+동일 `userId` 후보는 시스템 실패로 보지 않음.
+
+```mermaid
+flowchart TD
+    A[동일 userId 후보 발견] --> B{복구 대상?}
+    B -->|No| C[후보 부적합 skip]
+    C --> D{다음 후보 있음?}
+    D -->|Yes| E[다음 후보로 매칭 시도]
+    D -->|No| F[pair count 0]
+```
+
+선택 이유.
+
+- queue에서 제거되기 전 단계라 보상할 상태가 없음
+- `MatchFoundService` 후처리 복구 정책과 분리 가능
+- 로그/metric 없이 기존 scan loop 흐름 유지
+- 후보 하나가 부적합해도 scheduler 전체를 중단하지 않음
+
+### 4. 회귀 테스트 추가
+
+추가 테스트.
+
+- `sameUserIdCandidateSkippedAndNextCandidateMatched`
+- `sameUserIdOnlyCandidatesDoNotMatch`
+
+검증한 흐름.
+
+- 동일 `userId` 후보에 대해 `atomicPairRemove` 미호출
+- 동일 `userId` 후보에 대해 `MatchFoundService.process` 미호출
+- 다음 후보가 있으면 정상 매칭 진행
+- 동일 `userId` 후보만 있으면 `recordPairsPerScan(0)` 기록
+
+기존 정책 회귀 확인.
+
+- FIFO 정렬 후 오래 기다린 유저 우선 탐색 유지
+- tier range/sliding window 정책 유지
+- placement/Apex 매칭 정책 유지
+- `atomicPairRemove` 실패 시 다음 후보 탐색 유지
+- Issue 66 후처리 실패 scan loop 유지
+
+## 📝 Note
+
+미포함.
+
+- 동일 IP 기반 어뷰징 방지
+- client IP 추출
+- proxy/load balancer header 신뢰 정책
+- `MatchTicket` IP/hash 필드 추가
+- Redis queue key 변경
+- Lua `atomic_pair_remove` 변경
+- `MatchFoundService` 후처리 복구 정책 변경
+- 로그/metric/Grafana 추가
+
+검증.
+
+- `./gradlew :smite-matching:cleanTest :smite-matching:test --tests '*MatchPairingServiceTest'`
+- `./gradlew :smite-matching:test`
+- `./gradlew test`
+- `./gradlew build`
+- `git diff --check`
+
+`./gradlew build` 중 생성된 `openapi3.yaml` 변경은 이번 이슈와 무관한 생성물이라 원복.
+
+## 📌 Related Issue
+
+- Closes #68
+````

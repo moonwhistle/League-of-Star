@@ -309,8 +309,8 @@ flowchart TD
 - [x] `MatchPairingService` 후보 판정에서 동일 userId 후보를 매칭 제외
 - [x] 동일 userId 후보 제외 시 다음 후보 탐색이 계속되는지 검증
 - [x] `MatchPairingServiceTest` 동일 userId 셀프 매칭 방지 회귀 테스트 추가
-- [ ] 관련 문서와 checkpoint 갱신
-- [ ] 전체 테스트 및 빌드 검증
+- [x] 관련 문서와 checkpoint 갱신
+- [x] 전체 테스트 및 빌드 검증
 
 ## 5. MVP 기준
 
