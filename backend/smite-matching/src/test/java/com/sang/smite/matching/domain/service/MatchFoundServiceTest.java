@@ -23,6 +23,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -323,5 +324,35 @@ class MatchFoundServiceTest {
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("event 발행에 실패해도 session timeout FOUND 상태를 유지하고 queue 복귀를 수행하지 않는다")
+    void processWhenEventPublishFails() {
+        // given
+        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
+        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
+        when(clock.millis()).thenReturn(1_000L);
+        doThrow(new RuntimeException("event publish failed")).when(eventPublisher).publishEvent(any());
+
+        // when & then
+        assertThatCode(() -> matchFoundService.process(userA, userB))
+                .doesNotThrowAnyException();
+
+        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
+        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        MatchSession savedSession = sessionCaptor.getValue();
+
+        verify(timeoutStore).addPending(
+                savedSession.matchId(),
+                1_000L + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
+        );
+        verify(userStatusStore).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(sessionStore, never()).delete(any());
+        verify(timeoutStore, never()).cleanup(any());
+        verify(matchQueueStore, never()).add(any());
+        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
     }
 }

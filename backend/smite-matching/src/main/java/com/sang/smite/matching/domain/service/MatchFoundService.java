@@ -83,12 +83,16 @@ public class MatchFoundService {
             throw e;
         }
 
-        eventPublisher.publishEvent(new MatchFoundEvent(
-                matchId,
-                userA.userId(),
-                userB.userId(),
-                MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS
-        ));
+        try {
+            eventPublisher.publishEvent(new MatchFoundEvent(
+                    matchId,
+                    userA.userId(),
+                    userB.userId(),
+                    MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS
+            ));
+        } catch (RuntimeException ignored) {
+            // Event publication is isolated. The pending timeout will settle unanswered matches.
+        }
     }
 
     private void restoreUsersToQueue(MatchTicket userA, MatchTicket userB) {

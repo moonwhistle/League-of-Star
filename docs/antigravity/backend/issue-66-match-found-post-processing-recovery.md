@@ -232,13 +232,13 @@ flowchart TD
 
 ### 6. event 발행 실패 격리 구현
 
-- [ ] `eventPublisher.publishEvent` 실패를 session/status/timeout 복구 대상과 분리함.
-- [ ] event 발행 실패 시 session을 삭제하지 않음.
-- [ ] event 발행 실패 시 timeout pending을 cleanup하지 않음.
-- [ ] event 발행 실패 시 user status `FOUND`를 유지함.
-- [ ] event 발행 실패 시 userA/userB를 queue에 복귀시키지 않음.
-- [ ] event 발행 실패 시 session/status/timeout 결과를 되돌리지 않고 새 로그/metric은 추가하지 않음.
-- [ ] event 발행 실패 후 응답이 없으면 기존 timeout scheduler가 정산한다는 정책을 문서화함.
+- [x] `eventPublisher.publishEvent` 실패를 session/status/timeout 복구 대상과 분리함.
+- [x] event 발행 실패 시 session을 삭제하지 않음.
+- [x] event 발행 실패 시 timeout pending을 cleanup하지 않음.
+- [x] event 발행 실패 시 user status `FOUND`를 유지함.
+- [x] event 발행 실패 시 userA/userB를 queue에 복귀시키지 않음.
+- [x] event 발행 실패 시 session/status/timeout 결과를 되돌리지 않고 새 로그/metric은 추가하지 않음.
+- [x] event 발행 실패 후 응답이 없으면 기존 timeout scheduler가 정산한다는 정책을 문서화함.
 
 완료 기준은 다음과 같음.
 
@@ -271,7 +271,7 @@ flowchart TD
 - [x] timeout pending 등록 실패 시 user status `FOUND` 갱신과 event 발행이 호출되지 않는지 검증함.
 - [x] userA `FOUND` 갱신 실패 시 timeout cleanup, session 삭제, queue 복귀, `MATCHING` status 복구를 검증함.
 - [x] userB `FOUND` 갱신 실패 시 userA까지 포함해 두 유저 모두 queue 복귀와 `MATCHING` status 복구 대상인지 검증함.
-- [ ] event 발행 실패 시 session/timeout/status를 유지하고 queue 복귀가 호출되지 않는지 검증함.
+- [x] event 발행 실패 시 session/timeout/status를 유지하고 queue 복귀가 호출되지 않는지 검증함.
 - [x] 보상 작업 일부가 실패해도 나머지 보상 작업을 계속 시도하는지 검증함.
 
 테스트 기준은 다음과 같음.
