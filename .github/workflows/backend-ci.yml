@@ -43,3 +43,13 @@ jobs:
 
       - name: 빌드 및 테스트
         run: ./gradlew build --build-cache --parallel
+
+      - name: 테스트 리포트 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/**/build/test-results/test/**
+            backend/**/build/reports/tests/test/**
+          if-no-files-found: ignore
