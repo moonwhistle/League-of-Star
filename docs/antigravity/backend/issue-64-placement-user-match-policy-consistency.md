@@ -41,22 +41,22 @@ flowchart TD
 - `MatchTicket`, Redis queue key, Redis Lua atomic remove, `MatchSession` schema는 변경하지 않음.
 - match 응답 상대 프로필에서 배치 유저는 `Unranked`로 표시함.
 
-### Current Implementation Analysis
+### Implementation Result
 
-현재 구현 상태는 다음과 같음.
+구현 완료 상태는 다음과 같음.
 
-- `MatchQueueService.joinQueue`는 active gameRoom 여부를 먼저 확인하고, `UserRankInfo.getTierScore()`를 `MatchQueueCommandService.joinQueue(userId, tierScore)`로 전달함.
-- `MatchQueueService.leaveQueue`도 `UserRankInfo.getTierScore()`를 사용해 Redis queue에서 제거함.
-- `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 여부는 queue join/leave 흐름에서 조회하지 않음.
-- `RankReadService`는 현재 `UserRankInfo` 조회만 제공함.
-- `RankSeriesRepository`는 `findByUserIdAndStatus`를 제공하지만 type 조건 조회는 없음.
-- `MatchTicket`은 `userId`, `tierScore`, `entryTime`만 보유함.
-- `MatchQueueCommandService`와 `RedisMatchQueueStore`는 전달받은 tierScore를 그대로 `matching:queue:{tierScore}` key에 저장함.
-- `MatchPairingService`는 ticket의 tierScore 차이와 userA 대기 시간 기준으로 매칭 가능 여부를 판단함.
-- 30초 초과 전체 매칭 정책은 이미 `TIER_SCORE_MAX - TIER_SCORE_MIN` 기준으로 구현되어 있음.
-- `MatchResponseResultService`는 실패 정산 시 `MatchSession`에 저장된 tierScore와 entryTime으로 수락 유저를 재큐잉함.
-- `MatchOpponentProfileProvider`는 현재 상대의 `UserRankInfo.rank`를 그대로 tierName으로 내려줌.
-- 현재 상태에서는 배치 유저도 실제 `UserRankInfo.rank`가 노출될 수 있어 “배치 중 티어 미표시” 정책과 맞지 않음.
+- `MatchQueueService.joinQueue`는 active gameRoom 여부를 가장 먼저 확인하고, `resolveQueueTierScore`로 매칭용 tierScore를 결정함.
+- `MatchQueueService.leaveQueue`도 `resolveQueueTierScore`를 사용해 join/leave Redis queue key 불일치를 방지함.
+- `resolveQueueTierScore`는 `UserRankInfo` 조회 후 `RankReadService.isPlacementInProgress`가 true면 tierScore `9`, 아니면 실제 `UserRankInfo.getTierScore()`를 반환함.
+- `RankReadService.isPlacementInProgress`는 `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 조건으로 active placement 여부를 조회함.
+- `RankSeriesRepository.existsByUserIdAndStatusAndType`를 추가해 완료된 placement와 promotion series를 배치 진행 중으로 보지 않도록 함.
+- `MatchTicket`은 기존처럼 `userId`, `tierScore`, `entryTime`만 보유함.
+- `MatchQueueCommandService`와 `RedisMatchQueueStore`는 전달받은 tierScore를 그대로 `matching:queue:{tierScore}` key에 저장/제거함.
+- `MatchPairingService`는 배치 여부를 직접 알지 않고, ticket의 tierScore 차이와 userA 대기 시간 기준으로 기존 매칭 정책을 재사용함.
+- 30초 초과 전체 매칭 정책은 기존 `TIER_SCORE_MAX - TIER_SCORE_MIN` 기준 구현을 그대로 사용함.
+- `MatchResponseResultService`는 실패 정산 시 기존처럼 `MatchSession`에 저장된 tierScore와 entryTime으로 수락 유저를 재큐잉함.
+- `MatchOpponentProfileProvider`는 상대가 active placement면 tierName을 `Unranked`, tierScore를 match session/event fallback tierScore로 응답함.
+- 일반/Apex 상대 프로필은 기존처럼 실제 `UserRankInfo.rank`와 `UserRankInfo.getTierScore()`를 응답함.
 
 ### Package Boundary
 
@@ -241,19 +241,37 @@ Step 7 구현 결과는 다음과 같음.
 
 ### 8. 기존 정책 회귀 방지
 
-- [ ] 일반 유저 queue join/leave 기존 동작이 유지되는지 검증함.
-- [ ] Apex `29/33/37` scan 및 30초 초과 전체 매칭 정책이 유지되는지 검증함.
-- [ ] accept/reject/timeout 재큐잉 흐름에서 기존 ticket tierScore 기준이 유지되는지 확인함.
-- [ ] active gameRoom DB 검증이 placement 조회 추가 이후에도 joinQueue 가장 앞단에서 유지되는지 확인함.
-- [ ] Redis status 기반 중복 큐 진입 차단 정책이 유지되는지 확인함.
+- [x] 일반 유저 queue join/leave 기존 동작이 유지되는지 검증함.
+- [x] Apex `29/33/37` scan 및 30초 초과 전체 매칭 정책이 유지되는지 검증함.
+- [x] accept/reject/timeout 재큐잉 흐름에서 기존 ticket tierScore 기준이 유지되는지 확인함.
+- [x] active gameRoom DB 검증이 placement 조회 추가 이후에도 joinQueue 가장 앞단에서 유지되는지 확인함.
+- [x] Redis status 기반 중복 큐 진입 차단 정책이 유지되는지 확인함.
+
+Step 8 검증 결과는 다음과 같음.
+
+- 일반 유저 queue join/leave는 `MatchQueueServiceTest`의 기존 성공 케이스에서 실제 rank tierScore로 matching module에 위임되는지 검증함.
+- active gameRoom DB 검증은 `MatchQueueServiceTest.joinQueue_activeGameRoom_exists`에서 rank/placement 조회와 matching module 호출 전에 차단되는지 검증함.
+- Apex `29/33/37` scan은 `RedisMatchQueueStoreTest`의 Apex findAll/count/atomicPairRemove 테스트로 유지됨.
+- 30초 초과 전체 tierScore 매칭은 `MatchPairingServiceTest.testSlidingWindow_FullRangeAfterThirtySeconds`로 유지됨.
+- accept/reject/timeout 재큐잉은 `MatchResponseResultServiceTest`에서 `MatchSession`에 저장된 기존 tierScore와 entryTime으로 ticket을 재삽입하는지 검증함.
+- Redis status 기반 중복 큐 진입 차단은 `MatchQueueCommandServiceTest.joinQueue_already_matching`에서 유지됨.
+- 이번 단계에서 production code, `MatchTicket`, Redis key, Lua script, `MatchSession` schema는 변경하지 않음.
 
 ### 9. 문서 정합성
 
-- [ ] `docs/project/policy.md`의 배치 매칭 정책을 tierScore `9` 시작 기준으로 갱신함.
-- [ ] `docs/project/policy.md`의 배치 매칭 표현을 tierScore `9` 시작과 기존 대기 확장 재사용 정책에 맞춤.
-- [ ] `docs/antigravity/backend/plan-checkpoint.md` Step 15 체크리스트를 구현 결과에 맞게 갱신함.
-- [ ] Issue 문서에 구현 결과, 테스트 범위, 제외 범위를 반영함.
-- [ ] 배치 완료/정산 정책은 이번 이슈 범위가 아님을 문서에 명시함.
+- [x] `docs/project/policy.md`의 배치 매칭 정책을 tierScore `9` 시작 기준으로 갱신함.
+- [x] `docs/project/policy.md`의 배치 매칭 표현을 tierScore `9` 시작과 기존 대기 확장 재사용 정책에 맞춤.
+- [x] `docs/antigravity/backend/plan-checkpoint.md` Step 15 체크리스트를 구현 결과에 맞게 갱신함.
+- [x] Issue 문서에 구현 결과, 테스트 범위, 제외 범위를 반영함.
+- [x] 배치 완료/정산 정책은 이번 이슈 범위가 아님을 문서에 명시함.
+
+Step 9 문서 정합성 결과는 다음과 같음.
+
+- `docs/project/policy.md`는 배치 진행 중 유저를 `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS`로 식별하고, 매칭용 tierScore `9`를 사용하는 정책으로 정리됨.
+- `docs/project/policy.md`의 오래된 고정 구간 매칭 표현은 제거됨.
+- `docs/antigravity/backend/plan-checkpoint.md` Step 15는 구현 완료 항목과 회귀 검증 결과를 반영함.
+- Issue 문서는 구현 전 분석 표현을 최종 구현 결과 기준으로 갱신함.
+- 배치 완료 시 최종 rank/LP 배정, `RankSeries` 정산, `game_records.seriesType=PLACEMENT` 정산 흐름은 이번 이슈 범위가 아님을 유지함.
 
 ## 📝 Note
 
@@ -264,3 +282,84 @@ Step 7 구현 결과는 다음과 같음.
 - 배치 유저끼리는 diff `0`으로 즉시 매칭될 수 있음.
 - 배치 중 상대 프로필은 `Unranked`로 표시함.
 - 사용자 수가 늘면 배치 전용 후보 범위나 MMR 기반 매칭을 별도 이슈로 고도화할 수 있음.
+
+## 📌 Summary
+
+```mermaid
+flowchart TD
+    A[queue join 또는 leave 요청] --> B{join 요청인가}
+    B -->|Yes| C[active gameRoom DB 검증]
+    B -->|No| D[rank 정보 조회]
+    C --> D
+    D --> E[active PLACEMENT 조회]
+    E --> F{배치 진행 중}
+    F -->|Yes| G[매칭용 tierScore 9 사용]
+    F -->|No| H[실제 rank tierScore 사용]
+    G --> I[MatchQueueCommandService]
+    H --> I
+    I --> J[기존 matching queue 저장/제거]
+    J --> K[기존 MatchPairingService 정책 재사용]
+    K --> L{상대 프로필 생성}
+    L -->|상대 배치 진행 중| M[Unranked + fallback tierScore]
+    L -->|일반 또는 Apex| N[실제 rank tier + tierScore]
+```
+
+배치 진행 중 유저를 `RankSeries.type=PLACEMENT`, `status=IN_PROGRESS` 기준으로 식별하고, queue join/leave에서 실제 rank tierScore 대신 Silver IV 기준 매칭용 tierScore `9`를 사용하도록 보정함.
+matching module은 배치 여부를 직접 알지 않고 기존 `MatchTicket.tierScore()` 기반 대기 시간별 매칭 정책을 그대로 재사용함.
+
+match 응답 상대 프로필에서는 배치 완료 전 티어 미표시 정책에 맞춰 active placement 유저를 `Unranked`로 표시하고, tierScore는 match session/event에 저장된 fallback tierScore를 사용함.
+
+## 📚 Changes
+
+- core read 경계에 active placement 조회를 추가함.
+  - `RankSeriesRepository.existsByUserIdAndStatusAndType`를 추가함.
+  - `RankReadService.isPlacementInProgress`에서 `IN_PROGRESS + PLACEMENT` 조건을 고정함.
+  - 정산용 pessimistic lock 조회인 `findByUserIdAndStatus`는 변경하지 않음.
+
+- `MatchQueueService`에서 queue join/leave tierScore 결정을 통일함.
+  - 기존: join/leave 모두 실제 `UserRankInfo.getTierScore()` 사용
+  - 변경: active placement면 tierScore `9`, 아니면 실제 rank tierScore 사용
+  - join과 leave가 같은 `resolveQueueTierScore` helper를 사용해 Redis key 불일치를 방지함.
+  - active gameRoom DB 검증은 기존처럼 join 흐름 가장 앞단에서 유지함.
+
+- matching engine은 변경하지 않고 기존 정책을 재사용함.
+  - 배치 전용 queue나 배치 전용 matchmaking engine을 만들지 않음.
+  - 기존 `matching:queue:{tierScore}`, `MatchTicket`, Redis Lua atomic remove, `MatchSession` schema를 유지함.
+  - 이 선택으로 schema 변경 없이 배치 유저 매칭 성사율을 높였지만, 배치 전용 MMR 정교화는 후속 고도화 범위로 남김.
+
+- match 응답 상대 프로필 표시 정책을 보정함.
+  - active placement 상대는 `Unranked`로 표시함.
+  - active placement 상대의 tierScore는 실제 rank tierScore가 아니라 match session/event fallback tierScore를 사용함.
+  - 일반/Apex 상대는 기존처럼 실제 rank tier와 tierScore를 표시함.
+  - rank 조회 실패 fallback `UNKNOWN` 경로는 유지함.
+
+- 단위 테스트와 회귀 테스트를 보강함.
+  - 배치 join/leave tierScore `9` 위임 검증
+  - active placement 조회 조건 검증
+  - 배치 tierScore `9`의 기존 대기 시간별 매칭 정책 재사용 검증
+  - opponent profile `Unranked` 표시 검증
+  - 일반/Apex/재큐잉/active gameRoom/Redis 중복 큐 정책 회귀 확인
+
+- 문서 정합성을 갱신함.
+  - `docs/project/policy.md`
+  - `docs/antigravity/backend/plan-checkpoint.md`
+  - `docs/antigravity/backend/issue-64-placement-user-match-policy-consistency.md`
+
+## 📝 Note
+
+- 배치 완료 시 최종 rank/LP 배정 정책은 변경하지 않음.
+- `RankSeries` 정산 로직과 `game_records.seriesType=PLACEMENT` 흐름은 변경하지 않음.
+- 배치 유저는 MVP 환경에서 낮은 구간인 tierScore `9`에서 시작하고, 기존 `±1 / ±2 / ±4 / 30초 초과 전체` 확장 정책을 그대로 따름.
+- queue 대기 중 placement가 외부 정산으로 완료되는 경합까지 완전히 막으려면 ticket에 저장된 tierScore 기준 제거 구조가 더 강하지만, 현재 정책과 정상 흐름에서는 join/leave가 같은 helper를 사용하므로 key 불일치를 방지함.
+
+검증:
+
+- `./gradlew :smite-core:test --tests com.sang.smite.domain.rank.repository.RankSeriesRepositoryTest --rerun-tasks`
+- `./gradlew :smite-api:test --tests com.sang.smite.match.service.MatchQueueServiceTest --tests com.sang.smite.notification.match.factory.MatchResponseResultNotificationFactoryTest`
+- `./gradlew :smite-matching:test --tests com.sang.smite.matching.domain.service.MatchPairingServiceTest --tests com.sang.smite.matching.infrastructure.redis.RedisMatchQueueStoreTest --tests com.sang.smite.matching.command.MatchServiceTest --tests com.sang.smite.matching.domain.service.MatchResponseResultServiceTest`
+- `./gradlew :smite-core:test :smite-api:test :smite-matching:test`
+- `git diff --check`
+
+## 📌 Related Issue
+
+- Closes #64

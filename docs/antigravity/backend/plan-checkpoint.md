@@ -288,6 +288,8 @@ flowchart TD
 - [x] 기존 `MatchPairingService`가 배치 tierScore `9`를 기존 대기 시간별 diff 정책으로 처리하는지 검증
 - [x] match 응답 상대 프로필에서 배치 진행 중 유저를 `Unranked`로 표시
 - [x] 배치 유저 매칭 단위 테스트 추가
+- [x] 일반/Apex/재큐잉/active gameRoom/Redis 중복 큐 정책 회귀 방지 검증
+- [x] policy/issue/checkpoint 문서 정합성 반영
 
 ### Step 16. match_found 후처리 실패 복구
 
