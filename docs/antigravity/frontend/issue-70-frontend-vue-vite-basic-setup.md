@@ -1,4 +1,4 @@
-# Issue 66. Frontend Vue Vite Basic Setup
+# Issue 70. Frontend Vue Vite Basic Setup
 
 ## Feature Description
 
