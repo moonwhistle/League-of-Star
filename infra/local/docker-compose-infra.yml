@@ -5,7 +5,7 @@ services:
     networks:
       - smite-local
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root1234
       MYSQL_DATABASE: smite
@@ -22,7 +22,7 @@ services:
     networks:
       - smite-local
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
 volumes:
   mysql-data:
