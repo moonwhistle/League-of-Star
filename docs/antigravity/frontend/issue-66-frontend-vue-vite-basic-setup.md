@@ -239,12 +239,12 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 ### 5. Service layer 골격
 
-- [ ] `apiClient.ts` 생성
-- [ ] `authToken.ts` 생성
-- [ ] API base URL env 검증 helper 생성
-- [ ] JSON request/response 처리 기본 함수 생성
-- [ ] 인증 토큰이 있으면 Authorization header를 주입할 수 있는 구조 준비
-- [ ] `matchService.ts`, `gameSummaryService.ts`는 함수 signature 중심으로 skeleton 작성
+- [x] `apiClient.ts` 생성
+- [x] `authToken.ts` 생성
+- [x] API base URL env 검증 helper 생성
+- [x] JSON request/response 처리 기본 함수 생성
+- [x] 인증 토큰이 있으면 Authorization header를 주입할 수 있는 구조 준비
+- [x] `matchService.ts`, `gameSummaryService.ts`는 함수 signature 중심으로 skeleton 작성
 
 ### 6. Realtime 골격
 
@@ -355,4 +355,14 @@ npm run dev
 - `App.vue`는 `RouterView`만 렌더링하는 최소 shell로 변경했다.
 - `main.ts`에서 Vue app에 router plugin을 등록했다.
 - TypeScript가 `@` alias를 해석하도록 `tsconfig.app.json`에 `paths`를 추가했다.
+- `npm run typecheck`, `npm run build` 통과를 확인했다.
+
+### 2026-06-01 - Task 5 Service Layer Skeleton
+
+- `src/constants/env.ts`에 필수 `VITE_*` 환경변수 검증 helper와 API/WebSocket/video URL 상수를 추가했다.
+- `src/services/authToken.ts`에 access/refresh token 저장, 조회, 삭제 유틸을 추가했다.
+- `src/services/apiClient.ts`에 fetch 기반 JSON request helper, void request helper, `ApiClientError`, Authorization header 주입 구조를 추가했다.
+- `src/services/matchService.ts`에 match queue join/leave, match accept/reject 함수 signature를 추가했다.
+- `src/services/gameSummaryService.ts`에 game summary 조회 함수 signature를 추가했다.
+- `src/types/api.ts`, `src/types/match.ts`, `src/types/game.ts`에 service layer에서 사용하는 최소 타입을 추가했다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
