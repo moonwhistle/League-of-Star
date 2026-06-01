@@ -283,7 +283,7 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 - [x] `.agents/rules/frontend-convention.md`를 Vue 기준으로 갱신
 - [x] `docs/project/overallplan.md` 프론트 스택 설명을 Vue 기준으로 갱신
 - [x] `docs/project/websocket client.md`에서 프레임워크 의존 문구가 있으면 Vue 기준과 충돌하지 않게 정리
-- [ ] 이번 이슈 문서에 구현 결과와 검증 명령 기록
+- [x] 이번 이슈 문서에 구현 결과와 검증 명령 기록
 
 ## Implementation Report Before Coding
 
@@ -405,3 +405,90 @@ npm run dev
 - `package.json`에 `lint`, `test`, `format`, `format:write` scripts를 추가했다.
 - Prettier 기준에 맞게 기존 frontend 파일 포맷을 정리했다.
 - `npm run lint`, `npm run test`, `npm run format`, `npm run typecheck`, `npm run build` 통과를 확인했다.
+
+### 2026-06-01 - Task 10 Documentation Consistency
+
+- 이슈 문서는 `docs/antigravity/frontend/issue-66-frontend-vue-vite-basic-setup.md`에 위치한다.
+- `.agents/rules/frontend-convention.md`, `.agents/rules/project-context.md`, `docs/project/overallplan.md`의 활성 프론트 기준이 Vue 3 + Vite + TypeScript와 충돌하지 않는지 확인했다.
+- 남아있는 React 문구는 과거 변경 이력 또는 React에서 Vue로 전환한 비교표/기록뿐이며, 현재 스택 기준 문구는 Vue 기준이다.
+- `docs/project/websocket client.md`에는 React/Router/TanStack Query 등 프레임워크 충돌 문구가 없음을 확인했다.
+- 전체 구현 결과와 검증 명령은 이 문서의 Progress 섹션에 Task별로 기록했다.
+- 최종 검증 명령은 `npm run lint`, `npm run test`, `npm run format`, `npm run typecheck`, `npm run build`, `git diff --check`이다.
+
+## PR Message
+
+## 📌 Summary
+
+Vue 3 + Vite + TypeScript 기반 프론트엔드 작업대 구현. 백엔드 Auth/Match/SSE/WebSocket/Game Summary 계약을 후속 화면 구현에서 바로 연결할 수 있도록 라우팅, 서비스 경계, 실시간 통신 wrapper, 게임 런타임 유틸, 테스트/린트/포맷 검증 체계 구성.
+
+```mermaid
+flowchart TD
+    A[Vue 3 + Vite + TypeScript scaffold] --> B[Router shell]
+    B --> C[Home/Login/Match/Game route placeholders]
+
+    A --> D[Env constants]
+    D --> E[API client + auth token storage]
+    E --> F[Match service]
+    E --> G[Game summary service]
+
+    D --> H[Realtime wrappers]
+    H --> I[Match SSE EventSource skeleton]
+    H --> J[Game WebSocket skeleton]
+
+    J --> K[Game runtime skeleton]
+    K --> L[WebSocket message factories]
+    K --> M[HP scenario helper]
+
+    A --> N[Base styling]
+    A --> O[Test/Lint/Format]
+    O --> P[lint/test/format/typecheck/build verified]
+```
+
+## 📚 Changes
+
+- Vue + Vite 프로젝트를 루트 `frontend/`에 생성하고 기존 React 기준 문서를 Vue 기준으로 정리.
+  - 백엔드가 이미 REST, SSE, native WebSocket 중심으로 구현되어 있어 프론트는 무거운 상태관리/서버상태 라이브러리를 먼저 도입하지 않고, Vue Router + typed service 함수 중심으로 시작.
+  - Pinia와 TanStack Query Vue는 실제 전역 상태나 캐싱/무효화 요구가 생기는 후속 기능 이슈에서 도입하도록 보류.
+
+- Router shell과 페이지 placeholder 고정.
+  - 백엔드 플로우가 로그인 → 매칭 → 게임 대기 → 게임 진행 → 결과 확인으로 나뉘어 있으므로, `/`, `/login`, `/match`, `/game/:gameRoomId/waiting`, `/game/:gameRoomId/play`, `/game/:gameRoomId/result` 라우트만 먼저 구성.
+  - 이번 PR은 화면 기능 구현이 아니라 후속 페이지 구현을 위한 route boundary 확정 목적.
+
+- API service layer를 백엔드 REST 계약 기준으로 분리.
+  - `apiClient`는 `VITE_API_BASE_URL`을 기준으로 요청 URL을 만들고, access token이 있으면 `Authorization: Bearer` 헤더를 주입.
+  - Match queue/response API는 백엔드의 command API가 `Void` 응답을 반환하므로 `requestVoid` 중심으로 구성.
+  - Game summary는 백엔드가 `PENDING | DONE` 응답을 반환하므로 discriminated union 타입으로 받을 수 있게 최소 타입 구성.
+
+- Realtime wrapper는 native API를 유지하되 orchestration 제외.
+  - 매칭 알림은 백엔드 정책대로 `match_found`, `match_response_result`까지 SSE가 담당하므로 `EventSource` wrapper만 구성.
+  - 게임 대기/RTT/카운트다운/SMITE/종료는 백엔드 WebSocket 경로가 담당하므로 `WebSocket` wrapper와 client command 함수만 구성.
+  - WebSocket handshake는 백엔드가 `/ws/game/{gameRoomId}?token={accessToken}`을 요구하므로 token query를 붙이는 구조로 정렬.
+  - reconnect, heartbeat 처리, RTT 측정 orchestration은 후속 기능 이슈에서 실제 화면 상태와 함께 구현 예정.
+
+- Game runtime은 순수 유틸 수준으로만 추가.
+  - 서버가 내려주는 HP scenario를 기반으로 후속 게임 화면에서 HP overlay를 계산할 수 있도록 `getHpAtElapsedMs`만 제공.
+  - `requestAnimationFrame`, video sync, HUD rendering은 아직 구현하지 않아 후속 게임 화면 정책 변경에 대응 가능.
+
+- Styling은 전역 변수와 최소 reset만 추가.
+  - 이번 단계는 UI 디자인이 아니라 프론트 작업대 구축이므로 landing page, card layout, HUD style 미구현.
+  - 후속 화면 구현에서 필요한 디자인 정책이 정해질 때 확장.
+
+- 테스트/린트/포맷 체계 추가.
+  - Vitest + Vue Test Utils로 App router shell smoke test 추가.
+  - ESLint flat config와 Prettier를 추가하고 `lint`, `test`, `format`, `typecheck`, `build` 검증 통과.
+
+## 📝 Note
+
+- 현재 백엔드 SSE 인증은 `Authorization: Bearer` 헤더 기반이나, 브라우저 native `EventSource`는 custom header를 지원하지 않음. 후속 SSE 연결 플로우 구현 전 cookie, query token, 또는 SSE 전용 인증 정책 중 하나로 백엔드/프론트 계약 정리 필요.
+- 이번 PR은 사용자 화면 완성 범위 아님. 로그인/매칭/게임/결과 화면은 이번 skeleton 위에서 후속 이슈로 구현.
+- 최종 검증 명령:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run format`
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+
+## 📌 Related Issue
+
+- Closes #70
