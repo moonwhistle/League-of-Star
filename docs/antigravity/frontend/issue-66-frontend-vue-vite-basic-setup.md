@@ -231,11 +231,11 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 ### 4. Router와 페이지 shell
 
-- [ ] Vue Router 설치 및 `src/router/index.ts` 생성
-- [ ] `routes.ts` 상수 생성
-- [ ] 기본 route 6개 등록
-- [ ] 각 route별 placeholder page 생성
-- [ ] `App.vue`는 router-view 중심의 최소 shell로 구성
+- [x] Vue Router 설치 및 `src/router/index.ts` 생성
+- [x] `routes.ts` 상수 생성
+- [x] 기본 route 6개 등록
+- [x] 각 route별 placeholder page 생성
+- [x] `App.vue`는 router-view 중심의 최소 shell로 구성
 
 ### 5. Service layer 골격
 
@@ -344,4 +344,15 @@ npm run dev
 - `tsconfig.app.json`에 `strict`, `noImplicitOverride`, `noUncheckedIndexedAccess`를 명시했다.
 - Vue 프로젝트 기준에 맞게 app TS include에서 `src/**/*.tsx`를 제거했다.
 - `tsconfig.node.json`에도 `strict`를 명시했다.
+- `npm run typecheck`, `npm run build` 통과를 확인했다.
+
+### 2026-06-01 - Task 4 Router and Page Shell
+
+- `vue-router`를 설치하고 `src/router/index.ts`를 생성했다.
+- `src/constants/routes.ts`에 route path/name 상수를 추가했다.
+- `/`, `/login`, `/match`, `/game/:gameRoomId/waiting`, `/game/:gameRoomId/play`, `/game/:gameRoomId/result` 6개 route를 등록했다.
+- 각 route에 대응하는 placeholder page를 `src/pages/`에 생성했다.
+- `App.vue`는 `RouterView`만 렌더링하는 최소 shell로 변경했다.
+- `main.ts`에서 Vue app에 router plugin을 등록했다.
+- TypeScript가 `@` alias를 해석하도록 `tsconfig.app.json`에 `paths`를 추가했다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.

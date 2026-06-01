@@ -1,5 +1,3 @@
 <template>
-  <main>
-    League of Smite
-  </main>
+  <RouterView />
 </template>
