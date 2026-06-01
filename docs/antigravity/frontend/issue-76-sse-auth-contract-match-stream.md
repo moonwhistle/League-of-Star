@@ -222,12 +222,12 @@ interface MatchResponseResultNotification {
 
 ### 6. Error policy 구현
 
-- [ ] access token 없음 error 정책 구현.
-- [ ] 401/403 수신 시 refresh/retry 없이 error 상태로 처리 구현.
-- [ ] 네트워크 오류 발생 시 page local error 상태로 처리 구현.
-- [ ] 자동 재연결 고도화는 후속 이슈로 유지 구현.
-- [ ] 사용자에게 노출할 메시지는 최소 fallback message로 처리 구현.
-- [ ] token 만료와 refresh token 사용은 후속 token refresh 이슈로 유지 구현.
+- [x] access token 없음 error 정책 구현.
+- [x] 401/403 수신 시 refresh/retry 없이 error 상태로 처리 구현.
+- [x] 네트워크 오류 발생 시 page local error 상태로 처리 구현.
+- [x] 자동 재연결 고도화는 후속 이슈로 유지 구현.
+- [x] 사용자에게 노출할 메시지는 최소 fallback message로 처리 구현.
+- [x] token 만료와 refresh token 사용은 후속 token refresh 이슈로 유지 구현.
 
 ### 7. Test 구현
 

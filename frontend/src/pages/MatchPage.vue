@@ -5,6 +5,7 @@
     :data-last-heartbeat-at="lastHeartbeatAt"
     :data-match-found-id="matchFound?.matchId ?? ''"
     :data-match-result-action="matchResponseResult?.action ?? ''"
+    :data-stream-error-message="streamErrorMessage"
   >
     Match
   </main>
@@ -20,6 +21,9 @@ const connectedEvent = shallowRef()
 const lastHeartbeatAt = ref('')
 const matchFound = shallowRef()
 const matchResponseResult = shallowRef()
+const streamErrorMessage = ref('')
+
+const MATCH_STREAM_ERROR_MESSAGE = 'Match event stream is currently unavailable.'
 
 let closeMatchEventSource = () => {}
 let isActive = false
@@ -27,12 +31,14 @@ let isActive = false
 onMounted(() => {
   isActive = true
   streamStatus.value = 'connecting'
+  streamErrorMessage.value = ''
 
   try {
     const connection = connectMatchEventSource({
       onOpen: () => {
         if (isActive) {
           streamStatus.value = 'open'
+          streamErrorMessage.value = ''
         }
       },
       onConnected: (payload) => {
@@ -58,13 +64,13 @@ onMounted(() => {
       },
       onError: () => {
         if (isActive) {
-          streamStatus.value = 'error'
+          setStreamError()
         }
       },
     })
     closeMatchEventSource = connection.close
   } catch {
-    streamStatus.value = 'error'
+    setStreamError()
   }
 })
 
@@ -73,4 +79,9 @@ onUnmounted(() => {
   closeMatchEventSource()
   closeMatchEventSource = () => {}
 })
+
+function setStreamError() {
+  streamStatus.value = 'error'
+  streamErrorMessage.value = MATCH_STREAM_ERROR_MESSAGE
+}
 </script>
