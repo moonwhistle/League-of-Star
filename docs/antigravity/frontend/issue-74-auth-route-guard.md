@@ -92,13 +92,13 @@ flowchart TD
 
 ### 3. Auth route guard 구현
 
-- [ ] `src/router/authGuard.ts` 생성 구현.
-- [ ] `to.meta.requiresAuth === true`이고 미인증이면 login route redirect 반환 구현.
-- [ ] `to.meta.guestOnly === true`이고 인증 상태면 match route redirect 반환 구현.
-- [ ] 그 외 route는 통과하도록 구현.
-- [ ] redirect target은 route path string이 아니라 `ROUTE_NAMES` 기반 name 객체로 구현.
-- [ ] redirect query는 이번 이슈에서 추가하지 않도록 구현.
-- [ ] guard 내부에서 token 만료 검증이나 refresh 호출을 하지 않도록 구현.
+- [x] `src/router/authGuard.ts` 생성 구현.
+- [x] `to.meta.requiresAuth === true`이고 미인증이면 login route redirect 반환 구현.
+- [x] `to.meta.guestOnly === true`이고 인증 상태면 match route redirect 반환 구현.
+- [x] 그 외 route는 통과하도록 구현.
+- [x] redirect target은 route path string이 아니라 `ROUTE_NAMES` 기반 name 객체로 구현.
+- [x] redirect query는 이번 이슈에서 추가하지 않도록 구현.
+- [x] guard 내부에서 token 만료 검증이나 refresh 호출을 하지 않도록 구현.
 
 ### 4. Router 연결 구현
 
