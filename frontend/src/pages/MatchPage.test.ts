@@ -122,4 +122,38 @@ describe('MatchPage', () => {
 
     expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
   })
+
+  it('ignores late stream callbacks after unmount', async () => {
+    const wrapper = mount(MatchPage)
+    const handlers = getCurrentHandlers()
+
+    wrapper.unmount()
+    const beforeLateCallbacksHtml = wrapper.html()
+    handlers.onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    handlers.onHeartbeat?.({
+      sentAt: '2026-06-01T00:00:01Z',
+    })
+    handlers.onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: '2026-06-01T00:00:02Z',
+    })
+    handlers.onMatchResponseResult?.({
+      matchId: 'match-1',
+      outcome: 'MATCHED',
+      reason: 'BOTH_ACCEPTED',
+      action: 'GO_TO_GAME_WAITING',
+      opponent: null,
+      game: null,
+    })
+    handlers.onError?.(new Error('late stream error'))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.html()).toBe(beforeLateCallbacksHtml)
+  })
 })

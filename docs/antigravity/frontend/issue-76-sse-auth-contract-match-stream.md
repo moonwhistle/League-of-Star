@@ -241,8 +241,10 @@ interface MatchResponseResultNotification {
 - [x] 알 수 없는 event는 무시하는지 검증.
 - [x] JSON parse 실패 시 error callback이 호출되는지 검증.
 - [x] close 호출 시 AbortController가 abort되는지 검증.
+- [x] close 반복 호출 시 AbortController abort가 중복 실행되지 않는지 검증.
 - [x] Match page mount 시 연결되는지 검증.
 - [x] Match page unmount 시 close되는지 검증.
+- [x] Match page unmount 이후 지연 stream callback을 무시하는지 검증.
 
 ### 8. 문서 정합성 구현
 
@@ -273,6 +275,8 @@ interface MatchResponseResultNotification {
 - SSE client는 localStorage key를 직접 알지 않는다.
 - `fetch-event-source` 외 추가 realtime abstraction은 만들지 않는다.
 - `match_found`와 `match_response_result`는 수신/보관까지만 처리한다.
+- page component는 route unmount 이후 늦게 도착한 stream callback이 local state를 변경하지 않도록 `isActive` guard를 둔다.
+- SSE connection의 `close`는 idempotent하게 처리해 반복 호출되어도 `AbortController.abort()`가 중복 실행되지 않도록 한다.
 - 화면 전환은 후속 `match_response_result` 이슈에서 구현한다.
 - 매칭 수락/거절 command는 후속 이슈에서 구현한다.
 - 자동 refresh/retry는 후속 auth 이슈에서 구현한다.
@@ -287,6 +291,8 @@ interface MatchResponseResultNotification {
 - `connected`, `heartbeat`, `match_found`, `match_response_result` event가 handler로 dispatch됨.
 - `/match` 페이지 진입 시 stream 연결 lifecycle이 동작함.
 - `/match` 페이지 이탈 시 stream 연결이 해제됨.
+- `/match` 페이지 이탈 이후 늦게 도착한 stream callback이 page state를 갱신하지 않음.
+- stream close 반복 호출이 중복 abort를 발생시키지 않음.
 - 이번 이슈에서 match modal, accept/reject, game route 이동이 구현되지 않음.
 - lint / format / typecheck / test / build 통과.
 
@@ -328,9 +334,11 @@ flowchart TD
 - SSE client는 `src/services/realtime` 계층에 두고, token 조회는 기존 `authToken.ts` helper를 통해서만 수행하도록 구현해 localStorage key 의존성을 realtime client 밖으로 격리.
 - `connected`, `heartbeat`, `match_found`, `match_response_result` event를 handler 기반으로 dispatch하도록 구현해, 후속 매칭 UI가 transport 구현을 직접 알지 않도록 구성.
 - `/match` 페이지는 stream mount/unmount lifecycle과 payload 보관만 담당하도록 구현해, 현재 단계에서 매칭 시작/취소 UI와 수락/거절 모달 책임을 섞지 않도록 분리.
+- `/match` 페이지는 `isActive` guard를 통해 route unmount 이후 늦게 도착한 stream callback이 local state를 갱신하지 않도록 구현.
 - `match_found`는 후속 수락/거절 모달의 입력 payload로만 보관하고, `match_response_result`는 후속 route 전환 정책의 입력 payload로만 보관하도록 범위 제한.
 - 401/403, 네트워크 오류, JSON parse 실패는 현재 단계에서 local error callback/fallback 상태로 처리하고, token refresh/retry와 transport error 세분화는 후속 auth/error handling 이슈로 분리.
-- SSE client 단위 테스트와 Match page lifecycle 테스트로 Authorization header 연결, event dispatch, abort close, mount/unmount 연결 정책 검증.
+- SSE connection close는 idempotent하게 처리해 route 이동, component unmount, stream close가 겹쳐도 중복 abort가 발생하지 않도록 구현.
+- SSE client 단위 테스트와 Match page lifecycle 테스트로 Authorization header 연결, event dispatch, idempotent close, unmount 이후 지연 callback 무시, mount/unmount 연결 정책 검증.
 
 ## 📝 Note
 

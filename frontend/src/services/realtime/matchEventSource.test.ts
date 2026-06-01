@@ -217,17 +217,23 @@ describe('connectMatchEventSource', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(SyntaxError))
   })
 
-  it('aborts the stream when close is called', () => {
+  it('keeps close idempotent when called repeatedly', () => {
+    const abortSpy = vi.spyOn(AbortController.prototype, 'abort')
     fetchEventSourceMock.mockReturnValue(new Promise(() => {}))
 
-    const connection = connectMatchEventSource()
-    const init = getFetchEventSourceInit()
+    try {
+      const connection = connectMatchEventSource()
+      const init = getFetchEventSourceInit()
 
-    expect(init.signal?.aborted).toBe(false)
+      expect(init.signal?.aborted).toBe(false)
 
-    connection.close()
-    connection.close()
+      connection.close()
+      connection.close()
 
-    expect(init.signal?.aborted).toBe(true)
+      expect(init.signal?.aborted).toBe(true)
+      expect(abortSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      abortSpy.mockRestore()
+    }
   })
 })

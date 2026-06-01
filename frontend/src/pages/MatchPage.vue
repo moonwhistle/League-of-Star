@@ -26,6 +26,7 @@ const streamErrorMessage = ref('')
 const MATCH_STREAM_ERROR_MESSAGE = 'Match event stream is currently unavailable.'
 
 let closeMatchEventSource = () => {}
+// Guards against late stream callbacks that arrive after route unmount.
 let isActive = false
 
 onMounted(() => {
