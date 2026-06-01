@@ -88,18 +88,18 @@ flowchart TD
 
 ### 1. 백엔드 로그인 계약 반영
 
-- [ ] `POST /api/v1/auth/login` request/response 타입 정의 구현.
-- [ ] 로그인 API는 `auth: false`로 호출하도록 구현.
-- [ ] response의 `accessToken`, `refreshToken`, `userId`, `nickname` 타입 반영.
-- [ ] 전역 `ErrorResponse` 실패 메시지 처리 기준 정리.
+- [x] `POST /api/v1/auth/login` request/response 타입 정의 구현.
+- [x] 로그인 API는 `auth: false`로 호출하도록 구현.
+- [x] response의 `accessToken`, `refreshToken`, `userId`, `nickname` 타입 반영.
+- [x] 전역 `ErrorResponse` 실패 메시지 처리 기준 정리.
 
 ### 2. Auth service 구현
 
-- [ ] `src/services/authService.ts` 생성 구현.
-- [ ] `login` 함수 구현.
-- [ ] `LoginRequest`, `LoginResponse` 타입 추가 구현.
-- [ ] 기존 `apiClient.ts`와 `authToken.ts` 구조 재사용.
-- [ ] `authService.ts`는 API 호출만 담당하도록 구현.
+- [x] `src/services/authService.ts` 생성 구현.
+- [x] `login` 함수 구현.
+- [x] `LoginRequest`, `LoginResponse` 타입 추가 구현.
+- [x] 기존 `apiClient.ts`와 `authToken.ts` 구조 재사용.
+- [x] `authService.ts`는 API 호출만 담당하도록 구현.
 - [ ] access/refresh token 저장은 기존 `authToken.ts`의 `setAuthTokens`로 처리.
 - [ ] `LoginPage.vue`는 `login` 호출, token 저장, router 이동을 조립하는 page 역할로 구현.
 
