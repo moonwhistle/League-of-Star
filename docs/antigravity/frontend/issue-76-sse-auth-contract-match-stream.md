@@ -210,15 +210,15 @@ interface MatchResponseResultNotification {
 
 ### 5. Match page 연결 골격 구현
 
-- [ ] `/match` 페이지 mount 시 match SSE 연결 구현.
-- [ ] `/match` 페이지 unmount 시 SSE 연결 close 구현.
-- [ ] `connected` 수신 상태를 page local state로 보관 구현.
-- [ ] `heartbeat` 수신 시 마지막 수신 시각을 page local state로 보관 구현.
-- [ ] `match_found` payload를 page local state로 보관 구현.
-- [ ] `match_response_result` payload를 page local state로 보관 구현.
-- [ ] 이번 단계에서 수락/거절 모달을 띄우지 않도록 유지 구현.
-- [ ] 이번 단계에서 `match_response_result.action` route 이동을 하지 않도록 유지 구현.
-- [ ] 페이지 이탈 후 handler가 상태를 변경하지 않도록 연결 해제 구현.
+- [x] `/match` 페이지 mount 시 match SSE 연결 구현.
+- [x] `/match` 페이지 unmount 시 SSE 연결 close 구현.
+- [x] `connected` 수신 상태를 page local state로 보관 구현.
+- [x] `heartbeat` 수신 시 마지막 수신 시각을 page local state로 보관 구현.
+- [x] `match_found` payload를 page local state로 보관 구현.
+- [x] `match_response_result` payload를 page local state로 보관 구현.
+- [x] 이번 단계에서 수락/거절 모달을 띄우지 않도록 유지 구현.
+- [x] 이번 단계에서 `match_response_result.action` route 이동을 하지 않도록 유지 구현.
+- [x] 페이지 이탈 후 handler가 상태를 변경하지 않도록 연결 해제 구현.
 
 ### 6. Error policy 구현
 
