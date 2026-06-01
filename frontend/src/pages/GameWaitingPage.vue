@@ -1,5 +1,3 @@
 <template>
-  <main>
-    Game Waiting
-  </main>
+  <main>Game Waiting</main>
 </template>

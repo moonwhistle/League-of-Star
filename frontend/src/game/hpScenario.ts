@@ -35,7 +35,11 @@ export function getHpAtElapsedMs(scenario: GameStartScenario, elapsedMs: number)
   return lastStep.hp
 }
 
-function interpolateHp(previousStep: HpTimelineStep, nextStep: HpTimelineStep, elapsedMs: number): number {
+function interpolateHp(
+  previousStep: HpTimelineStep,
+  nextStep: HpTimelineStep,
+  elapsedMs: number,
+): number {
   const durationMs = nextStep.timeMs - previousStep.timeMs
 
   if (durationMs <= 0) {

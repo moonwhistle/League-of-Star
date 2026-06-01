@@ -1,7 +1,4 @@
-import type {
-  GameWebSocketClientMessage,
-  GameWebSocketServerMessage,
-} from '@/types/game'
+import type { GameWebSocketClientMessage, GameWebSocketServerMessage } from '@/types/game'
 
 export type { GameWebSocketClientMessage, GameWebSocketServerMessage }
 

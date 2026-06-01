@@ -263,20 +263,20 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 ### 8. Styling 기본값
 
-- [ ] `styles/base.css` 생성
-- [ ] `styles/variables.css` 생성
-- [ ] 전역 reset은 최소화
-- [ ] 특정 페이지 디자인은 구현하지 않음
-- [ ] card-heavy landing page 형태를 만들지 않고 앱 shell 중심으로 유지
+- [x] `styles/base.css` 생성
+- [x] `styles/variables.css` 생성
+- [x] 전역 reset은 최소화
+- [x] 특정 페이지 디자인은 구현하지 않음
+- [x] card-heavy landing page 형태를 만들지 않고 앱 shell 중심으로 유지
 
 ### 9. Test/Lint/Format
 
-- [ ] Vitest 설정
-- [ ] Vue Test Utils 설정
-- [ ] 기본 mount smoke test 추가
-- [ ] ESLint 설정 파일 생성 또는 scaffold 결과 정리
-- [ ] Prettier 설정
-- [ ] `npm run lint`, `npm run test`, `npm run build` scripts 검증
+- [x] Vitest 설정
+- [x] Vue Test Utils 설정
+- [x] 기본 mount smoke test 추가
+- [x] ESLint 설정 파일 생성 또는 scaffold 결과 정리
+- [x] Prettier 설정
+- [x] `npm run lint`, `npm run test`, `npm run build` scripts 검증
 
 ### 10. 문서 정합성
 
@@ -387,3 +387,21 @@ npm run dev
 - `requestAnimationFrame` 기반 overlay 갱신은 후속 게임 화면 이슈에서 구현한다.
 - MP4 URL 상수는 기존 `src/constants/env.ts`의 `GAME_VIDEO_URL`을 사용한다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
+
+### 2026-06-01 - Task 8 Styling Defaults
+
+- `src/styles/variables.css`에 기본 color/font/spacing CSS variable을 추가했다.
+- `src/styles/base.css`에 box sizing, body margin, form font inheritance, app min-height 수준의 최소 reset을 추가했다.
+- `main.ts`에서 `variables.css`, `base.css` 순서로 import한다.
+- 특정 페이지 디자인, card layout, landing page 구성은 구현하지 않았다.
+- `npm run typecheck`, `npm run build` 통과를 확인했다.
+
+### 2026-06-01 - Task 9 Test/Lint/Format
+
+- Vitest와 Vue Test Utils를 설치하고 `vite.config.ts`에 `jsdom` test environment를 설정했다.
+- `src/App.test.ts`에 App router shell mount smoke test를 추가했다.
+- ESLint flat config를 `eslint.config.js`에 추가했다.
+- Prettier 설정을 `.prettierrc`에 추가했다.
+- `package.json`에 `lint`, `test`, `format`, `format:write` scripts를 추가했다.
+- Prettier 기준에 맞게 기존 frontend 파일 포맷을 정리했다.
+- `npm run lint`, `npm run test`, `npm run format`, `npm run typecheck`, `npm run build` 통과를 확인했다.

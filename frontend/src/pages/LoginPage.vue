@@ -1,5 +1,3 @@
 <template>
-  <main>
-    Login
-  </main>
+  <main>Login</main>
 </template>

@@ -1,5 +1,3 @@
 <template>
-  <main>
-    Game Result
-  </main>
+  <main>Game Result</main>
 </template>

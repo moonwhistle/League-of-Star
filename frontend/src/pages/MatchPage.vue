@@ -1,5 +1,3 @@
 <template>
-  <main>
-    Match
-  </main>
+  <main>Match</main>
 </template>
