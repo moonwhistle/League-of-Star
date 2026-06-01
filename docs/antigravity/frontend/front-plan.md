@@ -67,7 +67,7 @@ flowchart TD
 - 네트워크 오류, CORS 오류, AbortError, timeout 등 transport 계층 오류는 이번 단계에서 client fallback message로 처리하고, 세분화는 공통 error handling 이슈에서 진행.
 - 회원가입, 비밀번호 찾기, OAuth 로그인은 후속 작업으로 보류.
 
-### 2. [ ] 인증 라우트 가드 구현
+### 2. [x] 인증 라우트 가드 구현
 
 - `/match`, `/game/:gameRoomId/waiting`, `/game/:gameRoomId/play`, `/game/:gameRoomId/result` 인증 필요 route로 처리.
 - token 없으면 `/login` 이동 구현.
@@ -76,6 +76,8 @@ flowchart TD
 - 만료된 access token으로 API 호출 시 refresh/retry 처리 정책은 후속 token refresh 이슈에서 결정.
 - Pinia는 아직 도입하지 않고 기존 token storage와 작은 helper 중심으로 처리.
 - 현재 token 저장소는 `localStorage`이며, XSS 대비 저장 전략 변경 여부는 인증 보안 고도화 이슈에서 결정.
+- route guard는 access token 존재 여부만 판단하는 MVP 정책으로 구현.
+- route guard 단위 테스트와 router meta 정합성 테스트로 protected/guest only/public route 정책 검증.
 
 ### 3. [ ] SSE 인증 계약 확정 및 매칭 스트림 연결 구현
 

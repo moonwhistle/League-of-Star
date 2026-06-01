@@ -6,7 +6,7 @@ Vue 프론트엔드의 인증 필요 route를 보호하는 route guard를 구현
 
 현재 로그인 페이지는 성공 시 access token과 refresh token을 저장하고 `/match`로 이동한다. 하지만 token이 없는 사용자가 `/match`, `/game/:gameRoomId/waiting`, `/game/:gameRoomId/play`, `/game/:gameRoomId/result`에 직접 접근하는 것을 막는 처리는 아직 없다.
 
-이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `2. [ ] 인증 라우트 가드 구현`을 구현 기준으로 삼는다. `1. [x] 로그인 페이지 구현`에서 저장한 access token을 기준으로 최소 인증 상태를 판단하고, route 전환 정책만 구현한다.
+이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `2. [x] 인증 라우트 가드 구현`을 구현 기준으로 삼는다. `1. [x] 로그인 페이지 구현`에서 저장한 access token을 기준으로 최소 인증 상태를 판단하고, route 전환 정책만 구현한다.
 
 이번 작업은 route guard 1차 구현 범위로 제한한다. JWT 만료 검증, refresh token 자동 재발급, API 401 retry, profile 전역 저장, Pinia 도입, 보안 저장소 변경은 후속 이슈에서 진행한다.
 
@@ -123,21 +123,21 @@ flowchart TD
 
 ### 6. 문서 정합성 구현
 
-- [ ] `front-plan.md`의 `2. [ ] 인증 라우트 가드 구현` 완료 상태 반영.
-- [ ] route guard가 access token 존재 여부만 판단하는 MVP 정책 명시.
-- [ ] refresh token 자동 재발급과 token 만료 검증은 후속 이슈로 유지.
-- [ ] profile/auth state 저장 정책은 후속 이슈로 유지.
-- [ ] 이번 이슈 PR 메시지 섹션 작성.
+- [x] `front-plan.md`의 `2. [x] 인증 라우트 가드 구현` 완료 상태 반영.
+- [x] route guard가 access token 존재 여부만 판단하는 MVP 정책 명시.
+- [x] refresh token 자동 재발급과 token 만료 검증은 후속 이슈로 유지.
+- [x] profile/auth state 저장 정책은 후속 이슈로 유지.
+- [x] 이번 이슈 PR 메시지 섹션 작성.
 
 ### 7. 검증
 
-- [ ] `npm run lint` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] dev server 실행 후 token 없는 상태에서 `/match` 접근 시 `/login` 이동 확인.
-- [ ] token 있는 상태에서 `/login` 접근 시 `/match` 이동 확인.
+- [x] `npm run lint` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] dev server 실행 후 token 없는 상태에서 `/match` 접근 시 `/login` 이동 확인.
+- [x] token 있는 상태에서 `/login` 접근 시 `/match` 이동 확인.
 
 ## Implementation Policy
 
@@ -167,35 +167,49 @@ flowchart TD
 
 ## 📌 Summary
 
+로그인 성공 후 저장된 access token을 기준으로 프론트 route 접근 정책 구현.
+백엔드 매칭, 게임 대기방, 게임 진행, 결과 조회 흐름으로 진입하기 전에 최소 인증 상태를 확인하는 route guard 구현.
+
 ```mermaid
 flowchart TD
-    A[Route 이동 요청] --> B{requiresAuth}
-    B -->|true| C{access token 존재}
-    C -->|no| D["/login redirect"]
-    C -->|yes| E[route 통과]
-    B -->|false| F{guestOnly}
-    F -->|true| G{access token 존재}
-    G -->|yes| H["/match redirect"]
-    G -->|no| E
-    F -->|false| E
+    A["POST /api/v1/auth/login 성공"] --> B[access token 저장]
+    B --> C[Route 이동 요청]
+    C --> D{requiresAuth route}
+    D -->|yes| E{access token 존재}
+    E -->|no| F["/login redirect"]
+    E -->|yes| G[protected route 진입]
+    D -->|no| H{guestOnly route}
+    H -->|yes| I{access token 존재}
+    I -->|yes| J["/match redirect"]
+    I -->|no| K[guest route 진입]
+    H -->|no| L[public route 진입]
+    G --> M[Match / Game backend flow 준비]
 ```
 
 ## 📚 Changes
 
-- `front-plan.md`의 인증 라우트 가드 단계 기준으로 protected route와 guest only route 정책 구현.
-- 인증 상태 판단은 access token 존재 여부만 사용하도록 구현.
-- router가 token storage 세부 구현을 알지 않도록 `authSession` helper로 관심사 분리.
-- `/match` 및 game route는 token 없을 때 `/login`으로 이동하도록 구현.
-- `/login`은 token 있는 상태에서 접근 시 `/match`로 이동하도록 구현.
-- refresh token 자동 재발급, token 만료 검증, profile 전역 저장은 후속 이슈로 유지.
+- `front-plan.md`의 `2. 인증 라우트 가드 구현` 단계 기준으로 protected / guest only / public route 정책 구현.
+- 백엔드 로그인 계약인 `POST /api/v1/auth/login` 응답의 `accessToken`, `refreshToken` 저장 흐름과 연결되도록 access token 존재 여부 기반 인증 상태 helper 구현.
+- router가 `localStorage` key와 token 저장 방식에 직접 의존하지 않도록 `authSession` helper를 분리하고, token 저장소 접근은 기존 `authToken.ts`로 제한 구현.
+- `/match`는 이후 `POST /api/v1/match/join`, SSE `match_found`, SSE `match_response_result` 흐름의 시작점이므로 token 없는 사용자의 직접 접근을 `/login`으로 차단 구현.
+- `/game/:gameRoomId/waiting`, `/game/:gameRoomId/play`, `/game/:gameRoomId/result`는 WebSocket 및 summary API 흐름과 연결되는 route이므로 token 없는 사용자의 직접 접근을 `/login`으로 차단 구현.
+- `/login`은 이미 token이 있는 사용자가 다시 진입했을 때 로그인 폼을 반복 노출하지 않고 백엔드 매칭 흐름 시작점인 `/match`로 이동하도록 구현.
+- 이번 단계는 route 진입 제어만 담당하도록 제한하고, refresh token 자동 재발급, access token 만료 검증, API 401 refresh/retry, profile 전역 상태 저장은 후속 인증 고도화 이슈로 분리.
+- route guard 단위 테스트로 protected / guest only / public route 분기 정책 검증.
+- router meta 정합성 테스트로 `/match`, game waiting/play/result, `/login`, `/` route 정책 검증.
 
 ## 📝 Note
 
 - 이번 이슈는 route 접근 제어 1차 구현 범위.
+- 인증 상태는 access token 문자열 존재 여부만 기준으로 판단.
 - access token 만료 여부는 검사하지 않음.
+- refresh token은 저장되어 있어도 route guard 판단에는 사용하지 않음.
 - 로그인 후 redirect query 기반 원래 route 복귀는 구현하지 않음.
 - Pinia 또는 전역 auth store는 도입하지 않음.
-- 구현 후 `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test`, `npm run build` 검증.
+- SSE 인증 방식, WebSocket 연결 인증, API 401 refresh/retry 정책은 후속 이슈에서 백엔드 계약 기준으로 확정.
+- `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test`, `npm run build` 검증.
+- dev server 기준 미인증 `/match` 접근 시 `/login` 이동 검증.
+- dev server 기준 인증 `/login` 접근 시 `/match` 이동 검증.
 
 ## 📌 Related Issue
 
