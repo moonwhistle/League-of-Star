@@ -16,25 +16,25 @@
 
 ```mermaid
 flowchart TD
-    A[Login] --> B[Token 저장]
-    B --> C[Match 화면 진입]
-    C --> D[SSE 연결]
+    A[로그인 페이지 구현] --> B[Token 저장]
+    B --> C[매칭 페이지 진입]
+    C --> D[매칭 스트림 연결]
     D --> E[Match queue join]
-    E --> F[match_found 수신]
-    F --> G[accept / reject command]
-    G --> H[match_response_result 수신]
-    H -->|GO_TO_GAME_WAITING| I[Game waiting 이동]
+    E --> F[match_found 이벤트 수신]
+    F --> G[수락/거절 커맨드]
+    G --> H[match_response_result 이벤트 수신]
+    H -->|GO_TO_GAME_WAITING| I[게임 대기방 이동]
     H -->|GO_TO_MATCH_START| C
     H -->|RETURN_TO_MATCHING| E
-    I --> J[Game WebSocket 연결]
+    I --> J[게임 WebSocket 연결]
     J --> K[CLIENT_READY]
     K --> L[RTT_PING / RTT_PONG]
     L --> M[COUNTDOWN]
     M --> N[GAME_START]
-    N --> O[Game play]
+    N --> O[게임 플레이 화면]
     O --> P[SMITE]
     P --> Q[GAME_RESULT]
-    Q --> R[Game summary 조회]
+    Q --> R[게임 결과 Summary 조회]
 ```
 
 ## Backend Contract
@@ -54,7 +54,7 @@ flowchart TD
 
 ## Implementation Steps
 
-### 1. Auth login 구현
+### 1. [x] 로그인 페이지 구현
 
 - `/login` 페이지에 email/password 입력 폼 구현.
 - `POST /api/v1/auth/login` 호출 구현.
@@ -65,7 +65,7 @@ flowchart TD
 - 실패 시 전역 `ErrorResponse.message` 기준 에러 메시지 표시 구현.
 - 회원가입, 비밀번호 찾기, OAuth 로그인은 후속 작업으로 보류.
 
-### 2. Protected route guard 구현
+### 2. [ ] 인증 라우트 가드 구현
 
 - `/match`, `/game/:gameRoomId/waiting`, `/game/:gameRoomId/play`, `/game/:gameRoomId/result` 인증 필요 route로 처리.
 - token 없으면 `/login` 이동 구현.
@@ -73,7 +73,7 @@ flowchart TD
 - refresh token 자동 재발급은 후속 작업으로 보류.
 - Pinia는 아직 도입하지 않고 기존 token storage와 작은 helper 중심으로 처리.
 
-### 3. Match SSE 연결 정책 구현
+### 3. [ ] SSE 인증 계약 확정 및 매칭 스트림 연결 구현
 
 - 매칭 화면 진입 시 `GET /api/v1/notifications/match/stream` 연결 구현.
 - event `connected`, `heartbeat`, `match_found`, `match_response_result` 처리 구현.
@@ -84,7 +84,7 @@ flowchart TD
 - 현재 백엔드 Authorization header 요구와 native `EventSource` 제약 충돌은 blocker로 문서화.
 - 실제 브라우저 연동 전 backend cookie auth, query token, fetch-event-source 중 하나로 계약 확정 필요.
 
-### 4. Match queue 구현
+### 4. [ ] 매칭 페이지 구현
 
 - `/match` 페이지에서 매칭 시작/취소 UI 구현.
 - `POST /api/v1/match/join` 호출 구현.
@@ -94,7 +94,7 @@ flowchart TD
 - 400/409 에러는 메시지 표시 후 현재 화면 유지 구현.
 - 매칭 상태는 우선 페이지 로컬 상태로 처리.
 
-### 5. match_found 처리 구현
+### 5. [ ] 매칭 성사 모달 구현
 
 - SSE `match_found` payload 수신 처리 구현.
 - payload shape 반영.
@@ -114,7 +114,7 @@ interface MatchFoundNotification {
 - 수락/거절 모달 표시 구현.
 - timeout 자체 판정은 프론트가 확정하지 않고 서버의 `match_response_result`를 최종 기준으로 사용.
 
-### 6. Match accept/reject command 구현
+### 6. [ ] 매칭 수락/거절 커맨드 구현
 
 - 수락 시 `POST /api/v1/match/{matchId}/accept` 호출 구현.
 - 거절 시 `POST /api/v1/match/{matchId}/reject` 호출 구현.
@@ -124,7 +124,7 @@ interface MatchFoundNotification {
 - `MATCH_012` 같은 lock 처리 중 에러는 모달 유지 후 SSE 최종 결과 대기 기준으로 처리.
 - 그 외 매칭 응답 실패는 start 버튼 화면 복귀 기준으로 처리.
 
-### 7. match_response_result 화면 전환 구현
+### 7. [ ] 매칭 응답 결과 화면 전환 구현
 
 - SSE `match_response_result` payload shape 반영.
 
@@ -162,7 +162,7 @@ interface MatchResponseResultNotification {
 - `game.videoUrl`, `game.webSocketUrl`은 게임 화면에서 사용할 수 있도록 route state 또는 session storage로 최소 보관 구현.
 - 최종 전환 기준은 HTTP accept/reject 응답이 아니라 이 이벤트의 `action`임을 테스트로 검증.
 
-### 8. Game waiting WebSocket 구현
+### 8. [ ] 게임 대기방 WebSocket 구현
 
 - `/game/:gameRoomId/waiting` 페이지에서 WebSocket 연결 구현.
 - 연결 URL은 `/ws/game/{gameRoomId}?token={accessToken}`로 구성.
@@ -187,7 +187,7 @@ type GameWaitingServerMessage =
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`는 에러 표시 후 매칭 화면 복귀 기준으로 처리.
 - WebSocket 재접속/복구는 후속 작업으로 보류.
 
-### 9. Game start 처리 구현
+### 9. [ ] 게임 시작 처리 구현
 
 - `COUNTDOWN` 수신 시 countdown 표시 구현.
 - `GAME_START` 수신 시 `serverTime`, `startAt`, `scenario` 저장 구현.
@@ -213,7 +213,7 @@ interface GameStartPayload {
 - HP 계산은 `startAt`과 `scenario.hpTimeline` 기준으로 구현.
 - server/client clock 보정은 후속 고도화로 보류하고, 현재 단계에서는 백엔드가 내려준 `serverTime`, `startAt`을 그대로 사용.
 
-### 10. Game play 구현
+### 10. [ ] 게임 플레이 화면 구현
 
 - `/game/:gameRoomId/play` 페이지에서 MP4 video 표시 구현.
 - HP bar, countdown, smite button HUD 구현.
@@ -224,7 +224,7 @@ interface GameStartPayload {
 - `GAME_RESULT` 수신 전까지 결과 화면 이동 금지.
 - PixiJS, canvas, Web Worker는 MVP에서 도입하지 않음.
 
-### 11. Game result WebSocket 처리 구현
+### 11. [ ] 게임 결과 WebSocket 처리 구현
 
 - `GAME_RESULT` payload shape 반영.
 
@@ -251,7 +251,7 @@ interface GameResultPayload {
 - WebSocket result payload는 즉시 전환/임시 표시용으로만 사용.
 - 최종 결과 source of truth는 summary API로 처리.
 
-### 12. Game summary 구현
+### 12. [ ] 게임 결과 Summary 화면 구현
 
 - `/game/:gameRoomId/result` 페이지에서 `GET /api/v1/games/{gameId}/summary` 호출 구현.
 - 현재 백엔드 기준 `gameId = gameRoomId`로 호출.
@@ -335,19 +335,23 @@ Accept: text/event-stream
 
 ## Issue Split Recommendation
 
-- Issue 1: 로그인 페이지와 인증 route guard 구현.
-- Issue 2: 매칭 페이지 join/leave 구현.
-- Issue 3: SSE 인증 계약 확정 및 match stream 연결 구현.
-- Issue 4: match_found 모달과 accept/reject command 구현.
-- Issue 5: match_response_result 기반 화면 전환 구현.
-- Issue 6: game waiting WebSocket과 ready/RTT 처리 구현.
-- Issue 7: game play video/HUD/SMITE 구현.
-- Issue 8: GAME_RESULT 처리와 summary 결과 화면 구현.
-- Issue 9: 공통 UI, 테스트, 문서 정합성 정리.
+- [x] 로그인 페이지 구현.
+- [ ] 인증 라우트 가드 구현.
+- [ ] SSE 인증 계약 확정 및 매칭 스트림 연결 구현.
+- [ ] 매칭 페이지 구현.
+- [ ] 매칭 성사 모달 구현.
+- [ ] 매칭 수락/거절 커맨드 구현.
+- [ ] 매칭 응답 결과 화면 전환 구현.
+- [ ] 게임 대기방 WebSocket 구현.
+- [ ] 게임 시작 처리 구현.
+- [ ] 게임 플레이 화면 구현.
+- [ ] 게임 결과 WebSocket 처리 구현.
+- [ ] 게임 결과 Summary 화면 구현.
+- [ ] 공통 UI, 테스트, 문서 정합성 정리.
 
 ## Assumptions
 
-- 이 문서는 `docs/antigravity/frontend/font-plan.md`로 유지.
+- 이 문서는 `docs/antigravity/frontend/front-plan.md`로 유지.
 - 백엔드 RestDocs와 Java DTO를 source of truth로 사용.
 - `match_response_result.game.webSocketUrl`은 `/ws/game/{gameRoomId}` 형식이며, 실제 프론트 연결 시 access token query를 붙임.
 - 결과 summary의 `gameId`는 현재 백엔드 문서 기준 `gameRoomId`와 동일하게 사용.

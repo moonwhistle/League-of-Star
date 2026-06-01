@@ -10,6 +10,8 @@ Vue 프론트엔드의 `/login` 페이지를 실제 로그인 화면으로 구�
 
 이번 작업은 로그인 페이지 1차 구현 범위로 제한한다. 회원가입, 비밀번호 찾기, Google OAuth, 자동 token refresh, 전역 auth store, 상세 validation 정책은 후속 이슈에서 진행한다.
 
+이 이슈는 `docs/antigravity/frontend/front-plan.md`의 `1. [x] 로그인 페이지 구현`을 구현 기준으로 삼는다. `2. [ ] 인증 라우트 가드 구현`은 `front-plan.md`상 다음 단계이므로 이번 이슈에서는 제외하고 후속 이슈에서 진행한다.
+
 ```mermaid
 flowchart TD
     A["/login 진입"] --> B["background.png 배경 렌더링"]
@@ -70,7 +72,7 @@ flowchart TD
 - 실패 시 오류 메시지 표시 구현.
 - submit 중 버튼 disabled/loading 상태 구현.
 - 최소 테스트 추가.
-- lint / format / typecheck / build 검증.
+- lint / format / typecheck / test / build 검증.
 
 이번 이슈에서 제외한다.
 
@@ -107,7 +109,7 @@ flowchart TD
 - [x] `src/pages/LoginPage.vue` placeholder 제거 구현.
 - [x] `background.png` full-screen 배경 적용 구현.
 - [x] `loginView.png` 레퍼런스 기준 좌측 로그인 패널 구현.
-- [x] id input 구현.
+- [x] email input 구현.
 - [x] password input 구현.
 - [x] Login submit button 구현.
 - [x] `FORGOT PASSWORD?`, `SIGN UP`, `Google`, `ABOUT THIS GAME` 표시 구현.
@@ -195,27 +197,39 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[LoginPage placeholder] --> B[background.png 기반 화면 구성]
-    B --> C[loginView.png 레퍼런스 UI 구현]
-    C --> D[Auth login service 구현]
-    D --> E[token 저장]
-    E --> F["/match 이동"]
+    A["/login 진입"] --> B["background.png 배경 렌더링"]
+    B --> C["loginView.png 레퍼런스 기반 로그인 UI 구현"]
+    C --> D["email/password 입력"]
+    D --> E["authService.login 호출"]
+    E --> F["POST /api/v1/auth/login"]
+    F -->|success| G["access/refresh token 저장"]
+    G --> H["/match 이동"]
+    F -->|failure| I["backend message 또는 fallback message 표시"]
 ```
 
 ## 📚 Changes
 
-- 백엔드 `POST /api/v1/auth/login` 계약 기준 로그인 요청/응답 타입 구현.
-- 로그인 API는 public endpoint이므로 Authorization header 없이 호출하도록 구현.
-- access/refresh token 저장은 기존 `authToken.ts` 정책을 재사용하도록 구현.
-- 로그인 성공 이후 사용자는 매칭 플로우로 진입해야 하므로 `/match` 이동으로 구현.
-- `loginView.png`는 디자인 기준으로 사용하고, `background.png`는 실제 배경 자산으로 사용하도록 구현.
-- 회원가입, 비밀번호 찾기, Google OAuth는 백엔드/라우팅 후속 계약이 필요하므로 표시만 구현.
+- 백엔드 `POST /api/v1/auth/login` 계약이 `email/password` 기반이고 회원가입 계약도 `email/password/nickname` 구조이므로 로그인 UI의 식별자 표현을 `EMAIL`로 통일 구현.
+- 로그인 요청/응답 타입은 백엔드 `LoginRequest`, `LoginResponse`와 동일하게 `email`, `password`, `accessToken`, `refreshToken`, `userId`, `nickname` 기준으로 구현.
+- 로그인 API는 public endpoint이므로 기존 `apiClient`의 인증 header 자동 주입을 끄는 `auth: false` 정책으로 호출 구현.
+- `authService.ts`는 백엔드 API 호출만 담당하고, token 저장과 route 이동은 `LoginPage.vue`에서 조립하도록 책임 분리 구현.
+- access/refresh token 저장은 기존 `authToken.ts`의 `setAuthTokens`를 재사용하여 프론트 인증 token 저장 위치를 분산하지 않도록 구현.
+- 로그인 성공 이후 사용자는 매칭 플로우로 진입해야 하므로 router name 기반으로 `/match` 이동 구현.
+- 로그인 실패는 백엔드 `ErrorResponse.message`를 우선 표시하고, 예상하지 못한 오류는 client fallback message로 처리하도록 구현.
+- `.env`가 없는 로컬 개발 환경에서도 로그인 페이지가 import 단계에서 죽지 않도록 `.env.example`과 동일한 기본 env fallback 정책 구현.
+- `loginView.png`는 디자인 레퍼런스로만 사용하고, `background.png`는 실제 배경 asset으로 import하여 화면 구성 구현.
+- 모바일 viewport 검증 중 로그인 카드 잘림을 확인하여 카드 폭과 제목 크기를 보정하고, desktop/mobile 모두 입력 필드와 버튼이 화면 밖으로 넘치지 않도록 구현.
+- 회원가입, 비밀번호 찾기, Google OAuth, About this game은 백엔드/라우팅 후속 계약이 필요하므로 현재 PR에서는 표시만 구현.
+- 로그인 페이지 interaction은 service/router/token 저장소를 mock 처리하여 렌더링, submit, 성공 이동, 실패 메시지, loading disabled 상태를 검증하도록 구현.
 
 ## 📝 Note
 
 - 이번 이슈는 로그인 페이지와 일반 로그인 연동 1차 구현 범위.
-- route guard, refresh token 자동 재발급, OAuth 로그인은 후속 이슈에서 진행.
-- 구현 후 `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test`, `npm run build` 검증.
+- route guard, refresh token 자동 재발급, OAuth 로그인, 회원가입 페이지, 비밀번호 찾기 페이지는 후속 이슈에서 진행.
+- Google 로그인 버튼은 실제 OAuth endpoint에 연결하지 않고 UI 표시만 구현.
+- env 값은 실제 설정이 있으면 env를 우선 사용하고, 없으면 local 개발 fallback을 사용.
+- `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test`, `npm run build` 검증 완료.
+- dev server `/login` 접속 및 desktop/mobile viewport screenshot 검증 완료.
 
 ## 📌 Related Issue
 
