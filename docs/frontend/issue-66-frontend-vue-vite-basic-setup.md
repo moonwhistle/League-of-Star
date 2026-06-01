@@ -215,11 +215,11 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 ### 2. 프로젝트 생성
 
-- [ ] 루트에 `frontend/` 생성
-- [ ] Vue 3 + TypeScript + Vite scaffold 생성
-- [ ] 불필요한 예제 파일 제거
-- [ ] `package.json` scripts 정리
-- [ ] `.env.example` 추가
+- [x] 루트에 `frontend/` 생성
+- [x] Vue 3 + TypeScript + Vite scaffold 생성
+- [x] 불필요한 예제 파일 제거
+- [x] `package.json` scripts 정리
+- [x] `.env.example` 추가
 
 ### 3. TypeScript/Vite 설정
 
@@ -324,3 +324,14 @@ npm run dev
 - Docker MySQL/Redis는 로컬 바인딩으로 잠근 상태다.
 - 프론트 dev server는 Vite 기본 포트 `5173`을 사용한다.
 - 실제 API 호출과 인증 플로우는 후속 기능 이슈에서 구현한다.
+
+## Progress
+
+### 2026-06-01 - Task 2 Project Creation
+
+- `frontend/`를 Vue 3 + TypeScript + Vite scaffold로 생성했다.
+- `npm install`로 `package-lock.json`을 생성했다.
+- Vite 예제 컴포넌트와 로고 자산을 제거했다.
+- `package.json` 이름을 `smite-frontend`로 정리하고 `typecheck` script를 추가했다.
+- `.env.example`에 백엔드 API, WebSocket, 게임 MP4 URL 기본값을 추가했다.
+- `npm run typecheck`, `npm run build` 통과를 확인했다.
