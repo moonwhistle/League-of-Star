@@ -12,7 +12,7 @@
 - 최종 매칭 결과와 게임 대기방 이동은 `match_response_result` SSE 이벤트 기준으로 처리.
 - 게임 WebSocket은 `/ws/game/{gameRoomId}?token={accessToken}` 형식으로 연결.
 - 게임 결과 화면의 summary 조회는 현재 백엔드 기준 `gameId = gameRoomId`로 처리.
-- SSE는 백엔드가 `Authorization: Bearer`를 요구하지만 native `EventSource`는 Authorization header를 보낼 수 없으므로 인증 방식 계약 조정 필요.
+- SSE는 백엔드의 `Authorization: Bearer` 계약을 유지하고, native `EventSource` 대신 `@microsoft/fetch-event-source`로 header 기반 연결을 구현.
 
 ```mermaid
 flowchart TD
@@ -79,17 +79,18 @@ flowchart TD
 - route guard는 access token 존재 여부만 판단하는 MVP 정책으로 구현.
 - route guard 단위 테스트와 router meta 정합성 테스트로 protected/guest only/public route 정책 검증.
 
-### 3. [ ] SSE 인증 계약 확정 및 매칭 스트림 연결 구현
+### 3. [x] SSE 인증 계약 확정 및 매칭 스트림 연결 구현
 
 - 매칭 화면 진입 시 `GET /api/v1/notifications/match/stream` 연결 구현.
 - event `connected`, `heartbeat`, `match_found`, `match_response_result` 처리 구현.
 - `connected`는 연결 확인 상태로 처리.
 - `heartbeat`는 연결 유지 신호로 처리.
-- `match_found`는 수락/거절 UI 표시 기준으로 처리.
-- `match_response_result`는 최종 화면 전환 기준으로 처리.
-- 현재 백엔드 Authorization header 요구와 native `EventSource` 제약 충돌은 blocker로 문서화.
-- 실제 브라우저 연동 전 backend cookie auth, query token, fetch-event-source 중 하나로 계약 확정 필요.
-- SSE 인증 방식은 백엔드와 프론트가 함께 결정해야 하며, 계약 확정 전 매칭 스트림 실연동을 진행하지 않음.
+- `match_found`는 이번 단계에서 payload 보관까지만 처리하고, 수락/거절 UI는 후속 이슈에서 구현.
+- `match_response_result`는 이번 단계에서 payload 보관까지만 처리하고, 최종 화면 전환은 후속 이슈에서 구현.
+- 백엔드 Authorization header 요구와 native `EventSource` 제약 충돌은 `@microsoft/fetch-event-source` 도입으로 해소.
+- query token 방식은 token 노출 위험 때문에 사용하지 않음.
+- cookie auth 전환은 백엔드 인증 전략 변경 범위이므로 이번 단계에서 제외.
+- token 만료에 따른 refresh/retry는 후속 token refresh 이슈에서 구현.
 
 ### 4. [ ] 매칭 페이지 구현
 
@@ -297,7 +298,7 @@ type GameSummaryResponse =
 - `accessToken`, `refreshToken` 외 `userId`, `nickname` 저장 위치와 profile 조회 전략은 후속 auth state/profile 이슈에서 결정.
 - transport error 세분화와 request abort 처리는 공통 service/error handling 이슈에서 결정.
 - accept/reject 이후 전환을 HTTP response 기준으로 구현하지 않도록 테스트에 명시.
-- SSE 인증 충돌은 프론트 단독으로 숨기지 않고 blocker로 명시.
+- SSE는 `@microsoft/fetch-event-source`로 Authorization header를 전달하고, native `EventSource`와 query token은 사용하지 않음.
 
 ## Test Plan
 
@@ -305,7 +306,9 @@ type GameSummaryResponse =
 - 로그인 실패 시 에러 메시지 표시 검증.
 - protected route token 없을 때 `/login` 이동 검증.
 - token 있는 상태에서 `/login` 접근 시 `/match` 이동 검증.
-- match SSE event listener 등록 검증.
+- match SSE Authorization header 연결 검증.
+- match SSE event dispatch 검증.
+- match page mount/unmount stream lifecycle 검증.
 - join/leave API 호출 검증.
 - `match_found` 수신 시 수락/거절 UI 표시 검증.
 - accept/reject 200 이후 즉시 이동하지 않는 것 검증.
@@ -320,11 +323,11 @@ type GameSummaryResponse =
 - summary `PENDING` polling 검증.
 - summary `DONE` 결과 표시 검증.
 
-## Known Blocker
+## Resolved Decision
 
-### SSE 인증 방식 충돌
+### SSE 인증 방식
 
-현재 백엔드 RestDocs는 match stream 요청에 `Authorization: Bearer access-token` header를 요구한다.
+백엔드 RestDocs는 match stream 요청에 `Authorization: Bearer access-token` header를 요구한다.
 
 ```text
 GET /api/v1/notifications/match/stream
@@ -332,21 +335,22 @@ Authorization: Bearer access-token
 Accept: text/event-stream
 ```
 
-하지만 브라우저 native `EventSource`는 custom `Authorization` header를 설정할 수 없다.
+브라우저 native `EventSource`는 custom `Authorization` header를 설정할 수 없으므로 사용하지 않는다.
 
-따라서 실제 브라우저 연동 전 다음 중 하나를 백엔드/프론트 계약으로 확정해야 한다.
+확정한 방식은 다음과 같다.
 
-- Cookie 기반 인증으로 SSE 연결 구현.
-- SSE 전용 query token 정책 구현.
-- native `EventSource` 대신 header 설정이 가능한 fetch 기반 SSE client 사용.
-
-현재 프론트 skeleton은 native `EventSource` 기준이므로, 이 계약이 확정되기 전까지 SSE 실연동은 blocker로 본다.
+- `@microsoft/fetch-event-source` 기반으로 SSE 연결 구현.
+- 기존 백엔드 `Authorization: Bearer {accessToken}` header 계약 유지.
+- query token 방식은 token 노출 위험 때문에 사용하지 않음.
+- cookie auth 전환은 백엔드 인증 전략 변경 범위이므로 이번 흐름에서 제외.
+- access token 없음, 401/403, 네트워크 오류는 page local error 상태로 처리.
+- token refresh/retry는 후속 auth 이슈에서 구현.
 
 ## Issue Split Recommendation
 
 - [x] 로그인 페이지 구현.
-- [ ] 인증 라우트 가드 구현.
-- [ ] SSE 인증 계약 확정 및 매칭 스트림 연결 구현.
+- [x] 인증 라우트 가드 구현.
+- [x] SSE 인증 계약 확정 및 매칭 스트림 연결 구현.
 - [ ] 매칭 페이지 구현.
 - [ ] 매칭 성사 모달 구현.
 - [ ] 매칭 수락/거절 커맨드 구현.
