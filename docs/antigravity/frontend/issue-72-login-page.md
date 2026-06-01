@@ -83,6 +83,8 @@ flowchart TD
 - Pinia 도입.
 - refresh token 자동 재발급.
 - route guard 전체 구현.
+- transport error 세분화.
+- 페이지 이탈 시 로그인 요청 abort 처리.
 - 접근성 고도화.
 - 디자인 시스템 구축.
 
@@ -174,10 +176,14 @@ flowchart TD
 - Google 로그인 버튼은 표시만 구현하고 실제 OAuth endpoint 연결은 후속 작업으로 보류.
 - `SIGN UP`, `FORGOT PASSWORD?`, `ABOUT THIS GAME`은 표시만 구현하고 route 이동은 후속 작업으로 보류.
 - API 계약은 백엔드 `AuthController`와 RestDocs 기준을 따른다.
-- token 저장은 기존 `authToken.ts`를 재사용한다.
+- token 저장은 기존 `authToken.ts`를 재사용하며, `accessToken`, `refreshToken`만 저장한다.
+- `userId`, `nickname`은 로그인 응답 타입에는 반영하지만 이번 이슈에서 전역 저장하지 않고 후속 profile/auth state 정책에서 결정한다.
 - 로그인 성공 후 이동 경로는 `/match`로 고정한다.
+- `/match` route name은 현재 router 상수와 일치하지만, 접근 제어는 후속 인증 라우트 가드 이슈에서 처리한다.
 - `authService.ts`는 token 저장이나 router 이동을 직접 수행하지 않는다.
 - `LoginPage.vue`가 form 상태, submit 상태, token 저장 호출, router 이동을 조립한다.
+- `authService.login`은 `AbortSignal`을 받을 수 있고 `fetch`까지 전달하지만, 페이지 이탈 시 요청 취소 조립은 이번 범위에서 제외한다.
+- 네트워크 오류, CORS 오류, AbortError, timeout 등 transport 계층 오류는 이번 범위에서 client fallback message로 처리한다.
 
 ## Acceptance Criteria
 
@@ -216,7 +222,8 @@ flowchart TD
 - access/refresh token 저장은 기존 `authToken.ts`의 `setAuthTokens`를 재사용하여 프론트 인증 token 저장 위치를 분산하지 않도록 구현.
 - 로그인 성공 이후 사용자는 매칭 플로우로 진입해야 하므로 router name 기반으로 `/match` 이동 구현.
 - 로그인 실패는 백엔드 `ErrorResponse.message`를 우선 표시하고, 예상하지 못한 오류는 client fallback message로 처리하도록 구현.
-- `.env`가 없는 로컬 개발 환경에서도 로그인 페이지가 import 단계에서 죽지 않도록 `.env.example`과 동일한 기본 env fallback 정책 구현.
+- `.env`가 없는 local dev 환경에서도 로그인 페이지가 import 단계에서 죽지 않도록 `.env.example`과 동일한 기본 env fallback 정책 구현.
+- production 환경에서는 env 누락 시 localhost fallback으로 조용히 실행되지 않도록 필수 env 누락 오류를 발생시키는 정책 구현.
 - `loginView.png`는 디자인 레퍼런스로만 사용하고, `background.png`는 실제 배경 asset으로 import하여 화면 구성 구현.
 - 모바일 viewport 검증 중 로그인 카드 잘림을 확인하여 카드 폭과 제목 크기를 보정하고, desktop/mobile 모두 입력 필드와 버튼이 화면 밖으로 넘치지 않도록 구현.
 - 회원가입, 비밀번호 찾기, Google OAuth, About this game은 백엔드/라우팅 후속 계약이 필요하므로 현재 PR에서는 표시만 구현.
@@ -227,7 +234,10 @@ flowchart TD
 - 이번 이슈는 로그인 페이지와 일반 로그인 연동 1차 구현 범위.
 - route guard, refresh token 자동 재발급, OAuth 로그인, 회원가입 페이지, 비밀번호 찾기 페이지는 후속 이슈에서 진행.
 - Google 로그인 버튼은 실제 OAuth endpoint에 연결하지 않고 UI 표시만 구현.
-- env 값은 실제 설정이 있으면 env를 우선 사용하고, 없으면 local 개발 fallback을 사용.
+- env 값은 실제 설정이 있으면 env를 우선 사용하고, 없으면 local dev에서만 fallback을 사용.
+- `setAuthTokens`는 access/refresh token만 저장하며 `userId`, `nickname` 저장 및 profile 조회 전략은 후속 auth state/profile 이슈에서 결정.
+- transport error 세분화와 페이지 이탈 시 request abort 처리는 후속 공통 error/service 이슈에서 진행.
+- SSE 인증 방식은 `front-plan.md`의 blocker로 유지하며, 백엔드/프론트 계약 확정 전 매칭 스트림 실연동은 진행하지 않음.
 - `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test`, `npm run build` 검증 완료.
 - dev server `/login` 접속 및 desktop/mobile viewport screenshot 검증 완료.
 

@@ -11,7 +11,11 @@ function getEnv(name: keyof typeof DEFAULT_ENV): string {
     return value
   }
 
-  return DEFAULT_ENV[name]
+  if (import.meta.env.DEV) {
+    return DEFAULT_ENV[name]
+  }
+
+  throw new Error(`Missing required environment variable: ${name}`)
 }
 
 export const API_BASE_URL = getEnv('VITE_API_BASE_URL')

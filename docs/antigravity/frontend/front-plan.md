@@ -61,8 +61,10 @@ flowchart TD
 - request `{ email, password }` 반영.
 - response `{ accessToken, refreshToken, userId, nickname }` 반영.
 - 성공 시 기존 `authToken.ts`에 access/refresh token 저장 구현.
+- `userId`, `nickname`은 이번 단계에서 전역 저장하지 않고 후속 profile/auth state 정책에서 결정.
 - 성공 후 `/match` 이동 구현.
 - 실패 시 전역 `ErrorResponse.message` 기준 에러 메시지 표시 구현.
+- 네트워크 오류, CORS 오류, AbortError, timeout 등 transport 계층 오류는 이번 단계에서 client fallback message로 처리하고, 세분화는 공통 error handling 이슈에서 진행.
 - 회원가입, 비밀번호 찾기, OAuth 로그인은 후속 작업으로 보류.
 
 ### 2. [ ] 인증 라우트 가드 구현
@@ -71,7 +73,9 @@ flowchart TD
 - token 없으면 `/login` 이동 구현.
 - token 있는 상태에서 `/login` 접근 시 `/match` 이동 구현.
 - refresh token 자동 재발급은 후속 작업으로 보류.
+- 만료된 access token으로 API 호출 시 refresh/retry 처리 정책은 후속 token refresh 이슈에서 결정.
 - Pinia는 아직 도입하지 않고 기존 token storage와 작은 helper 중심으로 처리.
+- 현재 token 저장소는 `localStorage`이며, XSS 대비 저장 전략 변경 여부는 인증 보안 고도화 이슈에서 결정.
 
 ### 3. [ ] SSE 인증 계약 확정 및 매칭 스트림 연결 구현
 
@@ -83,6 +87,7 @@ flowchart TD
 - `match_response_result`는 최종 화면 전환 기준으로 처리.
 - 현재 백엔드 Authorization header 요구와 native `EventSource` 제약 충돌은 blocker로 문서화.
 - 실제 브라우저 연동 전 backend cookie auth, query token, fetch-event-source 중 하나로 계약 확정 필요.
+- SSE 인증 방식은 백엔드와 프론트가 함께 결정해야 하며, 계약 확정 전 매칭 스트림 실연동을 진행하지 않음.
 
 ### 4. [ ] 매칭 페이지 구현
 
@@ -287,6 +292,8 @@ type GameSummaryResponse =
 - `types`는 백엔드 DTO, SSE event, WebSocket message type 담당.
 - API 호출, 라우터 이동, WebSocket/EventSource 연결은 presentational component에 넣지 않음.
 - Pinia, TanStack Query Vue, OAuth, 회원가입, 비밀번호 재설정, 자동 token refresh는 이번 흐름 구현에서 제외.
+- `accessToken`, `refreshToken` 외 `userId`, `nickname` 저장 위치와 profile 조회 전략은 후속 auth state/profile 이슈에서 결정.
+- transport error 세분화와 request abort 처리는 공통 service/error handling 이슈에서 결정.
 - accept/reject 이후 전환을 HTTP response 기준으로 구현하지 않도록 테스트에 명시.
 - SSE 인증 충돌은 프론트 단독으로 숨기지 않고 blocker로 명시.
 
