@@ -45,7 +45,7 @@ flowchart TD
 - 로그인 패널은 desktop에서 좌측 정렬 기준으로 구현.
 - 패널은 밝은 반투명 카드 톤으로 구현.
 - 타이틀은 `LEAGUE OF SMITE`, subtitle은 `PROVE YOUR REACTION`으로 구현.
-- 입력 필드는 email/password 2개만 실제 동작 구현.
+- 입력 필드는 id/password 2개만 실제 동작 구현.
 - `FORGOT PASSWORD?`, `SIGN UP`, `Google`, `ABOUT THIS GAME`은 레퍼런스에 맞춰 표시하되 실제 기능 연결은 보류.
 - 모바일에서는 패널이 화면 중앙 또는 상단 중심으로 안정적으로 보이도록 반응형 구현.
 
@@ -62,7 +62,7 @@ flowchart TD
 - `/login` placeholder를 실제 로그인 페이지로 교체 구현.
 - 로그인 배경 이미지 적용.
 - 로그인 패널 레이아웃 구현.
-- email/password form 상태 구현.
+- id/password form 상태 구현.
 - login service 함수 구현.
 - 백엔드 로그인 API 호출 구현.
 - 성공 시 `setAuthTokens(accessToken, refreshToken)` 호출 구현.
@@ -100,29 +100,30 @@ flowchart TD
 - [x] `LoginRequest`, `LoginResponse` 타입 추가 구현.
 - [x] 기존 `apiClient.ts`와 `authToken.ts` 구조 재사용.
 - [x] `authService.ts`는 API 호출만 담당하도록 구현.
-- [ ] access/refresh token 저장은 기존 `authToken.ts`의 `setAuthTokens`로 처리.
-- [ ] `LoginPage.vue`는 `login` 호출, token 저장, router 이동을 조립하는 page 역할로 구현.
+- [x] access/refresh token 저장은 기존 `authToken.ts`의 `setAuthTokens`로 처리하도록 기준 확정.
 
 ### 3. Login page UI 구현
 
-- [ ] `src/pages/LoginPage.vue` placeholder 제거 구현.
-- [ ] `background.png` full-screen 배경 적용 구현.
-- [ ] `loginView.png` 레퍼런스 기준 좌측 로그인 패널 구현.
-- [ ] email input 구현.
-- [ ] password input 구현.
-- [ ] Login submit button 구현.
-- [ ] `FORGOT PASSWORD?`, `SIGN UP`, `Google`, `ABOUT THIS GAME` 표시 구현.
-- [ ] 기능 미연결 요소는 button 또는 anchor 형태만 두고 실제 route 연결은 보류.
+- [x] `src/pages/LoginPage.vue` placeholder 제거 구현.
+- [x] `background.png` full-screen 배경 적용 구현.
+- [x] `loginView.png` 레퍼런스 기준 좌측 로그인 패널 구현.
+- [x] id input 구현.
+- [x] password input 구현.
+- [x] Login submit button 구현.
+- [x] `FORGOT PASSWORD?`, `SIGN UP`, `Google`, `ABOUT THIS GAME` 표시 구현.
+- [x] 기능 미연결 요소는 button 또는 anchor 형태만 두고 실제 route 연결은 보류.
 
 ### 4. Login interaction 구현
 
-- [ ] form submit 시 기본 새로고침 방지 구현.
-- [ ] submit 중 중복 요청 방지 구현.
-- [ ] email/password 값이 비어 있으면 client message 표시 구현.
-- [ ] API 성공 시 token 저장 구현.
-- [ ] API 성공 시 `/match` 이동 구현.
-- [ ] API 실패 시 backend message 또는 기본 실패 메시지 표시 구현.
-- [ ] password input에서 enter submit 동작 구현.
+- [x] form submit 시 기본 새로고침 방지 구현.
+- [x] submit 중 중복 요청 방지 구현.
+- [x] id/password 값이 비어 있으면 client message 표시 구현.
+- [x] UI의 id 입력값을 백엔드 login request의 `email` 필드로 매핑하도록 구현.
+- [x] API 성공 시 token 저장 구현.
+- [x] API 성공 시 `/match` 이동 구현.
+- [x] API 실패 시 backend message 또는 기본 실패 메시지 표시 구현.
+- [x] password input에서 enter submit 동작 구현.
+- [x] `LoginPage.vue`는 `login` 호출, token 저장, router 이동을 조립하는 page 역할로 구현.
 
 구현 흐름:
 
@@ -181,7 +182,7 @@ flowchart TD
 - `/login` 진입 시 `background.png` 기반 full-screen 로그인 화면 표시.
 - desktop에서 레퍼런스처럼 좌측 로그인 패널 표시.
 - mobile에서 패널과 입력 요소가 화면 밖으로 밀리지 않음.
-- email/password 입력 후 Login 클릭 시 `/api/v1/auth/login` 호출.
+- id/password 입력 후 Login 클릭 시 `/api/v1/auth/login` 호출.
 - 로그인 성공 시 access/refresh token 저장.
 - 로그인 성공 시 `/match` 이동.
 - 로그인 실패 시 사용자에게 에러 메시지 표시.
