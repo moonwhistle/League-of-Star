@@ -186,15 +186,15 @@ interface MatchResponseResultNotification {
 
 ### 3. Match SSE client 구현
 
-- [ ] `src/services/realtime/matchEventSource.ts`를 fetch 기반 SSE client로 변경 구현.
-- [ ] `API_BASE_URL` 기준 `/api/v1/notifications/match/stream` URL 생성 구현.
-- [ ] `getAccessToken`으로 access token 조회 구현.
-- [ ] access token이 없으면 연결 시도 없이 명확한 error 반환 구현.
-- [ ] `Authorization: Bearer {accessToken}` header 전달 구현.
-- [ ] `Accept: text/event-stream` header 전달 구현.
-- [ ] `AbortController` 기반 close 함수 구현.
-- [ ] connection 반환 객체를 fetch 기반 구조에 맞게 재정의 구현.
-- [ ] token 저장소 key를 SSE client가 직접 알지 않도록 구현.
+- [x] `src/services/realtime/matchEventSource.ts`를 fetch 기반 SSE client로 변경 구현.
+- [x] `API_BASE_URL` 기준 `/api/v1/notifications/match/stream` URL 생성 구현.
+- [x] `getAccessToken`으로 access token 조회 구현.
+- [x] access token이 없으면 연결 시도 없이 명확한 error 반환 구현.
+- [x] `Authorization: Bearer {accessToken}` header 전달 구현.
+- [x] `Accept: text/event-stream` header 전달 구현.
+- [x] `AbortController` 기반 close 함수 구현.
+- [x] connection 반환 객체를 fetch 기반 구조에 맞게 재정의 구현.
+- [x] token 저장소 key를 SSE client가 직접 알지 않도록 구현.
 
 ### 4. SSE event dispatch 구현
 
