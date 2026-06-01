@@ -16,7 +16,6 @@ export interface MatchEventSourceHandlers {
 }
 
 export interface MatchEventSourceConnection {
-  eventSource: EventSource
   close: () => void
 }
 
@@ -44,7 +43,6 @@ export function connectMatchEventSource(
   }
 
   return {
-    eventSource,
     close: () => eventSource.close(),
   }
 }
