@@ -19,7 +19,7 @@ trigger: always_on
 | 영역 | 기술 |
 |------|------|
 | **Backend** | Java 17, Spring Boot 3.4.2, Spring MVC SSE, Spring WebSocket, Spring Security + JWT, OAuth2 Client, JPA (Hibernate), MySQL, Redis |
-| **Frontend** | React 19, TypeScript, Vite, React Router, TanStack Query, EventSource, native WebSocket, HTML video + React/CSS overlay |
+| **Frontend** | Vue 3, TypeScript, Vite, Vue Router, EventSource, native WebSocket, HTML video + Vue/CSS overlay |
 | **Infra** | Docker, Nginx, GitHub Actions |
 
 ---
@@ -43,7 +43,7 @@ smite/
 │   ├── smite-core/           # Core 모듈 (Entity, Repository, 게임 로직, Service 인터페이스)
 │   ├── smite-matching/       # 매칭 큐, 매칭 엔진, 수락/거절/timeout 정산
 │   └── smite-infra-redis/    # Redis 인프라 모듈 (매칭 큐, 세션 관리)
-├── frontend/                 # React 19 + TypeScript + Vite
+├── frontend/                 # Vue 3 + TypeScript + Vite
 └── docs/                     # 기획, 정책, DB 설계 문서
 ```
 
@@ -91,4 +91,5 @@ smite-core → (독립, JPA/Hibernate만 의존)
 
 | 날짜 | 변경 내용 |
 | :--- | :--- |
+| 2026-06-01 | MVP 프론트엔드 기술 스택을 Vue 3/TypeScript/Vite, Vue Router, EventSource, native WebSocket, HTML video + Vue/CSS overlay로 전환. Pinia와 TanStack Query Vue는 후속 이슈에서 필요 시 도입 |
 | 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, React Router, TanStack Query, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화 |

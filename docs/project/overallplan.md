@@ -244,15 +244,16 @@ gap = 상대_티어점수 - 내_티어점수
 
 | 기술 | 용도 |
 |------|------|
-| **React 19** | UI 프레임워크 (로비, HUD, 상태 관리) |
+| **Vue 3** | UI 프레임워크 (로비, HUD, 상태 관리) |
 | **TypeScript** | 타입 안전성 |
 | **Vite** | 빌드 도구 |
-| **React Router** | 화면 라우팅 |
-| **TanStack Query** | 서버 상태/REST API 캐싱 |
+| **Vue Router** | 화면 라우팅 |
+| **Pinia** | 후속 이슈에서 전역 상태가 필요해질 때 도입 검토 |
+| **TanStack Query Vue** | 후속 이슈에서 서버 상태 캐싱/무효화 요구가 명확해질 때 도입 검토 |
 | **Native EventSource** | 매칭 SSE 수신 |
 | **Native WebSocket** | 게임 준비, RTT, 카운트다운, SMITE 입력 |
-| **HTML video + React/CSS overlay** | MP4 배경 재생, HP bar/HUD 렌더링 |
-| **Vitest + React Testing Library** | 프론트엔드 테스트 |
+| **HTML video + Vue/CSS overlay** | MP4 배경 재생, HP bar/HUD 렌더링 |
+| **Vitest + Vue Test Utils** | 프론트엔드 테스트 |
 
 ### 5.3 Infra *(확장 시)*
 
@@ -310,7 +311,7 @@ smite-core → (독립, JPA/Hibernate만 의존)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                      Client (React)                     │
+│                       Client (Vue)                      │
 │  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐ │
 │  │  로그인   │  │  로비     │  │ 게임 (Video + Overlay)│ │
 │  └──────────┘  └──────────┘  └────────────────────────┘ │
@@ -350,12 +351,12 @@ smite-core → (독립, JPA/Hibernate만 의존)
 ## 9. 프론트엔드 아키텍처 전략
 
 MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
-렌더링 엔진을 별도로 도입하지 않고 브라우저 기본 기능과 React 상태만으로 게임 화면을 구성합니다.
+렌더링 엔진을 별도로 도입하지 않고 브라우저 기본 기능과 Vue 상태만으로 게임 화면을 구성합니다.
 
 ### 9.1 MVP 렌더링 방식
 
 - MP4 배경은 HTML `<video>`로 재생합니다.
-- HP bar, countdown, result HUD는 React 컴포넌트와 CSS overlay로 렌더링합니다.
+- HP bar, countdown, result HUD는 Vue 컴포넌트와 CSS overlay로 렌더링합니다.
 - HP overlay는 서버가 내려준 `startAt`과 scenario를 기준으로 `requestAnimationFrame`에서 계산합니다.
 - PixiJS, Web Worker, OffscreenCanvas는 MVP 이후 성능 문제가 확인될 때 검토합니다.
 
@@ -407,3 +408,4 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-05-18 | GAME_START 이전 timeout은 `ABORTED` 및 전적/LP 미반영, GAME_START 이후 disconnect는 정상 판정 흐름 유지로 정책 조정 |
 | 2026-05-18 | 게임 대기 WebSocket timeout을 gameRoom `createdAt` 기준 30초로 확정 |
 | 2026-05-20 | GAME_START `startAt = serverNow + 4000ms`, 프론트 3초 countdown, COUNTDOWN/GAME_START 사전 전송 정책 반영 |
+| 2026-06-01 | 프론트엔드 기준을 Vue 3 + Vite + TypeScript로 전환. Vue Router를 라우팅 기본값으로 두고 Pinia/TanStack Query Vue는 후속 이슈에서 필요 시 도입하도록 보류 |
