@@ -102,11 +102,11 @@ flowchart TD
 
 ### 4. Router 연결 구현
 
-- [ ] `src/router/index.ts`에 auth guard 등록 구현.
-- [ ] router 생성 이후 `beforeEach`로 guard를 연결하도록 구현.
-- [ ] 기존 route path/name 상수 구조를 유지하도록 구현.
-- [ ] page component가 인증 여부를 직접 판단하지 않도록 구현.
-- [ ] `LoginPage.vue`의 로그인 성공 후 `/match` 이동 정책은 유지하도록 구현.
+- [x] `src/router/index.ts`에 auth guard 등록 구현.
+- [x] router 생성 이후 `beforeEach`로 guard를 연결하도록 구현.
+- [x] 기존 route path/name 상수 구조를 유지하도록 구현.
+- [x] page component가 인증 여부를 직접 판단하지 않도록 구현.
+- [x] `LoginPage.vue`의 로그인 성공 후 `/match` 이동 정책은 유지하도록 구현.
 
 ### 5. Test 구현
 

@@ -8,6 +8,8 @@ import HomePage from '@/pages/HomePage.vue'
 import LoginPage from '@/pages/LoginPage.vue'
 import MatchPage from '@/pages/MatchPage.vue'
 
+import { authGuard } from './authGuard'
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -58,3 +60,5 @@ export const router = createRouter({
     },
   ],
 })
+
+router.beforeEach(authGuard)
