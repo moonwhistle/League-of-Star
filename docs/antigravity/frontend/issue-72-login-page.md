@@ -45,7 +45,7 @@ flowchart TD
 - 로그인 패널은 desktop에서 좌측 정렬 기준으로 구현.
 - 패널은 밝은 반투명 카드 톤으로 구현.
 - 타이틀은 `LEAGUE OF SMITE`, subtitle은 `PROVE YOUR REACTION`으로 구현.
-- 입력 필드는 id/password 2개만 실제 동작 구현.
+- 입력 필드는 email/password 2개만 실제 동작 구현.
 - `FORGOT PASSWORD?`, `SIGN UP`, `Google`, `ABOUT THIS GAME`은 레퍼런스에 맞춰 표시하되 실제 기능 연결은 보류.
 - 모바일에서는 패널이 화면 중앙 또는 상단 중심으로 안정적으로 보이도록 반응형 구현.
 
@@ -62,7 +62,7 @@ flowchart TD
 - `/login` placeholder를 실제 로그인 페이지로 교체 구현.
 - 로그인 배경 이미지 적용.
 - 로그인 패널 레이아웃 구현.
-- id/password form 상태 구현.
+- email/password form 상태 구현.
 - login service 함수 구현.
 - 백엔드 로그인 API 호출 구현.
 - 성공 시 `setAuthTokens(accessToken, refreshToken)` 호출 구현.
@@ -117,8 +117,8 @@ flowchart TD
 
 - [x] form submit 시 기본 새로고침 방지 구현.
 - [x] submit 중 중복 요청 방지 구현.
-- [x] id/password 값이 비어 있으면 client message 표시 구현.
-- [x] UI의 id 입력값을 백엔드 login request의 `email` 필드로 매핑하도록 구현.
+- [x] email/password 값이 비어 있으면 client message 표시 구현.
+- [x] UI의 email 입력값을 백엔드 login request의 `email` 필드로 전달하도록 구현.
 - [x] API 성공 시 token 저장 구현.
 - [x] API 성공 시 `/match` 이동 구현.
 - [x] API 실패 시 backend message 또는 기본 실패 메시지 표시 구현.
@@ -139,30 +139,30 @@ flowchart TD
 
 ### 5. Styling 구현
 
-- [ ] page scoped style 중심으로 구현.
-- [ ] 기존 `styles/variables.css` 토큰을 가능한 범위에서 재사용.
-- [ ] background image는 화면 비율에 따라 깨지지 않도록 `cover` 기준 구현.
-- [ ] desktop 기준 패널 좌측 배치 구현.
-- [ ] mobile 기준 패널 폭/여백/텍스트 크기 조정 구현.
-- [ ] 버튼과 input text가 container 밖으로 넘치지 않도록 검증.
+- [x] page scoped style 중심으로 구현.
+- [x] 기존 `styles/variables.css` 토큰을 가능한 범위에서 재사용.
+- [x] background image는 화면 비율에 따라 깨지지 않도록 `cover` 기준 구현.
+- [x] desktop 기준 패널 좌측 배치 구현.
+- [x] mobile 기준 패널 폭/여백/텍스트 크기 조정 구현.
+- [x] 버튼과 input text가 container 밖으로 넘치지 않도록 검증.
 
 ### 6. Test 구현
 
-- [ ] 로그인 페이지 렌더링 테스트 추가.
-- [ ] email/password 입력 후 submit 시 login service 호출 검증.
-- [ ] 성공 시 token 저장 및 `/match` 이동 검증.
-- [ ] 실패 시 오류 메시지 표시 검증.
-- [ ] submit 중 버튼 disabled 상태 검증.
+- [x] 로그인 페이지 렌더링 테스트 추가.
+- [x] email/password 입력 후 submit 시 login service 호출 검증.
+- [x] 성공 시 token 저장 및 `/match` 이동 검증.
+- [x] 실패 시 오류 메시지 표시 검증.
+- [x] submit 중 버튼 disabled 상태 검증.
 
 ### 7. 검증
 
-- [ ] `npm run lint` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] dev server 실행 후 `/login` 화면 확인.
-- [ ] desktop/mobile viewport에서 배경, 패널, 입력 필드, 버튼 겹침 여부 확인.
+- [x] `npm run lint` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] dev server 실행 후 `/login` 화면 확인.
+- [x] desktop/mobile viewport에서 배경, 패널, 입력 필드, 버튼 겹침 여부 확인.
 
 ## Implementation Policy
 
@@ -182,7 +182,7 @@ flowchart TD
 - `/login` 진입 시 `background.png` 기반 full-screen 로그인 화면 표시.
 - desktop에서 레퍼런스처럼 좌측 로그인 패널 표시.
 - mobile에서 패널과 입력 요소가 화면 밖으로 밀리지 않음.
-- id/password 입력 후 Login 클릭 시 `/api/v1/auth/login` 호출.
+- email/password 입력 후 Login 클릭 시 `/api/v1/auth/login` 호출.
 - 로그인 성공 시 access/refresh token 저장.
 - 로그인 성공 시 `/match` 이동.
 - 로그인 실패 시 사용자에게 에러 메시지 표시.

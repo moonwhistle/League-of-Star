@@ -8,16 +8,16 @@
       </div>
 
       <form class="login-form" aria-label="Login form" @submit.prevent="handleSubmit">
-        <label class="field-group" for="login-id">
-          <span>ID</span>
+        <label class="field-group" for="login-email">
+          <span>EMAIL</span>
           <span class="field-control">
             <input
-              id="login-id"
-              v-model.trim="id"
-              type="text"
-              name="id"
-              autocomplete="username"
-              placeholder="id"
+              id="login-email"
+              v-model.trim="email"
+              type="email"
+              name="email"
+              autocomplete="email"
+              placeholder="email"
             />
             <span class="field-icon field-icon-email" aria-hidden="true"></span>
           </span>
@@ -96,7 +96,7 @@ import backgroundImageUrl from '../../img/background.png'
 
 const router = useRouter()
 
-const id = ref('')
+const email = ref('')
 const password = ref('')
 const errorMessage = ref('')
 const isSubmitting = ref(false)
@@ -108,8 +108,8 @@ async function handleSubmit() {
 
   errorMessage.value = ''
 
-  if (id.value === '' || password.value === '') {
-    errorMessage.value = 'ID and password are required.'
+  if (email.value === '' || password.value === '') {
+    errorMessage.value = 'Email and password are required.'
     return
   }
 
@@ -117,7 +117,7 @@ async function handleSubmit() {
 
   try {
     const response = await login({
-      email: id.value,
+      email: email.value,
       password: password.value,
     })
 
@@ -389,12 +389,15 @@ async function handleSubmit() {
   }
 
   .login-card {
+    width: 358px;
+    max-width: calc(100dvw - 32px);
+    min-width: 0;
     padding: 28px 22px;
     border-radius: 24px;
   }
 
   .login-heading h1 {
-    font-size: 2rem;
+    font-size: 1.72rem;
   }
 
   .login-heading p {
