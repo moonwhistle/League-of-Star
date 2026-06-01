@@ -223,11 +223,11 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 ### 3. TypeScript/Vite 설정
 
-- [ ] `vite.config.ts` 설정
-- [ ] `@` alias를 `src`로 연결
-- [ ] TS strict 설정 확인
-- [ ] Vite dev server 기본 포트 `5173` 사용
-- [ ] backend proxy 도입 여부는 이번 이슈에서 보류하고 env base URL 방식 유지
+- [x] `vite.config.ts` 설정
+- [x] `@` alias를 `src`로 연결
+- [x] TS strict 설정 확인
+- [x] Vite dev server 기본 포트 `5173` 사용
+- [x] backend proxy 도입 여부는 이번 이슈에서 보류하고 env base URL 방식 유지
 
 ### 4. Router와 페이지 shell
 
@@ -334,4 +334,14 @@ npm run dev
 - Vite 예제 컴포넌트와 로고 자산을 제거했다.
 - `package.json` 이름을 `smite-frontend`로 정리하고 `typecheck` script를 추가했다.
 - `.env.example`에 백엔드 API, WebSocket, 게임 MP4 URL 기본값을 추가했다.
+- `npm run typecheck`, `npm run build` 통과를 확인했다.
+
+### 2026-06-01 - Task 3 TypeScript/Vite Settings
+
+- `vite.config.ts`에 `@` alias를 `frontend/src`로 연결했다.
+- Vite dev server 기본 포트를 `5173`으로 명시했다.
+- backend proxy는 설정하지 않고 `.env.example`의 base URL 방식 유지로 확정했다.
+- `tsconfig.app.json`에 `strict`, `noImplicitOverride`, `noUncheckedIndexedAccess`를 명시했다.
+- Vue 프로젝트 기준에 맞게 app TS include에서 `src/**/*.tsx`를 제거했다.
+- `tsconfig.node.json`에도 `strict`를 명시했다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
