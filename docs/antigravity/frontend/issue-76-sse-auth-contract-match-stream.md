@@ -198,15 +198,15 @@ interface MatchResponseResultNotification {
 
 ### 4. SSE event dispatch 구현
 
-- [ ] `connected` event JSON parse 후 `onConnected` handler 호출 구현.
-- [ ] `heartbeat` event JSON parse 후 `onHeartbeat` handler 호출 구현.
-- [ ] `match_found` event JSON parse 후 `onMatchFound` handler 호출 구현.
-- [ ] `match_response_result` event JSON parse 후 `onMatchResponseResult` handler 호출 구현.
-- [ ] 알 수 없는 event name은 무시하도록 구현.
-- [ ] 빈 event data는 handler 호출하지 않도록 구현.
-- [ ] JSON parse 실패 시 `onError` 또는 error callback으로 전달 구현.
-- [ ] `onOpen` equivalent callback 처리 방식 구현.
-- [ ] stream close 또는 abort 시 중복 close가 터지지 않도록 구현.
+- [x] `connected` event JSON parse 후 `onConnected` handler 호출 구현.
+- [x] `heartbeat` event JSON parse 후 `onHeartbeat` handler 호출 구현.
+- [x] `match_found` event JSON parse 후 `onMatchFound` handler 호출 구현.
+- [x] `match_response_result` event JSON parse 후 `onMatchResponseResult` handler 호출 구현.
+- [x] 알 수 없는 event name은 무시하도록 구현.
+- [x] 빈 event data는 handler 호출하지 않도록 구현.
+- [x] JSON parse 실패 시 `onError` 또는 error callback으로 전달 구현.
+- [x] `onOpen` equivalent callback 처리 방식 구현.
+- [x] stream close 또는 abort 시 중복 close가 터지지 않도록 구현.
 
 ### 5. Match page 연결 골격 구현
 

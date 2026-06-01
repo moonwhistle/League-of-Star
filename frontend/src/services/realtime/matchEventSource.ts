@@ -50,6 +50,7 @@ export function connectMatchEventSource(
   }
 
   const abortController = new AbortController()
+  let isClosed = false
 
   void fetchEventSource(buildMatchStreamUrl(), {
     method: 'GET',
@@ -74,17 +75,27 @@ export function connectMatchEventSource(
     onmessage: (message) => {
       dispatchMatchEventMessage(message.event, message.data, handlers)
     },
+    onclose: () => {
+      isClosed = true
+    },
     onerror: (error) => {
       throw error
     },
   }).catch((error: unknown) => {
-    if (!abortController.signal.aborted) {
+    if (!isClosed && !abortController.signal.aborted) {
       handlers.onError?.(error)
     }
   })
 
   return {
-    close: () => abortController.abort(),
+    close: () => {
+      if (isClosed) {
+        return
+      }
+
+      isClosed = true
+      abortController.abort()
+    },
   }
 }
 
@@ -101,16 +112,32 @@ function dispatchMatchEventMessage(
 ): void {
   switch (eventName) {
     case 'connected':
-      handlers.onConnected?.(JSON.parse(eventData) as MatchSseConnectedEvent)
+      dispatchJsonEvent(eventData, handlers.onConnected, handlers.onError)
       break
     case 'heartbeat':
-      handlers.onHeartbeat?.(JSON.parse(eventData) as MatchSseHeartbeatEvent)
+      dispatchJsonEvent(eventData, handlers.onHeartbeat, handlers.onError)
       break
     case 'match_found':
-      handlers.onMatchFound?.(JSON.parse(eventData) as MatchFoundNotification)
+      dispatchJsonEvent(eventData, handlers.onMatchFound, handlers.onError)
       break
     case 'match_response_result':
-      handlers.onMatchResponseResult?.(JSON.parse(eventData) as MatchResponseResultNotification)
+      dispatchJsonEvent(eventData, handlers.onMatchResponseResult, handlers.onError)
       break
+  }
+}
+
+function dispatchJsonEvent<TPayload>(
+  eventData: string,
+  handler: ((payload: TPayload) => void) | undefined,
+  onError: ((error: unknown) => void) | undefined,
+): void {
+  if (handler === undefined || eventData.trim() === '') {
+    return
+  }
+
+  try {
+    handler(JSON.parse(eventData) as TPayload)
+  } catch (error) {
+    onError?.(error)
   }
 }
