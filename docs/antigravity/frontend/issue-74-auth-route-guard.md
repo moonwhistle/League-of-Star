@@ -82,13 +82,13 @@ flowchart TD
 
 ### 2. Route meta 정책 구현
 
-- [ ] `/login` route에 `guestOnly` meta 설정 구현.
-- [ ] `/match` route에 `requiresAuth` meta 설정 구현.
-- [ ] `/game/:gameRoomId/waiting` route에 `requiresAuth` meta 설정 구현.
-- [ ] `/game/:gameRoomId/play` route에 `requiresAuth` meta 설정 구현.
-- [ ] `/game/:gameRoomId/result` route에 `requiresAuth` meta 설정 구현.
-- [ ] `/` route는 public route로 유지하도록 구현.
-- [ ] route meta 타입 확장 필요 여부 확인 후 TypeScript 오류 없이 구현.
+- [x] `/login` route에 `guestOnly` meta 설정 구현.
+- [x] `/match` route에 `requiresAuth` meta 설정 구현.
+- [x] `/game/:gameRoomId/waiting` route에 `requiresAuth` meta 설정 구현.
+- [x] `/game/:gameRoomId/play` route에 `requiresAuth` meta 설정 구현.
+- [x] `/game/:gameRoomId/result` route에 `requiresAuth` meta 설정 구현.
+- [x] `/` route는 public route로 유지하도록 구현.
+- [x] route meta 타입 확장 필요 여부 확인 후 TypeScript 오류 없이 구현.
 
 ### 3. Auth route guard 구현
 
