@@ -248,11 +248,11 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 ### 6. Realtime 골격
 
-- [ ] `matchEventSource.ts` 생성
-- [ ] `gameWebSocket.ts` 생성
-- [ ] SSE/WebSocket message 타입 위치 확정
-- [ ] reconnect, heartbeat, RTT 처리 구현은 후속 이슈로 분리
-- [ ] 브라우저 native API 사용 원칙 명시
+- [x] `matchEventSource.ts` 생성
+- [x] `gameWebSocket.ts` 생성
+- [x] SSE/WebSocket message 타입 위치 확정
+- [x] reconnect, heartbeat, RTT 처리 구현은 후속 이슈로 분리
+- [x] 브라우저 native API 사용 원칙 명시
 
 ### 7. Game runtime 골격
 
@@ -365,4 +365,17 @@ npm run dev
 - `src/services/matchService.ts`에 match queue join/leave, match accept/reject 함수 signature를 추가했다.
 - `src/services/gameSummaryService.ts`에 game summary 조회 함수 signature를 추가했다.
 - `src/types/api.ts`, `src/types/match.ts`, `src/types/game.ts`에 service layer에서 사용하는 최소 타입을 추가했다.
+- `npm run typecheck`, `npm run build` 통과를 확인했다.
+
+### 2026-06-01 - Task 6 Realtime Skeleton
+
+- `src/services/realtime/matchEventSource.ts`에 native `EventSource` 기반 match notification wrapper를 추가했다.
+- match SSE event는 `connected`, `heartbeat`, `match_found`, `match_response_result`를 기준으로 분기한다.
+- match SSE payload 타입은 `src/types/match.ts`에 위치시켰다.
+- `src/services/realtime/gameWebSocket.ts`에 native `WebSocket` 기반 game room wrapper를 추가했다.
+- game WebSocket URL은 백엔드 handshake 계약에 맞춰 `?token={accessToken}`을 붙인다.
+- game WebSocket client command는 `CLIENT_READY`, `RTT_PONG`, `SMITE` 전송 함수로 노출했다.
+- game WebSocket server/client envelope 타입은 `src/types/game.ts`에 위치시켰다.
+- reconnect, heartbeat 처리, RTT 측정 orchestration은 후속 기능 이슈에서 구현한다.
+- 현재 백엔드 SSE 인증은 `Authorization: Bearer` 헤더 기반이고 native `EventSource`는 custom header를 지원하지 않는다. 후속 SSE 연결 플로우 구현 전 백엔드 인증 방식을 cookie 또는 query token 등 native EventSource와 호환되는 방식으로 정리해야 한다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
