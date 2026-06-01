@@ -231,18 +231,18 @@ interface MatchResponseResultNotification {
 
 ### 7. Test 구현
 
-- [ ] access token이 없으면 SSE 연결을 시도하지 않는지 검증.
-- [ ] access token이 있으면 Authorization header가 포함되는지 검증.
-- [ ] `/api/v1/notifications/match/stream` URL로 연결하는지 검증.
-- [ ] `connected` event dispatch 검증.
-- [ ] `heartbeat` event dispatch 검증.
-- [ ] `match_found` event dispatch 검증.
-- [ ] `match_response_result` event dispatch 검증.
-- [ ] 알 수 없는 event는 무시하는지 검증.
-- [ ] JSON parse 실패 시 error callback이 호출되는지 검증.
-- [ ] close 호출 시 AbortController가 abort되는지 검증.
-- [ ] Match page mount 시 연결되는지 검증.
-- [ ] Match page unmount 시 close되는지 검증.
+- [x] access token이 없으면 SSE 연결을 시도하지 않는지 검증.
+- [x] access token이 있으면 Authorization header가 포함되는지 검증.
+- [x] `/api/v1/notifications/match/stream` URL로 연결하는지 검증.
+- [x] `connected` event dispatch 검증.
+- [x] `heartbeat` event dispatch 검증.
+- [x] `match_found` event dispatch 검증.
+- [x] `match_response_result` event dispatch 검증.
+- [x] 알 수 없는 event는 무시하는지 검증.
+- [x] JSON parse 실패 시 error callback이 호출되는지 검증.
+- [x] close 호출 시 AbortController가 abort되는지 검증.
+- [x] Match page mount 시 연결되는지 검증.
+- [x] Match page unmount 시 close되는지 검증.
 
 ### 8. 문서 정합성 구현
 
