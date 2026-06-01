@@ -6,7 +6,7 @@ Vue 프론트엔드에서 백엔드 매칭 알림 SSE 스트림을 Bearer token 
 
 백엔드 RestDocs 기준 매칭 알림 스트림은 `GET /api/v1/notifications/match/stream`이며, `Authorization: Bearer {accessToken}` header를 요구한다. 하지만 브라우저 native `EventSource`는 custom header를 보낼 수 없으므로, 기존 `EventSource` 기반 골격을 유지하면 현재 백엔드 계약과 실연동할 수 없다.
 
-이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `3. [ ] SSE 인증 계약 확정 및 매칭 스트림 연결 구현`을 구현 기준으로 삼는다. 인증 방식은 `@microsoft/fetch-event-source` 기반으로 확정하고, 기존 백엔드 Authorization header 계약을 유지한다.
+이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `3. [x] SSE 인증 계약 확정 및 매칭 스트림 연결 구현`을 구현 기준으로 삼는다. 인증 방식은 `@microsoft/fetch-event-source` 기반으로 확정하고, 기존 백엔드 Authorization header 계약을 유지한다.
 
 이번 작업은 매칭 스트림 연결 골격과 event dispatch 정책까지만 구현한다. 매칭 시작/취소 UI, 수락/거절 모달, accept/reject command, 최종 게임 대기방 이동은 후속 이슈에서 구현한다.
 
@@ -86,7 +86,7 @@ flowchart TD
 - 따라서 프론트는 token을 URL query가 아니라 Authorization header로 전달해야 함.
 - native `EventSource`는 Authorization header를 설정할 수 없으므로 현재 백엔드 계약과 직접 호환되지 않음.
 - 이번 이슈의 구현 방향은 `@microsoft/fetch-event-source` 기반 Bearer header 연결로 확정.
-- `front-plan.md` 3번 단계의 blocker였던 `Authorization header 요구와 native EventSource 제약 충돌`은 fetch 기반 SSE client 도입으로 해소하는 방향이 issue-76에 반영됨.
+- `front-plan.md` 3번 단계의 `Authorization header 요구와 native EventSource 제약 충돌`은 fetch 기반 SSE client 도입으로 해소됨.
 
 ## Payload Contract
 
@@ -246,23 +246,24 @@ interface MatchResponseResultNotification {
 
 ### 8. 문서 정합성 구현
 
-- [ ] `front-plan.md`의 3번 단계에 fetch 기반 SSE 인증 확정 정책 반영.
-- [ ] issue-76에 백엔드 Authorization header 계약 반영.
-- [ ] issue-76에 native `EventSource` 미사용 정책 반영.
-- [ ] issue-76에 query token 미사용 정책 반영.
-- [ ] issue-76에 token refresh/retry 후속 이슈 분리 정책 반영.
-- [ ] 이번 이슈 PR 메시지 섹션 작성.
+- [x] `front-plan.md`의 3번 단계에 fetch 기반 SSE 인증 확정 정책 반영.
+- [x] issue-76에 백엔드 Authorization header 계약 반영.
+- [x] issue-76에 native `EventSource` 미사용 정책 반영.
+- [x] issue-76에 query token 미사용 정책 반영.
+- [x] issue-76에 token refresh/retry 후속 이슈 분리 정책 반영.
+- [x] 이번 이슈 PR 메시지 섹션 작성.
 
 ### 9. 검증
 
-- [ ] `npm run lint` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] dev server 실행 후 `/match` 진입 시 SSE 연결 시도 확인.
-- [ ] token 없는 상태에서 `/match` 진입 시 SSE 연결이 시도되지 않는지 확인.
-- [ ] token 있는 상태에서 Authorization header 기반 연결 시도 확인.
+- [x] `npm run lint` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] `git diff --check` 검증.
+- [x] token 없는 상태에서 SSE 연결이 시도되지 않는지 테스트로 검증.
+- [x] token 있는 상태에서 Authorization header 기반 연결 시도 테스트로 검증.
+- [x] `/match` mount/unmount stream lifecycle 테스트로 검증.
 
 ## Implementation Policy
 
@@ -293,35 +294,43 @@ interface MatchResponseResultNotification {
 
 ## 📌 Summary
 
-Bearer token 기반 SPA 구조에 맞춰 매칭 SSE 인증 방식을 fetch 기반 SSE client로 확정 구현.
-백엔드 `Authorization: Bearer` 계약을 유지하면서 `/match` 페이지에서 매칭 알림 스트림 연결 골격 구현.
+Bearer token 기반 SPA 구조에 맞춰 매칭 SSE 인증 방식을 `@microsoft/fetch-event-source` 기반으로 확정 구현.
+백엔드 `Authorization: Bearer` 계약을 유지하면서 `/match` 페이지 진입/이탈 기준 매칭 알림 스트림 연결 골격 구현.
+
+이번 PR은 매칭 페이지 UI를 완성하는 작업이 아니라, 이후 매칭 시작/취소, 수락/거절 모달, 최종 게임 대기방 이동이 붙을 수 있도록 SSE 인증 계약과 event dispatch 기반을 먼저 고정하는 작업.
 
 ```mermaid
 flowchart TD
-    A["/match 진입"] --> B{access token 존재}
-    B -->|no| C["stream 연결 중단"]
-    B -->|yes| D["fetch-event-source 실행"]
-    D --> E["Authorization Bearer header 전달"]
-    E --> F["match stream 연결"]
-    F --> G{event name}
-    G -->|connected| H["연결 상태 처리"]
-    G -->|heartbeat| I["heartbeat 처리"]
-    G -->|match_found| J["매칭 성사 payload 저장"]
-    G -->|match_response_result| K["최종 결과 payload 저장"]
-    A --> L["/match 이탈"]
-    L --> M["AbortController abort"]
+    A["/match route mount"] --> B{access token 존재}
+    B -->|no| C["SSE 연결 시도하지 않음"]
+    C --> D["page local error 상태 처리"]
+    B -->|yes| E["fetch-event-source 실행"]
+    E --> F["GET /api/v1/notifications/match/stream"]
+    F --> G["Authorization: Bearer accessToken 전달"]
+    G --> H{"SSE event name"}
+    H -->|connected| I["연결 확인 상태 보관"]
+    H -->|heartbeat| J["마지막 heartbeat 시각 보관"]
+    H -->|match_found| K["매칭 성사 payload 보관"]
+    H -->|match_response_result| L["매칭 결과 payload 보관"]
+    K --> M["후속 수락/거절 모달 구현에서 사용"]
+    L --> N["후속 화면 전환 구현에서 사용"]
+    A --> O["/match route unmount"]
+    O --> P["AbortController abort"]
 ```
 
 ## 📚 Changes
 
-- 백엔드 RestDocs의 `GET /api/v1/notifications/match/stream` Authorization header 계약 기준으로 SSE 인증 방식 구현.
-- native `EventSource`가 custom header를 지원하지 않는 제약을 반영해 `@microsoft/fetch-event-source` 기반 연결로 변경.
-- query token 방식은 token 노출 위험이 있어 사용하지 않도록 정책화.
-- cookie auth 전환은 백엔드 인증 전략 변경 범위이므로 이번 이슈에서 제외.
-- access token이 없으면 SSE 연결을 시도하지 않도록 구현.
-- `connected`, `heartbeat`, `match_found`, `match_response_result` event dispatch 구현.
-- `/match` 페이지 mount/unmount 기준 stream 연결 lifecycle 구현.
-- `match_found`와 `match_response_result`는 수신/보관까지만 처리하고, 모달/화면 전환은 후속 이슈로 유지.
+- 백엔드 RestDocs의 `GET /api/v1/notifications/match/stream` 계약이 `Authorization: Bearer {accessToken}` header를 요구하므로, 프론트 SSE 인증 방식도 기존 API 인증 정책과 동일하게 Bearer header 기준으로 구현.
+- 브라우저 native `EventSource`는 custom `Authorization` header를 설정할 수 없으므로, 백엔드 계약을 우회하지 않고 `@microsoft/fetch-event-source`로 header 기반 SSE 연결을 구현.
+- query token 방식은 URL, proxy log, monitoring log에 access token이 노출될 수 있어 사용하지 않도록 정책화.
+- cookie auth 전환은 백엔드 인증 전략 변경과 CORS/credential 정책 변경을 동반하므로 이번 프론트 이슈 범위에서 제외.
+- access token이 없으면 `/api/v1/notifications/match/stream` 요청 자체를 만들지 않도록 구현해, 인증 실패를 서버 요청 이후가 아니라 client 연결 전 단계에서 차단.
+- SSE client는 `src/services/realtime` 계층에 두고, token 조회는 기존 `authToken.ts` helper를 통해서만 수행하도록 구현해 localStorage key 의존성을 realtime client 밖으로 격리.
+- `connected`, `heartbeat`, `match_found`, `match_response_result` event를 handler 기반으로 dispatch하도록 구현해, 후속 매칭 UI가 transport 구현을 직접 알지 않도록 구성.
+- `/match` 페이지는 stream mount/unmount lifecycle과 payload 보관만 담당하도록 구현해, 현재 단계에서 매칭 시작/취소 UI와 수락/거절 모달 책임을 섞지 않도록 분리.
+- `match_found`는 후속 수락/거절 모달의 입력 payload로만 보관하고, `match_response_result`는 후속 route 전환 정책의 입력 payload로만 보관하도록 범위 제한.
+- 401/403, 네트워크 오류, JSON parse 실패는 현재 단계에서 local error callback/fallback 상태로 처리하고, token refresh/retry와 transport error 세분화는 후속 auth/error handling 이슈로 분리.
+- SSE client 단위 테스트와 Match page lifecycle 테스트로 Authorization header 연결, event dispatch, abort close, mount/unmount 연결 정책 검증.
 
 ## 📝 Note
 
@@ -330,8 +339,11 @@ flowchart TD
 - 수락/거절 모달은 구현하지 않음.
 - accept/reject command는 구현하지 않음.
 - `match_response_result.action` 기반 route 이동은 구현하지 않음.
+- native `EventSource`는 사용하지 않음.
+- query token 인증은 사용하지 않음.
+- cookie auth 전환은 진행하지 않음.
 - token refresh/retry는 구현하지 않음.
-- `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test`, `npm run build` 검증.
+- `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test`, `npm run build`, `git diff --check` 검증.
 
 ## 📌 Related Issue
 
