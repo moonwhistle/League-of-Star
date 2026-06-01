@@ -110,16 +110,16 @@ flowchart TD
 
 ### 5. Test 구현
 
-- [ ] 미인증 사용자가 `/match` 접근 시 `/login` redirect 검증.
-- [ ] 미인증 사용자가 game waiting route 접근 시 `/login` redirect 검증.
-- [ ] 미인증 사용자가 game play route 접근 시 `/login` redirect 검증.
-- [ ] 미인증 사용자가 game result route 접근 시 `/login` redirect 검증.
-- [ ] 인증 사용자가 protected route 접근 시 통과 검증.
-- [ ] 인증 사용자가 `/login` 접근 시 `/match` redirect 검증.
-- [ ] 미인증 사용자가 `/login` 접근 시 통과 검증.
-- [ ] 인증 여부와 무관하게 `/` public route 접근 통과 검증.
-- [ ] protected route meta 정합성 검증.
-- [ ] guest only route meta 정합성 검증.
+- [x] 미인증 사용자가 `/match` 접근 시 `/login` redirect 검증.
+- [x] 미인증 사용자가 game waiting route 접근 시 `/login` redirect 검증.
+- [x] 미인증 사용자가 game play route 접근 시 `/login` redirect 검증.
+- [x] 미인증 사용자가 game result route 접근 시 `/login` redirect 검증.
+- [x] 인증 사용자가 protected route 접근 시 통과 검증.
+- [x] 인증 사용자가 `/login` 접근 시 `/match` redirect 검증.
+- [x] 미인증 사용자가 `/login` 접근 시 통과 검증.
+- [x] 인증 여부와 무관하게 `/` public route 접근 통과 검증.
+- [x] protected route meta 정합성 검증.
+- [x] guest only route meta 정합성 검증.
 
 ### 6. 문서 정합성 구현
 
