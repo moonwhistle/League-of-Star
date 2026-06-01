@@ -256,10 +256,10 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 ### 7. Game runtime 골격
 
-- [ ] `gameMessages.ts`에 WebSocket client/server message type 초안 작성
-- [ ] `hpScenario.ts`에 HP scenario 계산 함수 자리 생성
-- [ ] `requestAnimationFrame` 기반 overlay 갱신은 후속 게임 화면 이슈로 분리
-- [ ] MP4 URL 상수 위치 확정
+- [x] `gameMessages.ts`에 WebSocket client/server message type 초안 작성
+- [x] `hpScenario.ts`에 HP scenario 계산 함수 자리 생성
+- [x] `requestAnimationFrame` 기반 overlay 갱신은 후속 게임 화면 이슈로 분리
+- [x] MP4 URL 상수 위치 확정
 
 ### 8. Styling 기본값
 
@@ -378,4 +378,12 @@ npm run dev
 - game WebSocket server/client envelope 타입은 `src/types/game.ts`에 위치시켰다.
 - reconnect, heartbeat 처리, RTT 측정 orchestration은 후속 기능 이슈에서 구현한다.
 - 현재 백엔드 SSE 인증은 `Authorization: Bearer` 헤더 기반이고 native `EventSource`는 custom header를 지원하지 않는다. 후속 SSE 연결 플로우 구현 전 백엔드 인증 방식을 cookie 또는 query token 등 native EventSource와 호환되는 방식으로 정리해야 한다.
+- `npm run typecheck`, `npm run build` 통과를 확인했다.
+
+### 2026-06-01 - Task 7 Game Runtime Skeleton
+
+- `src/game/gameMessages.ts`에 WebSocket client/server message 타입 re-export와 client message 생성 함수를 추가했다.
+- `src/game/hpScenario.ts`에 scenario timeline 기준 HP 계산 함수 자리를 추가했다.
+- `requestAnimationFrame` 기반 overlay 갱신은 후속 게임 화면 이슈에서 구현한다.
+- MP4 URL 상수는 기존 `src/constants/env.ts`의 `GAME_VIDEO_URL`을 사용한다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
