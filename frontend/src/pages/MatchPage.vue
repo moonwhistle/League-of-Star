@@ -412,13 +412,21 @@ function abortLeaveRequest() {
   --match-muted: rgba(219, 232, 244, 0.72);
 
   position: relative;
-  min-height: 100vh;
+  width: 100%;
+  height: 100dvh;
+  min-height: 620px;
   overflow: hidden;
+  font-family: var(--font-sans);
   color: var(--match-text);
   background:
     linear-gradient(90deg, rgba(4, 8, 22, 0.82), rgba(4, 8, 22, 0.22) 58%),
     linear-gradient(0deg, rgba(4, 8, 22, 0.82), rgba(4, 8, 22, 0.1) 48%),
     var(--match-background-image) center / cover no-repeat;
+}
+
+.match-page,
+.match-page * {
+  box-sizing: border-box;
 }
 
 .match-page::before {
@@ -439,6 +447,7 @@ function abortLeaveRequest() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   min-height: 64px;
   padding: 0 clamp(20px, 4vw, 40px);
   border-bottom: 1px solid rgba(206, 224, 255, 0.12);
@@ -446,17 +455,24 @@ function abortLeaveRequest() {
 }
 
 .match-app-bar h1 {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
-  font-size: clamp(1.25rem, 2vw, 1.7rem);
+  overflow: hidden;
+  font-size: 1.55rem;
   font-weight: 900;
   letter-spacing: 0;
   color: #f0d7ff;
   text-shadow: 0 0 16px rgba(188, 107, 255, 0.72);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .match-actions {
   display: flex;
+  flex: 0 0 auto;
   gap: 12px;
+  min-width: 0;
 }
 
 .locale-toggle {
@@ -471,8 +487,7 @@ function abortLeaveRequest() {
 }
 
 .match-locale-toggle {
-  margin-left: auto;
-  margin-right: 16px;
+  flex: 0 0 auto;
 }
 
 .icon-button {
@@ -500,7 +515,9 @@ function abortLeaveRequest() {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(320px, 1fr);
   gap: clamp(24px, 5vw, 72px);
-  min-height: calc(100vh - 64px);
+  min-width: 0;
+  height: calc(100dvh - 64px);
+  min-height: 556px;
   padding: 16px clamp(20px, 4vw, 40px) 32px;
 }
 
@@ -508,7 +525,10 @@ function abortLeaveRequest() {
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: min(720px, calc(100vh - 112px));
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid rgba(206, 224, 255, 0.12);
   background: var(--match-panel-strong);
   box-shadow: 20px 0 42px rgba(0, 0, 0, 0.22);
@@ -614,8 +634,10 @@ function abortLeaveRequest() {
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-height: 0;
   padding: 14px 0;
   margin: 0;
+  overflow-y: auto;
   list-style: none;
 }
 
@@ -655,6 +677,7 @@ function abortLeaveRequest() {
   align-self: end;
   justify-self: end;
   width: min(380px, 100%);
+  min-width: 0;
   margin-bottom: clamp(20px, 6vh, 64px);
 }
 
@@ -662,6 +685,7 @@ function abortLeaveRequest() {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 12px;
+  min-width: 0;
   padding: 18px;
   margin-bottom: 16px;
   border-right: 4px solid rgba(100, 242, 232, 0.42);
@@ -684,6 +708,7 @@ function abortLeaveRequest() {
 
 .progress-track {
   grid-column: 1 / -1;
+  min-width: 0;
   height: 8px;
   overflow: hidden;
   background: rgba(142, 174, 196, 0.28);
@@ -705,6 +730,7 @@ function abortLeaveRequest() {
   padding: 0 24px;
   font-size: 1.35rem;
   font-weight: 900;
+  line-height: 1.15;
   color: #f8fbff;
   background: #162a42;
   border: 1px solid rgba(99, 242, 232, 0.48);
@@ -742,12 +768,17 @@ function abortLeaveRequest() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+  min-width: 0;
   margin-top: 14px;
 }
 
 .secondary-actions button {
+  min-width: 0;
   min-height: 56px;
+  padding: 0 12px;
   color: var(--match-text);
+  line-height: 1.15;
+  white-space: normal;
   background: rgba(24, 31, 52, 0.86);
   border: 1px solid rgba(206, 224, 255, 0.12);
   border-radius: 4px;
@@ -755,17 +786,34 @@ function abortLeaveRequest() {
 
 @media (max-width: 760px) {
   .match-page {
+    width: 100%;
+    height: auto;
     min-height: 100svh;
+    overflow-x: hidden;
     overflow-y: auto;
   }
 
   .match-app-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 38px 70px;
+    gap: 8px;
     min-height: 58px;
-    padding: 0 16px;
+    padding: 0 12px;
+  }
+
+  .match-app-bar h1 {
+    max-width: 152px;
+    font-size: 1rem;
+  }
+
+  .match-locale-toggle {
+    width: 38px;
+    min-width: 38px;
   }
 
   .match-actions {
-    gap: 8px;
+    gap: 6px;
+    justify-content: flex-end;
   }
 
   .icon-button {
@@ -777,6 +825,9 @@ function abortLeaveRequest() {
     display: flex;
     flex-direction: column-reverse;
     gap: 18px;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
     min-height: auto;
     padding: 18px 16px 28px;
   }
@@ -784,11 +835,18 @@ function abortLeaveRequest() {
   .match-cta-panel {
     align-self: stretch;
     width: 100%;
+    max-width: 100%;
     margin-bottom: 0;
   }
 
   .ranking-panel {
+    height: auto;
+    overflow: visible;
     min-height: auto;
+  }
+
+  .ranking-list {
+    overflow-y: visible;
   }
 
   .rank-panel {
@@ -803,6 +861,11 @@ function abortLeaveRequest() {
   .primary-match-button {
     min-height: 64px;
     font-size: 1.12rem;
+  }
+
+  .secondary-actions {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 }
 </style>

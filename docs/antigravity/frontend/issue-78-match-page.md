@@ -168,13 +168,13 @@ flowchart TD
 
 ### 5. Styling 구현
 
-- [ ] page scoped style 중심으로 구현.
-- [ ] 기존 `styles/variables.css` 토큰을 가능한 범위에서 재사용.
-- [ ] desktop 기준 `matchingPage.jpeg`의 좌측 panel + 우측 하단 CTA 구조 구현.
-- [ ] mobile 기준 주요 CTA와 상태가 화면 밖으로 밀리지 않도록 구현.
-- [ ] full viewport 배경에서 불필요한 body scroll이 생기지 않도록 구현.
-- [ ] 버튼과 상태 text가 container 밖으로 넘치지 않도록 검증.
-- [ ] 배경 이미지 위 텍스트 가독성을 위해 overlay 또는 panel contrast 구현.
+- [x] page scoped style 중심으로 구현.
+- [x] 기존 `styles/variables.css` 토큰을 가능한 범위에서 재사용.
+- [x] desktop 기준 `matchingPage.jpeg`의 좌측 panel + 우측 하단 CTA 구조 구현.
+- [x] mobile 기준 주요 CTA와 상태가 화면 밖으로 밀리지 않도록 구현.
+- [x] full viewport 배경에서 불필요한 body scroll이 생기지 않도록 구현.
+- [x] 버튼과 상태 text가 container 밖으로 넘치지 않도록 검증.
+- [x] 배경 이미지 위 텍스트 가독성을 위해 overlay 또는 panel contrast 구현.
 
 ### 6. Test 구현
 
@@ -205,8 +205,8 @@ flowchart TD
 - [x] `npm run typecheck` 검증.
 - [x] `npm run test` 검증.
 - [x] `npm run build` 검증.
-- [ ] desktop viewport에서 배경, 좌측 panel, CTA 영역 겹침 여부 확인.
-- [ ] mobile viewport에서 CTA와 상태 text가 화면 밖으로 밀리지 않는지 확인.
+- [x] desktop viewport에서 배경, 좌측 panel, CTA 영역 겹침 여부 확인.
+- [x] mobile viewport에서 CTA와 상태 text가 화면 밖으로 밀리지 않는지 확인.
 
 ## Implementation Policy
 
