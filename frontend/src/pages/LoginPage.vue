@@ -1,15 +1,19 @@
 <template>
   <!-- eslint-disable vue/max-attributes-per-line, vue/singleline-html-element-content-newline, vue/html-self-closing -->
   <main class="login-page" :style="{ '--login-background-image': `url(${backgroundImageUrl})` }">
+    <button class="locale-toggle" type="button" @click="toggleLocale">
+      {{ nextLocaleLabel }}
+    </button>
+
     <section class="login-card" aria-labelledby="login-title">
       <div class="login-heading">
         <h1 id="login-title">LEAGUE OF SMITE</h1>
-        <p>PROVE YOUR REACTION</p>
+        <p>PROVE YOUR SMITE TIMING</p>
       </div>
 
       <form class="login-form" aria-label="Login form" @submit.prevent="handleSubmit">
         <label class="field-group" for="login-email">
-          <span>EMAIL</span>
+          <span>{{ t('login.email') }}</span>
           <span class="field-control">
             <input
               id="login-email"
@@ -24,7 +28,7 @@
         </label>
 
         <label class="field-group" for="login-password">
-          <span>PASSWORD</span>
+          <span>{{ t('login.password') }}</span>
           <span class="field-control">
             <input
               id="login-password"
@@ -39,8 +43,8 @@
         </label>
 
         <div class="login-links">
-          <button type="button">FORGOT PASSWORD?</button>
-          <button type="button">SIGN UP</button>
+          <button type="button">{{ t('login.forgotPassword') }}</button>
+          <button type="button">{{ t('login.signUp') }}</button>
         </div>
 
         <p v-if="errorMessage !== ''" class="login-error" role="alert">
@@ -48,15 +52,15 @@
         </p>
 
         <button class="login-button" type="submit" :disabled="isSubmitting">
-          {{ isSubmitting ? 'Logging in' : 'Login' }}
+          {{ isSubmitting ? t('login.submitting') : t('login.submit') }}
         </button>
       </form>
 
       <div class="bridge-divider">
-        <span>OR BRIDGE WITH</span>
+        <span>{{ t('login.bridgeWith') }}</span>
       </div>
 
-      <button class="google-button" type="button" aria-label="Continue with Google">
+      <button class="google-button" type="button" :aria-label="t('login.continueGoogle')">
         <svg class="google-mark" viewBox="0 0 24 24" aria-hidden="true">
           <path
             fill="#4285f4"
@@ -78,7 +82,7 @@
         <span>Google</span>
       </button>
 
-      <button class="about-button" type="button">ABOUT THIS GAME</button>
+      <button class="about-button" type="button">{{ t('login.about') }}</button>
     </section>
   </main>
 </template>
@@ -87,6 +91,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
 import { login } from '@/services/authService'
@@ -95,6 +100,7 @@ import { setAuthTokens } from '@/services/authToken'
 import backgroundImageUrl from '../../img/background.png'
 
 const router = useRouter()
+const { nextLocaleLabel, t, toggleLocale } = useLocale()
 
 const email = ref('')
 const password = ref('')
@@ -109,7 +115,7 @@ async function handleSubmit() {
   errorMessage.value = ''
 
   if (email.value === '' || password.value === '') {
-    errorMessage.value = 'Email and password are required.'
+    errorMessage.value = t('login.required')
     return
   }
 
@@ -125,8 +131,7 @@ async function handleSubmit() {
 
     await router.push({ name: ROUTE_NAMES.match })
   } catch (error) {
-    errorMessage.value =
-      error instanceof ApiClientError ? error.message : 'Failed to login. Please try again.'
+    errorMessage.value = error instanceof ApiClientError ? error.message : t('login.failed')
   } finally {
     isSubmitting.value = false
   }
@@ -143,7 +148,8 @@ async function handleSubmit() {
   overflow: hidden;
   background-color: #0d1723;
   background:
-    linear-gradient(90deg, rgb(21 23 34 / 0.3), rgb(70 82 92 / 0.42)), var(--login-background-image);
+    linear-gradient(90deg, rgb(4 8 22 / 0.82), rgb(4 8 22 / 0.28) 58%),
+    linear-gradient(0deg, rgb(4 8 22 / 0.84), rgb(4 8 22 / 0.16) 50%), var(--login-background-image);
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;
@@ -157,10 +163,26 @@ async function handleSubmit() {
   padding: 32px 34px;
   display: flex;
   flex-direction: column;
-  border-radius: 28px;
-  background: rgb(247 247 249 / 0.92);
-  box-shadow: 0 18px 48px rgb(20 23 34 / 0.28);
-  color: #6d647f;
+  border: 1px solid rgb(206 224 255 / 0.14);
+  border-radius: 8px;
+  background: rgb(6 10 24 / 0.88);
+  box-shadow: 0 18px 54px rgb(0 0 0 / 0.38);
+  color: #f8fbff;
+}
+
+.locale-toggle {
+  position: absolute;
+  z-index: 2;
+  top: 24px;
+  right: clamp(16px, 3vw, 40px);
+  min-width: 42px;
+  height: 32px;
+  color: rgb(219 232 244 / 0.78);
+  background: rgb(8 15 34 / 0.72);
+  border: 1px solid rgb(206 224 255 / 0.14);
+  border-radius: 4px;
+  font-size: 0.76rem;
+  font-weight: 900;
 }
 
 .login-heading {
@@ -169,16 +191,17 @@ async function handleSubmit() {
 
 .login-heading h1 {
   margin: 0;
-  color: #6a607f;
+  color: #f0d7ff;
   font-size: 2.2rem;
-  font-weight: 800;
+  font-weight: 900;
   line-height: 1;
   letter-spacing: 0;
+  text-shadow: 0 0 16px rgb(188 107 255 / 0.72);
 }
 
 .login-heading p {
   margin: 8px 0 0;
-  color: #8b8993;
+  color: rgb(219 232 244 / 0.72);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -190,7 +213,7 @@ async function handleSubmit() {
 
 .field-group {
   display: block;
-  color: #625e68;
+  color: rgb(219 232 244 / 0.78);
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0;
@@ -207,8 +230,9 @@ async function handleSubmit() {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
+  border: 1px solid rgb(206 224 255 / 0.12);
   border-radius: 4px;
-  background: rgb(243 243 246 / 0.82);
+  background: rgb(8 15 34 / 0.72);
 }
 
 .field-control input {
@@ -216,20 +240,20 @@ async function handleSubmit() {
   border: 0;
   outline: 0;
   background: transparent;
-  color: #5f5b68;
+  color: #f8fbff;
   font-size: 0.98rem;
   font-weight: 600;
 }
 
 .field-control input::placeholder {
-  color: #a7a5ae;
+  color: rgb(219 232 244 / 0.48);
 }
 
 .field-icon {
   position: relative;
   width: 22px;
   height: 22px;
-  color: #b6b2c4;
+  color: rgb(99 242 232 / 0.66);
 }
 
 .field-icon-email::before {
@@ -290,7 +314,7 @@ async function handleSubmit() {
 .about-button {
   border: 0;
   background: transparent;
-  color: #7c748e;
+  color: rgb(219 232 244 / 0.68);
   font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0;
@@ -300,13 +324,18 @@ async function handleSubmit() {
   width: 100%;
   min-height: 58px;
   margin-top: 24px;
-  border: 0;
-  border-radius: 29px;
-  background: #6d6388;
-  box-shadow: 0 16px 26px rgb(91 83 116 / 0.25);
-  color: #ffffff;
+  border: 1px solid rgb(99 242 232 / 0.42);
+  border-radius: 4px;
+  background: #162a42;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.28);
+  color: #e9feff;
   font-size: 1rem;
   font-weight: 800;
+}
+
+.login-button:hover:not(:disabled) {
+  background: #1b3854;
+  border-color: rgb(99 242 232 / 0.68);
 }
 
 .login-button:disabled {
@@ -317,7 +346,7 @@ async function handleSubmit() {
 .login-error {
   min-height: 18px;
   margin: 16px 0 0;
-  color: #b54a60;
+  color: #ffd3d3;
   font-size: 0.76rem;
   font-weight: 700;
 }
@@ -327,7 +356,7 @@ async function handleSubmit() {
   margin-top: 20px;
   display: flex;
   justify-content: center;
-  color: #9c98a7;
+  color: rgb(219 232 244 / 0.64);
   font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0;
@@ -340,14 +369,14 @@ async function handleSubmit() {
   left: 0;
   right: 0;
   height: 1px;
-  background: rgb(188 184 199 / 0.28);
+  background: rgb(206 224 255 / 0.12);
   content: '';
 }
 
 .bridge-divider span {
   position: relative;
   padding: 2px 16px;
-  background: rgb(247 247 249 / 0.72);
+  background: rgb(6 10 24 / 0.92);
   border-radius: 999px;
 }
 
@@ -355,14 +384,14 @@ async function handleSubmit() {
   width: 100%;
   min-height: 52px;
   margin-top: 18px;
-  border: 0;
+  border: 1px solid rgb(206 224 255 / 0.12);
   border-radius: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 18px;
-  background: #ffffff;
-  color: #557a86;
+  background: rgb(248 251 255 / 0.94);
+  color: #183349;
   font-size: 0.98rem;
   font-weight: 800;
 }
@@ -388,12 +417,17 @@ async function handleSubmit() {
     background-position: center;
   }
 
+  .locale-toggle {
+    top: 16px;
+    right: 16px;
+  }
+
   .login-card {
     width: 358px;
     max-width: calc(100dvw - 32px);
     min-width: 0;
     padding: 28px 22px;
-    border-radius: 24px;
+    border-radius: 8px;
   }
 
   .login-heading h1 {

@@ -12,7 +12,7 @@ Vue 프론트엔드에서 백엔드 매칭 알림 SSE 스트림을 Bearer token 
 
 ```mermaid
 flowchart TD
-    A["/match route 진입"] --> B{access token 존재}
+    A["match stream 연결 요청"] --> B{access token 존재}
     B -->|no| C["SSE 연결 중단"]
     C --> D["로그인 상태 문제로 처리"]
     B -->|yes| E["fetch-event-source 연결"]
@@ -36,7 +36,7 @@ flowchart TD
 | Endpoint | `GET /api/v1/notifications/match/stream` |
 | Accept | `text/event-stream` |
 | Auth | `Authorization: Bearer {accessToken}` |
-| 연결 시점 | 매칭 화면 진입 시 연결 |
+| 연결 시점 | page 정책에 따라 호출. issue-78 기준으로는 매칭 시작 클릭 후, join 호출 전 연결 |
 | 연결 유지 | `match_found` 수신 후에도 같은 연결 유지 |
 | 최종 전환 기준 | HTTP accept/reject 응답이 아니라 `match_response_result` |
 
@@ -60,6 +60,13 @@ flowchart TD
 - 기존 백엔드 RestDocs의 Authorization header 계약을 유지.
 - access token이 없으면 SSE 연결을 시도하지 않음.
 - token 만료로 인한 401/403 refresh/retry는 후속 token refresh 이슈에서 처리.
+
+Lifecycle 보정:
+
+- issue-76은 SSE transport와 event dispatch 골격을 구현하는 범위다.
+- `/match` 화면이 메인 화면 역할을 하게 되면서, issue-78부터 실제 page lifecycle은 화면 진입 즉시 연결이 아니라 매칭 시작 클릭 후 on-demand 연결로 조정한다.
+- 조정된 순서는 `매칭 시작 클릭 -> SSE 연결 -> connected 수신 -> POST /api/v1/match/join`이다.
+- `match_found` 이후에 SSE를 연결하는 방식은 이벤트 유실 가능성이 있으므로 사용하지 않는다.
 
 선택 이유:
 

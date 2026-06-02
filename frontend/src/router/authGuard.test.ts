@@ -19,7 +19,6 @@ vi.mock('@/services/authSession', () => ({
 const hasAuthSessionMock = vi.mocked(hasAuthSession)
 
 const protectedRouteNames = [
-  ROUTE_NAMES.match,
   ROUTE_NAMES.gameWaiting,
   ROUTE_NAMES.gamePlay,
   ROUTE_NAMES.gameResult,

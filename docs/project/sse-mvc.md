@@ -4,7 +4,8 @@
 
 핵심 정책은 다음과 같습니다.
 
-- 클라이언트는 매칭 시작 화면에 진입하면 먼저 SSE 연결을 생성합니다.
+- 클라이언트는 매칭 시작 버튼을 누르면 먼저 SSE 연결을 생성합니다.
+- 클라이언트는 SSE `connected` 이벤트를 받은 뒤 `joinQueue` 요청을 보냅니다.
 - 서버는 인증된 유저 ID 기준으로 SSE 연결을 현재 API 인스턴스 메모리에 저장합니다.
 - 연결이 유지되는 동안 서버는 주기적으로 `heartbeat` 이벤트를 보냅니다.
 - 매칭 엔진이 매칭을 성사시키면 `MatchFoundEvent`가 발생합니다.
@@ -89,12 +90,12 @@ Pub/Sub 메시지는 모든 API 인스턴스가 받습니다. 하지만 SSE 연�
 
 ```mermaid
 flowchart TD
-    A[사용자 매칭 화면 진입] --> B[SSE 연결 생성]
+    A[사용자 매칭 시작 클릭] --> B[SSE 연결 생성]
     B --> C[API 인스턴스 메모리에<br/>유저별 SSE 연결 저장]
     C --> D[connected 이벤트 전송]
     D --> E[heartbeat 주기 전송]
 
-    A --> F[joinQueue 요청]
+    D --> F[joinQueue 요청]
     F --> G[Redis 매칭 대기열 저장]
     G --> H[매칭 엔진 배치 스캔]
     H --> I[두 유저 원자 제거]
@@ -106,4 +107,4 @@ flowchart TD
     N --> O[연결된 유저에게<br/>match_found 전송]
 ```
 
-요약하면, 클라이언트는 매칭 시작과 동시에 SSE 연결을 열어두고 서버의 `heartbeat`를 받습니다. 이후 매칭이 성사되면 서버는 Redis Pub/Sub으로 모든 API 인스턴스에 `match_found` 메시지를 전파하고, 각 인스턴스는 자기에게 연결된 유저에게만 알림을 보냅니다.
+요약하면, 클라이언트는 매칭 시작 버튼을 누른 뒤 SSE 연결을 먼저 열고 `connected`를 받은 다음 `joinQueue`를 호출합니다. 이후 매칭이 성사되면 서버는 Redis Pub/Sub으로 모든 API 인스턴스에 `match_found` 메시지를 전파하고, 각 인스턴스는 자기에게 연결된 유저에게만 알림을 보냅니다.
