@@ -259,6 +259,16 @@ describe('MatchPage', () => {
     expect(main.attributes('data-match-found-loading')).toBe('false')
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('매칭 성사')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain(
+      '상대를 찾았습니다',
+    )
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('응답 대기 시간')
+    expect(wrapper.get('[data-testid="match-found-logo"]').attributes('src')).toBeTruthy()
+    expect(wrapper.get('.match-found-accept').text()).toBe('수락')
+    expect(wrapper.get('.match-found-decline').text()).toBe('거절')
+    expect(wrapper.get('.match-found-accept').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.match-found-decline').attributes('disabled')).toBeDefined()
 
     await vi.advanceTimersByTimeAsync(2000)
     await wrapper.vm.$nextTick()
@@ -298,6 +308,7 @@ describe('MatchPage', () => {
     expect(main.attributes('data-match-found-loading')).toBe('true')
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(main.attributes('data-stream-status')).toBe('connected')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
     expect(leaveMatchQueueMock).not.toHaveBeenCalled()
     expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
   })
@@ -358,6 +369,36 @@ describe('MatchPage', () => {
     expect(leaveMatchQueueMock).not.toHaveBeenCalled()
     expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
     expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('toggles match found modal copy between Korean and English', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('매칭 성사')
+
+    await wrapper.get('.match-locale-toggle').trigger('click')
+
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('Match Found')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('Opponent Found')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('Response Time')
+    expect(wrapper.get('.match-found-accept').text()).toBe('Accept')
+    expect(wrapper.get('.match-found-decline').text()).toBe('Decline')
   })
 
   it('clears match found modal state without leave when the stream fails after match_found', async () => {

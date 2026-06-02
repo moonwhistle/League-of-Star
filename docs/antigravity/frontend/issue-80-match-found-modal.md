@@ -128,27 +128,27 @@ interface MatchFoundNotification {
 
 ### 3. Match found modal UI 구현
 
-- [ ] `matchfound.jpeg` 레퍼런스 기준 중앙 modal panel 구현.
-- [ ] `logo.png` import 및 원형 logo frame 구현.
-- [ ] cyan countdown ring 스타일 구현.
-- [ ] match found title 구현.
-- [ ] countdown text 구현.
-- [ ] accept filled button UI 구현.
-- [ ] decline outlined button UI 구현.
-- [ ] accept/decline disabled 처리 구현.
-- [ ] countdown 0초 이후 `로딩중...` / `loading...` 표시 구현.
-- [ ] modal 접근성 `role="dialog"`, `aria-modal`, `aria-labelledby` 구현.
-- [ ] desktop/mobile viewport에서 모달이 화면 밖으로 밀리지 않도록 반응형 구현.
+- [x] `matchfound.jpeg` 레퍼런스 기준 중앙 modal panel 구현.
+- [x] `logo.png` import 및 원형 logo frame 구현.
+- [x] cyan countdown ring 스타일 구현.
+- [x] match found title 구현.
+- [x] countdown text 구현.
+- [x] accept filled button UI 구현.
+- [x] decline outlined button UI 구현.
+- [x] accept/decline disabled 처리 구현.
+- [x] countdown 0초 이후 `로딩중...` / `loading...` 표시 구현.
+- [x] modal 접근성 `role="dialog"`, `aria-modal`, `aria-labelledby` 구현.
+- [x] desktop/mobile viewport에서 모달이 화면 밖으로 밀리지 않도록 반응형 구현.
 
 ### 4. Locale 구현
 
-- [ ] `match.foundTitle` 문구 추가 구현.
-- [ ] `match.foundSubtitle` 문구 추가 구현.
-- [ ] `match.responseTime` 문구 추가 구현.
-- [ ] `match.accept` 문구 추가 구현.
-- [ ] `match.decline` 문구 추가 구현.
-- [ ] `match.loading` 문구 추가 구현.
-- [ ] 한/영 전환 시 모달 문구 갱신 구현.
+- [x] `match.foundTitle` 문구 추가 구현.
+- [x] `match.foundSubtitle` 문구 추가 구현.
+- [x] `match.responseTime` 문구 추가 구현.
+- [x] `match.accept` 문구 추가 구현.
+- [x] `match.decline` 문구 추가 구현.
+- [x] `match.loading` 문구 추가 구현.
+- [x] 한/영 전환 시 모달 문구 갱신 구현.
 
 ### 5. Test 구현
 
