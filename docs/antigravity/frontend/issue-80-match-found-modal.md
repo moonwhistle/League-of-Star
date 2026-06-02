@@ -152,17 +152,17 @@ interface MatchFoundNotification {
 
 ### 5. Test 구현
 
-- [ ] `match_found` 수신 시 모달 표시 검증.
-- [ ] `data-match-found-id` 저장 검증.
-- [ ] logo, title, countdown, accept/decline button 표시 검증.
-- [ ] `eventCreatedAt + acceptTimeoutSeconds` 기준 countdown 감소 검증.
-- [ ] `eventCreatedAt` 파싱 실패 시 fallback countdown 검증.
-- [ ] countdown 0초 도달 시 모달 유지 및 `로딩중...` 표시 검증.
-- [ ] countdown 0초 도달 시 `leaveMatchQueue`, accept/reject API, route 이동, ready reset 미발생 검증.
-- [ ] `match_found` 수신 시 기존 매칭 대기 timer 중지 검증.
-- [ ] 모달 표시 중 배경 CTA click이 start/cancel을 트리거하지 않는지 검증.
-- [ ] stream error, cancel, reset, unmount 시 modal countdown timer 정리 검증.
-- [ ] locale toggle 시 모달 문구 전환 검증.
+- [x] `match_found` 수신 시 모달 표시 검증.
+- [x] `data-match-found-id` 저장 검증.
+- [x] logo, title, countdown, accept/decline button 표시 검증.
+- [x] `eventCreatedAt + acceptTimeoutSeconds` 기준 countdown 감소 검증.
+- [x] `eventCreatedAt` 파싱 실패 시 fallback countdown 검증.
+- [x] countdown 0초 도달 시 모달 유지 및 `로딩중...` 표시 검증.
+- [x] countdown 0초 도달 시 `leaveMatchQueue`, accept/reject API, route 이동, ready reset 미발생 검증.
+- [x] `match_found` 수신 시 기존 매칭 대기 timer 중지 검증.
+- [x] 모달 표시 중 배경 CTA click이 start/cancel을 트리거하지 않는지 검증.
+- [x] stream error, cancel, reset, unmount 시 modal countdown timer 정리 검증.
+- [x] locale toggle 시 모달 문구 전환 검증.
 
 ### 6. 문서 정합성 구현
 

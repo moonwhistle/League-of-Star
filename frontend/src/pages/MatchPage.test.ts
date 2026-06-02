@@ -2,7 +2,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
-import { joinMatchQueue, leaveMatchQueue } from '@/services/matchService'
+import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import {
   connectMatchEventSource,
   type MatchEventSourceHandlers,
@@ -15,13 +15,17 @@ vi.mock('@/services/realtime/matchEventSource', () => ({
 }))
 
 vi.mock('@/services/matchService', () => ({
+  acceptMatch: vi.fn(),
   joinMatchQueue: vi.fn(),
   leaveMatchQueue: vi.fn(),
+  rejectMatch: vi.fn(),
 }))
 
 const connectMatchEventSourceMock = vi.mocked(connectMatchEventSource)
+const acceptMatchMock = vi.mocked(acceptMatch)
 const joinMatchQueueMock = vi.mocked(joinMatchQueue)
 const leaveMatchQueueMock = vi.mocked(leaveMatchQueue)
+const rejectMatchMock = vi.mocked(rejectMatch)
 const closeMatchEventSourceMock = vi.fn()
 const { setLocale } = useLocale()
 
@@ -310,6 +314,8 @@ describe('MatchPage', () => {
     expect(main.attributes('data-stream-status')).toBe('connected')
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
     expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(acceptMatchMock).not.toHaveBeenCalled()
+    expect(rejectMatchMock).not.toHaveBeenCalled()
     expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
   })
 
@@ -399,6 +405,63 @@ describe('MatchPage', () => {
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('Response Time')
     expect(wrapper.get('.match-found-accept').text()).toBe('Accept')
     expect(wrapper.get('.match-found-decline').text()).toBe('Decline')
+  })
+
+  it('keeps accept and decline buttons as UI-only controls in this issue', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await wrapper.get('.match-found-decline').trigger('click')
+
+    expect(acceptMatchMock).not.toHaveBeenCalled()
+    expect(rejectMatchMock).not.toHaveBeenCalled()
+    expect(wrapper.get('main').attributes('data-match-found-modal-open')).toBe('true')
+  })
+
+  it('clears the match found countdown timer on unmount', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval')
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    wrapper.unmount()
+
+    expect(clearIntervalSpy).toHaveBeenCalled()
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+
+    clearIntervalSpy.mockRestore()
   })
 
   it('clears match found modal state without leave when the stream fails after match_found', async () => {
