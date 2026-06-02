@@ -118,13 +118,13 @@ interface MatchFoundNotification {
 
 ### 2. Match found 상태 모델 구현
 
-- [ ] match found modal open 상태 구현.
-- [ ] match found countdown 상태 구현.
-- [ ] match found loading 상태 구현.
-- [ ] `matchFound` payload 보관 상태 유지 구현.
-- [ ] `match_found` 수신 시 기존 match waiting timer 중지 구현.
-- [ ] reset/cancel/unmount 시 match found modal countdown 정리 구현.
-- [ ] 모달 표시 중 배경 CTA 조작 차단 guard 구현.
+- [x] match found modal open 상태 구현.
+- [x] match found countdown 상태 구현.
+- [x] match found loading 상태 구현.
+- [x] `matchFound` payload 보관 상태 유지 구현.
+- [x] `match_found` 수신 시 기존 match waiting timer 중지 구현.
+- [x] reset/cancel/unmount 시 match found modal countdown 정리 구현.
+- [x] 모달 표시 중 배경 CTA 조작 차단 guard 구현.
 
 ### 3. Match found modal UI 구현
 

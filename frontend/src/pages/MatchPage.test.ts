@@ -221,8 +221,177 @@ describe('MatchPage', () => {
     expect(main.attributes('data-connected-user-id')).toBe('1')
     expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
     expect(main.attributes('data-match-found-id')).toBe('match-1')
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
     expect(main.attributes('data-match-result-action')).toBe('GO_TO_GAME_WAITING')
-    expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
+    expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('opens match found state and stops the waiting timer when match_found arrives', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(2000)
+    await wrapper.vm.$nextTick()
+
+    expect(getStartButton(wrapper).text()).toBe('3')
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: '2026-06-01T00:00:02Z',
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-id')).toBe('match-1')
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('10')
+    expect(main.attributes('data-match-found-loading')).toBe('false')
+    expect(main.attributes('data-queue-status')).toBe('queued')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+
+    await vi.advanceTimersByTimeAsync(2000)
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('8')
+    expect(getStartButton(wrapper).text()).toBe('3')
+  })
+
+  it('keeps match found state in loading without resetting when the countdown reaches zero', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 2,
+      eventCreatedAt: '2026-06-01T00:00:00Z',
+    })
+    await wrapper.vm.$nextTick()
+
+    await vi.advanceTimersByTimeAsync(2000)
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
+    expect(main.attributes('data-match-found-loading')).toBe('true')
+    expect(main.attributes('data-queue-status')).toBe('queued')
+    expect(main.attributes('data-stream-status')).toBe('connected')
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
+  })
+
+  it('uses acceptTimeoutSeconds as a local countdown fallback when eventCreatedAt is invalid', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 7,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('7')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('4')
+  })
+
+  it('blocks the background match action while match found state is active', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await getStartButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('clears match found modal state without leave when the stream fails after match_found', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    getCurrentHandlers().onError?.(new Error('stream failed'))
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
+    expect(main.attributes('data-stream-status')).toBe('error')
+    expect(main.attributes('data-queue-status')).toBe('queued')
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
+    )
   })
 
   it('stores a local error state when the stream reports an error', async () => {

@@ -7,6 +7,9 @@
     :data-connected-user-id="connectedEvent?.userId ?? ''"
     :data-last-heartbeat-at="lastHeartbeatAt"
     :data-match-found-id="matchFound?.matchId ?? ''"
+    :data-match-found-modal-open="isMatchFoundModalOpen"
+    :data-match-found-countdown-seconds="matchFoundCountdownSeconds"
+    :data-match-found-loading="isMatchFoundLoading"
     :data-match-result-action="matchResponseResult?.action ?? ''"
     :data-stream-error-message="streamErrorMessage"
     :data-can-start-match="canStartMatch"
@@ -168,11 +171,25 @@ const streamErrorMessage = ref('')
 const queueStatus = ref('ready')
 const queueErrorMessage = ref('')
 const matchWaitingSeconds = ref(0)
+const isMatchFoundModalOpen = ref(false)
+const matchFoundCountdownSeconds = ref(0)
 const errorModalMessage = ref('')
+const isMatchFoundLoading = computed(
+  () => isMatchFoundModalOpen.value && matchFoundCountdownSeconds.value <= 0,
+)
+const hasActiveMatchFoundResponse = computed(
+  () =>
+    isMatchFoundModalOpen.value ||
+    (matchFound.value !== undefined && matchResponseResult.value === undefined),
+)
 const canStartMatch = computed(
   () => queueStatus.value === 'ready' && streamStatus.value !== 'connecting',
 )
 const canUsePrimaryMatchAction = computed(() => {
+  if (hasActiveMatchFoundResponse.value || streamStatus.value === 'error') {
+    return false
+  }
+
   if (queueStatus.value === 'ready') {
     return streamStatus.value !== 'connecting'
   }
@@ -206,6 +223,8 @@ let closeMatchEventSource = () => {}
 // Guards against late stream callbacks that arrive after route unmount.
 let isActive = false
 let matchWaitingTimerId = 0
+let matchFoundCountdownTimerId = 0
+let matchFoundCountdownDeadline = 0
 let shouldJoinAfterStreamConnected = false
 let hasQueueJoinRequestStarted = false
 let joinAbortController = new AbortController()
@@ -222,10 +241,15 @@ onUnmounted(() => {
   abortJoinRequest()
   abortLeaveRequest()
   stopMatchWaitingTimer()
+  stopMatchFoundCountdown()
   closeMatchStream()
 })
 
 function handlePrimaryMatchAction() {
+  if (hasActiveMatchFoundResponse.value || streamStatus.value === 'error') {
+    return
+  }
+
   if (queueStatus.value === 'ready') {
     startMatchmaking()
     return
@@ -279,6 +303,7 @@ function startMatchmaking() {
       onMatchFound: (payload) => {
         if (isActive) {
           matchFound.value = payload
+          openMatchFoundModal()
         }
       },
       onMatchResponseResult: (payload) => {
@@ -380,6 +405,67 @@ function stopMatchWaitingTimer() {
   matchWaitingTimerId = 0
 }
 
+function openMatchFoundModal() {
+  isMatchFoundModalOpen.value = true
+  stopMatchWaitingTimer()
+  startMatchFoundCountdown()
+}
+
+function startMatchFoundCountdown() {
+  stopMatchFoundCountdown()
+  matchFoundCountdownDeadline = resolveMatchFoundDeadline()
+  updateMatchFoundCountdown()
+
+  if (matchFoundCountdownSeconds.value <= 0) {
+    return
+  }
+
+  matchFoundCountdownTimerId = window.setInterval(() => {
+    updateMatchFoundCountdown()
+
+    if (matchFoundCountdownSeconds.value <= 0) {
+      stopMatchFoundCountdown()
+    }
+  }, 1000)
+}
+
+function updateMatchFoundCountdown() {
+  matchFoundCountdownSeconds.value = calculateMatchFoundRemainingSeconds()
+}
+
+function resolveMatchFoundDeadline() {
+  const fallbackSeconds = Math.max(0, Number(matchFound.value?.acceptTimeoutSeconds ?? 0))
+  const eventCreatedAt = Date.parse(String(matchFound.value?.eventCreatedAt ?? ''))
+
+  if (Number.isNaN(eventCreatedAt)) {
+    return Date.now() + fallbackSeconds * 1000
+  }
+
+  return eventCreatedAt + fallbackSeconds * 1000
+}
+
+function calculateMatchFoundRemainingSeconds() {
+  const remainingMilliseconds = matchFoundCountdownDeadline - Date.now()
+
+  return Math.max(0, Math.ceil(remainingMilliseconds / 1000))
+}
+
+function stopMatchFoundCountdown() {
+  if (matchFoundCountdownTimerId === 0) {
+    return
+  }
+
+  window.clearInterval(matchFoundCountdownTimerId)
+  matchFoundCountdownTimerId = 0
+}
+
+function resetMatchFoundModalState() {
+  stopMatchFoundCountdown()
+  isMatchFoundModalOpen.value = false
+  matchFoundCountdownSeconds.value = 0
+  matchFoundCountdownDeadline = 0
+}
+
 function setStreamError() {
   streamStatus.value = 'error'
   streamErrorMessage.value = MATCH_STREAM_ERROR_MESSAGE
@@ -389,6 +475,12 @@ function handleStreamError() {
   shouldJoinAfterStreamConnected = false
   setStreamError()
   closeMatchStream()
+
+  if (hasActiveMatchFoundResponse.value) {
+    resetMatchFoundModalState()
+    showErrorModal(t('match.streamFailed'))
+    return
+  }
 
   if (
     (queueStatus.value === 'joining' || queueStatus.value === 'queued') &&
@@ -456,6 +548,7 @@ function resetStreamPayloads() {
   lastHeartbeatAt.value = ''
   matchFound.value = undefined
   matchResponseResult.value = undefined
+  resetMatchFoundModalState()
 }
 
 function abortJoinRequest() {
