@@ -44,6 +44,7 @@ describe('MatchPage', () => {
 
     expect(connectMatchEventSourceMock).toHaveBeenCalledTimes(1)
     expect(wrapper.get('main').attributes('data-stream-status')).toBe('connecting')
+    expect(wrapper.get('button').attributes('disabled')).toBeDefined()
   })
 
   it('stores stream event payloads as page local state', async () => {
@@ -78,10 +79,12 @@ describe('MatchPage', () => {
     const main = wrapper.get('main')
 
     expect(main.attributes('data-stream-status')).toBe('connected')
+    expect(main.attributes('data-can-start-match')).toBe('true')
     expect(main.attributes('data-connected-user-id')).toBe('1')
     expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
     expect(main.attributes('data-match-found-id')).toBe('match-1')
     expect(main.attributes('data-match-result-action')).toBe('GO_TO_GAME_WAITING')
+    expect(wrapper.get('button').attributes('disabled')).toBeUndefined()
   })
 
   it('stores a local error state when the stream reports an error', async () => {

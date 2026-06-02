@@ -1,4 +1,5 @@
 <template>
+  <!-- eslint-disable vue/max-attributes-per-line, vue/singleline-html-element-content-newline -->
   <main
     :data-stream-status="streamStatus"
     :data-connected-user-id="connectedEvent?.userId ?? ''"
@@ -6,13 +7,15 @@
     :data-match-found-id="matchFound?.matchId ?? ''"
     :data-match-result-action="matchResponseResult?.action ?? ''"
     :data-stream-error-message="streamErrorMessage"
+    :data-can-start-match="canStartMatch"
   >
     Match
+    <button type="button" :disabled="!canStartMatch">Start Matching</button>
   </main>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
 
@@ -22,6 +25,7 @@ const lastHeartbeatAt = ref('')
 const matchFound = shallowRef()
 const matchResponseResult = shallowRef()
 const streamErrorMessage = ref('')
+const canStartMatch = computed(() => streamStatus.value === 'connected')
 
 const MATCH_STREAM_ERROR_MESSAGE = 'Match event stream is currently unavailable.'
 

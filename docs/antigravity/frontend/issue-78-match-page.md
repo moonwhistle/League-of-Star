@@ -116,12 +116,12 @@ flowchart TD
 
 ### 1. 백엔드 매칭 계약 반영
 
-- [ ] `POST /api/v1/match/join` 계약 확인 구현.
-- [ ] `DELETE /api/v1/match/leave` 계약 확인 구현.
-- [ ] join/leave request body가 없다는 기준 반영 구현.
-- [ ] join/leave가 Authorization Bearer header 기반 API라는 기준 반영 구현.
-- [ ] 백엔드가 rank/tierScore를 내부 조회하므로 프론트 request에 rank 값을 넣지 않도록 구현.
-- [ ] SSE `connected` 전 매칭 시작 비활성화 정책 반영 구현.
+- [x] `POST /api/v1/match/join` 계약 확인 구현.
+- [x] `DELETE /api/v1/match/leave` 계약 확인 구현.
+- [x] join/leave request body가 없다는 기준 반영 구현.
+- [x] join/leave가 Authorization Bearer header 기반 API라는 기준 반영 구현.
+- [x] 백엔드가 rank/tierScore를 내부 조회하므로 프론트 request에 rank 값을 넣지 않도록 구현.
+- [x] SSE `connected` 전 매칭 시작 비활성화 정책 반영 구현.
 
 ### 2. Match page 상태 모델 구현
 
