@@ -107,7 +107,7 @@ describe('MatchPage', () => {
     expect(wrapper.find('[aria-label="Logout"]').exists()).toBe(true)
   })
 
-  it('keeps the stream connecting state until the connected event arrives', async () => {
+  it('starts the waiting timer immediately while the stream is connecting', async () => {
     const wrapper = mount(MatchPage)
 
     await getStartButton(wrapper).trigger('click')
@@ -119,7 +119,29 @@ describe('MatchPage', () => {
     expect(connectMatchEventSourceMock).toHaveBeenCalledTimes(1)
     expect(joinMatchQueueMock).not.toHaveBeenCalled()
     expect(wrapper.get('main').attributes('data-stream-status')).toBe('connecting')
-    expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
+    expect(getStartButton(wrapper).text()).toBe('1')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
+  })
+
+  it('cancels locally without leave when the queue join has not started yet', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-stream-status')).toBe('connecting')
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
+
+    await getStartButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(joinMatchQueueMock).not.toHaveBeenCalled()
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('main').attributes('data-stream-status')).toBe('idle')
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('ready')
+    expect(getStartButton(wrapper).text()).toContain('매칭 시작')
   })
 
   it('connects the stream before joining the queue and cancels with leave', async () => {
@@ -214,11 +236,108 @@ describe('MatchPage', () => {
 
     const main = wrapper.get('main')
 
-    expect(main.attributes('data-stream-status')).toBe('error')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(main.attributes('data-queue-status')).toBe('ready')
     expect(main.attributes('data-stream-error-message')).toBe(
       'Match event stream is currently unavailable.',
     )
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
+    )
     expect(joinMatchQueueMock).not.toHaveBeenCalled()
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+  })
+
+  it('leaves the queue when the stream fails after join may have reached the backend', async () => {
+    let resolveJoin: () => void = () => {}
+    joinMatchQueueMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveJoin = resolve
+      }),
+    )
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
+
+    getCurrentHandlers().onError?.(new Error('stream failed'))
+    await flushPromises()
+
+    expect(leaveMatchQueueMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('ready')
+    expect(wrapper.get('main').attributes('data-stream-status')).toBe('idle')
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
+    )
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+
+    resolveJoin()
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('ready')
+  })
+
+  it('leaves the queue and returns to ready when the stream fails while queued', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
+    expect(getStartButton(wrapper).text()).toBe('1')
+
+    getCurrentHandlers().onError?.(new Error('stream failed'))
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(2000)
+    await wrapper.vm.$nextTick()
+
+    expect(leaveMatchQueueMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('ready')
+    expect(wrapper.get('main').attributes('data-stream-status')).toBe('idle')
+    expect(getStartButton(wrapper).text()).toContain('매칭 시작')
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
+    )
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores cleanup errors when stream failure leave cleanup fails', async () => {
+    leaveMatchQueueMock.mockRejectedValueOnce(new Error('cleanup failed'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
+
+    getCurrentHandlers().onError?.(new Error('stream failed'))
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(leaveMatchQueueMock).toHaveBeenCalledTimes(1)
+    expect(main.attributes('data-queue-status')).toBe('ready')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(main.attributes('data-queue-error-message')).toBe('cleanup failed')
+    expect(main.attributes('data-stream-error-message')).toBe(
+      'Match event stream is currently unavailable.',
+    )
+    expect(wrapper.get('[role="dialog"]').text()).toContain('cleanup failed')
   })
 
   it('stores a local error state when stream connection throws on start', async () => {
@@ -232,9 +351,13 @@ describe('MatchPage', () => {
 
     const main = wrapper.get('main')
 
-    expect(main.attributes('data-stream-status')).toBe('error')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(main.attributes('data-queue-status')).toBe('ready')
     expect(main.attributes('data-stream-error-message')).toBe(
       'Match event stream is currently unavailable.',
+    )
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
     )
     expect(joinMatchQueueMock).not.toHaveBeenCalled()
   })
@@ -257,6 +380,7 @@ describe('MatchPage', () => {
     expect(main.attributes('data-queue-status')).toBe('ready')
     expect(main.attributes('data-stream-status')).toBe('idle')
     expect(main.attributes('data-queue-error-message')).toBe('join failed')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('join failed')
   })
 
   it('keeps queued state when leave fails', async () => {

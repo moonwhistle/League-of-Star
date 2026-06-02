@@ -127,6 +127,25 @@
         </div>
       </section>
     </section>
+
+    <div
+      v-if="errorModalMessage !== ''"
+      class="match-error-backdrop"
+      role="presentation"
+      @click="closeErrorModal"
+    >
+      <section
+        class="match-error-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="match-error-title"
+        @click.stop
+      >
+        <h2 id="match-error-title">{{ t('match.errorTitle') }}</h2>
+        <p>{{ errorModalMessage }}</p>
+        <button type="button" @click="closeErrorModal">{{ t('match.errorConfirm') }}</button>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -149,6 +168,7 @@ const streamErrorMessage = ref('')
 const queueStatus = ref('ready')
 const queueErrorMessage = ref('')
 const matchWaitingSeconds = ref(0)
+const errorModalMessage = ref('')
 const canStartMatch = computed(
   () => queueStatus.value === 'ready' && streamStatus.value !== 'connecting',
 )
@@ -187,6 +207,7 @@ let closeMatchEventSource = () => {}
 let isActive = false
 let matchWaitingTimerId = 0
 let shouldJoinAfterStreamConnected = false
+let hasQueueJoinRequestStarted = false
 let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
 
@@ -216,16 +237,19 @@ function handlePrimaryMatchAction() {
 }
 
 function startMatchmaking() {
-  if (streamStatus.value === 'connecting') {
+  if (queueStatus.value !== 'ready') {
     return
   }
 
   queueErrorMessage.value = ''
   streamErrorMessage.value = ''
+  errorModalMessage.value = ''
   shouldJoinAfterStreamConnected = true
+  hasQueueJoinRequestStarted = false
   streamStatus.value = 'connecting'
   resetStreamPayloads()
   closeMatchStream()
+  startMatchWaiting()
 
   try {
     const connection = connectMatchEventSource({
@@ -242,7 +266,7 @@ function startMatchmaking() {
         connectedEvent.value = payload
         streamStatus.value = 'connected'
 
-        if (shouldJoinAfterStreamConnected && queueStatus.value === 'ready') {
+        if (shouldJoinAfterStreamConnected && queueStatus.value === 'queued') {
           shouldJoinAfterStreamConnected = false
           void joinQueueAfterStreamConnected()
         }
@@ -275,11 +299,11 @@ function startMatchmaking() {
 }
 
 async function joinQueueAfterStreamConnected() {
-  queueStatus.value = 'joining'
   queueErrorMessage.value = ''
   abortJoinRequest()
   joinAbortController = new AbortController()
   const activeJoinAbortController = joinAbortController
+  hasQueueJoinRequestStarted = true
 
   try {
     await joinMatchQueue(activeJoinAbortController.signal)
@@ -288,20 +312,18 @@ async function joinQueueAfterStreamConnected() {
       return
     }
 
-    startMatchWaiting()
+    queueErrorMessage.value = ''
   } catch (error) {
     if (!isActive || (error instanceof Error && error.name === 'AbortError')) {
       return
     }
 
-    queueStatus.value = 'ready'
     queueErrorMessage.value =
       error instanceof Error && error.message.trim() !== ''
         ? error.message
         : MATCH_QUEUE_ERROR_MESSAGE
     closeMatchStream()
-    streamStatus.value = 'idle'
-    resetStreamPayloads()
+    failMatchmaking(queueErrorMessage.value, queueErrorMessage.value)
   }
 }
 
@@ -316,8 +338,14 @@ function startMatchWaiting() {
 }
 
 async function cancelMatchmaking() {
+  if (!hasQueueJoinRequestStarted) {
+    resetMatchmakingState()
+    return
+  }
+
   queueStatus.value = 'leaving'
   queueErrorMessage.value = ''
+  abortJoinRequest()
   abortLeaveRequest()
   leaveAbortController = new AbortController()
   const activeLeaveAbortController = leaveAbortController
@@ -360,12 +388,49 @@ function setStreamError() {
 function handleStreamError() {
   shouldJoinAfterStreamConnected = false
   setStreamError()
+  closeMatchStream()
 
-  if (queueStatus.value === 'ready' || queueStatus.value === 'joining') {
-    queueStatus.value = 'ready'
+  if (
+    (queueStatus.value === 'joining' || queueStatus.value === 'queued') &&
+    hasQueueJoinRequestStarted
+  ) {
+    void leaveQueueAfterStreamError()
+    return
   }
 
-  closeMatchStream()
+  failMatchmaking(t('match.streamFailed'), '', MATCH_STREAM_ERROR_MESSAGE)
+}
+
+async function leaveQueueAfterStreamError() {
+  queueStatus.value = 'leaving'
+  queueErrorMessage.value = ''
+  abortJoinRequest()
+  abortLeaveRequest()
+  stopMatchWaitingTimer()
+  leaveAbortController = new AbortController()
+  const activeLeaveAbortController = leaveAbortController
+
+  try {
+    await leaveMatchQueue(activeLeaveAbortController.signal)
+
+    if (!isActive || activeLeaveAbortController.signal.aborted) {
+      return
+    }
+
+    resetMatchmakingState()
+    showErrorModal(t('match.streamFailed'))
+  } catch (error) {
+    if (!isActive || (error instanceof Error && error.name === 'AbortError')) {
+      return
+    }
+
+    queueErrorMessage.value =
+      error instanceof Error && error.message.trim() !== ''
+        ? error.message
+        : MATCH_QUEUE_ERROR_MESSAGE
+    streamErrorMessage.value = MATCH_STREAM_ERROR_MESSAGE
+    failMatchmaking(queueErrorMessage.value, queueErrorMessage.value, MATCH_STREAM_ERROR_MESSAGE)
+  }
 }
 
 function closeMatchStream() {
@@ -382,6 +447,7 @@ function resetMatchmakingState() {
   streamStatus.value = 'idle'
   streamErrorMessage.value = ''
   shouldJoinAfterStreamConnected = false
+  hasQueueJoinRequestStarted = false
   resetStreamPayloads()
 }
 
@@ -398,6 +464,21 @@ function abortJoinRequest() {
 
 function abortLeaveRequest() {
   leaveAbortController.abort()
+}
+
+function failMatchmaking(message = '', nextQueueErrorMessage = '', nextStreamErrorMessage = '') {
+  resetMatchmakingState()
+  queueErrorMessage.value = nextQueueErrorMessage
+  streamErrorMessage.value = nextStreamErrorMessage
+  showErrorModal(message)
+}
+
+function showErrorModal(message = '') {
+  errorModalMessage.value = message
+}
+
+function closeErrorModal() {
+  errorModalMessage.value = ''
 }
 </script>
 
@@ -781,6 +862,48 @@ function abortLeaveRequest() {
   white-space: normal;
   background: rgba(24, 31, 52, 0.86);
   border: 1px solid rgba(206, 224, 255, 0.12);
+  border-radius: 4px;
+}
+
+.match-error-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 5, 14, 0.68);
+}
+
+.match-error-dialog {
+  width: min(360px, 100%);
+  padding: 22px;
+  color: var(--match-text);
+  background: rgba(7, 13, 31, 0.96);
+  border: 1px solid rgba(99, 242, 232, 0.28);
+  border-radius: 6px;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.42);
+}
+
+.match-error-dialog h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.match-error-dialog p {
+  margin: 0 0 18px;
+  color: var(--match-muted);
+  line-height: 1.5;
+}
+
+.match-error-dialog button {
+  width: 100%;
+  min-height: 44px;
+  color: #06101c;
+  font-weight: 900;
+  background: var(--match-accent);
+  border: 0;
   border-radius: 4px;
 }
 

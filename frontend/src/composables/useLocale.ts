@@ -30,6 +30,9 @@ const messages = {
     'match.leaving': '취소 중',
     'match.practice': '연습 모드',
     'match.custom': '사용자 지정',
+    'match.errorTitle': '매칭 오류',
+    'match.errorConfirm': '확인',
+    'match.streamFailed': '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
   },
   en: {
     'login.email': 'Email',
@@ -58,6 +61,9 @@ const messages = {
     'match.leaving': 'Canceling',
     'match.practice': 'Practice Mode',
     'match.custom': 'Custom Game',
+    'match.errorTitle': 'Match Error',
+    'match.errorConfirm': 'OK',
+    'match.streamFailed': 'Failed to connect matching. Please try again.',
   },
 } as const
 
