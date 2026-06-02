@@ -8,6 +8,8 @@
     :data-match-result-action="matchResponseResult?.action ?? ''"
     :data-stream-error-message="streamErrorMessage"
     :data-can-start-match="canStartMatch"
+    :data-queue-status="queueStatus"
+    :data-queue-error-message="queueErrorMessage"
   >
     Match
     <button type="button" :disabled="!canStartMatch">Start Matching</button>
@@ -19,13 +21,17 @@ import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
 
-const streamStatus = ref('idle')
-const connectedEvent = shallowRef()
+const streamStatus = ref('connecting')
 const lastHeartbeatAt = ref('')
+const connectedEvent = shallowRef()
 const matchFound = shallowRef()
 const matchResponseResult = shallowRef()
 const streamErrorMessage = ref('')
-const canStartMatch = computed(() => streamStatus.value === 'connected')
+const queueStatus = ref('ready')
+const queueErrorMessage = ref('')
+const canStartMatch = computed(
+  () => streamStatus.value === 'connected' && queueStatus.value === 'ready',
+)
 
 const MATCH_STREAM_ERROR_MESSAGE = 'Match event stream is currently unavailable.'
 
@@ -42,7 +48,6 @@ onMounted(() => {
     const connection = connectMatchEventSource({
       onOpen: () => {
         if (isActive) {
-          streamStatus.value = 'open'
           streamErrorMessage.value = ''
         }
       },

@@ -125,12 +125,12 @@ flowchart TD
 
 ### 2. Match page 상태 모델 구현
 
-- [ ] `streamStatus`와 `queueStatus`를 분리 구현.
-- [ ] `streamStatus`는 `connecting`, `connected`, `error` 기준으로 처리 구현.
-- [ ] `queueStatus`는 `ready`, `joining`, `queued`, `leaving` 기준으로 처리 구현.
-- [ ] join/leave error message 상태 구현.
-- [ ] 기존 `match_found`, `match_response_result` payload 보관 상태 유지 구현.
-- [ ] page unmount 이후 late callback 무시 정책 유지 구현.
+- [x] `streamStatus`와 `queueStatus`를 분리 구현.
+- [x] `streamStatus`는 `connecting`, `connected`, `error` 기준으로 처리 구현.
+- [x] `queueStatus`는 `ready`, `joining`, `queued`, `leaving` 기준으로 처리 구현.
+- [x] join/leave error message 상태 구현.
+- [x] 기존 `match_found`, `match_response_result` payload 보관 상태 유지 구현.
+- [x] page unmount 이후 late callback 무시 정책 유지 구현.
 
 ### 3. Match page UI 구현
 

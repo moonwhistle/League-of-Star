@@ -44,6 +44,19 @@ describe('MatchPage', () => {
 
     expect(connectMatchEventSourceMock).toHaveBeenCalledTimes(1)
     expect(wrapper.get('main').attributes('data-stream-status')).toBe('connecting')
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('ready')
+    expect(wrapper.get('main').attributes('data-queue-error-message')).toBe('')
+    expect(wrapper.get('button').attributes('disabled')).toBeDefined()
+  })
+
+  it('keeps the stream connecting state until the connected event arrives', async () => {
+    const wrapper = mount(MatchPage)
+    const handlers = getCurrentHandlers()
+
+    handlers.onOpen?.(new Response())
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-stream-status')).toBe('connecting')
     expect(wrapper.get('button').attributes('disabled')).toBeDefined()
   })
 
@@ -80,6 +93,7 @@ describe('MatchPage', () => {
 
     expect(main.attributes('data-stream-status')).toBe('connected')
     expect(main.attributes('data-can-start-match')).toBe('true')
+    expect(main.attributes('data-queue-status')).toBe('ready')
     expect(main.attributes('data-connected-user-id')).toBe('1')
     expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
     expect(main.attributes('data-match-found-id')).toBe('match-1')
