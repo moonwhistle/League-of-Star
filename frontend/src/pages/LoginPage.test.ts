@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
 import { login } from '@/services/authService'
@@ -26,19 +27,33 @@ vi.mock('@/services/authToken', () => ({
 
 const loginMock = vi.mocked(login)
 const setAuthTokensMock = vi.mocked(setAuthTokens)
+const { setLocale } = useLocale()
 
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('ko')
   })
 
   it('renders the login page', () => {
     const wrapper = mount(LoginPage)
 
     expect(wrapper.get('h1').text()).toBe('LEAGUE OF SMITE')
+    expect(wrapper.get('.login-heading p').text()).toBe('PROVE YOUR SMITE TIMING')
     expect(wrapper.find('#login-email').exists()).toBe(true)
     expect(wrapper.find('#login-password').exists()).toBe(true)
+    expect(wrapper.get('.login-button').text()).toBe('로그인')
+  })
+
+  it('toggles login copy between Korean and English', async () => {
+    const wrapper = mount(LoginPage)
+
+    expect(wrapper.get('.login-button').text()).toBe('로그인')
+
+    await wrapper.get('.locale-toggle').trigger('click')
+
     expect(wrapper.get('.login-button').text()).toBe('Login')
+    expect(wrapper.get('.login-links').text()).toContain('Forgot Password?')
   })
 
   it('submits email and password through the login service', async () => {
@@ -117,7 +132,7 @@ describe('LoginPage', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.get<HTMLButtonElement>('.login-button').element.disabled).toBe(true)
-    expect(wrapper.get('.login-button').text()).toBe('Logging in')
+    expect(wrapper.get('.login-button').text()).toBe('로그인 중')
 
     resolveLogin!()
     await flushPromises()

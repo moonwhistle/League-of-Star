@@ -18,23 +18,25 @@
 flowchart TD
     A[로그인 페이지 구현] --> B[Token 저장]
     B --> C[매칭 페이지 진입]
-    C --> D[매칭 스트림 연결]
-    D --> E[Match queue join]
-    E --> F[match_found 이벤트 수신]
-    F --> G[수락/거절 커맨드]
-    G --> H[match_response_result 이벤트 수신]
-    H -->|GO_TO_GAME_WAITING| I[게임 대기방 이동]
-    H -->|GO_TO_MATCH_START| C
-    H -->|RETURN_TO_MATCHING| E
-    I --> J[게임 WebSocket 연결]
-    J --> K[CLIENT_READY]
-    K --> L[RTT_PING / RTT_PONG]
-    L --> M[COUNTDOWN]
-    M --> N[GAME_START]
-    N --> O[게임 플레이 화면]
-    O --> P[SMITE]
-    P --> Q[GAME_RESULT]
-    Q --> R[게임 결과 Summary 조회]
+    C --> D[매칭 시작 클릭]
+    D --> E[매칭 스트림 연결]
+    E --> F[connected 수신]
+    F --> G[Match queue join]
+    G --> H[match_found 이벤트 수신]
+    H --> I[수락/거절 커맨드]
+    I --> J[match_response_result 이벤트 수신]
+    J -->|GO_TO_GAME_WAITING| K[게임 대기방 이동]
+    J -->|GO_TO_MATCH_START| C
+    J -->|RETURN_TO_MATCHING| G
+    K --> L[게임 WebSocket 연결]
+    L --> M[CLIENT_READY]
+    M --> N[RTT_PING / RTT_PONG]
+    N --> O[COUNTDOWN]
+    O --> P[GAME_START]
+    P --> Q[게임 플레이 화면]
+    Q --> R[SMITE]
+    R --> S[GAME_RESULT]
+    S --> T[게임 결과 Summary 조회]
 ```
 
 ## Backend Contract
@@ -42,7 +44,7 @@ flowchart TD
 | Flow | Backend Contract | Frontend 기준 |
 |------|------------------|---------------|
 | Login | `POST /api/v1/auth/login` | token 저장 후 `/match` 이동 |
-| Match stream | `GET /api/v1/notifications/match/stream` | 매칭 화면 진입 시 연결 |
+| Match stream | `GET /api/v1/notifications/match/stream` | 매칭 시작 클릭 후, join 호출 전에 연결 |
 | Match join | `POST /api/v1/match/join` | 매칭 대기 상태 진입 |
 | Match leave | `DELETE /api/v1/match/leave` | 매칭 시작 가능 상태 복귀 |
 | Match found | SSE `match_found` | 수락/거절 모달 표시 |
@@ -81,7 +83,8 @@ flowchart TD
 
 ### 3. [x] SSE 인증 계약 확정 및 매칭 스트림 연결 구현
 
-- 매칭 화면 진입 시 `GET /api/v1/notifications/match/stream` 연결 구현.
+- `GET /api/v1/notifications/match/stream` 연결 client 구현.
+- issue-78부터 화면 진입 즉시 연결하지 않고, 매칭 시작 클릭 후 `connected` 수신까지 확인한 뒤 join을 호출하는 lifecycle로 사용.
 - event `connected`, `heartbeat`, `match_found`, `match_response_result` 처리 구현.
 - `connected`는 연결 확인 상태로 처리.
 - `heartbeat`는 연결 유지 신호로 처리.
@@ -95,10 +98,12 @@ flowchart TD
 ### 4. [ ] 매칭 페이지 구현
 
 - `/match` 페이지에서 매칭 시작/취소 UI 구현.
+- 매칭 시작 클릭 시 먼저 `GET /api/v1/notifications/match/stream` 연결 구현.
+- SSE `connected` 수신 후 `POST /api/v1/match/join` 호출 구현.
 - `POST /api/v1/match/join` 호출 구현.
 - `DELETE /api/v1/match/leave` 호출 구현.
 - join 성공 후 “매칭 대기 중” 상태 표시 구현.
-- leave 성공 후 “매칭 시작 가능” 상태 복귀 구현.
+- leave 성공 후 “매칭 시작 가능” 상태 복귀 및 매칭 SSE close 구현.
 - 400/409 에러는 메시지 표시 후 현재 화면 유지 구현.
 - 매칭 상태는 우선 페이지 로컬 상태로 처리.
 

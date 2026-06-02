@@ -4,7 +4,6 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/constants/routes'
 import GamePlayPage from '@/pages/GamePlayPage.vue'
 import GameResultPage from '@/pages/GameResultPage.vue'
 import GameWaitingPage from '@/pages/GameWaitingPage.vue'
-import HomePage from '@/pages/HomePage.vue'
 import LoginPage from '@/pages/LoginPage.vue'
 import MatchPage from '@/pages/MatchPage.vue'
 
@@ -16,7 +15,9 @@ export const router = createRouter({
     {
       path: ROUTE_PATHS.home,
       name: ROUTE_NAMES.home,
-      component: HomePage,
+      redirect: {
+        name: ROUTE_NAMES.match,
+      },
     },
     {
       path: ROUTE_PATHS.login,
@@ -30,9 +31,8 @@ export const router = createRouter({
       path: ROUTE_PATHS.match,
       name: ROUTE_NAMES.match,
       component: MatchPage,
-      meta: {
-        requiresAuth: true,
-      },
+      // TODO(issue-78): Temporary preview access while the match page UI is being implemented.
+      // Restore requiresAuth before merging the completed authenticated match flow.
     },
     {
       path: ROUTE_PATHS.gameWaiting,
