@@ -95,7 +95,7 @@ flowchart TD
 - cookie auth 전환은 백엔드 인증 전략 변경 범위이므로 이번 단계에서 제외.
 - token 만료에 따른 refresh/retry는 후속 token refresh 이슈에서 구현.
 
-### 4. [ ] 매칭 페이지 구현
+### 4. [x] 매칭 페이지 구현
 
 - `/match` 페이지에서 매칭 시작/취소 UI 구현.
 - 매칭 시작 클릭 시 먼저 `GET /api/v1/notifications/match/stream` 연결 구현.
