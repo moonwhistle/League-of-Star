@@ -166,24 +166,24 @@ interface MatchFoundNotification {
 
 ### 6. 문서 정합성 구현
 
-- [ ] `front-plan.md`의 5번 단계와 issue-80 범위 정합성 확인 구현.
-- [ ] issue-78 구현 완료에 따라 `front-plan.md`의 4번 매칭 페이지 구현 완료 표시 확인 및 반영 구현.
-- [ ] issue-76의 SSE event dispatch 정책과 issue-80의 modal 표시 범위 연결 확인 구현.
-- [ ] issue-78의 on-demand stream lifecycle과 issue-80의 `match_found` 처리 시점 정합성 확인 구현.
-- [ ] backend issue-34의 `match_response_result` 최종 전환 정책과 countdown 0초 처리 정합성 확인 구현.
-- [ ] `matchfound.jpeg`는 레퍼런스 전용이고 `logo.png`만 실제 asset으로 사용한다는 문서 기준 확인 구현.
-- [ ] accept/reject command와 result routing을 후속 이슈로 제외한다는 정책 확인 구현.
-- [ ] 이번 이슈 PR 메시지 섹션 작성.
+- [x] `front-plan.md`의 5번 단계와 issue-80 범위 정합성 확인 구현.
+- [x] issue-78 구현 완료에 따라 `front-plan.md`의 4번 매칭 페이지 구현 완료 표시 확인 및 반영 구현.
+- [x] issue-76의 SSE event dispatch 정책과 issue-80의 modal 표시 범위 연결 확인 구현.
+- [x] issue-78의 on-demand stream lifecycle과 issue-80의 `match_found` 처리 시점 정합성 확인 구현.
+- [x] backend issue-34의 `match_response_result` 최종 전환 정책과 countdown 0초 처리 정합성 확인 구현.
+- [x] `matchfound.jpeg`는 레퍼런스 전용이고 `logo.png`만 실제 asset으로 사용한다는 문서 기준 확인 구현.
+- [x] accept/reject command와 result routing을 후속 이슈로 제외한다는 정책 확인 구현.
+- [x] 이번 이슈 PR 메시지 섹션 작성.
 
 ### 7. 검증
 
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] desktop viewport에서 modal panel, logo, button 겹침 여부 확인.
-- [ ] mobile viewport에서 modal panel과 button이 화면 밖으로 밀리지 않는지 확인.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] desktop viewport에서 modal panel, logo, button 겹침 여부 확인.
+- [x] mobile viewport에서 modal panel과 button이 화면 밖으로 밀리지 않는지 확인.
 
 ## Implementation Policy
 
