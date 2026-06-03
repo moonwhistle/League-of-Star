@@ -60,6 +60,8 @@ interface MatchFoundNotification {
 - countdown은 사용자 응답 가능 시간을 보여주는 UI 상태이며 timeout 확정 기준이 아님.
 - timeout 자체 판정은 프론트가 확정하지 않고 서버의 `match_response_result`를 최종 기준으로 사용.
 - countdown 0초에 `leaveMatchQueue`, ready reset, route 이동, SSE close를 호출하지 않음.
+- `acceptTimeoutSeconds`가 유효하지 않은 값이면 countdown은 0초로 방어 처리하고 서버 최종 이벤트를 기다림.
+- `match_found` 이후 SSE가 끊기면 큐 단계가 아니라 match session 응답 단계로 보고 `leaveMatchQueue`를 호출하지 않음.
 - `GO_TO_MATCH_START`, `RETURN_TO_MATCHING`, `GO_TO_GAME_WAITING` 처리는 후속 `match_response_result` 이슈에서 구현.
 
 ## Asset 기준
@@ -86,10 +88,12 @@ interface MatchFoundNotification {
 - `eventCreatedAt` 파싱 실패 시 `acceptTimeoutSeconds` fallback countdown 구현.
 - `match_found` 수신 시 기존 매칭 대기 숫자 timer 중지 구현.
 - countdown 0초 이후 `로딩중...` / `loading...` 표시 구현.
+- `acceptTimeoutSeconds` 비정상 값 수신 시 countdown 0초 fallback 구현.
 - 수락/거절 버튼 UI 표시 구현.
 - 수락/거절 버튼 disabled 처리 구현.
 - 모달 표시 중 배경 매칭 CTA 조작 차단 구현.
 - stream error, cancel, reset, unmount 시 match found modal countdown 정리 구현.
+- `match_found` 이후 stream error 시 `leaveMatchQueue` 없이 에러 확인 후 ready 복귀 구현.
 - 한/영 locale 문구 추가 구현.
 - Match page 테스트 보강.
 - lint / format / typecheck / test / build 검증.
@@ -157,11 +161,13 @@ interface MatchFoundNotification {
 - [x] logo, title, countdown, accept/decline button 표시 검증.
 - [x] `eventCreatedAt + acceptTimeoutSeconds` 기준 countdown 감소 검증.
 - [x] `eventCreatedAt` 파싱 실패 시 fallback countdown 검증.
+- [x] `acceptTimeoutSeconds` 비정상 값 수신 시 loading fallback 검증.
 - [x] countdown 0초 도달 시 모달 유지 및 `로딩중...` 표시 검증.
 - [x] countdown 0초 도달 시 `leaveMatchQueue`, accept/reject API, route 이동, ready reset 미발생 검증.
 - [x] `match_found` 수신 시 기존 매칭 대기 timer 중지 검증.
 - [x] 모달 표시 중 배경 CTA click이 start/cancel을 트리거하지 않는지 검증.
 - [x] stream error, cancel, reset, unmount 시 modal countdown timer 정리 검증.
+- [x] `match_found` 이후 stream error 시 `leaveMatchQueue` 미호출 및 에러 확인 후 ready 복귀 검증.
 - [x] locale toggle 시 모달 문구 전환 검증.
 
 ### 6. 문서 정합성 구현
@@ -197,11 +203,15 @@ interface MatchFoundNotification {
 - 모달이 떠 있는 동안 배경의 매칭 시작/취소 CTA는 조작할 수 없다.
 - 수락/거절 버튼은 이번 이슈에서 API 호출 없는 disabled UI로 둔다.
 - countdown은 `eventCreatedAt + acceptTimeoutSeconds` 기준으로 계산한다.
-- `eventCreatedAt` 파싱 실패 시 `acceptTimeoutSeconds`를 fallback으로 사용한다.
+- `eventCreatedAt` 파싱 실패 시 `acceptTimeoutSeconds`를 표시용 fallback으로 사용한다.
+- `acceptTimeoutSeconds`가 유효하지 않은 값이면 countdown을 0초로 처리하고 `로딩중...` / `loading...` 상태로 서버 최종 이벤트를 기다린다.
 - countdown 0초 이후에도 모달을 유지하고 `로딩중...` / `loading...`을 표시한다.
 - countdown 0초에 ready 복귀, leave 호출, route 이동, SSE close를 수행하지 않는다.
+- countdown은 timeout을 확정하는 로직이 아니라 사용자에게 남은 응답 시간을 보여주는 표시용 상태다.
+- 장시간 `match_response_result`가 오지 않는 상황의 watchdog, session recovery, 재조회 API는 후속 이슈에서 다룬다.
 - `match_found` 이전 stream error는 기존 queued cleanup 정책을 유지한다.
-- `match_found` 이후 stream error는 match session 응답 단계로 보고, modal/timer 정리와 stream error 표시까지만 수행한다.
+- `match_found` 이후 stream error는 match session 응답 단계로 보고 `leaveMatchQueue`를 호출하지 않는다.
+- `match_found` 이후 stream error는 modal/timer를 정리하고 error modal을 표시한 뒤, 사용자가 확인하면 화면만 ready 상태로 복귀한다.
 - 최종 상태 전환은 후속 이슈에서 `match_response_result.action` 기준으로 구현한다.
 
 ## Acceptance Criteria
@@ -212,34 +222,85 @@ interface MatchFoundNotification {
 - 모달 중앙 원형 영역에 `logo.png`가 표시됨.
 - `matchfound.jpeg`는 구현 asset으로 import되지 않음.
 - countdown이 `eventCreatedAt + acceptTimeoutSeconds` 기준으로 감소함.
+- `acceptTimeoutSeconds`가 유효하지 않으면 countdown이 0초 loading 상태로 방어 처리됨.
 - countdown 0초 이후 모달이 유지되고 `로딩중...` / `loading...`이 표시됨.
 - countdown 0초 이후 ready 복귀, leave 호출, route 이동, SSE close가 발생하지 않음.
 - 수락/거절 버튼이 표시되지만 API 호출은 발생하지 않음.
 - 모달 표시 중 배경 CTA가 start/cancel을 트리거하지 않음.
 - stream error, cancel, reset, unmount 시 modal countdown이 정리됨.
+- `match_found` 이후 stream error 발생 시 `leaveMatchQueue`가 호출되지 않고 에러 확인 후 ready로 복귀함.
 - 한/영 전환 시 모달 문구가 전환됨.
 - lint / format / typecheck / test / build 통과.
 
 ## PR Message
 
-## Summary
+## 📌 Summary
 
-Issue 80은 `/match` 페이지의 `match_found` SSE 이벤트를 사용자에게 보여주는 매칭 성사 모달로 연결한다. 이번 이슈는 수락/거절 API와 최종 화면 전환을 구현하지 않고, 매칭 성사 인지와 응답 가능 시간 표시까지만 담당한다.
+`/match` 페이지에서 백엔드가 보내는 SSE `match_found` 이벤트를 매칭 성사 모달로 보여주는 흐름을 구현함.
 
-## Changes
+```mermaid
+flowchart TD
+    A["매칭 시작 클릭"] --> B["SSE stream 연결"]
+    B --> C["connected 수신"]
+    C --> D["POST /api/v1/match/join"]
+    D --> E["매칭 대기 숫자 timer 표시"]
+    E --> F["백엔드 매칭 엔진이 두 유저를 queue에서 원자 제거"]
+    F --> G["MatchSession + timeout pending 생성"]
+    G --> H["user status = FOUND"]
+    H --> I["SSE match_found 수신"]
+    I --> J["매칭 대기 timer 중지"]
+    J --> K["매칭 성사 모달 표시"]
+    K --> L["eventCreatedAt + acceptTimeoutSeconds 기준 countdown 표시"]
+    L --> M{"countdown > 0"}
+    M -->|Yes| N["수락/거절 버튼은 disabled UI로 표시"]
+    M -->|No| O["로딩중... / loading... 표시"]
+    N --> P["SSE match_response_result 대기"]
+    O --> P
+    P --> Q["최종 화면 전환은 후속 이슈에서 처리"]
+```
 
-- `match_found` 수신 시 payload 저장, 매칭 대기 timer 중지, 매칭 성사 모달 표시 흐름을 구현함.
-- `matchfound.jpeg`를 실제 asset으로 쓰지 않고 CSS로 레퍼런스 디자인을 재현함.
-- `logo.png`를 모달 중앙 원형 영역에 배치함.
-- countdown 0초 이후에도 ready로 복귀하지 않고 `로딩중...` 상태로 `match_response_result`를 기다리는 정책을 반영함.
-- 수락/거절 버튼은 후속 command 이슈 전까지 disabled UI로만 제공함.
+핵심 정책은 다음과 같음.
 
-## Note
+- 프론트는 `match_found`를 받으면 “큐 대기 중”이 아니라 “매칭 세션 응답 대기 중”으로 판단함.
+- `match_found` 이후에는 백엔드가 이미 Redis queue에서 두 유저를 제거하고 `FOUND` 세션과 timeout 정산 경로를 만든 상태임.
+- 그래서 `match_found` 이후 SSE가 끊겨도 프론트가 `leaveMatchQueue`를 호출하지 않음.
+- countdown은 사용자가 보기 위한 남은 응답 시간 표시일 뿐, timeout 확정 기준이 아님.
+- 최종 성공, 실패, 복귀, 게임 대기 이동은 백엔드의 `match_response_result.action`을 기준으로 후속 이슈에서 처리함.
 
-- accept/reject command는 후속 이슈에서 진행.
-- `match_response_result.action` 기반 화면 전환은 후속 이슈에서 진행.
-- 전역 match store는 도입하지 않음.
+백엔드와의 소통 방식은 다음과 같음.
 
-## Related Issue
+- 프론트는 매칭 시작 시 SSE를 먼저 연결함.
+- SSE `connected`를 받은 뒤 `POST /api/v1/match/join`을 호출함.
+- 백엔드가 매칭을 성사시키면 SSE `match_found`를 보냄.
+- 프론트는 같은 SSE 연결을 유지한 채 `match_response_result`를 기다림.
+- 이번 이슈에서는 accept/reject command를 보내지 않고, 모달과 countdown 표시까지만 담당함.
+
+## 📚 Changes
+
+- `match_found` 이후 상태를 큐 상태가 아니라 match session 응답 상태로 해석하도록 정리함.
+  이 결정 때문에 `match_found` 이후 stream error에서 `leaveMatchQueue`를 호출하지 않음. 이미 백엔드가 Lua `atomic_pair_remove`로 큐에서 제거한 유저를 프론트가 다시 큐 leave로 정리하려 하면 책임 경계가 섞이기 때문임.
+
+- countdown 0초를 프론트 timeout 확정으로 사용하지 않도록 정리함.
+  사용자는 0초를 보면 응답 시간이 끝났다고 이해할 수 있지만, 실제 최종 판정은 서버 timeout scheduler와 `match_response_result`가 담당함. 그래서 0초에는 ready 복귀, route 이동, SSE close를 하지 않고 `로딩중...` 상태로 서버 결과를 기다리게 함.
+
+- `eventCreatedAt` 파싱 실패와 `acceptTimeoutSeconds` 비정상 값에 대한 방어 기준을 정리함.
+  `eventCreatedAt`이 깨지면 payload의 `acceptTimeoutSeconds`를 표시용 fallback으로 사용함. `acceptTimeoutSeconds` 자체가 유효하지 않으면 countdown을 0초로 두고 서버 최종 이벤트를 기다림. 프론트 표시가 깨지는 것보다 “결정은 서버가 한다”는 계약을 유지하는 쪽을 선택함.
+
+- `match_found` 이후 SSE 에러 복구 방식을 명확히 함.
+  에러가 나면 매칭 성사 모달과 timer는 정리하고 에러 모달을 보여줌. 사용자가 확인하면 화면은 다시 `ready`로 돌아감. 단, 서버의 `FOUND` 세션 정산은 프론트가 취소하지 않음.
+
+- 모달 UI 범위를 command 없이 표시 전용으로 제한함.
+  수락/거절 API와 최종 화면 전환까지 한 번에 넣으면 이벤트 흐름, 실패 처리, 중복 응답 제어가 같이 커짐. 이번 이슈는 `match_found`를 사용자에게 안정적으로 보여주는 것까지로 자르고, command와 result routing은 다음 단계에서 다룸.
+
+## 📝 Note
+
+- `acceptMatch`, `rejectMatch` 호출은 후속 이슈에서 구현함.
+- `match_response_result.action` 기반 ready 복귀, 매칭 대기 복귀, game waiting 이동은 후속 이슈에서 구현함.
+- 장시간 `match_response_result`가 오지 않는 상황의 watchdog, session recovery, 재조회 API는 후속 이슈에서 다룸.
+- 새 패키지는 추가하지 않음.
+- `matchfound.jpeg`는 디자인 레퍼런스로만 사용하고 실제 화면 asset으로 import하지 않음.
+- 실제 모달 중앙 이미지는 `logo.png`를 사용함.
+
+## 📌 Related Issue
 
 - Closes #80

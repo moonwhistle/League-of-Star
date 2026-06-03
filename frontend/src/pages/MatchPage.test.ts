@@ -350,6 +350,34 @@ describe('MatchPage', () => {
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('4')
   })
 
+  it('falls back to loading state when acceptTimeoutSeconds is not finite', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: Number.NaN,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
+    expect(main.attributes('data-match-found-loading')).toBe('true')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
+  })
+
   it('blocks the background match action while match found state is active', async () => {
     const wrapper = mount(MatchPage)
 
@@ -464,7 +492,7 @@ describe('MatchPage', () => {
     clearIntervalSpy.mockRestore()
   })
 
-  it('clears match found modal state without leave when the stream fails after match_found', async () => {
+  it('clears match found modal state without leave and returns ready after confirming a stream error', async () => {
     const wrapper = mount(MatchPage)
 
     await getStartButton(wrapper).trigger('click')
@@ -496,6 +524,14 @@ describe('MatchPage', () => {
     expect(wrapper.get('[role="dialog"]').text()).toContain(
       '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
     )
+
+    await wrapper.get('.match-error-dialog button').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-found-id')).toBe('')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(main.attributes('data-queue-status')).toBe('ready')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
   })
 
   it('stores a local error state when the stream reports an error', async () => {

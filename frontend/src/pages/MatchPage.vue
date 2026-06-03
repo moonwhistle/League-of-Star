@@ -219,7 +219,7 @@ const isMatchFoundLoading = computed(
   () => isMatchFoundModalOpen.value && matchFoundCountdownSeconds.value <= 0,
 )
 const matchFoundCountdownProgress = computed(() => {
-  const totalSeconds = Math.max(1, Number(matchFound.value?.acceptTimeoutSeconds ?? 1))
+  const totalSeconds = Math.max(1, getMatchFoundAcceptTimeoutSeconds(1))
   const progress = Math.min(1, Math.max(0, matchFoundCountdownSeconds.value / totalSeconds))
 
   return `${progress}turn`
@@ -281,6 +281,7 @@ let matchFoundCountdownTimerId = 0
 let matchFoundCountdownDeadline = 0
 let shouldJoinAfterStreamConnected = false
 let hasQueueJoinRequestStarted = false
+let shouldResetMatchmakingAfterErrorModalClose = false
 let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
 
@@ -488,7 +489,7 @@ function updateMatchFoundCountdown() {
 }
 
 function resolveMatchFoundDeadline() {
-  const fallbackSeconds = Math.max(0, Number(matchFound.value?.acceptTimeoutSeconds ?? 0))
+  const fallbackSeconds = getMatchFoundAcceptTimeoutSeconds(0)
   const eventCreatedAt = Date.parse(String(matchFound.value?.eventCreatedAt ?? ''))
 
   if (Number.isNaN(eventCreatedAt)) {
@@ -496,6 +497,16 @@ function resolveMatchFoundDeadline() {
   }
 
   return eventCreatedAt + fallbackSeconds * 1000
+}
+
+function getMatchFoundAcceptTimeoutSeconds(defaultSeconds = 0) {
+  const seconds = Number(matchFound.value?.acceptTimeoutSeconds ?? defaultSeconds)
+
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return defaultSeconds
+  }
+
+  return seconds
 }
 
 function calculateMatchFoundRemainingSeconds() {
@@ -532,6 +543,7 @@ function handleStreamError() {
 
   if (hasActiveMatchFoundResponse.value) {
     resetMatchFoundModalState()
+    shouldResetMatchmakingAfterErrorModalClose = true
     showErrorModal(t('match.streamFailed'))
     return
   }
@@ -594,6 +606,7 @@ function resetMatchmakingState() {
   streamErrorMessage.value = ''
   shouldJoinAfterStreamConnected = false
   hasQueueJoinRequestStarted = false
+  shouldResetMatchmakingAfterErrorModalClose = false
   resetStreamPayloads()
 }
 
@@ -626,6 +639,11 @@ function showErrorModal(message = '') {
 
 function closeErrorModal() {
   errorModalMessage.value = ''
+
+  if (shouldResetMatchmakingAfterErrorModalClose) {
+    shouldResetMatchmakingAfterErrorModalClose = false
+    resetMatchmakingState()
+  }
 }
 </script>
 
