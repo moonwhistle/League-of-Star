@@ -33,6 +33,12 @@ const messages = {
     'match.errorTitle': '매칭 오류',
     'match.errorConfirm': '확인',
     'match.streamFailed': '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
+    'match.foundTitle': '매칭 성사',
+    'match.foundSubtitle': '상대를 찾았습니다',
+    'match.responseTime': '응답 대기 시간',
+    'match.accept': '수락',
+    'match.decline': '거절',
+    'match.loading': '로딩중...',
   },
   en: {
     'login.email': 'Email',
@@ -64,6 +70,12 @@ const messages = {
     'match.errorTitle': 'Match Error',
     'match.errorConfirm': 'OK',
     'match.streamFailed': 'Failed to connect matching. Please try again.',
+    'match.foundTitle': 'Match Found',
+    'match.foundSubtitle': 'Opponent Found',
+    'match.responseTime': 'Response Time',
+    'match.accept': 'Accept',
+    'match.decline': 'Decline',
+    'match.loading': 'loading...',
   },
 } as const
 

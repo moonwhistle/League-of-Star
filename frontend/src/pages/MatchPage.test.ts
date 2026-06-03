@@ -2,7 +2,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
-import { joinMatchQueue, leaveMatchQueue } from '@/services/matchService'
+import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import {
   connectMatchEventSource,
   type MatchEventSourceHandlers,
@@ -15,13 +15,17 @@ vi.mock('@/services/realtime/matchEventSource', () => ({
 }))
 
 vi.mock('@/services/matchService', () => ({
+  acceptMatch: vi.fn(),
   joinMatchQueue: vi.fn(),
   leaveMatchQueue: vi.fn(),
+  rejectMatch: vi.fn(),
 }))
 
 const connectMatchEventSourceMock = vi.mocked(connectMatchEventSource)
+const acceptMatchMock = vi.mocked(acceptMatch)
 const joinMatchQueueMock = vi.mocked(joinMatchQueue)
 const leaveMatchQueueMock = vi.mocked(leaveMatchQueue)
+const rejectMatchMock = vi.mocked(rejectMatch)
 const closeMatchEventSourceMock = vi.fn()
 const { setLocale } = useLocale()
 
@@ -221,7 +225,312 @@ describe('MatchPage', () => {
     expect(main.attributes('data-connected-user-id')).toBe('1')
     expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
     expect(main.attributes('data-match-found-id')).toBe('match-1')
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
     expect(main.attributes('data-match-result-action')).toBe('GO_TO_GAME_WAITING')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('opens match found state and stops the waiting timer when match_found arrives', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(2000)
+    await wrapper.vm.$nextTick()
+
+    expect(getStartButton(wrapper).text()).toBe('3')
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: '2026-06-01T00:00:02Z',
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-id')).toBe('match-1')
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('10')
+    expect(main.attributes('data-match-found-loading')).toBe('false')
+    expect(main.attributes('data-queue-status')).toBe('queued')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('매칭 성사')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain(
+      '상대를 찾았습니다',
+    )
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('응답 대기 시간')
+    expect(wrapper.get('[data-testid="match-found-logo"]').attributes('src')).toBeTruthy()
+    expect(wrapper.get('.match-found-accept').text()).toBe('수락')
+    expect(wrapper.get('.match-found-decline').text()).toBe('거절')
+    expect(wrapper.get('.match-found-accept').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.match-found-decline').attributes('disabled')).toBeDefined()
+
+    await vi.advanceTimersByTimeAsync(2000)
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('8')
+    expect(getStartButton(wrapper).text()).toBe('3')
+  })
+
+  it('keeps match found state in loading without resetting when the countdown reaches zero', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 2,
+      eventCreatedAt: '2026-06-01T00:00:00Z',
+    })
+    await wrapper.vm.$nextTick()
+
+    await vi.advanceTimersByTimeAsync(2000)
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
+    expect(main.attributes('data-match-found-loading')).toBe('true')
+    expect(main.attributes('data-queue-status')).toBe('queued')
+    expect(main.attributes('data-stream-status')).toBe('connected')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(acceptMatchMock).not.toHaveBeenCalled()
+    expect(rejectMatchMock).not.toHaveBeenCalled()
+    expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
+  })
+
+  it('uses acceptTimeoutSeconds as a local countdown fallback when eventCreatedAt is invalid', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 7,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('7')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('4')
+  })
+
+  it('falls back to loading state when acceptTimeoutSeconds is not finite', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: Number.NaN,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
+    expect(main.attributes('data-match-found-loading')).toBe('true')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
+  })
+
+  it('blocks the background match action while match found state is active', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await getStartButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('toggles match found modal copy between Korean and English', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('매칭 성사')
+
+    await wrapper.get('.match-locale-toggle').trigger('click')
+
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('Match Found')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('Opponent Found')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('Response Time')
+    expect(wrapper.get('.match-found-accept').text()).toBe('Accept')
+    expect(wrapper.get('.match-found-decline').text()).toBe('Decline')
+  })
+
+  it('keeps accept and decline buttons as UI-only controls in this issue', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await wrapper.get('.match-found-decline').trigger('click')
+
+    expect(acceptMatchMock).not.toHaveBeenCalled()
+    expect(rejectMatchMock).not.toHaveBeenCalled()
+    expect(wrapper.get('main').attributes('data-match-found-modal-open')).toBe('true')
+  })
+
+  it('clears the match found countdown timer on unmount', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval')
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    wrapper.unmount()
+
+    expect(clearIntervalSpy).toHaveBeenCalled()
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+
+    clearIntervalSpy.mockRestore()
+  })
+
+  it('clears match found modal state without leave and returns ready after confirming a stream error', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    getCurrentHandlers().onError?.(new Error('stream failed'))
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
+    expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
+    expect(main.attributes('data-stream-status')).toBe('error')
+    expect(main.attributes('data-queue-status')).toBe('queued')
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      '매칭 연결에 실패했습니다. 다시 시도해 주세요.',
+    )
+
+    await wrapper.get('.match-error-dialog button').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-found-id')).toBe('')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(main.attributes('data-queue-status')).toBe('ready')
     expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
   })
 

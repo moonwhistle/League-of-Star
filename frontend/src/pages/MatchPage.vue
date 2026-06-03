@@ -1,5 +1,5 @@
 <template>
-  <!-- eslint-disable vue/max-attributes-per-line, vue/singleline-html-element-content-newline -->
+  <!-- eslint-disable vue/max-attributes-per-line, vue/singleline-html-element-content-newline, vue/html-self-closing -->
   <main
     class="match-page"
     :style="{ '--match-background-image': `url(${backgroundImageUrl})` }"
@@ -7,6 +7,9 @@
     :data-connected-user-id="connectedEvent?.userId ?? ''"
     :data-last-heartbeat-at="lastHeartbeatAt"
     :data-match-found-id="matchFound?.matchId ?? ''"
+    :data-match-found-modal-open="isMatchFoundModalOpen"
+    :data-match-found-countdown-seconds="matchFoundCountdownSeconds"
+    :data-match-found-loading="isMatchFoundLoading"
     :data-match-result-action="matchResponseResult?.action ?? ''"
     :data-stream-error-message="streamErrorMessage"
     :data-can-start-match="canStartMatch"
@@ -128,6 +131,46 @@
       </section>
     </section>
 
+    <div v-if="isMatchFoundModalOpen" class="match-found-backdrop" role="presentation">
+      <section
+        class="match-found-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="match-found-title"
+      >
+        <span class="match-found-corner is-top-left" aria-hidden="true" />
+        <span class="match-found-corner is-top-right" aria-hidden="true" />
+        <span class="match-found-corner is-bottom-left" aria-hidden="true" />
+        <span class="match-found-corner is-bottom-right" aria-hidden="true" />
+
+        <h2 id="match-found-title">{{ t('match.foundTitle') }}</h2>
+        <p class="match-found-subtitle">{{ t('match.foundSubtitle') }}</p>
+
+        <div
+          class="match-found-emblem"
+          :style="{ '--match-found-progress': matchFoundCountdownProgress }"
+          aria-hidden="true"
+        >
+          <span class="match-found-ring" />
+          <div class="match-found-logo-frame">
+            <img :src="logoImageUrl" alt="" data-testid="match-found-logo" />
+          </div>
+        </div>
+
+        <p class="match-found-countdown" aria-live="polite">
+          <span v-if="!isMatchFoundLoading">{{ t('match.responseTime') }}</span>
+          <strong>{{ matchFoundStatusLabel }}</strong>
+        </p>
+
+        <div class="match-found-actions">
+          <button class="match-found-accept" type="button" disabled>{{ t('match.accept') }}</button>
+          <button class="match-found-decline" type="button" disabled>
+            {{ t('match.decline') }}
+          </button>
+        </div>
+      </section>
+    </div>
+
     <div
       v-if="errorModalMessage !== ''"
       class="match-error-backdrop"
@@ -157,6 +200,7 @@ import { joinMatchQueue, leaveMatchQueue } from '@/services/matchService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
 
 import backgroundImageUrl from '../../img/background.png'
+import logoImageUrl from '../../img/logo.png'
 
 const streamStatus = ref('idle')
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
@@ -168,11 +212,38 @@ const streamErrorMessage = ref('')
 const queueStatus = ref('ready')
 const queueErrorMessage = ref('')
 const matchWaitingSeconds = ref(0)
+const isMatchFoundModalOpen = ref(false)
+const matchFoundCountdownSeconds = ref(0)
 const errorModalMessage = ref('')
+const isMatchFoundLoading = computed(
+  () => isMatchFoundModalOpen.value && matchFoundCountdownSeconds.value <= 0,
+)
+const matchFoundCountdownProgress = computed(() => {
+  const totalSeconds = Math.max(1, getMatchFoundAcceptTimeoutSeconds(1))
+  const progress = Math.min(1, Math.max(0, matchFoundCountdownSeconds.value / totalSeconds))
+
+  return `${progress}turn`
+})
+const matchFoundStatusLabel = computed(() => {
+  if (isMatchFoundLoading.value) {
+    return t('match.loading')
+  }
+
+  return String(matchFoundCountdownSeconds.value)
+})
+const hasActiveMatchFoundResponse = computed(
+  () =>
+    isMatchFoundModalOpen.value ||
+    (matchFound.value !== undefined && matchResponseResult.value === undefined),
+)
 const canStartMatch = computed(
   () => queueStatus.value === 'ready' && streamStatus.value !== 'connecting',
 )
 const canUsePrimaryMatchAction = computed(() => {
+  if (hasActiveMatchFoundResponse.value || streamStatus.value === 'error') {
+    return false
+  }
+
   if (queueStatus.value === 'ready') {
     return streamStatus.value !== 'connecting'
   }
@@ -206,8 +277,11 @@ let closeMatchEventSource = () => {}
 // Guards against late stream callbacks that arrive after route unmount.
 let isActive = false
 let matchWaitingTimerId = 0
+let matchFoundCountdownTimerId = 0
+let matchFoundCountdownDeadline = 0
 let shouldJoinAfterStreamConnected = false
 let hasQueueJoinRequestStarted = false
+let shouldResetMatchmakingAfterErrorModalClose = false
 let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
 
@@ -222,10 +296,15 @@ onUnmounted(() => {
   abortJoinRequest()
   abortLeaveRequest()
   stopMatchWaitingTimer()
+  stopMatchFoundCountdown()
   closeMatchStream()
 })
 
 function handlePrimaryMatchAction() {
+  if (hasActiveMatchFoundResponse.value || streamStatus.value === 'error') {
+    return
+  }
+
   if (queueStatus.value === 'ready') {
     startMatchmaking()
     return
@@ -279,6 +358,7 @@ function startMatchmaking() {
       onMatchFound: (payload) => {
         if (isActive) {
           matchFound.value = payload
+          openMatchFoundModal()
         }
       },
       onMatchResponseResult: (payload) => {
@@ -380,6 +460,77 @@ function stopMatchWaitingTimer() {
   matchWaitingTimerId = 0
 }
 
+function openMatchFoundModal() {
+  isMatchFoundModalOpen.value = true
+  stopMatchWaitingTimer()
+  startMatchFoundCountdown()
+}
+
+function startMatchFoundCountdown() {
+  stopMatchFoundCountdown()
+  matchFoundCountdownDeadline = resolveMatchFoundDeadline()
+  updateMatchFoundCountdown()
+
+  if (matchFoundCountdownSeconds.value <= 0) {
+    return
+  }
+
+  matchFoundCountdownTimerId = window.setInterval(() => {
+    updateMatchFoundCountdown()
+
+    if (matchFoundCountdownSeconds.value <= 0) {
+      stopMatchFoundCountdown()
+    }
+  }, 1000)
+}
+
+function updateMatchFoundCountdown() {
+  matchFoundCountdownSeconds.value = calculateMatchFoundRemainingSeconds()
+}
+
+function resolveMatchFoundDeadline() {
+  const fallbackSeconds = getMatchFoundAcceptTimeoutSeconds(0)
+  const eventCreatedAt = Date.parse(String(matchFound.value?.eventCreatedAt ?? ''))
+
+  if (Number.isNaN(eventCreatedAt)) {
+    return Date.now() + fallbackSeconds * 1000
+  }
+
+  return eventCreatedAt + fallbackSeconds * 1000
+}
+
+function getMatchFoundAcceptTimeoutSeconds(defaultSeconds = 0) {
+  const seconds = Number(matchFound.value?.acceptTimeoutSeconds ?? defaultSeconds)
+
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return defaultSeconds
+  }
+
+  return seconds
+}
+
+function calculateMatchFoundRemainingSeconds() {
+  const remainingMilliseconds = matchFoundCountdownDeadline - Date.now()
+
+  return Math.max(0, Math.ceil(remainingMilliseconds / 1000))
+}
+
+function stopMatchFoundCountdown() {
+  if (matchFoundCountdownTimerId === 0) {
+    return
+  }
+
+  window.clearInterval(matchFoundCountdownTimerId)
+  matchFoundCountdownTimerId = 0
+}
+
+function resetMatchFoundModalState() {
+  stopMatchFoundCountdown()
+  isMatchFoundModalOpen.value = false
+  matchFoundCountdownSeconds.value = 0
+  matchFoundCountdownDeadline = 0
+}
+
 function setStreamError() {
   streamStatus.value = 'error'
   streamErrorMessage.value = MATCH_STREAM_ERROR_MESSAGE
@@ -389,6 +540,13 @@ function handleStreamError() {
   shouldJoinAfterStreamConnected = false
   setStreamError()
   closeMatchStream()
+
+  if (hasActiveMatchFoundResponse.value) {
+    resetMatchFoundModalState()
+    shouldResetMatchmakingAfterErrorModalClose = true
+    showErrorModal(t('match.streamFailed'))
+    return
+  }
 
   if (
     (queueStatus.value === 'joining' || queueStatus.value === 'queued') &&
@@ -448,6 +606,7 @@ function resetMatchmakingState() {
   streamErrorMessage.value = ''
   shouldJoinAfterStreamConnected = false
   hasQueueJoinRequestStarted = false
+  shouldResetMatchmakingAfterErrorModalClose = false
   resetStreamPayloads()
 }
 
@@ -456,6 +615,7 @@ function resetStreamPayloads() {
   lastHeartbeatAt.value = ''
   matchFound.value = undefined
   matchResponseResult.value = undefined
+  resetMatchFoundModalState()
 }
 
 function abortJoinRequest() {
@@ -479,6 +639,11 @@ function showErrorModal(message = '') {
 
 function closeErrorModal() {
   errorModalMessage.value = ''
+
+  if (shouldResetMatchmakingAfterErrorModalClose) {
+    shouldResetMatchmakingAfterErrorModalClose = false
+    resetMatchmakingState()
+  }
 }
 </script>
 
@@ -865,6 +1030,201 @@ function closeErrorModal() {
   border-radius: 4px;
 }
 
+.match-found-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(71, 229, 220, 0.1), transparent 28%),
+    rgba(1, 5, 14, 0.74);
+  backdrop-filter: blur(5px);
+}
+
+.match-found-dialog {
+  position: relative;
+  width: min(380px, 100%);
+  min-width: 0;
+  max-height: calc(100svh - 48px);
+  padding: clamp(28px, 5vw, 42px) clamp(24px, 5vw, 38px) 36px;
+  overflow: hidden;
+  color: var(--match-text);
+  text-align: center;
+  background:
+    linear-gradient(180deg, rgba(12, 20, 40, 0.98), rgba(4, 9, 22, 0.98)), rgba(5, 10, 24, 0.98);
+  border: 1px solid rgba(99, 242, 232, 0.3);
+  box-shadow:
+    0 26px 76px rgba(0, 0, 0, 0.58),
+    inset 0 0 42px rgba(99, 242, 232, 0.04);
+}
+
+.match-found-dialog::before {
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  content: '';
+  border: 1px solid rgba(99, 242, 232, 0.08);
+}
+
+.match-found-corner {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  pointer-events: none;
+  border-color: rgba(99, 242, 232, 0.58);
+}
+
+.match-found-corner.is-top-left {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.match-found-corner.is-top-right {
+  top: -1px;
+  right: -1px;
+  border-top: 2px solid;
+  border-right: 2px solid;
+}
+
+.match-found-corner.is-bottom-left {
+  bottom: -1px;
+  left: -1px;
+  border-bottom: 2px solid;
+  border-left: 2px solid;
+}
+
+.match-found-corner.is-bottom-right {
+  right: -1px;
+  bottom: -1px;
+  border-right: 2px solid;
+  border-bottom: 2px solid;
+}
+
+.match-found-dialog h2 {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: clamp(1.55rem, 5vw, 2rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--match-accent);
+  text-transform: uppercase;
+  text-shadow: 0 0 18px rgba(99, 242, 232, 0.72);
+}
+
+.match-found-subtitle {
+  position: relative;
+  z-index: 1;
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--match-muted);
+  text-transform: uppercase;
+}
+
+.match-found-emblem {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: clamp(138px, 40vw, 178px);
+  height: clamp(138px, 40vw, 178px);
+  margin: clamp(26px, 5vh, 36px) auto 22px;
+  place-items: center;
+}
+
+.match-found-ring {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle, transparent 56%, #07101d 57%, #07101d 65%, transparent 66%),
+    conic-gradient(var(--match-accent) var(--match-found-progress), rgba(99, 242, 232, 0.16) 0);
+  border-radius: 50%;
+  box-shadow: 0 0 22px rgba(99, 242, 232, 0.22);
+}
+
+.match-found-logo-frame {
+  position: relative;
+  display: grid;
+  width: 72%;
+  height: 72%;
+  place-items: center;
+  background: rgba(18, 34, 49, 0.92);
+  border: 1px solid rgba(99, 242, 232, 0.2);
+  border-radius: 50%;
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.38);
+}
+
+.match-found-logo-frame img {
+  width: 58%;
+  height: 58%;
+  object-fit: contain;
+}
+
+.match-found-countdown {
+  position: relative;
+  z-index: 1;
+  min-height: 42px;
+  margin: 0 0 18px;
+  color: var(--match-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.match-found-countdown span,
+.match-found-countdown strong {
+  display: block;
+}
+
+.match-found-countdown strong {
+  margin-top: 5px;
+  color: var(--match-accent);
+  font-size: 1.28rem;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(99, 242, 232, 0.48);
+}
+
+.match-found-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+}
+
+.match-found-actions button {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 20px;
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);
+}
+
+.match-found-actions button:disabled {
+  cursor: not-allowed;
+}
+
+.match-found-accept {
+  color: #06101c;
+  background: var(--match-accent);
+  border: 1px solid rgba(209, 255, 251, 0.72);
+  box-shadow: 0 0 22px rgba(99, 242, 232, 0.22);
+}
+
+.match-found-decline {
+  color: rgba(240, 249, 255, 0.82);
+  background: rgba(4, 9, 22, 0.74);
+  border: 1px solid rgba(206, 224, 255, 0.22);
+}
+
 .match-error-backdrop {
   position: fixed;
   inset: 0;
@@ -989,6 +1349,23 @@ function closeErrorModal() {
   .secondary-actions {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .match-found-backdrop {
+    padding: 18px;
+  }
+
+  .match-found-dialog {
+    width: min(342px, 100%);
+    padding: 28px 22px 30px;
+  }
+
+  .match-found-emblem {
+    margin: 24px auto 18px;
+  }
+
+  .match-found-actions button {
+    min-height: 46px;
   }
 }
 </style>

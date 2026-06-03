@@ -95,7 +95,7 @@ flowchart TD
 - cookie auth 전환은 백엔드 인증 전략 변경 범위이므로 이번 단계에서 제외.
 - token 만료에 따른 refresh/retry는 후속 token refresh 이슈에서 구현.
 
-### 4. [ ] 매칭 페이지 구현
+### 4. [x] 매칭 페이지 구현
 
 - `/match` 페이지에서 매칭 시작/취소 UI 구현.
 - 매칭 시작 클릭 시 먼저 `GET /api/v1/notifications/match/stream` 연결 구현.
@@ -107,7 +107,7 @@ flowchart TD
 - 400/409 에러는 메시지 표시 후 현재 화면 유지 구현.
 - 매칭 상태는 우선 페이지 로컬 상태로 처리.
 
-### 5. [ ] 매칭 성사 모달 구현
+### 5. [x] 매칭 성사 모달 구현
 
 - SSE `match_found` payload 수신 처리 구현.
 - payload shape 반영.
