@@ -36,6 +36,12 @@ export type MatchResponseReason =
 
 export type MatchResponseAction = 'GO_TO_GAME_WAITING' | 'GO_TO_MATCH_START' | 'RETURN_TO_MATCHING'
 
+/**
+ * Final backend-settled match response result.
+ *
+ * HTTP accept/reject responses are command acknowledgements only. Page transition
+ * must be driven by this SSE payload's action.
+ */
 export interface MatchResponseOpponent {
   userId: number
   nickname: string
@@ -43,12 +49,23 @@ export interface MatchResponseOpponent {
   tierScore: number
 }
 
+/**
+ * Required only when action is GO_TO_GAME_WAITING.
+ * Failed outcomes can legally send game as null.
+ */
 export interface MatchResponseGame {
   gameRoomId: number
   videoUrl: string
   webSocketUrl: string
 }
 
+/**
+ * Action policy:
+ * - GO_TO_GAME_WAITING: close match SSE and move to game waiting with game payload.
+ * - GO_TO_MATCH_START: close match SSE and return to ready state.
+ * - RETURN_TO_MATCHING: backend already restored this user to queue; keep match SSE
+ *   open and do not call join/leave.
+ */
 export interface MatchResponseResultNotification {
   matchId: MatchId
   outcome: MatchResponseOutcome

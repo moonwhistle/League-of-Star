@@ -8,7 +8,8 @@
 미접속/READY timeout 실행 처리, RTT 측정, countdown, `GAME_START`, scenario 전달, SMITE 판정, `game_actions`, `game_records` 저장은 후속 이슈에서 구현한다.
 
 매칭 SSE는 `match_response_result`까지 담당한다.
-클라이언트는 `match_response_result` 수신 후 매칭 SSE `EventSource.close()`를 호출하고, `GO_TO_GAME_WAITING`이면 `game.webSocketUrl`로 gameRoom WebSocket에 연결한다.
+클라이언트는 `GO_TO_GAME_WAITING` 수신 시 매칭 SSE `EventSource.close()`를 호출하고, `game.webSocketUrl`로 gameRoom WebSocket에 연결한다.
+`GO_TO_MATCH_START`, `RETURN_TO_MATCHING` 처리는 매칭 화면 전환 범위이며, 이 이슈는 게임 대기 WebSocket 연결 action만 다룬다.
 
 ```mermaid
 flowchart TD
@@ -394,7 +395,7 @@ timeout 발생
 ## 📌 Summary
 
 `GO_TO_GAME_WAITING` 이후 게임 대기 화면에서 사용할 gameRoom WebSocket 기반을 구현했습니다.
-클라이언트는 매칭 SSE `match_response_result` 수신 후 `EventSource.close()`를 호출하고, `/ws/game/{gameRoomId}?token=...`로 연결합니다.
+클라이언트는 매칭 SSE `match_response_result.action=GO_TO_GAME_WAITING` 수신 후 `EventSource.close()`를 호출하고, `/ws/game/{gameRoomId}?token=...`로 연결합니다.
 서버는 handshake 단계에서 JWT와 gameRoom participant를 검증하고, 연결/READY 상태를 gameRoom 단위로 관리합니다.
 
 ```mermaid

@@ -27,8 +27,10 @@ flowchart LR
 클라이언트 기준:
 
 - `match_response_result`는 해당 `matchId`의 최종 SSE 이벤트입니다.
-- `match_response_result` 수신 후 매칭 SSE `EventSource.close()`를 호출합니다.
+- 매칭 SSE close 여부는 `match_response_result.action`별로 결정합니다.
 - `GO_TO_GAME_WAITING`일 때만 게임 대기 화면으로 이동합니다.
+- `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`는 매칭 SSE를 닫습니다.
+- `RETURN_TO_MATCHING`은 백엔드가 큐 복귀를 완료한 상태이므로 매칭 SSE를 유지하고 `join/leave`를 호출하지 않습니다.
 - 게임 대기 화면부터는 WebSocket으로 연결/READY 상태를 처리합니다.
 
 ## 2. 수락-수락 전체 흐름
@@ -657,8 +659,9 @@ stateDiagram-v2
 
 클라이언트 구현 체크리스트:
 
-- `match_response_result` 수신 후 매칭 SSE를 닫습니다.
+- `match_response_result.action` 기준으로 매칭 SSE close/유지 정책을 분기합니다.
 - `GO_TO_GAME_WAITING`일 때만 게임 대기 화면으로 이동합니다.
+- `RETURN_TO_MATCHING`에서는 매칭 SSE를 유지하고 `join/leave`를 호출하지 않습니다.
 - `game.webSocketUrl`에 access token query parameter를 붙여 WebSocket에 연결합니다.
 - WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `GAME_RESULT`, `ERROR`를 처리합니다.
 - MP4 preload 완료 후 `CLIENT_READY`를 한 번 전송합니다.

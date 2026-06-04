@@ -171,6 +171,8 @@ interface MatchResponseResultNotification {
 - `GO_TO_GAME_WAITING`이면 `game.gameRoomId` 기준으로 `/game/:gameRoomId/waiting` 이동 구현.
 - `GO_TO_MATCH_START`이면 매칭 시작 가능 상태 복귀 구현.
 - `RETURN_TO_MATCHING`이면 매칭 대기 상태 복귀 구현.
+- `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`는 매칭 SSE를 닫고, `RETURN_TO_MATCHING`은 백엔드 큐 복귀 완료 이벤트로 보고 SSE를 유지.
+- `RETURN_TO_MATCHING`에서는 `joinMatchQueue`, `leaveMatchQueue`를 호출하지 않음.
 - `game`이 null인 실패 이벤트에서는 게임 화면 이동 금지.
 - `game.videoUrl`, `game.webSocketUrl`은 게임 화면에서 사용할 수 있도록 route state 또는 session storage로 최소 보관 구현.
 - 최종 전환 기준은 HTTP accept/reject 응답이 아니라 이 이벤트의 `action`임을 테스트로 검증.
