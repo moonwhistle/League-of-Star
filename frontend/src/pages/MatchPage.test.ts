@@ -226,7 +226,10 @@ describe('MatchPage', () => {
     expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
     expect(main.attributes('data-match-found-id')).toBe('match-1')
     expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-match-response-command-pending')).toBe('false')
     expect(main.attributes('data-match-result-action')).toBe('GO_TO_GAME_WAITING')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
   })
 
@@ -261,6 +264,9 @@ describe('MatchPage', () => {
     expect(main.attributes('data-match-found-modal-open')).toBe('true')
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('10')
     expect(main.attributes('data-match-found-loading')).toBe('false')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-match-response-command-pending')).toBe('false')
+    expect(main.attributes('data-can-submit-match-response')).toBe('true')
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('매칭 성사')
@@ -310,6 +316,8 @@ describe('MatchPage', () => {
     expect(main.attributes('data-match-found-modal-open')).toBe('true')
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
     expect(main.attributes('data-match-found-loading')).toBe('true')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(main.attributes('data-stream-status')).toBe('connected')
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
@@ -375,7 +383,34 @@ describe('MatchPage', () => {
 
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
     expect(main.attributes('data-match-found-loading')).toBe('true')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
+  })
+
+  it('blocks match response submission when match_found does not include a match id', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: '',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
   })
 
   it('blocks the background match action while match found state is active', async () => {
@@ -519,6 +554,8 @@ describe('MatchPage', () => {
     expect(leaveMatchQueueMock).not.toHaveBeenCalled()
     expect(main.attributes('data-match-found-modal-open')).toBe('false')
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(main.attributes('data-stream-status')).toBe('error')
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(wrapper.get('[role="dialog"]').text()).toContain(

@@ -10,6 +10,9 @@
     :data-match-found-modal-open="isMatchFoundModalOpen"
     :data-match-found-countdown-seconds="matchFoundCountdownSeconds"
     :data-match-found-loading="isMatchFoundLoading"
+    :data-match-response-command-status="matchResponseCommandStatus"
+    :data-match-response-command-pending="isMatchResponseCommandPending"
+    :data-can-submit-match-response="canSubmitMatchResponse"
     :data-match-result-action="matchResponseResult?.action ?? ''"
     :data-stream-error-message="streamErrorMessage"
     :data-can-start-match="canStartMatch"
@@ -214,9 +217,32 @@ const queueErrorMessage = ref('')
 const matchWaitingSeconds = ref(0)
 const isMatchFoundModalOpen = ref(false)
 const matchFoundCountdownSeconds = ref(0)
+const matchResponseCommandStatus = ref('idle')
 const errorModalMessage = ref('')
+const isMatchResponseCommandPending = computed(
+  () =>
+    matchResponseCommandStatus.value === 'accepting' ||
+    matchResponseCommandStatus.value === 'rejecting',
+)
+const hasSubmittedMatchResponseCommand = computed(
+  () =>
+    matchResponseCommandStatus.value === 'accepted' ||
+    matchResponseCommandStatus.value === 'rejected' ||
+    matchResponseCommandStatus.value === 'lockWaiting',
+)
+const currentMatchFoundId = computed(() => String(matchFound.value?.matchId ?? '').trim())
 const isMatchFoundLoading = computed(
   () => isMatchFoundModalOpen.value && matchFoundCountdownSeconds.value <= 0,
+)
+const canSubmitMatchResponse = computed(
+  () =>
+    isMatchFoundModalOpen.value &&
+    currentMatchFoundId.value !== '' &&
+    matchFoundCountdownSeconds.value > 0 &&
+    streamStatus.value === 'connected' &&
+    !isMatchResponseCommandPending.value &&
+    !hasSubmittedMatchResponseCommand.value &&
+    matchResponseResult.value === undefined,
 )
 const matchFoundCountdownProgress = computed(() => {
   const totalSeconds = Math.max(1, getMatchFoundAcceptTimeoutSeconds(1))
@@ -284,6 +310,7 @@ let hasQueueJoinRequestStarted = false
 let shouldResetMatchmakingAfterErrorModalClose = false
 let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
+let matchResponseAbortController = new AbortController()
 
 onMounted(() => {
   isActive = true
@@ -295,6 +322,7 @@ onUnmounted(() => {
   shouldJoinAfterStreamConnected = false
   abortJoinRequest()
   abortLeaveRequest()
+  abortMatchResponseRequest()
   stopMatchWaitingTimer()
   stopMatchFoundCountdown()
   closeMatchStream()
@@ -461,6 +489,7 @@ function stopMatchWaitingTimer() {
 }
 
 function openMatchFoundModal() {
+  resetMatchResponseCommandState()
   isMatchFoundModalOpen.value = true
   stopMatchWaitingTimer()
   startMatchFoundCountdown()
@@ -526,6 +555,7 @@ function stopMatchFoundCountdown() {
 
 function resetMatchFoundModalState() {
   stopMatchFoundCountdown()
+  resetMatchResponseCommandState()
   isMatchFoundModalOpen.value = false
   matchFoundCountdownSeconds.value = 0
   matchFoundCountdownDeadline = 0
@@ -624,6 +654,16 @@ function abortJoinRequest() {
 
 function abortLeaveRequest() {
   leaveAbortController.abort()
+}
+
+function abortMatchResponseRequest() {
+  matchResponseAbortController.abort()
+  matchResponseAbortController = new AbortController()
+}
+
+function resetMatchResponseCommandState() {
+  abortMatchResponseRequest()
+  matchResponseCommandStatus.value = 'idle'
 }
 
 function failMatchmaking(message = '', nextQueueErrorMessage = '', nextStreamErrorMessage = '') {
