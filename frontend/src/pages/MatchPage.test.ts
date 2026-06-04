@@ -539,6 +539,39 @@ describe('MatchPage', () => {
     expect(wrapper.get('.match-found-accept').text()).toBe('Accepted')
   })
 
+  it('blocks decline when accept command is already pending', async () => {
+    acceptMatchMock.mockReturnValueOnce(new Promise<void>(() => {}))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await wrapper.get('.match-found-decline').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(acceptMatchMock).toHaveBeenCalledTimes(1)
+    expect(rejectMatchMock).not.toHaveBeenCalled()
+    expect(main.attributes('data-match-response-command-status')).toBe('accepting')
+    expect(main.attributes('data-match-response-command-pending')).toBe('true')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('수락 중...')
+  })
+
   it('submits reject command and waits for the final SSE result', async () => {
     const wrapper = mount(MatchPage)
 
@@ -606,7 +639,7 @@ describe('MatchPage', () => {
     expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(main.attributes('data-match-found-modal-open')).toBe('true')
     expect(main.attributes('data-stream-status')).toBe('connected')
-    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('결과 대기')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('응답 처리 중...')
     expect(wrapper.find('.match-error-dialog').exists()).toBe(false)
     expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
   })

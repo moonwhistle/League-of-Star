@@ -284,11 +284,12 @@ const matchFoundStatusLabel = computed(() => {
     return t('match.waitingForOpponent')
   }
 
-  if (
-    matchResponseCommandStatus.value === 'rejected' ||
-    matchResponseCommandStatus.value === 'lockWaiting'
-  ) {
+  if (matchResponseCommandStatus.value === 'rejected') {
     return t('match.waitingForResult')
+  }
+
+  if (matchResponseCommandStatus.value === 'lockWaiting') {
+    return t('match.processingResponse')
   }
 
   if (isMatchFoundLoading.value) {
