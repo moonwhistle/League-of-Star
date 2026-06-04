@@ -217,9 +217,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
+import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { saveGameWaitingPayloadFromMatchResult } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
 
@@ -228,6 +231,7 @@ import logoImageUrl from '../../img/logo.png'
 
 const streamStatus = ref('idle')
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
+const router = useRouter()
 const lastHeartbeatAt = ref('')
 const connectedEvent = shallowRef()
 const matchFound = shallowRef()
@@ -371,6 +375,7 @@ let matchFoundCountdownDeadline = 0
 let shouldJoinAfterStreamConnected = false
 let hasQueueJoinRequestStarted = false
 let shouldResetMatchmakingAfterErrorModalClose = false
+let hasCompletedMatchResultTransition = false
 let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
 let matchResponseAbortController = new AbortController()
@@ -411,6 +416,7 @@ function startMatchmaking() {
     return
   }
 
+  hasCompletedMatchResultTransition = false
   queueErrorMessage.value = ''
   streamErrorMessage.value = ''
   errorModalMessage.value = ''
@@ -424,12 +430,12 @@ function startMatchmaking() {
   try {
     const connection = connectMatchEventSource({
       onOpen: () => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           streamErrorMessage.value = ''
         }
       },
       onConnected: (payload) => {
-        if (!isActive) {
+        if (!isActive || hasCompletedMatchResultTransition) {
           return
         }
 
@@ -442,23 +448,25 @@ function startMatchmaking() {
         }
       },
       onHeartbeat: (payload) => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           lastHeartbeatAt.value = payload.sentAt
         }
       },
       onMatchFound: (payload) => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           matchFound.value = payload
+          matchResponseResult.value = undefined
           openMatchFoundModal()
         }
       },
       onMatchResponseResult: (payload) => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           matchResponseResult.value = payload
+          handleMatchResponseResult()
         }
       },
       onError: () => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           handleStreamError()
         }
       },
@@ -467,6 +475,90 @@ function startMatchmaking() {
   } catch {
     handleStreamError()
   }
+}
+
+function handleMatchResponseResult() {
+  const payload = matchResponseResult.value
+
+  if (payload.action === 'GO_TO_GAME_WAITING') {
+    transitionToGameWaiting()
+    return
+  }
+
+  if (payload.action === 'RETURN_TO_MATCHING') {
+    returnToMatchingQueue()
+    return
+  }
+
+  returnToMatchStart()
+}
+
+function transitionToGameWaiting() {
+  const game = matchResponseResult.value?.game
+
+  if (!isValidGamePayload(game)) {
+    failMatchmaking(t('match.resultFailed'))
+    return
+  }
+
+  hasCompletedMatchResultTransition = true
+  resetMatchFoundModalState()
+  stopMatchWaitingTimer()
+  saveGameWaitingPayloadFromMatchResult(matchResponseResult.value)
+  closeMatchStream()
+  queueStatus.value = 'ready'
+  queueErrorMessage.value = ''
+  matchWaitingSeconds.value = 0
+  streamStatus.value = 'idle'
+  streamErrorMessage.value = ''
+  shouldJoinAfterStreamConnected = false
+  hasQueueJoinRequestStarted = false
+
+  void Promise.resolve(
+    router.push({
+      name: ROUTE_NAMES.gameWaiting,
+      params: {
+        gameRoomId: String(game.gameRoomId),
+      },
+    }),
+  ).catch(() => {
+    if (isActive) {
+      failMatchmaking(t('match.resultFailed'))
+    }
+  })
+}
+
+function isValidGamePayload(game = {}) {
+  if (typeof game !== 'object' || game === null) {
+    return false
+  }
+
+  const gameRoomId = Reflect.get(game, 'gameRoomId')
+  const videoUrl = Reflect.get(game, 'videoUrl')
+  const webSocketUrl = Reflect.get(game, 'webSocketUrl')
+
+  return (
+    Number.isFinite(gameRoomId) &&
+    String(videoUrl).trim() !== '' &&
+    String(webSocketUrl).trim() !== ''
+  )
+}
+
+function returnToMatchStart() {
+  resetMatchmakingState()
+  hasCompletedMatchResultTransition = true
+}
+
+function returnToMatchingQueue() {
+  resetMatchFoundModalState()
+  matchFound.value = undefined
+  matchResponseResult.value = undefined
+  queueStatus.value = 'queued'
+  queueErrorMessage.value = ''
+  streamErrorMessage.value = ''
+  shouldJoinAfterStreamConnected = false
+  hasQueueJoinRequestStarted = true
+  startMatchWaiting()
 }
 
 async function joinQueueAfterStreamConnected() {

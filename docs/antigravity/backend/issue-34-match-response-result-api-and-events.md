@@ -248,6 +248,7 @@ Content-Length: 0
 - [x] `outcome/reason/action` 조합별 프론트 처리 매핑표 정의
 - [x] 이벤트 payload에 상대 nickname/tier/tierScore 포함
 - [x] `match_response_result` 이벤트 이름 자체가 최종 이벤트임을 클라이언트 정책에 명시
+- [x] `RETURN_TO_MATCHING`은 백엔드 큐 복귀 완료 후 발행되며, 클라이언트는 SSE 유지 및 `join/leave` 미호출
 
 #### SSE result code mapping
 

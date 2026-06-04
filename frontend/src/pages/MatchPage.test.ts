@@ -2,7 +2,9 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
+import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import {
   connectMatchEventSource,
@@ -10,6 +12,14 @@ import {
 } from '@/services/realtime/matchEventSource'
 
 import MatchPage from './MatchPage.vue'
+
+const routerPushMock = vi.hoisted(() => vi.fn())
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({
+    push: routerPushMock,
+  }),
+}))
 
 vi.mock('@/services/realtime/matchEventSource', () => ({
   connectMatchEventSource: vi.fn(),
@@ -50,6 +60,8 @@ describe('MatchPage', () => {
     vi.useRealTimers()
     setLocale('ko')
     currentHandlers = undefined
+    window.sessionStorage.clear()
+    routerPushMock.mockResolvedValue(undefined)
     acceptMatchMock.mockResolvedValue(undefined)
     joinMatchQueueMock.mockResolvedValue(undefined)
     leaveMatchQueueMock.mockResolvedValue(undefined)
@@ -188,7 +200,7 @@ describe('MatchPage', () => {
     expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
   })
 
-  it('stores stream event payloads as page local state', async () => {
+  it('stores stream event payloads and moves to game waiting when matched', async () => {
     const wrapper = mount(MatchPage)
 
     await getStartButton(wrapper).trigger('click')
@@ -214,26 +226,92 @@ describe('MatchPage', () => {
       outcome: 'MATCHED',
       reason: 'BOTH_ACCEPTED',
       action: 'GO_TO_GAME_WAITING',
-      opponent: null,
-      game: null,
+      opponent: {
+        userId: 2,
+        nickname: 'opponent',
+        tier: 'Gold IV',
+        tierScore: 13,
+      },
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
     })
     await wrapper.vm.$nextTick()
     await flushPromises()
 
     const main = wrapper.get('main')
 
-    expect(main.attributes('data-stream-status')).toBe('connected')
-    expect(main.attributes('data-can-start-match')).toBe('false')
-    expect(main.attributes('data-queue-status')).toBe('queued')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(main.attributes('data-can-start-match')).toBe('true')
+    expect(main.attributes('data-queue-status')).toBe('ready')
     expect(main.attributes('data-connected-user-id')).toBe('1')
     expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
     expect(main.attributes('data-match-found-id')).toBe('match-1')
-    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
     expect(main.attributes('data-match-response-command-status')).toBe('idle')
     expect(main.attributes('data-match-response-command-pending')).toBe('false')
     expect(main.attributes('data-match-result-action')).toBe('GO_TO_GAME_WAITING')
     expect(main.attributes('data-can-submit-match-response')).toBe('false')
-    expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+    expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+    expect(readGameWaitingPayload(100)).toEqual({
+      matchId: 'match-1',
+      opponent: {
+        userId: 2,
+        nickname: 'opponent',
+        tier: 'Gold IV',
+        tierScore: 13,
+      },
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: expect.any(String),
+    })
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gameWaiting,
+      params: {
+        gameRoomId: '100',
+      },
+    })
+
+    handlers.onMatchResponseResult?.({
+      matchId: 'match-1',
+      outcome: 'FAILED',
+      reason: 'OPPONENT_REJECTED',
+      action: 'RETURN_TO_MATCHING',
+      opponent: null,
+      game: null,
+    })
+    handlers.onMatchFound?.({
+      matchId: 'late-match',
+      userId: 1,
+      opponentUserId: 3,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: '2026-06-01T00:00:03Z',
+    })
+    handlers.onConnected?.({
+      userId: 9,
+      connectedAt: '2026-06-01T00:00:04Z',
+    })
+    handlers.onHeartbeat?.({
+      sentAt: '2026-06-01T00:00:05Z',
+    })
+    handlers.onError?.(new Error('late stream error'))
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-result-action')).toBe('GO_TO_GAME_WAITING')
+    expect(main.attributes('data-match-found-id')).toBe('match-1')
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
+    expect(main.attributes('data-queue-status')).toBe('ready')
+    expect(main.attributes('data-connected-user-id')).toBe('1')
+    expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).toHaveBeenCalledTimes(1)
   })
 
   it('opens match found state and stops the waiting timer when match_found arrives', async () => {
@@ -445,6 +523,150 @@ describe('MatchPage', () => {
     expect(leaveMatchQueueMock).not.toHaveBeenCalled()
     expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
     expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('returns to ready and closes the stream when result action is GO_TO_MATCH_START', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    getCurrentHandlers().onMatchResponseResult?.({
+      matchId: 'match-1',
+      outcome: 'FAILED',
+      reason: 'MY_REJECTED',
+      action: 'GO_TO_MATCH_START',
+      opponent: null,
+      game: null,
+    })
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
+    expect(main.attributes('data-match-found-id')).toBe('')
+    expect(main.attributes('data-match-result-action')).toBe('')
+    expect(main.attributes('data-queue-status')).toBe('ready')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).not.toHaveBeenCalled()
+  })
+
+  it('returns to queued without closing or rejoining when result action is RETURN_TO_MATCHING', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    getCurrentHandlers().onMatchResponseResult?.({
+      matchId: 'match-1',
+      outcome: 'FAILED',
+      reason: 'OPPONENT_REJECTED',
+      action: 'RETURN_TO_MATCHING',
+      opponent: null,
+      game: null,
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
+    expect(main.attributes('data-match-found-id')).toBe('')
+    expect(main.attributes('data-match-result-action')).toBe('')
+    expect(main.attributes('data-queue-status')).toBe('queued')
+    expect(main.attributes('data-stream-status')).toBe('connected')
+    expect(getStartButton(wrapper).text()).toBe('1')
+    expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
+    expect(joinMatchQueueMock).toHaveBeenCalledTimes(1)
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(routerPushMock).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await wrapper.vm.$nextTick()
+
+    expect(getStartButton(wrapper).text()).toBe('2')
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-2',
+      userId: 1,
+      opponentUserId: 3,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-found-id')).toBe('match-2')
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-can-submit-match-response')).toBe('true')
+  })
+
+  it('does not move to game waiting when GO_TO_GAME_WAITING omits game payload', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    getCurrentHandlers().onMatchResponseResult?.({
+      matchId: 'match-1',
+      outcome: 'MATCHED',
+      reason: 'BOTH_ACCEPTED',
+      action: 'GO_TO_GAME_WAITING',
+      opponent: null,
+      game: null,
+    })
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(routerPushMock).not.toHaveBeenCalled()
+    expect(readGameWaitingPayload(100)).toBeNull()
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
+    expect(main.attributes('data-queue-status')).toBe('ready')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      '매칭 결과를 처리하지 못했습니다. 다시 시도해 주세요.',
+    )
   })
 
   it('toggles match found modal copy between Korean and English', async () => {

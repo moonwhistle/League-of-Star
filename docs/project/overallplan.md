@@ -35,7 +35,8 @@
   - 게임방 생성 실패 시 `GAME_SETUP_FAILED` 결과를 전달하고 양쪽 모두 start 버튼 화면으로 복귀
   - 게임방 생성 후 Redis 상태 전환 실패 시 생성된 게임방/참여자는 `ABORTED`로 보상 처리하고 동일하게 `GAME_SETUP_FAILED` 결과를 전달
   - 게임방 생성 실패 또는 Redis 상태 전환 실패 시 매칭 큐에 자동 복귀하지 않음
-  - 클라이언트는 `match_response_result` 수신 후 매칭 SSE `EventSource.close()`를 호출
+  - 클라이언트는 `match_response_result.action`별로 매칭 SSE close/유지 정책을 분기
+  - `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`는 매칭 SSE를 닫고, `RETURN_TO_MATCHING`은 백엔드 큐 복귀 완료 이벤트로 보고 SSE를 유지
   - 게임 대기 화면 진입 이후 준비/RTT/카운트다운/게임 시작/입력/종료는 WebSocket 담당
 
 ### 2.3 강타 싸움 게임
@@ -403,6 +404,7 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GAME_SETUP_FAILED` reason 기준으로 start 버튼 화면 복귀하도록 정책 조정 |
 | 2026-05-13 | Redis 상태 전환 실패 시 gameRoom/participant `ABORTED` 보상 처리 정책과 8~17초 게임 시간 반영 |
 | 2026-05-14 | `match_response_result` 수신 후 클라이언트가 매칭 SSE `EventSource.close()`를 호출하는 책임 명시 |
+| 2026-06-04 | `match_response_result.action`별 SSE close/유지 정책 반영. `RETURN_TO_MATCHING`은 백엔드 큐 복귀 완료 이벤트로 보고 SSE 유지 및 `join/leave` 미호출 |
 | 2026-05-15 | 게임 WebSocket local registry의 멀티 인스턴스 전제로 `gameRoomId` 기반 sticky routing 정책 추가 |
 | 2026-05-15 | WebSocket session 상태를 API local memory registry 상태로 분리하여 명시 |
 | 2026-05-18 | GAME_START 이전 timeout은 `ABORTED` 및 전적/LP 미반영, GAME_START 이후 disconnect는 정상 판정 흐름 유지로 정책 조정 |
