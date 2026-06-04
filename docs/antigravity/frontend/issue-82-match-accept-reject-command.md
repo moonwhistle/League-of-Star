@@ -132,20 +132,20 @@ flowchart TD
 
 ### 5. Test 구현
 
-- [ ] `acceptMatch(matchId)`가 accept endpoint로 요청하는지 검증.
-- [ ] `rejectMatch(matchId)`가 reject endpoint로 요청하는지 검증.
-- [ ] `matchId` URL encoding 검증.
-- [ ] `match_found` 수신 후 countdown 중 수락/거절 버튼 활성화 검증.
-- [ ] 수락 클릭 시 `acceptMatch(matchId)` 호출 검증.
-- [ ] 거절 클릭 시 `rejectMatch(matchId)` 호출 검증.
-- [ ] accept/reject 요청 중 중복 클릭 방지 검증.
-- [ ] accept 성공 후 모달 유지, SSE close 미발생, 화면 전환 미발생 검증.
-- [ ] reject 성공 후 모달 유지, ready 즉시 복귀 미발생 검증.
-- [ ] `MATCH_RESPONSE_LOCK_FAILED` 실패 시 모달 유지 및 결과 대기 상태 검증.
-- [ ] 그 외 실패 시 에러 표시 후 ready 복귀 검증.
-- [ ] countdown 0초 이후 accept/reject 클릭 불가 검증.
-- [ ] unmount 시 accept/reject abort 검증.
-- [ ] locale toggle 시 응답 상태 문구 전환 검증.
+- [x] `acceptMatch(matchId)`가 accept endpoint로 요청하는지 검증.
+- [x] `rejectMatch(matchId)`가 reject endpoint로 요청하는지 검증.
+- [x] `matchId` URL encoding 검증.
+- [x] `match_found` 수신 후 countdown 중 수락/거절 버튼 활성화 검증.
+- [x] 수락 클릭 시 `acceptMatch(matchId)` 호출 검증.
+- [x] 거절 클릭 시 `rejectMatch(matchId)` 호출 검증.
+- [x] accept/reject 요청 중 중복 클릭 방지 검증.
+- [x] accept 성공 후 모달 유지, SSE close 미발생, 화면 전환 미발생 검증.
+- [x] reject 성공 후 모달 유지, ready 즉시 복귀 미발생 검증.
+- [x] `MATCH_RESPONSE_LOCK_FAILED` 실패 시 모달 유지 및 결과 대기 상태 검증.
+- [x] 그 외 실패 시 에러 표시 후 ready 복귀 검증.
+- [x] countdown 0초 이후 accept/reject 클릭 불가 검증.
+- [x] unmount 시 accept/reject abort 검증.
+- [x] locale toggle 시 응답 상태 문구 전환 검증.
 
 ### 6. 문서 정합성 구현
 

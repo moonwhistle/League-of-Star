@@ -324,6 +324,10 @@ describe('MatchPage', () => {
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(main.attributes('data-stream-status')).toBe('connected')
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await wrapper.get('.match-found-decline').trigger('click')
+
     expect(leaveMatchQueueMock).not.toHaveBeenCalled()
     expect(acceptMatchMock).not.toHaveBeenCalled()
     expect(rejectMatchMock).not.toHaveBeenCalled()
@@ -639,6 +643,41 @@ describe('MatchPage', () => {
     expect(main.attributes('data-queue-error-message')).toBe('accept failed')
     expect(wrapper.get('[role="dialog"]').text()).toContain('accept failed')
     expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts an in-flight match response command on unmount', async () => {
+    let acceptSignal: AbortSignal | undefined
+    acceptMatchMock.mockImplementationOnce((_matchId, signal) => {
+      acceptSignal = signal
+
+      return new Promise<void>(() => {})
+    })
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(acceptSignal?.aborted).toBe(false)
+
+    wrapper.unmount()
+
+    expect(acceptSignal?.aborted).toBe(true)
   })
 
   it('clears the match found countdown timer on unmount', async () => {
