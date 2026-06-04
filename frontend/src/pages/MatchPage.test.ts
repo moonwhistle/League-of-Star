@@ -630,7 +630,7 @@ describe('MatchPage', () => {
     expect(main.attributes('data-queue-status')).toBe('ready')
     expect(main.attributes('data-stream-status')).toBe('idle')
     expect(wrapper.get('[role="dialog"]').text()).toContain(
-      '매칭 응답에 실패했습니다. 다시 시도해 주세요.',
+      '매칭 결과를 처리하지 못했습니다. 다시 시도해 주세요.',
     )
   })
 

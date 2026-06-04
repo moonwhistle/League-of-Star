@@ -497,7 +497,7 @@ function transitionToGameWaiting() {
   const game = matchResponseResult.value?.game
 
   if (!isValidGamePayload(game)) {
-    failMatchmaking(t('match.responseFailed'))
+    failMatchmaking(t('match.resultFailed'))
     return
   }
 
@@ -520,7 +520,7 @@ function transitionToGameWaiting() {
     }),
   ).catch(() => {
     if (isActive) {
-      failMatchmaking(t('match.responseFailed'))
+      failMatchmaking(t('match.resultFailed'))
     }
   })
 }

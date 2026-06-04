@@ -14,6 +14,10 @@
       </button>
     </header>
 
+    <p v-if="payloadErrorMessage !== ''" class="payload-error" role="alert">
+      {{ payloadErrorMessage }}
+    </p>
+
     <section class="game-waiting-stage" aria-label="Game waiting details">
       <section class="combatant-panel is-player" aria-label="Player info">
         <span class="panel-label">{{ t('gameWaiting.myInfo') }}</span>
@@ -80,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from 'vue'
+import { computed, onMounted, ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
@@ -94,6 +98,7 @@ const route = useRoute()
 const router = useRouter()
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
 const gameWaitingPayload = shallowRef()
+const payloadErrorMessage = ref('')
 
 const opponentName = computed(
   () => gameWaitingPayload.value?.opponent?.nickname ?? t('gameWaiting.unknownOpponent'),
@@ -121,14 +126,14 @@ onMounted(() => {
     : String(routeGameRoomIdParam ?? '').trim()
 
   if (gameRoomId === '') {
-    returnToMatch()
+    returnToMatchWithPayloadError()
     return
   }
 
   const payload = readGameWaitingPayload(gameRoomId)
 
   if (payload === null) {
-    returnToMatch()
+    returnToMatchWithPayloadError()
     return
   }
 
@@ -137,6 +142,11 @@ onMounted(() => {
 
 function returnToMatch() {
   void router.replace({ name: ROUTE_NAMES.match })
+}
+
+function returnToMatchWithPayloadError() {
+  payloadErrorMessage.value = t('gameWaiting.payloadMissing')
+  returnToMatch()
 }
 
 function getLoadingStepLabel(key = '') {
@@ -239,6 +249,17 @@ function getLoadingStepLabel(key = '') {
   border-radius: 4px;
   font-size: 0.76rem;
   font-weight: 900;
+}
+
+.payload-error {
+  position: relative;
+  z-index: 1;
+  width: min(620px, calc(100% - 40px));
+  padding: 12px 16px;
+  margin: 16px auto 0;
+  color: #ffd9d6;
+  background: rgba(36, 10, 18, 0.8);
+  border: 1px solid rgba(255, 182, 178, 0.28);
 }
 
 .game-waiting-stage {

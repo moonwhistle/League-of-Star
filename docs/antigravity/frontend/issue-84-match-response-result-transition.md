@@ -169,12 +169,12 @@ interface MatchResponseResultNotification {
 
 ### 6. Locale 구현
 
-- [ ] match result 실패 안내 문구 추가.
-- [ ] game waiting title 문구 추가.
-- [ ] game waiting status 문구 추가.
-- [ ] game waiting payload missing 문구 추가.
-- [ ] loading step 문구 추가.
-- [ ] 한/영 전환 시 game waiting 문구 갱신 구현.
+- [x] match result 실패 안내 문구 추가.
+- [x] game waiting title 문구 추가.
+- [x] game waiting status 문구 추가.
+- [x] game waiting payload missing 문구 추가.
+- [x] loading step 문구 추가.
+- [x] 한/영 전환 시 game waiting 문구 갱신 구현.
 
 ### 7. Test 구현
 

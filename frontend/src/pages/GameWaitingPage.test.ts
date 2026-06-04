@@ -99,6 +99,9 @@ describe('GameWaitingPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-game-waiting-payload-ready')).toBe('false')
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      '게임 준비 정보를 찾을 수 없습니다. 매칭 화면으로 돌아갑니다.',
+    )
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
@@ -118,6 +121,9 @@ describe('GameWaitingPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-game-waiting-payload-ready')).toBe('false')
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      '게임 준비 정보를 찾을 수 없습니다. 매칭 화면으로 돌아갑니다.',
+    )
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 })
