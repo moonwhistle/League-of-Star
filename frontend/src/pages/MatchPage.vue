@@ -222,6 +222,7 @@ import { useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { saveGameWaitingPayloadFromMatchResult } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
 
@@ -500,6 +501,7 @@ function transitionToGameWaiting() {
     return
   }
 
+  saveGameWaitingPayloadFromMatchResult(matchResponseResult.value)
   closeMatchStream()
   queueStatus.value = 'ready'
   queueErrorMessage.value = ''

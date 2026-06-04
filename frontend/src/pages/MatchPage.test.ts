@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import {
   connectMatchEventSource,
@@ -59,6 +60,7 @@ describe('MatchPage', () => {
     vi.useRealTimers()
     setLocale('ko')
     currentHandlers = undefined
+    window.sessionStorage.clear()
     routerPushMock.mockResolvedValue(undefined)
     acceptMatchMock.mockResolvedValue(undefined)
     joinMatchQueueMock.mockResolvedValue(undefined)
@@ -254,6 +256,21 @@ describe('MatchPage', () => {
     expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
     expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+    expect(readGameWaitingPayload(100)).toEqual({
+      matchId: 'match-1',
+      opponent: {
+        userId: 2,
+        nickname: 'opponent',
+        tier: 'Gold IV',
+        tierScore: 13,
+      },
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: expect.any(String),
+    })
     expect(routerPushMock).toHaveBeenCalledWith({
       name: ROUTE_NAMES.gameWaiting,
       params: {
@@ -607,6 +624,7 @@ describe('MatchPage', () => {
     const main = wrapper.get('main')
 
     expect(routerPushMock).not.toHaveBeenCalled()
+    expect(readGameWaitingPayload(100)).toBeNull()
     expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
     expect(main.attributes('data-match-found-modal-open')).toBe('false')
     expect(main.attributes('data-queue-status')).toBe('ready')
