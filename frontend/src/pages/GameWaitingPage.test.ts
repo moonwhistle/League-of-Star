@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { saveGameWaitingPayload } from '@/services/gameWaitingPayload'
 
@@ -12,6 +13,7 @@ const routeMock = vi.hoisted(() => ({
   },
 }))
 const routerReplaceMock = vi.hoisted(() => vi.fn())
+const { setLocale } = useLocale()
 
 vi.mock('vue-router', () => ({
   useRoute: () => routeMock,
@@ -26,9 +28,48 @@ describe('GameWaitingPage', () => {
     window.sessionStorage.clear()
     routeMock.params.gameRoomId = '100'
     routerReplaceMock.mockResolvedValue(undefined)
+    setLocale('ko')
   })
 
   it('reads the stored game waiting payload for the current route gameRoomId', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: {
+        userId: 2,
+        nickname: 'Voidwalker',
+        tier: 'Gold IV',
+        tierScore: 13,
+      },
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-waiting-payload-ready')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-room-id')).toBe('100')
+    expect(wrapper.get('main').attributes('data-loading-progress')).toBe('100')
+    expect(wrapper.get('h1').text()).toBe('LEAGUE OF SMITE')
+    expect(wrapper.text()).toContain('게임 준비 중')
+    expect(wrapper.text()).toContain('전투 데이터를 동기화하는 중')
+    expect(wrapper.text()).toContain('Voidwalker')
+    expect(wrapper.text()).toContain('Gold IV')
+    expect(wrapper.text()).toContain('매칭 정보')
+    expect(wrapper.text()).toContain('게임 준비')
+    expect(wrapper.text()).not.toContain('#100')
+    expect(wrapper.text()).not.toContain('match-1')
+    expect(wrapper.text()).not.toContain('게임룸')
+    expect(wrapper.text()).not.toContain('매치 ID')
+    expect(wrapper.findAll('.loading-steps .is-ready')).toHaveLength(5)
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('toggles game waiting copy between Korean and English', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
@@ -43,9 +84,14 @@ describe('GameWaitingPage', () => {
     const wrapper = mount(GameWaitingPage)
     await flushPromises()
 
-    expect(wrapper.get('main').attributes('data-game-waiting-payload-ready')).toBe('true')
-    expect(wrapper.get('main').attributes('data-game-room-id')).toBe('100')
-    expect(routerReplaceMock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('게임 준비 중')
+    expect(wrapper.text()).toContain('상대 정보 대기')
+    expect(wrapper.get('main').attributes('data-loading-progress')).toBe('80')
+
+    await wrapper.get('.locale-toggle').trigger('click')
+
+    expect(wrapper.text()).toContain('Preparing Game')
+    expect(wrapper.text()).toContain('Waiting for opponent')
   })
 
   it('returns to match when payload is missing', async () => {

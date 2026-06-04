@@ -143,16 +143,16 @@ interface MatchResponseResultNotification {
 
 ### 4. Game waiting UI 구현
 
-- [ ] `GameWaitingPage.vue` placeholder 제거.
-- [ ] `background.png` 기반 full-screen background 구현.
-- [ ] `gameloading.png` 참고 디자인을 CSS로 재현.
-- [ ] `gameloading.png` runtime import 금지 유지.
-- [ ] `LEAGUE OF SMITE` title 구현.
-- [ ] 게임 준비 중 title 구현.
-- [ ] 상대 nickname / tier / gameRoomId 표시 구현.
-- [ ] segmented loading bar 구현.
-- [ ] payload 확보율 기반 loading progress 구현.
-- [ ] desktop/mobile responsive layout 구현.
+- [x] `GameWaitingPage.vue` placeholder 제거.
+- [x] `background.png` 기반 full-screen background 구현.
+- [x] `gameloading.png` 참고 디자인을 CSS로 재현.
+- [x] `gameloading.png` runtime import 금지 유지.
+- [x] `LEAGUE OF SMITE` title 구현.
+- [x] 게임 준비 중 title 구현.
+- [x] 상대 nickname / tier / gameRoomId 표시 구현.
+- [x] segmented loading bar 구현.
+- [x] payload 확보율 기반 loading progress 구현.
+- [x] desktop/mobile responsive layout 구현.
 
 ### 5. Loading bar 정책 구현
 
