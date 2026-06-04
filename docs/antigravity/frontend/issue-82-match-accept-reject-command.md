@@ -29,14 +29,14 @@ flowchart TD
 
 ## Backend Contract
 
-| 항목 | 기준 |
-|------|------|
-| Match accept | `POST /api/v1/match/{matchId}/accept` |
-| Match reject | `POST /api/v1/match/{matchId}/reject` |
-| Success response | `200 OK` empty body |
-| Failure response | 전역 `ErrorResponse` |
-| Lock failure | `MATCH_012` / `MATCH_RESPONSE_LOCK_FAILED` |
-| Final transition source | SSE `match_response_result.action` |
+| 항목                    | 기준                                       |
+| ----------------------- | ------------------------------------------ |
+| Match accept            | `POST /api/v1/match/{matchId}/accept`      |
+| Match reject            | `POST /api/v1/match/{matchId}/reject`      |
+| Success response        | `200 OK` empty body                        |
+| Failure response        | 전역 `ErrorResponse`                       |
+| Lock failure            | `MATCH_012` / `MATCH_RESPONSE_LOCK_FAILED` |
+| Final transition source | SSE `match_response_result.action`         |
 
 프론트 처리 기준:
 
@@ -109,26 +109,26 @@ flowchart TD
 
 ### 3. Match found modal command UI 구현
 
-- [ ] 기존 disabled 수락/거절 버튼을 상태 기반 활성/비활성으로 변경.
-- [ ] 수락 클릭 handler 구현.
-- [ ] 거절 클릭 handler 구현.
-- [ ] 요청 중 버튼 disabled 및 pending 문구 표시 구현.
-- [ ] 수락 성공 후 `상대 응답 대기` 상태 표시 구현.
-- [ ] 거절 성공 후 `결과 대기` 상태 표시 구현.
-- [ ] lock failure 후 `결과 대기` 상태 표시 구현.
-- [ ] 버튼 disabled 스타일이 기존 modal design과 어울리도록 보강.
-- [ ] 배경 CTA 차단 정책 유지.
+- [x] 기존 disabled 수락/거절 버튼을 상태 기반 활성/비활성으로 변경.
+- [x] 수락 클릭 handler 구현.
+- [x] 거절 클릭 handler 구현.
+- [x] 요청 중 버튼 disabled 및 pending 문구 표시 구현.
+- [x] 수락 성공 후 `상대 응답 대기` 상태 표시 구현.
+- [x] 거절 성공 후 `결과 대기` 상태 표시 구현.
+- [x] lock failure 후 `결과 대기` 상태 표시 구현.
+- [x] 버튼 disabled 스타일이 기존 modal design과 어울리도록 보강.
+- [x] 배경 CTA 차단 정책 유지.
 
 ### 4. Locale 구현
 
-- [ ] `match.accepting` 문구 추가.
-- [ ] `match.declining` 문구 추가.
-- [ ] `match.accepted` 문구 추가.
-- [ ] `match.declined` 문구 추가.
-- [ ] `match.waitingForOpponent` 문구 추가.
-- [ ] `match.waitingForResult` 문구 추가.
-- [ ] `match.responseFailed` 문구 추가.
-- [ ] 한/영 전환 시 응답 상태 문구 갱신 구현.
+- [x] `match.accepting` 문구 추가.
+- [x] `match.declining` 문구 추가.
+- [x] `match.accepted` 문구 추가.
+- [x] `match.declined` 문구 추가.
+- [x] `match.waitingForOpponent` 문구 추가.
+- [x] `match.waitingForResult` 문구 추가.
+- [x] `match.responseFailed` 문구 추가.
+- [x] 한/영 전환 시 응답 상태 문구 갱신 구현.
 
 ### 5. Test 구현
 
