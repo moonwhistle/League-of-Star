@@ -2,6 +2,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
+import { ApiClientError } from '@/services/apiClient'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import {
   connectMatchEventSource,
@@ -49,8 +50,10 @@ describe('MatchPage', () => {
     vi.useRealTimers()
     setLocale('ko')
     currentHandlers = undefined
+    acceptMatchMock.mockResolvedValue(undefined)
     joinMatchQueueMock.mockResolvedValue(undefined)
     leaveMatchQueueMock.mockResolvedValue(undefined)
+    rejectMatchMock.mockResolvedValue(undefined)
     connectMatchEventSourceMock.mockImplementation((handlers = {}) => {
       currentHandlers = handlers
 
@@ -226,7 +229,10 @@ describe('MatchPage', () => {
     expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
     expect(main.attributes('data-match-found-id')).toBe('match-1')
     expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-match-response-command-pending')).toBe('false')
     expect(main.attributes('data-match-result-action')).toBe('GO_TO_GAME_WAITING')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
   })
 
@@ -261,6 +267,9 @@ describe('MatchPage', () => {
     expect(main.attributes('data-match-found-modal-open')).toBe('true')
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('10')
     expect(main.attributes('data-match-found-loading')).toBe('false')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-match-response-command-pending')).toBe('false')
+    expect(main.attributes('data-can-submit-match-response')).toBe('true')
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('매칭 성사')
@@ -271,8 +280,8 @@ describe('MatchPage', () => {
     expect(wrapper.get('[data-testid="match-found-logo"]').attributes('src')).toBeTruthy()
     expect(wrapper.get('.match-found-accept').text()).toBe('수락')
     expect(wrapper.get('.match-found-decline').text()).toBe('거절')
-    expect(wrapper.get('.match-found-accept').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('.match-found-decline').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.match-found-accept').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('.match-found-decline').attributes('disabled')).toBeUndefined()
 
     await vi.advanceTimersByTimeAsync(2000)
     await wrapper.vm.$nextTick()
@@ -310,9 +319,15 @@ describe('MatchPage', () => {
     expect(main.attributes('data-match-found-modal-open')).toBe('true')
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
     expect(main.attributes('data-match-found-loading')).toBe('true')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(main.attributes('data-stream-status')).toBe('connected')
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await wrapper.get('.match-found-decline').trigger('click')
+
     expect(leaveMatchQueueMock).not.toHaveBeenCalled()
     expect(acceptMatchMock).not.toHaveBeenCalled()
     expect(rejectMatchMock).not.toHaveBeenCalled()
@@ -375,7 +390,34 @@ describe('MatchPage', () => {
 
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
     expect(main.attributes('data-match-found-loading')).toBe('true')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('로딩중...')
+  })
+
+  it('blocks match response submission when match_found does not include a match id', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: '',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
   })
 
   it('blocks the background match action while match found state is active', async () => {
@@ -435,7 +477,70 @@ describe('MatchPage', () => {
     expect(wrapper.get('.match-found-decline').text()).toBe('Decline')
   })
 
-  it('keeps accept and decline buttons as UI-only controls in this issue', async () => {
+  it('submits accept command and waits for the final SSE result', async () => {
+    let resolveAccept: () => void = () => {}
+    acceptMatchMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveAccept = resolve
+      }),
+    )
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const main = wrapper.get('main')
+
+    expect(acceptMatchMock).toHaveBeenCalledWith('match-1', expect.any(AbortSignal))
+    expect(rejectMatchMock).not.toHaveBeenCalled()
+    expect(main.attributes('data-match-response-command-status')).toBe('accepting')
+    expect(main.attributes('data-match-response-command-pending')).toBe('true')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
+    expect(wrapper.get('.match-found-accept').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.match-found-decline').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('수락 중...')
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    expect(acceptMatchMock).toHaveBeenCalledTimes(1)
+
+    resolveAccept()
+    await flushPromises()
+
+    expect(main.attributes('data-match-response-command-status')).toBe('accepted')
+    expect(main.attributes('data-match-response-command-pending')).toBe('false')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('상대 응답 대기')
+    expect(wrapper.get('.match-found-accept').text()).toBe('수락 완료')
+    expect(wrapper.get('main').attributes('data-match-found-modal-open')).toBe('true')
+    expect(wrapper.get('main').attributes('data-stream-status')).toBe('connected')
+    expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
+
+    await wrapper.get('.match-locale-toggle').trigger('click')
+
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain(
+      'Waiting for opponent',
+    )
+    expect(wrapper.get('.match-found-accept').text()).toBe('Accepted')
+  })
+
+  it('blocks decline when accept command is already pending', async () => {
+    acceptMatchMock.mockReturnValueOnce(new Promise<void>(() => {}))
     const wrapper = mount(MatchPage)
 
     await getStartButton(wrapper).trigger('click')
@@ -456,10 +561,156 @@ describe('MatchPage', () => {
 
     await wrapper.get('.match-found-accept').trigger('click')
     await wrapper.get('.match-found-decline').trigger('click')
+    await wrapper.vm.$nextTick()
 
-    expect(acceptMatchMock).not.toHaveBeenCalled()
+    const main = wrapper.get('main')
+
+    expect(acceptMatchMock).toHaveBeenCalledTimes(1)
     expect(rejectMatchMock).not.toHaveBeenCalled()
+    expect(main.attributes('data-match-response-command-status')).toBe('accepting')
+    expect(main.attributes('data-match-response-command-pending')).toBe('true')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('수락 중...')
+  })
+
+  it('submits reject command and waits for the final SSE result', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-decline').trigger('click')
+    await flushPromises()
+
+    expect(rejectMatchMock).toHaveBeenCalledWith('match-1', expect.any(AbortSignal))
+    expect(acceptMatchMock).not.toHaveBeenCalled()
+    expect(wrapper.get('main').attributes('data-match-response-command-status')).toBe('rejected')
+    expect(wrapper.get('main').attributes('data-can-submit-match-response')).toBe('false')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('결과 대기')
+    expect(wrapper.get('.match-found-decline').text()).toBe('거절 완료')
     expect(wrapper.get('main').attributes('data-match-found-modal-open')).toBe('true')
+    expect(wrapper.get('main').attributes('data-stream-status')).toBe('connected')
+    expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the modal open and waits for SSE when response lock fails', async () => {
+    acceptMatchMock.mockRejectedValueOnce(
+      new ApiClientError(409, {
+        code: 'MATCH_012',
+        message: '매칭 응답 처리 중입니다. 잠시 후 다시 시도해주세요.',
+      }),
+    )
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-response-command-status')).toBe('lockWaiting')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
+    expect(main.attributes('data-match-found-modal-open')).toBe('true')
+    expect(main.attributes('data-stream-status')).toBe('connected')
+    expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('응답 처리 중...')
+    expect(wrapper.find('.match-error-dialog').exists()).toBe(false)
+    expect(closeMatchEventSourceMock).not.toHaveBeenCalled()
+  })
+
+  it('closes the modal and returns to ready when response command fails generally', async () => {
+    acceptMatchMock.mockRejectedValueOnce(new Error('accept failed'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
+    expect(main.attributes('data-queue-status')).toBe('ready')
+    expect(main.attributes('data-stream-status')).toBe('idle')
+    expect(main.attributes('data-queue-error-message')).toBe('accept failed')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('accept failed')
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts an in-flight match response command on unmount', async () => {
+    let acceptSignal: AbortSignal | undefined
+    acceptMatchMock.mockImplementationOnce((_matchId, signal) => {
+      acceptSignal = signal
+
+      return new Promise<void>(() => {})
+    })
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.match-found-accept').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(acceptSignal?.aborted).toBe(false)
+
+    wrapper.unmount()
+
+    expect(acceptSignal?.aborted).toBe(true)
   })
 
   it('clears the match found countdown timer on unmount', async () => {
@@ -519,6 +770,8 @@ describe('MatchPage', () => {
     expect(leaveMatchQueueMock).not.toHaveBeenCalled()
     expect(main.attributes('data-match-found-modal-open')).toBe('false')
     expect(main.attributes('data-match-found-countdown-seconds')).toBe('0')
+    expect(main.attributes('data-match-response-command-status')).toBe('idle')
+    expect(main.attributes('data-can-submit-match-response')).toBe('false')
     expect(main.attributes('data-stream-status')).toBe('error')
     expect(main.attributes('data-queue-status')).toBe('queued')
     expect(wrapper.get('[role="dialog"]').text()).toContain(

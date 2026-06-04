@@ -10,6 +10,9 @@
     :data-match-found-modal-open="isMatchFoundModalOpen"
     :data-match-found-countdown-seconds="matchFoundCountdownSeconds"
     :data-match-found-loading="isMatchFoundLoading"
+    :data-match-response-command-status="matchResponseCommandStatus"
+    :data-match-response-command-pending="isMatchResponseCommandPending"
+    :data-can-submit-match-response="canSubmitMatchResponse"
     :data-match-result-action="matchResponseResult?.action ?? ''"
     :data-stream-error-message="streamErrorMessage"
     :data-can-start-match="canStartMatch"
@@ -163,9 +166,29 @@
         </p>
 
         <div class="match-found-actions">
-          <button class="match-found-accept" type="button" disabled>{{ t('match.accept') }}</button>
-          <button class="match-found-decline" type="button" disabled>
-            {{ t('match.decline') }}
+          <button
+            class="match-found-accept"
+            :class="{
+              'is-pending': matchResponseCommandStatus === 'accepting',
+              'is-submitted': matchResponseCommandStatus === 'accepted',
+            }"
+            type="button"
+            :disabled="!canSubmitMatchResponse"
+            @click="acceptMatchResponse"
+          >
+            {{ matchAcceptActionLabel }}
+          </button>
+          <button
+            class="match-found-decline"
+            :class="{
+              'is-pending': matchResponseCommandStatus === 'rejecting',
+              'is-submitted': matchResponseCommandStatus === 'rejected',
+            }"
+            type="button"
+            :disabled="!canSubmitMatchResponse"
+            @click="rejectMatchResponse"
+          >
+            {{ matchRejectActionLabel }}
           </button>
         </div>
       </section>
@@ -196,7 +219,8 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 
 import { useLocale } from '@/composables/useLocale'
-import { joinMatchQueue, leaveMatchQueue } from '@/services/matchService'
+import { ApiClientError } from '@/services/apiClient'
+import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
 
 import backgroundImageUrl from '../../img/background.png'
@@ -214,9 +238,32 @@ const queueErrorMessage = ref('')
 const matchWaitingSeconds = ref(0)
 const isMatchFoundModalOpen = ref(false)
 const matchFoundCountdownSeconds = ref(0)
+const matchResponseCommandStatus = ref('idle')
 const errorModalMessage = ref('')
+const isMatchResponseCommandPending = computed(
+  () =>
+    matchResponseCommandStatus.value === 'accepting' ||
+    matchResponseCommandStatus.value === 'rejecting',
+)
+const hasSubmittedMatchResponseCommand = computed(
+  () =>
+    matchResponseCommandStatus.value === 'accepted' ||
+    matchResponseCommandStatus.value === 'rejected' ||
+    matchResponseCommandStatus.value === 'lockWaiting',
+)
+const currentMatchFoundId = computed(() => String(matchFound.value?.matchId ?? '').trim())
 const isMatchFoundLoading = computed(
   () => isMatchFoundModalOpen.value && matchFoundCountdownSeconds.value <= 0,
+)
+const canSubmitMatchResponse = computed(
+  () =>
+    isMatchFoundModalOpen.value &&
+    currentMatchFoundId.value !== '' &&
+    matchFoundCountdownSeconds.value > 0 &&
+    streamStatus.value === 'connected' &&
+    !isMatchResponseCommandPending.value &&
+    !hasSubmittedMatchResponseCommand.value &&
+    matchResponseResult.value === undefined,
 )
 const matchFoundCountdownProgress = computed(() => {
   const totalSeconds = Math.max(1, getMatchFoundAcceptTimeoutSeconds(1))
@@ -225,11 +272,53 @@ const matchFoundCountdownProgress = computed(() => {
   return `${progress}turn`
 })
 const matchFoundStatusLabel = computed(() => {
+  if (matchResponseCommandStatus.value === 'accepting') {
+    return t('match.accepting')
+  }
+
+  if (matchResponseCommandStatus.value === 'rejecting') {
+    return t('match.declining')
+  }
+
+  if (matchResponseCommandStatus.value === 'accepted') {
+    return t('match.waitingForOpponent')
+  }
+
+  if (matchResponseCommandStatus.value === 'rejected') {
+    return t('match.waitingForResult')
+  }
+
+  if (matchResponseCommandStatus.value === 'lockWaiting') {
+    return t('match.processingResponse')
+  }
+
   if (isMatchFoundLoading.value) {
     return t('match.loading')
   }
 
   return String(matchFoundCountdownSeconds.value)
+})
+const matchAcceptActionLabel = computed(() => {
+  if (matchResponseCommandStatus.value === 'accepting') {
+    return t('match.accepting')
+  }
+
+  if (matchResponseCommandStatus.value === 'accepted') {
+    return t('match.accepted')
+  }
+
+  return t('match.accept')
+})
+const matchRejectActionLabel = computed(() => {
+  if (matchResponseCommandStatus.value === 'rejecting') {
+    return t('match.declining')
+  }
+
+  if (matchResponseCommandStatus.value === 'rejected') {
+    return t('match.declined')
+  }
+
+  return t('match.decline')
 })
 const hasActiveMatchFoundResponse = computed(
   () =>
@@ -284,6 +373,7 @@ let hasQueueJoinRequestStarted = false
 let shouldResetMatchmakingAfterErrorModalClose = false
 let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
+let matchResponseAbortController = new AbortController()
 
 onMounted(() => {
   isActive = true
@@ -295,6 +385,7 @@ onUnmounted(() => {
   shouldJoinAfterStreamConnected = false
   abortJoinRequest()
   abortLeaveRequest()
+  abortMatchResponseRequest()
   stopMatchWaitingTimer()
   stopMatchFoundCountdown()
   closeMatchStream()
@@ -451,6 +542,54 @@ async function cancelMatchmaking() {
   }
 }
 
+async function acceptMatchResponse() {
+  await submitMatchResponseCommand('accept')
+}
+
+async function rejectMatchResponse() {
+  await submitMatchResponseCommand('reject')
+}
+
+async function submitMatchResponseCommand(command = 'accept') {
+  if (!canSubmitMatchResponse.value) {
+    return
+  }
+
+  const matchId = currentMatchFoundId.value
+  abortMatchResponseRequest()
+  const activeMatchResponseAbortController = matchResponseAbortController
+  matchResponseCommandStatus.value = command === 'accept' ? 'accepting' : 'rejecting'
+
+  try {
+    if (command === 'accept') {
+      await acceptMatch(matchId, activeMatchResponseAbortController.signal)
+    } else {
+      await rejectMatch(matchId, activeMatchResponseAbortController.signal)
+    }
+
+    if (!isActive || activeMatchResponseAbortController.signal.aborted) {
+      return
+    }
+
+    matchResponseCommandStatus.value = command === 'accept' ? 'accepted' : 'rejected'
+  } catch (error) {
+    if (!isActive || (error instanceof Error && error.name === 'AbortError')) {
+      return
+    }
+
+    if (error instanceof ApiClientError && isMatchResponseLockFailure(error)) {
+      matchResponseCommandStatus.value = 'lockWaiting'
+      return
+    }
+
+    const message =
+      error instanceof Error && error.message.trim() !== ''
+        ? error.message
+        : t('match.responseFailed')
+    failMatchmaking(message, message)
+  }
+}
+
 function stopMatchWaitingTimer() {
   if (matchWaitingTimerId === 0) {
     return
@@ -461,6 +600,7 @@ function stopMatchWaitingTimer() {
 }
 
 function openMatchFoundModal() {
+  resetMatchResponseCommandState()
   isMatchFoundModalOpen.value = true
   stopMatchWaitingTimer()
   startMatchFoundCountdown()
@@ -526,6 +666,7 @@ function stopMatchFoundCountdown() {
 
 function resetMatchFoundModalState() {
   stopMatchFoundCountdown()
+  resetMatchResponseCommandState()
   isMatchFoundModalOpen.value = false
   matchFoundCountdownSeconds.value = 0
   matchFoundCountdownDeadline = 0
@@ -624,6 +765,32 @@ function abortJoinRequest() {
 
 function abortLeaveRequest() {
   leaveAbortController.abort()
+}
+
+function abortMatchResponseRequest() {
+  matchResponseAbortController.abort()
+  matchResponseAbortController = new AbortController()
+}
+
+function isMatchResponseLockFailure(error = new ApiClientError(0, undefined)) {
+  const errorCode = getApiErrorCode(error)
+
+  return errorCode === 'MATCH_012' || errorCode === 'MATCH_RESPONSE_LOCK_FAILED'
+}
+
+function getApiErrorCode(error = new ApiClientError(0, undefined)) {
+  if (typeof error.body !== 'object' || error.body === null) {
+    return ''
+  }
+
+  const code = Reflect.get(error.body, 'code')
+
+  return typeof code === 'string' ? code : ''
+}
+
+function resetMatchResponseCommandState() {
+  abortMatchResponseRequest()
+  matchResponseCommandStatus.value = 'idle'
 }
 
 function failMatchmaking(message = '', nextQueueErrorMessage = '', nextStreamErrorMessage = '') {
@@ -1210,6 +1377,12 @@ function closeErrorModal() {
 
 .match-found-actions button:disabled {
   cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.match-found-actions button.is-pending,
+.match-found-actions button.is-submitted {
+  opacity: 0.82;
 }
 
 .match-found-accept {
@@ -1223,6 +1396,17 @@ function closeErrorModal() {
   color: rgba(240, 249, 255, 0.82);
   background: rgba(4, 9, 22, 0.74);
   border: 1px solid rgba(206, 224, 255, 0.22);
+}
+
+.match-found-accept.is-submitted {
+  color: #06101c;
+  background: #b7fff7;
+}
+
+.match-found-decline.is-submitted {
+  color: #f7fbff;
+  background: rgba(119, 80, 156, 0.74);
+  border-color: rgba(214, 174, 255, 0.38);
 }
 
 .match-error-backdrop {
