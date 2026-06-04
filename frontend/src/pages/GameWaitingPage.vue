@@ -86,6 +86,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
+import { calculateGameWaitingProgress } from '@/services/gameWaitingProgress'
 
 import backgroundImageUrl from '../../img/background.png'
 
@@ -101,40 +102,14 @@ const opponentTier = computed(() => gameWaitingPayload.value?.opponent?.tier ?? 
 const opponentTierScore = computed(() =>
   String(gameWaitingPayload.value?.opponent?.tierScore ?? '-'),
 )
-const loadingSteps = computed(() => [
-  {
-    key: 'matchId',
-    label: t('gameWaiting.matchData'),
-    ready: String(gameWaitingPayload.value?.matchId ?? '').trim() !== '',
-  },
-  {
-    key: 'opponent',
-    label: t('gameWaiting.opponentInfo'),
-    ready:
-      gameWaitingPayload.value?.opponent !== null &&
-      gameWaitingPayload.value?.opponent !== undefined,
-  },
-  {
-    key: 'gameRoomId',
-    label: t('gameWaiting.gameSetup'),
-    ready: Number.isFinite(gameWaitingPayload.value?.game.gameRoomId),
-  },
-  {
-    key: 'videoUrl',
-    label: t('gameWaiting.video'),
-    ready: String(gameWaitingPayload.value?.game.videoUrl ?? '').trim() !== '',
-  },
-  {
-    key: 'webSocketUrl',
-    label: t('gameWaiting.socket'),
-    ready: String(gameWaitingPayload.value?.game.webSocketUrl ?? '').trim() !== '',
-  },
-])
-const loadingProgress = computed(() => {
-  const readyCount = loadingSteps.value.filter((step) => step.ready).length
-
-  return readyCount * 20
-})
+const loadingProgressState = computed(() => calculateGameWaitingProgress(gameWaitingPayload.value))
+const loadingSteps = computed(() =>
+  loadingProgressState.value.steps.map((step) => ({
+    ...step,
+    label: getLoadingStepLabel(step.key),
+  })),
+)
+const loadingProgress = computed(() => loadingProgressState.value.progress)
 const loadingStatusLabel = computed(() =>
   loadingProgress.value >= 100 ? t('gameWaiting.ready') : t('gameWaiting.pending'),
 )
@@ -162,6 +137,26 @@ onMounted(() => {
 
 function returnToMatch() {
   void router.replace({ name: ROUTE_NAMES.match })
+}
+
+function getLoadingStepLabel(key = '') {
+  if (key === 'matchId') {
+    return t('gameWaiting.matchData')
+  }
+
+  if (key === 'opponent') {
+    return t('gameWaiting.opponentInfo')
+  }
+
+  if (key === 'gameRoomId') {
+    return t('gameWaiting.gameSetup')
+  }
+
+  if (key === 'videoUrl') {
+    return t('gameWaiting.video')
+  }
+
+  return t('gameWaiting.socket')
 }
 </script>
 

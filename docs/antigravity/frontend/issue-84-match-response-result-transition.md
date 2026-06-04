@@ -156,16 +156,16 @@ interface MatchResponseResultNotification {
 
 ### 5. Loading bar 정책 구현
 
-- [ ] 필수 payload 항목을 5개로 정의.
+- [x] 필수 payload 항목을 5개로 정의.
   - `matchId`
   - `opponent`
   - `game.gameRoomId`
   - `game.videoUrl`
   - `game.webSocketUrl`
-- [ ] 각 항목을 20%로 계산.
-- [ ] 1개 확보 시 20%, 2개 확보 시 40%, 3개 확보 시 60%, 4개 확보 시 80%, 5개 확보 시 100% 표시.
-- [ ] 정상 `GO_TO_GAME_WAITING` payload는 route 진입 직후 100%가 될 수 있음을 UI 정책에 반영.
-- [ ] WebSocket 연결률과 `CLIENT_READY` progress는 이번 이슈에서 제외.
+- [x] 각 항목을 20%로 계산.
+- [x] 1개 확보 시 20%, 2개 확보 시 40%, 3개 확보 시 60%, 4개 확보 시 80%, 5개 확보 시 100% 표시.
+- [x] 정상 `GO_TO_GAME_WAITING` payload는 route 진입 직후 100%가 될 수 있음을 UI 정책에 반영.
+- [x] WebSocket 연결률과 `CLIENT_READY` progress는 이번 이슈에서 제외.
 
 ### 6. Locale 구현
 
