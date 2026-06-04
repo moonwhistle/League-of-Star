@@ -73,6 +73,7 @@ interface MatchResponseResultNotification {
 - `RETURN_TO_MATCHING`은 백엔드가 이미 큐 복귀를 완료한 상태로 보고 queued 상태로 복귀한다.
 - `RETURN_TO_MATCHING`은 매칭 SSE를 닫지 않는다.
 - `RETURN_TO_MATCHING`에서는 `joinMatchQueue`, `leaveMatchQueue`를 호출하지 않는다.
+- `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START` 처리 이후 늦게 도착한 매칭 SSE callback은 무시한다.
 
 ## Scope Boundary
 
@@ -88,6 +89,7 @@ interface MatchResponseResultNotification {
 - `background.png` 기반 game waiting background 구현.
 - `gameloading.png` 참고 디자인 기반 CSS 재현.
 - game waiting loading bar payload 확보율 구현.
+- game waiting loading bar 문구는 게임 시작 준비 완료가 아니라 payload 수신 상태로 표시.
 - game waiting 화면에는 사용자에게 필요한 상대 정보와 준비 상태만 표시하고, `gameRoomId`, `matchId`는 내부 저장/검증 데이터로만 유지.
 - 한/영 locale 문구 추가.
 - Match page / Game waiting page 테스트 구현.
@@ -131,6 +133,7 @@ interface MatchResponseResultNotification {
 - [x] `RETURN_TO_MATCHING` 처리 시 매칭 SSE 유지 구현.
 - [x] `RETURN_TO_MATCHING` 처리 시 waiting timer 재시작 구현.
 - [x] `RETURN_TO_MATCHING` 처리 시 join/leave API 미호출 유지 구현.
+- [x] `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START` 이후 늦은 매칭 SSE callback 무시 구현.
 - [x] `game` 필수 payload 누락 시 game waiting 이동 금지 구현.
 
 ### 3. Game waiting payload storage 구현
@@ -168,6 +171,7 @@ interface MatchResponseResultNotification {
 - [x] 1개 확보 시 20%, 2개 확보 시 40%, 3개 확보 시 60%, 4개 확보 시 80%, 5개 확보 시 100% 표시.
 - [x] 정상 `GO_TO_GAME_WAITING` payload는 route 진입 직후 100%가 될 수 있음을 UI 정책에 반영.
 - [x] WebSocket 연결률과 `CLIENT_READY` progress는 이번 이슈에서 제외.
+- [x] `100%` 문구는 게임 시작 준비 완료가 아니라 payload 수신 완료로 표시.
 
 ### 6. Locale 구현
 
@@ -190,7 +194,9 @@ interface MatchResponseResultNotification {
 - [x] `RETURN_TO_MATCHING` 수신 시 match SSE close 미호출 검증.
 - [x] `RETURN_TO_MATCHING` 수신 시 join/leave API 미호출 검증.
 - [x] `RETURN_TO_MATCHING` 이후 다음 `match_found` 수신 가능 검증.
+- [x] `GO_TO_GAME_WAITING` 이후 늦은 매칭 SSE callback 무시 검증.
 - [x] Game waiting page 상대 정보 표시 및 payload 기반 progress 검증.
+- [x] Game waiting loading bar가 `Ready`가 아니라 payload 수신 상태로 표시되는지 검증.
 - [x] loading bar 20/40/60/80/100% 계산 검증.
 - [x] payload 없음 또는 route param 불일치 시 `/match` 복귀 검증.
 - [x] locale toggle 시 game waiting 문구 전환 검증.
@@ -227,6 +233,7 @@ interface MatchResponseResultNotification {
 - `RETURN_TO_MATCHING`은 match SSE를 유지하고 queued 상태로 복귀한다.
 - `RETURN_TO_MATCHING`은 join/leave API를 호출하지 않는다.
 - `RETURN_TO_MATCHING`은 백엔드 큐 복귀 완료 이벤트로 해석한다.
+- `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START` 이후에는 최종 전환이 끝난 것으로 보고 늦은 매칭 SSE callback을 무시한다.
 - `game` payload는 `sessionStorage`에 최소 저장한다.
 - `GameWaitingPage.vue`는 상대 정보 표시와 loading UI까지만 담당한다.
 - `GameWaitingPage.vue`는 `gameRoomId`, `matchId`를 사용자에게 노출하지 않고 route 검증, storage key, loading progress 계산에만 사용한다.
@@ -247,6 +254,7 @@ interface MatchResponseResultNotification {
 - `RETURN_TO_MATCHING` 수신 시 join/leave API를 호출하지 않음.
 - Game waiting page는 저장된 opponent 정보를 표시하고, game payload는 내부 검증과 loading progress 계산에 사용함.
 - Loading bar는 5개 필수 payload 기준으로 20% 단위로 표시됨.
+- Loading bar 100%는 게임 시작 준비 완료가 아니라 필수 payload 수신 완료로 표시됨.
 - `gameloading.png`는 runtime asset으로 사용되지 않음.
 - lint / format / typecheck / test / build 통과.
 
@@ -283,6 +291,7 @@ flowchart TD
 - `GO_TO_MATCH_START`는 매칭 흐름이 종료된 상태로 보고 match SSE를 닫고 ready로 복귀함.
 - `RETURN_TO_MATCHING`은 백엔드가 수락 유저를 기존 우선순위로 큐에 다시 넣은 뒤 보내는 이벤트이므로, 프론트는 rejoin/leave 없이 queued로 복귀하고 SSE를 유지함.
 - Game waiting 화면은 상대 정보와 loading UI만 보여주고, `gameRoomId`, `matchId`는 route 검증, storage key, loading progress 계산에만 사용함.
+- `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START` 이후 늦게 도착한 매칭 SSE callback은 이미 끝난 흐름의 이벤트로 보고 무시함.
 
 ## 📚 Changes
 
@@ -306,6 +315,11 @@ flowchart TD
 - Loading bar 기준을 “필수 payload 확보율”로 정함.
   아직 Game WebSocket 연결은 이번 이슈 범위가 아니므로, 로딩 바를 실제 소켓 준비율처럼 보이면 오해가 생김.
   그래서 `matchId`, `opponent`, `gameRoomId`, `videoUrl`, `webSocketUrl` 5개 항목을 각각 20%로 계산함.
+  100% 상태 문구도 `Ready`가 아니라 `Received` 계열로 표현해 게임 시작 가능 상태와 구분함.
+
+- 최종 전환 이후 늦은 SSE callback을 무시함.
+  `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`는 현재 매칭 플로우가 끝난 상태임.
+  이 뒤에 네트워크 지연으로 이전 `match_found`나 다른 `match_response_result`가 도착해도 화면을 다시 queued/modal 상태로 되돌리지 않도록 guard를 둠.
 
 - Game waiting UI는 참고 이미지를 그대로 삽입하지 않고 CSS로 재구성함.
   `gameloading.png`는 디자인 참고용이고 runtime asset이 아님.

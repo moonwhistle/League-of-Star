@@ -61,6 +61,8 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('Gold IV')
     expect(wrapper.text()).toContain('매칭 정보')
     expect(wrapper.text()).toContain('게임 준비')
+    expect(wrapper.text()).toContain('수신 완료')
+    expect(wrapper.text()).not.toContain('준비 완료')
     expect(wrapper.text()).not.toContain('#100')
     expect(wrapper.text()).not.toContain('match-1')
     expect(wrapper.text()).not.toContain('게임룸')
@@ -86,12 +88,15 @@ describe('GameWaitingPage', () => {
 
     expect(wrapper.text()).toContain('게임 준비 중')
     expect(wrapper.text()).toContain('상대 정보 대기')
+    expect(wrapper.text()).toContain('수신 대기')
     expect(wrapper.get('main').attributes('data-loading-progress')).toBe('80')
 
     await wrapper.get('.locale-toggle').trigger('click')
 
     expect(wrapper.text()).toContain('Preparing Game')
     expect(wrapper.text()).toContain('Waiting for opponent')
+    expect(wrapper.text()).toContain('Waiting')
+    expect(wrapper.text()).not.toContain('Ready')
   })
 
   it('returns to match when payload is missing', async () => {

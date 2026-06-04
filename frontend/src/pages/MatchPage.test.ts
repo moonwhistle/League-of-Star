@@ -277,6 +277,41 @@ describe('MatchPage', () => {
         gameRoomId: '100',
       },
     })
+
+    handlers.onMatchResponseResult?.({
+      matchId: 'match-1',
+      outcome: 'FAILED',
+      reason: 'OPPONENT_REJECTED',
+      action: 'RETURN_TO_MATCHING',
+      opponent: null,
+      game: null,
+    })
+    handlers.onMatchFound?.({
+      matchId: 'late-match',
+      userId: 1,
+      opponentUserId: 3,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: '2026-06-01T00:00:03Z',
+    })
+    handlers.onConnected?.({
+      userId: 9,
+      connectedAt: '2026-06-01T00:00:04Z',
+    })
+    handlers.onHeartbeat?.({
+      sentAt: '2026-06-01T00:00:05Z',
+    })
+    handlers.onError?.(new Error('late stream error'))
+    await wrapper.vm.$nextTick()
+
+    expect(main.attributes('data-match-result-action')).toBe('GO_TO_GAME_WAITING')
+    expect(main.attributes('data-match-found-id')).toBe('match-1')
+    expect(main.attributes('data-match-found-modal-open')).toBe('false')
+    expect(main.attributes('data-queue-status')).toBe('ready')
+    expect(main.attributes('data-connected-user-id')).toBe('1')
+    expect(main.attributes('data-last-heartbeat-at')).toBe('2026-06-01T00:00:01Z')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(closeMatchEventSourceMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).toHaveBeenCalledTimes(1)
   })
 
   it('opens match found state and stops the waiting timer when match_found arrives', async () => {

@@ -375,6 +375,7 @@ let matchFoundCountdownDeadline = 0
 let shouldJoinAfterStreamConnected = false
 let hasQueueJoinRequestStarted = false
 let shouldResetMatchmakingAfterErrorModalClose = false
+let hasCompletedMatchResultTransition = false
 let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
 let matchResponseAbortController = new AbortController()
@@ -415,6 +416,7 @@ function startMatchmaking() {
     return
   }
 
+  hasCompletedMatchResultTransition = false
   queueErrorMessage.value = ''
   streamErrorMessage.value = ''
   errorModalMessage.value = ''
@@ -428,12 +430,12 @@ function startMatchmaking() {
   try {
     const connection = connectMatchEventSource({
       onOpen: () => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           streamErrorMessage.value = ''
         }
       },
       onConnected: (payload) => {
-        if (!isActive) {
+        if (!isActive || hasCompletedMatchResultTransition) {
           return
         }
 
@@ -446,25 +448,25 @@ function startMatchmaking() {
         }
       },
       onHeartbeat: (payload) => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           lastHeartbeatAt.value = payload.sentAt
         }
       },
       onMatchFound: (payload) => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           matchFound.value = payload
           matchResponseResult.value = undefined
           openMatchFoundModal()
         }
       },
       onMatchResponseResult: (payload) => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           matchResponseResult.value = payload
           handleMatchResponseResult()
         }
       },
       onError: () => {
-        if (isActive) {
+        if (isActive && !hasCompletedMatchResultTransition) {
           handleStreamError()
         }
       },
@@ -492,8 +494,6 @@ function handleMatchResponseResult() {
 }
 
 function transitionToGameWaiting() {
-  resetMatchFoundModalState()
-  stopMatchWaitingTimer()
   const game = matchResponseResult.value?.game
 
   if (!isValidGamePayload(game)) {
@@ -501,6 +501,9 @@ function transitionToGameWaiting() {
     return
   }
 
+  hasCompletedMatchResultTransition = true
+  resetMatchFoundModalState()
+  stopMatchWaitingTimer()
   saveGameWaitingPayloadFromMatchResult(matchResponseResult.value)
   closeMatchStream()
   queueStatus.value = 'ready'
@@ -543,6 +546,7 @@ function isValidGamePayload(game = {}) {
 
 function returnToMatchStart() {
   resetMatchmakingState()
+  hasCompletedMatchResultTransition = true
 }
 
 function returnToMatchingQueue() {
