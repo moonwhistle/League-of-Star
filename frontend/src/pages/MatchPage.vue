@@ -217,8 +217,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
+import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
@@ -228,6 +230,7 @@ import logoImageUrl from '../../img/logo.png'
 
 const streamStatus = ref('idle')
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
+const router = useRouter()
 const lastHeartbeatAt = ref('')
 const connectedEvent = shallowRef()
 const matchFound = shallowRef()
@@ -449,12 +452,14 @@ function startMatchmaking() {
       onMatchFound: (payload) => {
         if (isActive) {
           matchFound.value = payload
+          matchResponseResult.value = undefined
           openMatchFoundModal()
         }
       },
       onMatchResponseResult: (payload) => {
         if (isActive) {
           matchResponseResult.value = payload
+          handleMatchResponseResult()
         }
       },
       onError: () => {
@@ -467,6 +472,87 @@ function startMatchmaking() {
   } catch {
     handleStreamError()
   }
+}
+
+function handleMatchResponseResult() {
+  const payload = matchResponseResult.value
+
+  if (payload.action === 'GO_TO_GAME_WAITING') {
+    transitionToGameWaiting()
+    return
+  }
+
+  if (payload.action === 'RETURN_TO_MATCHING') {
+    returnToMatchingQueue()
+    return
+  }
+
+  returnToMatchStart()
+}
+
+function transitionToGameWaiting() {
+  resetMatchFoundModalState()
+  stopMatchWaitingTimer()
+  const game = matchResponseResult.value?.game
+
+  if (!isValidGamePayload(game)) {
+    failMatchmaking(t('match.responseFailed'))
+    return
+  }
+
+  closeMatchStream()
+  queueStatus.value = 'ready'
+  queueErrorMessage.value = ''
+  matchWaitingSeconds.value = 0
+  streamStatus.value = 'idle'
+  streamErrorMessage.value = ''
+  shouldJoinAfterStreamConnected = false
+  hasQueueJoinRequestStarted = false
+
+  void Promise.resolve(
+    router.push({
+      name: ROUTE_NAMES.gameWaiting,
+      params: {
+        gameRoomId: String(game.gameRoomId),
+      },
+    }),
+  ).catch(() => {
+    if (isActive) {
+      failMatchmaking(t('match.responseFailed'))
+    }
+  })
+}
+
+function isValidGamePayload(game = {}) {
+  if (typeof game !== 'object' || game === null) {
+    return false
+  }
+
+  const gameRoomId = Reflect.get(game, 'gameRoomId')
+  const videoUrl = Reflect.get(game, 'videoUrl')
+  const webSocketUrl = Reflect.get(game, 'webSocketUrl')
+
+  return (
+    Number.isFinite(gameRoomId) &&
+    String(videoUrl).trim() !== '' &&
+    String(webSocketUrl).trim() !== ''
+  )
+}
+
+function returnToMatchStart() {
+  resetMatchmakingState()
+}
+
+function returnToMatchingQueue() {
+  resetMatchFoundModalState()
+  matchFound.value = undefined
+  matchResponseResult.value = undefined
+  queueStatus.value = 'queued'
+  queueErrorMessage.value = ''
+  streamErrorMessage.value = ''
+  shouldJoinAfterStreamConnected = false
+  hasQueueJoinRequestStarted = true
+  startMatchWaiting()
 }
 
 async function joinQueueAfterStreamConnected() {

@@ -118,19 +118,19 @@ interface MatchResponseResultNotification {
 
 ### 2. Match page result transition 구현
 
-- [ ] `onMatchResponseResult`에서 action별 handler 분기 구현.
-- [ ] result 수신 시 match found modal 닫기 구현.
-- [ ] result 수신 시 countdown timer 정리 구현.
-- [ ] result 수신 시 accept/reject command state 초기화 구현.
-- [ ] `GO_TO_GAME_WAITING` route 이동 구현.
-- [ ] `GO_TO_GAME_WAITING` 처리 시 매칭 SSE close 구현.
-- [ ] `GO_TO_MATCH_START` ready 복귀 구현.
-- [ ] `GO_TO_MATCH_START` 처리 시 매칭 SSE close 구현.
-- [ ] `RETURN_TO_MATCHING` queued 복귀 구현.
-- [ ] `RETURN_TO_MATCHING` 처리 시 매칭 SSE 유지 구현.
-- [ ] `RETURN_TO_MATCHING` 처리 시 waiting timer 재시작 구현.
-- [ ] `RETURN_TO_MATCHING` 처리 시 join/leave API 미호출 유지 구현.
-- [ ] `game` 필수 payload 누락 시 game waiting 이동 금지 구현.
+- [x] `onMatchResponseResult`에서 action별 handler 분기 구현.
+- [x] result 수신 시 match found modal 닫기 구현.
+- [x] result 수신 시 countdown timer 정리 구현.
+- [x] result 수신 시 accept/reject command state 초기화 구현.
+- [x] `GO_TO_GAME_WAITING` route 이동 구현.
+- [x] `GO_TO_GAME_WAITING` 처리 시 매칭 SSE close 구현.
+- [x] `GO_TO_MATCH_START` ready 복귀 구현.
+- [x] `GO_TO_MATCH_START` 처리 시 매칭 SSE close 구현.
+- [x] `RETURN_TO_MATCHING` queued 복귀 구현.
+- [x] `RETURN_TO_MATCHING` 처리 시 매칭 SSE 유지 구현.
+- [x] `RETURN_TO_MATCHING` 처리 시 waiting timer 재시작 구현.
+- [x] `RETURN_TO_MATCHING` 처리 시 join/leave API 미호출 유지 구현.
+- [x] `game` 필수 payload 누락 시 game waiting 이동 금지 구현.
 
 ### 3. Game waiting payload storage 구현
 
