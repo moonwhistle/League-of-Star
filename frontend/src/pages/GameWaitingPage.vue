@@ -516,31 +516,131 @@ function getLoadingStepLabel(key = '') {
 @media (max-width: 760px) {
   .game-waiting-page {
     min-height: 100dvh;
-    overflow-y: auto;
+    overflow-y: hidden;
+  }
+
+  .game-waiting-header {
+    min-height: 54px;
+    padding: 0 16px;
+  }
+
+  .game-waiting-header h1 {
+    font-size: 1.05rem;
   }
 
   .game-waiting-stage {
-    grid-template-columns: 1fr;
-    padding: 20px 0 26px;
+    grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
+    gap: 8px;
+    width: min(100% - 24px, 420px);
+    padding: 12px 0 14px;
   }
 
   .versus-mark {
-    font-size: 2.6rem;
+    font-size: 1.85rem;
+  }
+
+  .panel-label {
+    margin-bottom: 8px;
+    font-size: 0.62rem;
+  }
+
+  .panel-label::before,
+  .panel-label::after {
+    width: 3px;
+    height: 11px;
   }
 
   .combatant-body {
     min-height: 0;
-    padding: 22px 18px;
+    padding: 12px 8px;
+  }
+
+  .combatant-emblem {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 10px;
+    font-size: 0.72rem;
+  }
+
+  .combatant-body h2 {
+    margin-bottom: 10px;
+    font-size: 0.92rem;
+    line-height: 1.1;
+  }
+
+  .combatant-body dl > div {
+    padding: 7px 5px;
+  }
+
+  .combatant-body dt {
+    font-size: 0.56rem;
+  }
+
+  .combatant-body dd {
+    font-size: 0.7rem;
+  }
+
+  .waiting-status {
+    width: min(100% - 24px, 420px);
+    margin-bottom: 16px;
   }
 
   .status-copy,
   .loading-meter-row {
     align-items: start;
     flex-direction: column;
+    gap: 6px;
+  }
+
+  .status-copy {
+    margin-bottom: 10px;
+  }
+
+  .status-copy p,
+  .loading-meter-row span {
+    font-size: 0.64rem;
+  }
+
+  .status-copy h2 {
+    font-size: 1.18rem;
+  }
+
+  .loading-meter-row {
+    margin-bottom: 6px;
+  }
+
+  .loading-meter-row strong {
+    font-size: 1.42rem;
+  }
+
+  .loading-track {
+    gap: 4px;
+    height: 10px;
   }
 
   .loading-steps {
     grid-template-columns: 1fr;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .loading-steps li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
+  .loading-steps span,
+  .loading-steps strong {
+    min-width: 0;
+    font-size: 0.62rem;
+  }
+
+  .loading-steps strong {
+    margin-top: 0;
+    text-align: right;
   }
 }
 </style>
