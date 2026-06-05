@@ -552,6 +552,101 @@ describe('GameWaitingPage', () => {
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
+  it('returns to match when the websocket connection cannot be created', async () => {
+    connectGameWebSocketMock.mockImplementationOnce(() => {
+      throw new Error('HANDSHAKE_FAILED')
+    })
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      'HANDSHAKE_FAILED',
+    )
+    expect(wrapper.text()).toContain('매칭 화면으로 돌아갑니다.')
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
+  it('returns to match when GAME_WAITING_TIMEOUT is received', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'GAME_WAITING_TIMEOUT',
+        payload: {
+          gameRoomId: 100,
+          reason: 'WAITING_TIMEOUT',
+          action: 'GO_TO_MATCH_START',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('WAITING_TIMEOUT')
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
+  it('returns to match when ERROR is received', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'ERROR',
+        payload: {
+          code: 'ROOM_ABORTED',
+          reason: 'ROOM_ABORTED',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('ROOM_ABORTED')
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
   it('marks final websocket failures and ignores late callbacks', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',
@@ -625,6 +720,35 @@ describe('GameWaitingPage', () => {
     wrapper.unmount()
 
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('cleans websocket, watchdog, and preload listeners on unmount', async () => {
+    vi.useFakeTimers()
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+    wrapper.unmount()
+    vi.advanceTimersByTime(30000)
+    emitLatestVideoPreloadEvent('loadeddata')
+    await flushPromises()
+
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
+    expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
   it('toggles game waiting copy between Korean and English', async () => {

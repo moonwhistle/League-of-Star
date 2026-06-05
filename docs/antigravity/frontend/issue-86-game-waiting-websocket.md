@@ -264,25 +264,25 @@ type GameWaitingServerMessage =
 
 ### 7. Test 구현
 
-- [ ] WebSocket URL 조립 테스트.
-- [ ] token query append 테스트.
-- [ ] access token 없음 테스트.
-- [ ] invalid JSON 수신 테스트.
-- [ ] `CLIENT_READY` payload `{}` 전송 테스트.
-- [ ] `RTT_PONG` payload `{ seq }` 전송 테스트.
-- [ ] GameWaitingPage mount 시 WebSocket 연결 테스트.
-- [ ] preload 완료 후 `CLIENT_READY` 1회 전송 테스트.
-- [ ] `PLAYER_READY bothReady=false` 상태 표시 테스트.
-- [ ] `PLAYER_READY bothReady=true` 상태 표시 테스트.
-- [ ] `RTT_PING` 수신 시 `RTT_PONG` 전송 테스트.
-- [ ] `GAME_WAITING_TIMEOUT` 수신 시 `/match` 복귀 테스트.
-- [ ] `GAME_START_FAILED` 수신 시 `/match` 복귀 테스트.
-- [ ] `ERROR` 수신 시 `/match` 복귀 테스트.
-- [ ] WebSocket close/error 시 `/match` 복귀 테스트.
-- [ ] client 30초 watchdog 만료 시 `/match` 복귀 테스트.
-- [ ] unmount 시 WebSocket/timer/preload listener 정리 테스트.
-- [ ] `COUNTDOWN`, `GAME_START` 수신이 이번 이슈 UI를 깨지 않는지 테스트.
-- [ ] locale toggle 시 WebSocket 상태 문구 전환 테스트.
+- [x] WebSocket URL 조립 테스트.
+- [x] token query append 테스트.
+- [x] access token 없음 테스트.
+- [x] invalid JSON 수신 테스트.
+- [x] `CLIENT_READY` payload `{}` 전송 테스트.
+- [x] `RTT_PONG` payload `{ seq }` 전송 테스트.
+- [x] GameWaitingPage mount 시 WebSocket 연결 테스트.
+- [x] preload 완료 후 `CLIENT_READY` 1회 전송 테스트.
+- [x] `PLAYER_READY bothReady=false` 상태 표시 테스트.
+- [x] `PLAYER_READY bothReady=true` 상태 표시 테스트.
+- [x] `RTT_PING` 수신 시 `RTT_PONG` 전송 테스트.
+- [x] `GAME_WAITING_TIMEOUT` 수신 시 `/match` 복귀 테스트.
+- [x] `GAME_START_FAILED` 수신 시 `/match` 복귀 테스트.
+- [x] `ERROR` 수신 시 `/match` 복귀 테스트.
+- [x] WebSocket close/error 시 `/match` 복귀 테스트.
+- [x] client 30초 watchdog 만료 시 `/match` 복귀 테스트.
+- [x] unmount 시 WebSocket/timer/preload listener 정리 테스트.
+- [x] `COUNTDOWN`, `GAME_START` 수신이 이번 이슈 UI를 깨지 않는지 테스트.
+- [x] locale toggle 시 WebSocket 상태 문구 전환 테스트.
 
 ### 8. 문서 정합성 구현
 
