@@ -5,7 +5,7 @@ export type { GameWebSocketClientMessage, GameWebSocketServerMessage }
 export function createClientReadyMessage(): GameWebSocketClientMessage {
   return {
     type: 'CLIENT_READY',
-    payload: null,
+    payload: {},
   }
 }
 
