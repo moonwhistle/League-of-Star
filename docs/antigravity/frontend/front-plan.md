@@ -10,7 +10,7 @@
 
 - `accept/reject` HTTP 응답은 화면 전환 기준이 아니라 command ack로 처리.
 - 최종 매칭 결과와 게임 대기방 이동은 `match_response_result` SSE 이벤트 기준으로 처리.
-- 게임 WebSocket은 `/ws/game/{gameRoomId}?token={accessToken}` 형식으로 연결.
+- 게임 WebSocket은 백엔드가 내려준 `game.webSocketUrl`을 source로 사용하고, access token은 query parameter로 붙여 연결.
 - 게임 결과 화면의 summary 조회는 현재 백엔드 기준 `gameId = gameRoomId`로 처리.
 - SSE는 백엔드의 `Authorization: Bearer` 계약을 유지하고, native `EventSource` 대신 `@microsoft/fetch-event-source`로 header 기반 연결을 구현.
 
@@ -41,18 +41,18 @@ flowchart TD
 
 ## Backend Contract
 
-| Flow | Backend Contract | Frontend 기준 |
-|------|------------------|---------------|
-| Login | `POST /api/v1/auth/login` | token 저장 후 `/match` 이동 |
-| Match stream | `GET /api/v1/notifications/match/stream` | 매칭 시작 클릭 후, join 호출 전에 연결 |
-| Match join | `POST /api/v1/match/join` | 매칭 대기 상태 진입 |
-| Match leave | `DELETE /api/v1/match/leave` | 매칭 시작 가능 상태 복귀 |
-| Match found | SSE `match_found` | 수락/거절 모달 표시 |
-| Match accept | `POST /api/v1/match/{matchId}/accept` | command ack로만 처리 |
-| Match reject | `POST /api/v1/match/{matchId}/reject` | command ack로만 처리 |
-| Match result | SSE `match_response_result` | 최종 화면 전환 기준 |
-| Game socket | `/ws/game/{gameRoomId}?token={accessToken}` | 대기/RTT/게임 진행 message 처리 |
-| Game summary | `GET /api/v1/games/{gameId}/summary` | 결과 화면 source of truth |
+| Flow         | Backend Contract                             | Frontend 기준                          |
+| ------------ | -------------------------------------------- | -------------------------------------- |
+| Login        | `POST /api/v1/auth/login`                    | token 저장 후 `/match` 이동            |
+| Match stream | `GET /api/v1/notifications/match/stream`     | 매칭 시작 클릭 후, join 호출 전에 연결 |
+| Match join   | `POST /api/v1/match/join`                    | 매칭 대기 상태 진입                    |
+| Match leave  | `DELETE /api/v1/match/leave`                 | 매칭 시작 가능 상태 복귀               |
+| Match found  | SSE `match_found`                            | 수락/거절 모달 표시                    |
+| Match accept | `POST /api/v1/match/{matchId}/accept`        | command ack로만 처리                   |
+| Match reject | `POST /api/v1/match/{matchId}/reject`        | command ack로만 처리                   |
+| Match result | SSE `match_response_result`                  | 최종 화면 전환 기준                    |
+| Game socket  | `game.webSocketUrl` + `?token={accessToken}` | 대기/RTT/게임 진행 message 처리        |
+| Game summary | `GET /api/v1/games/{gameId}/summary`         | 결과 화면 source of truth              |
 
 ## Implementation Steps
 
@@ -114,11 +114,11 @@ flowchart TD
 
 ```ts
 interface MatchFoundNotification {
-  matchId: string
-  userId: number
-  opponentUserId: number
-  acceptTimeoutSeconds: number
-  eventCreatedAt: string
+  matchId: string;
+  userId: number;
+  opponentUserId: number;
+  acceptTimeoutSeconds: number;
+  eventCreatedAt: string;
 }
 ```
 
@@ -127,7 +127,7 @@ interface MatchFoundNotification {
 - 수락/거절 모달 표시 구현.
 - timeout 자체 판정은 프론트가 확정하지 않고 서버의 `match_response_result`를 최종 기준으로 사용.
 
-### 6. [ ] 매칭 수락/거절 커맨드 구현
+### 6. [x] 매칭 수락/거절 커맨드 구현
 
 - 수락 시 `POST /api/v1/match/{matchId}/accept` 호출 구현.
 - 거절 시 `POST /api/v1/match/{matchId}/reject` 호출 구현.
@@ -137,34 +137,34 @@ interface MatchFoundNotification {
 - `MATCH_012` 같은 lock 처리 중 에러는 모달 유지 후 SSE 최종 결과 대기 기준으로 처리.
 - 그 외 매칭 응답 실패는 start 버튼 화면 복귀 기준으로 처리.
 
-### 7. [ ] 매칭 응답 결과 화면 전환 구현
+### 7. [x] 매칭 응답 결과 화면 전환 구현
 
 - SSE `match_response_result` payload shape 반영.
 
 ```ts
 interface MatchResponseResultNotification {
-  matchId: string
-  outcome: 'MATCHED' | 'FAILED'
+  matchId: string;
+  outcome: "MATCHED" | "FAILED";
   reason:
-    | 'BOTH_ACCEPTED'
-    | 'MY_REJECTED'
-    | 'OPPONENT_REJECTED'
-    | 'MY_TIMEOUT'
-    | 'OPPONENT_TIMEOUT'
-    | 'BOTH_TIMEOUT'
-    | 'GAME_SETUP_FAILED'
-  action: 'GO_TO_GAME_WAITING' | 'GO_TO_MATCH_START' | 'RETURN_TO_MATCHING'
+    | "BOTH_ACCEPTED"
+    | "MY_REJECTED"
+    | "OPPONENT_REJECTED"
+    | "MY_TIMEOUT"
+    | "OPPONENT_TIMEOUT"
+    | "BOTH_TIMEOUT"
+    | "GAME_SETUP_FAILED";
+  action: "GO_TO_GAME_WAITING" | "GO_TO_MATCH_START" | "RETURN_TO_MATCHING";
   opponent: {
-    userId: number
-    nickname: string
-    tier: string
-    tierScore: number
-  } | null
+    userId: number;
+    nickname: string;
+    tier: string;
+    tierScore: number;
+  } | null;
   game: {
-    gameRoomId: number
-    videoUrl: string
-    webSocketUrl: string
-  } | null
+    gameRoomId: number;
+    videoUrl: string;
+    webSocketUrl: string;
+  } | null;
 }
 ```
 
@@ -177,29 +177,31 @@ interface MatchResponseResultNotification {
 - `game.videoUrl`, `game.webSocketUrl`은 게임 화면에서 사용할 수 있도록 route state 또는 session storage로 최소 보관 구현.
 - 최종 전환 기준은 HTTP accept/reject 응답이 아니라 이 이벤트의 `action`임을 테스트로 검증.
 
-### 8. [ ] 게임 대기방 WebSocket 구현
+### 8. [x] 게임 대기방 WebSocket 구현
 
 - `/game/:gameRoomId/waiting` 페이지에서 WebSocket 연결 구현.
-- 연결 URL은 `/ws/game/{gameRoomId}?token={accessToken}`로 구성.
-- 연결 성공 후 `CLIENT_READY` 전송 버튼 또는 자동 ready 정책 구현.
+- 연결 URL은 백엔드가 `match_response_result.game.webSocketUrl`로 내려준 값을 source로 사용하고, access token query를 append해 구성.
+- 연결 성공 후 `game.videoUrl` MP4 preload가 완료되면 `CLIENT_READY`를 한 번만 자동 전송.
 - server message 처리 구현.
 
 ```ts
 type GameWaitingServerMessage =
-  | 'PLAYER_JOINED'
-  | 'PLAYER_READY'
-  | 'PLAYER_LEFT'
-  | 'RTT_PING'
-  | 'GAME_WAITING_TIMEOUT'
-  | 'GAME_START_FAILED'
-  | 'COUNTDOWN'
-  | 'GAME_START'
-  | 'ERROR'
+  | "PLAYER_JOINED"
+  | "PLAYER_READY"
+  | "PLAYER_LEFT"
+  | "RTT_PING"
+  | "GAME_WAITING_TIMEOUT"
+  | "GAME_START_FAILED"
+  | "COUNTDOWN"
+  | "GAME_START"
+  | "ERROR";
 ```
 
 - `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`는 대기 상태 표시로 처리.
 - `RTT_PING` 수신 시 즉시 `{ type: 'RTT_PONG', payload: { seq } }` 전송 구현.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`는 에러 표시 후 매칭 화면 복귀 기준으로 처리.
+- `COUNTDOWN`, `GAME_START`는 수신 가능하게 유지하되 이번 단계에서는 play route 이동을 발생시키지 않음.
+- Game Waiting loading bar는 payload 수신율로 유지하고 WebSocket progress와 섞지 않음.
 - WebSocket 재접속/복구는 후속 작업으로 보류.
 
 ### 9. [ ] 게임 시작 처리 구현
@@ -210,17 +212,17 @@ type GameWaitingServerMessage =
 
 ```ts
 interface GameStartPayload {
-  gameRoomId: number
-  serverTime: number
-  startAt: number
+  gameRoomId: number;
+  serverTime: number;
+  startAt: number;
   scenario: {
-    dragonMaxHp: number
-    durationMs: number
+    dragonMaxHp: number;
+    durationMs: number;
     hpTimeline: {
-      timeMs: number
-      hp: number
-    }[]
-  }
+      timeMs: number;
+      hp: number;
+    }[];
+  };
 }
 ```
 
@@ -245,20 +247,20 @@ interface GameStartPayload {
 
 ```ts
 interface GameResultPayload {
-  gameRoomId: number
-  result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'
-  winnerUserId: number | null
-  reason: string
-  finishedAt: number
+  gameRoomId: number;
+  result: "PLAYER1_WIN" | "PLAYER2_WIN" | "DRAW";
+  winnerUserId: number | null;
+  reason: string;
+  finishedAt: number;
   actions: {
-    userId: number
-    serverReceiveTime: number
-    smiteTimeMs: number
-    dragonHpAtSmite: number
-    damage: number
-    afterHp: number
-    isKill: boolean
-  }[]
+    userId: number;
+    serverReceiveTime: number;
+    smiteTimeMs: number;
+    dragonHpAtSmite: number;
+    damage: number;
+    afterHp: number;
+    isKill: boolean;
+  }[];
 }
 ```
 
@@ -278,19 +280,19 @@ interface GameResultPayload {
 ```ts
 type GameSummaryResponse =
   | {
-      summaryStatus: 'PENDING'
-      gameId: number
-      retryAfterMillis: number
+      summaryStatus: "PENDING";
+      gameId: number;
+      retryAfterMillis: number;
     }
   | {
-      summaryStatus: 'DONE'
-      gameId: number
-      gameResult: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'
-      winnerUserId: number | null
-      finishedAt: string
-      me: GameSummaryPlayer
-      opponent: GameSummaryPlayer
-    }
+      summaryStatus: "DONE";
+      gameId: number;
+      gameResult: "PLAYER1_WIN" | "PLAYER2_WIN" | "DRAW";
+      winnerUserId: number | null;
+      finishedAt: string;
+      me: GameSummaryPlayer;
+      opponent: GameSummaryPlayer;
+    };
 ```
 
 ## Implementation Policy

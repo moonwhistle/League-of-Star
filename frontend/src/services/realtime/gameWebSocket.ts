@@ -10,7 +10,7 @@ import { getAccessToken } from '../authToken'
 export interface GameWebSocketHandlers {
   onOpen?: (event: Event) => void
   onMessage?: (message: GameWebSocketServerMessage, event: MessageEvent<string>) => void
-  onError?: (event: Event) => void
+  onError?: (error: Event | unknown) => void
   onClose?: (event: CloseEvent) => void
 }
 
@@ -23,38 +23,76 @@ export interface GameWebSocketConnection {
 }
 
 export function connectGameWebSocket(
-  gameRoomId: GameRoomId,
+  webSocketUrlOrGameRoomId: string | GameRoomId,
   handlers: GameWebSocketHandlers = {},
 ): GameWebSocketConnection {
-  const socket = new WebSocket(buildGameWebSocketUrl(gameRoomId))
+  const socket = new WebSocket(buildGameWebSocketUrl(webSocketUrlOrGameRoomId))
+  let isClosed = false
 
   socket.addEventListener('open', (event) => handlers.onOpen?.(event))
   socket.addEventListener('message', (event: MessageEvent<string>) => {
-    handlers.onMessage?.(JSON.parse(event.data) as GameWebSocketServerMessage, event)
+    try {
+      handlers.onMessage?.(JSON.parse(event.data) as GameWebSocketServerMessage, event)
+    } catch (error) {
+      handlers.onError?.(error)
+    }
   })
   socket.addEventListener('error', (event) => handlers.onError?.(event))
-  socket.addEventListener('close', (event) => handlers.onClose?.(event))
+  socket.addEventListener('close', (event) => {
+    isClosed = true
+    handlers.onClose?.(event)
+  })
 
   return {
     socket,
-    sendClientReady: () => sendMessage(socket, { type: 'CLIENT_READY', payload: null }),
+    sendClientReady: () => sendMessage(socket, { type: 'CLIENT_READY', payload: {} }),
     sendRttPong: (seq) => sendMessage(socket, { type: 'RTT_PONG', payload: { seq } }),
     sendSmite: () => sendMessage(socket, { type: 'SMITE', payload: null }),
-    close: (code, reason) => socket.close(code, reason),
+    close: (code, reason) => {
+      if (isClosed) {
+        return
+      }
+
+      isClosed = true
+      socket.close(code, reason)
+    },
   }
 }
 
-function buildGameWebSocketUrl(gameRoomId: GameRoomId): string {
+function buildGameWebSocketUrl(webSocketUrlOrGameRoomId: string | GameRoomId): string {
   const accessToken = getAccessToken()
 
-  if (accessToken === null) {
+  if (accessToken === null || accessToken.trim() === '') {
     throw new Error('Game WebSocket connection requires an access token.')
   }
 
-  const baseUrl = WS_BASE_URL.replace(/\/$/, '')
-  const token = encodeURIComponent(accessToken)
+  const webSocketUrl =
+    typeof webSocketUrlOrGameRoomId === 'number'
+      ? `/ws/game/${webSocketUrlOrGameRoomId}`
+      : webSocketUrlOrGameRoomId
+  const url = resolveGameWebSocketUrl(webSocketUrl)
+  url.searchParams.set('token', accessToken)
 
-  return `${baseUrl}/ws/game/${gameRoomId}?token=${token}`
+  return url.toString()
+}
+
+function resolveGameWebSocketUrl(webSocketUrl: string): URL {
+  const trimmedWebSocketUrl = webSocketUrl.trim()
+
+  if (trimmedWebSocketUrl === '') {
+    throw new Error('Game WebSocket URL is required.')
+  }
+
+  if (trimmedWebSocketUrl.startsWith('ws://') || trimmedWebSocketUrl.startsWith('wss://')) {
+    return new URL(trimmedWebSocketUrl)
+  }
+
+  const baseUrl = WS_BASE_URL.replace(/\/$/, '')
+  const relativePath = trimmedWebSocketUrl.startsWith('/')
+    ? trimmedWebSocketUrl
+    : `/${trimmedWebSocketUrl}`
+
+  return new URL(`${baseUrl}${relativePath}`)
 }
 
 function sendMessage(socket: WebSocket, message: GameWebSocketClientMessage): void {

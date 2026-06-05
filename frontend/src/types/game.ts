@@ -44,7 +44,7 @@ export type GameSummaryResponse = GameSummaryPendingResponse | GameSummaryDoneRe
 export type GameWebSocketClientMessage =
   | {
       type: 'CLIENT_READY'
-      payload: null
+      payload: Record<string, never>
     }
   | {
       type: 'RTT_PONG'
