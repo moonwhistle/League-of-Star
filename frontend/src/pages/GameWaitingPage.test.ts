@@ -647,6 +647,48 @@ describe('GameWaitingPage', () => {
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
+  it('keeps a failed state when returning to match route fails', async () => {
+    routerReplaceMock.mockRejectedValueOnce(new Error('NAVIGATION_BLOCKED'))
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'ERROR',
+        payload: {
+          code: 'ROOM_ABORTED',
+          reason: 'ROOM_ABORTED',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toContain(
+      'ROOM_ABORTED',
+    )
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toContain(
+      '매칭 화면 복귀에 실패했습니다.',
+    )
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toContain(
+      'NAVIGATION_BLOCKED',
+    )
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
   it('marks final websocket failures and ignores late callbacks', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',

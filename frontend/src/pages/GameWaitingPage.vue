@@ -250,7 +250,17 @@ onUnmounted(() => {
 })
 
 function returnToMatch() {
-  void router.replace({ name: ROUTE_NAMES.match })
+  void router.replace({ name: ROUTE_NAMES.match }).catch((error) => {
+    if (!isActive) {
+      return
+    }
+
+    const routeErrorMessage =
+      error instanceof Error && error.message.trim() !== '' ? ` ${error.message}` : ''
+    gameSocketStatus.value = 'failed'
+    gameSocketErrorMessage.value =
+      `${gameSocketErrorMessage.value || t('gameWaiting.websocketFailed')} ${t('gameWaiting.returnFailed')}${routeErrorMessage}`.trim()
+  })
 }
 
 function returnToMatchWithPayloadError() {
