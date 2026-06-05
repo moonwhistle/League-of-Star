@@ -968,7 +968,9 @@ function getLoadingStepLabel(key = '') {
   }
 
   .combatant-body dd {
+    overflow-wrap: anywhere;
     font-size: 0.7rem;
+    white-space: normal;
   }
 
   .waiting-status {
