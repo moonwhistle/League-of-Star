@@ -186,6 +186,7 @@ describe('GameWaitingPage', () => {
 
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('preloading')
     expect(wrapper.text()).toContain('전장 데이터 확인 중')
+    expect(wrapper.text()).toContain('게임 시작 전에 필요한 MP4 데이터를 미리 불러오는 중입니다.')
 
     handlers.onMessage?.(
       {
@@ -203,6 +204,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('PLAYER_READY')
     expect(wrapper.get('main').attributes('data-game-socket-both-ready')).toBe('false')
     expect(wrapper.text()).toContain('상대 준비 대기')
+    expect(wrapper.text()).toContain('상대방의 준비 신호를 기다리는 중입니다.')
 
     handlers.onMessage?.(
       {
@@ -234,6 +236,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('bothReady')
     expect(wrapper.get('main').attributes('data-game-socket-both-ready')).toBe('true')
     expect(wrapper.text()).toContain('양쪽 준비 완료')
+    expect(wrapper.text()).toContain('양쪽 준비가 끝났고 연결 품질 확인을 기다리는 중입니다.')
   })
 
   it('preloads the game video after websocket open and sends CLIENT_READY once', async () => {
@@ -271,6 +274,7 @@ describe('GameWaitingPage', () => {
     expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('readySent')
     expect(wrapper.text()).toContain('준비 신호 전송됨')
+    expect(wrapper.text()).toContain('내 준비 신호를 보냈고 상대 준비를 기다리는 중입니다.')
 
     emitLatestVideoPreloadEvent('canplaythrough')
     emitLatestVideoPreloadEvent('loadeddata')
@@ -303,6 +307,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
       '전장 데이터를 불러오지 못했습니다.',
     )
+    expect(wrapper.text()).toContain('매칭 화면으로 돌아갑니다.')
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
     expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
@@ -364,6 +369,7 @@ describe('GameWaitingPage', () => {
     expect(gameWebSocketMock.state.connection.sendRttPong).toHaveBeenCalledWith(7)
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('rttMeasuring')
     expect(wrapper.text()).toContain('연결 품질 확인 중')
+    expect(wrapper.text()).toContain('서버와 왕복 지연 시간을 확인하는 중입니다.')
 
     handlers.onMessage?.(
       {
@@ -428,6 +434,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
       '게임 대기 시간이 초과되었습니다.',
     )
+    expect(wrapper.text()).toContain('매칭 화면으로 돌아갑니다.')
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
@@ -523,6 +530,7 @@ describe('GameWaitingPage', () => {
     expect(errorWrapper.get('main').attributes('data-game-socket-error-message')).toBe(
       'SOCKET_ERROR',
     )
+    expect(errorWrapper.text()).toContain('매칭 화면으로 돌아갑니다.')
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
 
@@ -539,6 +547,7 @@ describe('GameWaitingPage', () => {
     expect(closeWrapper.get('main').attributes('data-game-socket-error-message')).toBe(
       '게임 대기 연결이 종료되었습니다.',
     )
+    expect(closeWrapper.text()).toContain('매칭 화면으로 돌아갑니다.')
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
@@ -575,6 +584,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('RTT_FAILED')
     expect(wrapper.text()).toContain('게임 대기 연결 실패')
+    expect(wrapper.text()).toContain('매칭 화면으로 돌아갑니다.')
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
 
@@ -635,6 +645,8 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('게임 준비 중')
     expect(wrapper.text()).toContain('상대 정보 대기')
     expect(wrapper.text()).toContain('수신 대기')
+    expect(wrapper.text()).toContain('대기방 연결 중')
+    expect(wrapper.text()).toContain('게임 대기방에 접속하는 중입니다.')
     expect(wrapper.get('main').attributes('data-loading-progress')).toBe('80')
 
     await wrapper.get('.locale-toggle').trigger('click')
@@ -642,6 +654,8 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('Preparing Game')
     expect(wrapper.text()).toContain('Waiting for opponent')
     expect(wrapper.text()).toContain('Waiting')
+    expect(wrapper.text()).toContain('Connecting room')
+    expect(wrapper.text()).toContain('Connecting to the game waiting room.')
     expect(wrapper.text()).not.toContain('Ready')
   })
 

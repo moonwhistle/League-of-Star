@@ -252,15 +252,15 @@ type GameWaitingServerMessage =
 
 ### 6. Game Waiting UI / Locale 구현
 
-- [ ] WebSocket 연결 중 문구 추가.
-- [ ] MP4 preload 중 문구 추가.
-- [ ] `CLIENT_READY` 전송 완료 문구 추가.
-- [ ] 상대 준비 대기 문구 추가.
-- [ ] 양쪽 준비 완료 문구 추가.
-- [ ] RTT 측정 중 문구 추가.
-- [ ] 실패 복귀 안내 문구 추가.
-- [ ] 한/영 locale 모두 추가.
-- [ ] 기존 loading bar는 payload 수신율 의미로 유지하고 WebSocket progress와 섞지 않음.
+- [x] WebSocket 연결 중 문구 추가.
+- [x] MP4 preload 중 문구 추가.
+- [x] `CLIENT_READY` 전송 완료 문구 추가.
+- [x] 상대 준비 대기 문구 추가.
+- [x] 양쪽 준비 완료 문구 추가.
+- [x] RTT 측정 중 문구 추가.
+- [x] 실패 복귀 안내 문구 추가.
+- [x] 한/영 locale 모두 추가.
+- [x] 기존 loading bar는 payload 수신율 의미로 유지하고 WebSocket progress와 섞지 않음.
 
 ### 7. Test 구현
 

@@ -187,7 +187,35 @@ const gameSocketDetailLabel = computed(() => {
   }
 
   if (gameSocketErrorMessage.value !== '') {
-    return gameSocketErrorMessage.value
+    return `${gameSocketErrorMessage.value} ${t('gameWaiting.returningToMatch')}`.trim()
+  }
+
+  if (gameSocketStatus.value === 'connecting') {
+    return t('gameWaiting.socketConnectingDetail')
+  }
+
+  if (gameSocketStatus.value === 'connected') {
+    return t('gameWaiting.socketConnectedDetail')
+  }
+
+  if (gameSocketStatus.value === 'preloading') {
+    return t('gameWaiting.videoPreloadingDetail')
+  }
+
+  if (gameSocketStatus.value === 'readySent') {
+    return t('gameWaiting.readySentDetail')
+  }
+
+  if (gameSocketStatus.value === 'waitingOpponent') {
+    return t('gameWaiting.waitingOpponentReadyDetail')
+  }
+
+  if (gameSocketStatus.value === 'bothReady') {
+    return t('gameWaiting.bothReadyDetail')
+  }
+
+  if (gameSocketStatus.value === 'rttMeasuring') {
+    return t('gameWaiting.rttMeasuringDetail')
   }
 
   return t('gameWaiting.socketDetail')
@@ -787,12 +815,11 @@ function getLoadingStepLabel(key = '') {
   grid-column: 2;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   font-size: 0.68rem;
   font-weight: 800;
   color: var(--waiting-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .loading-meter-row {
