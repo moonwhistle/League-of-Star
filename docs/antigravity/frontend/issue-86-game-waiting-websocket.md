@@ -210,7 +210,7 @@ type GameWaitingServerMessage =
 
 ### 3. Game Waiting 상태 모델 구현
 
-- [ ] WebSocket 상태 local state 구현.
+- [x] WebSocket 상태 local state 구현.
   - `idle`
   - `connecting`
   - `connected`
@@ -220,14 +220,14 @@ type GameWaitingServerMessage =
   - `bothReady`
   - `rttMeasuring`
   - `failed`
-- [ ] `PLAYER_JOINED` 수신 시 연결 상태 표시 구현.
-- [ ] `PLAYER_READY bothReady=false` 수신 시 상대 준비 대기 표시 구현.
-- [ ] `PLAYER_READY bothReady=true` 수신 시 양쪽 준비 완료 표시 구현.
-- [ ] `PLAYER_LEFT` 수신 시 상대 이탈 상태 표시 구현.
-- [ ] `RTT_PING` 수신 시 `rttMeasuring` 상태 전환 및 `RTT_PONG` 전송 구현.
-- [ ] `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR` 수신 시 실패 상태 전환 구현.
-- [ ] `COUNTDOWN`, `GAME_START` 수신 시 현재 이슈에서는 상태를 깨지 않도록 안전 처리 구현.
-- [ ] final failure 이후 늦은 WebSocket callback은 상태를 다시 흔들지 않도록 guard 구현.
+- [x] `PLAYER_JOINED` 수신 시 연결 상태 표시 구현.
+- [x] `PLAYER_READY bothReady=false` 수신 시 상대 준비 대기 표시 구현.
+- [x] `PLAYER_READY bothReady=true` 수신 시 양쪽 준비 완료 표시 구현.
+- [x] `PLAYER_LEFT` 수신 시 상대 이탈 상태 표시 구현.
+- [x] `RTT_PING` 수신 시 `rttMeasuring` 상태 전환 및 `RTT_PONG` 전송 구현.
+- [x] `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR` 수신 시 실패 상태 전환 구현.
+- [x] `COUNTDOWN`, `GAME_START` 수신 시 현재 이슈에서는 상태를 깨지 않도록 안전 처리 구현.
+- [x] final failure 이후 늦은 WebSocket callback은 상태를 다시 흔들지 않도록 guard 구현.
 
 ### 4. MP4 preload + CLIENT_READY 구현
 

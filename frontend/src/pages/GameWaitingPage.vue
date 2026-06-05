@@ -6,6 +6,10 @@
     :data-game-waiting-payload-ready="gameWaitingPayload !== undefined"
     :data-game-room-id="gameWaitingPayload?.game.gameRoomId ?? ''"
     :data-loading-progress="loadingProgress"
+    :data-game-socket-status="gameSocketStatus"
+    :data-game-socket-last-event="gameSocketLastEvent"
+    :data-game-socket-both-ready="gameSocketBothReady"
+    :data-game-socket-error-message="gameSocketErrorMessage"
   >
     <header class="game-waiting-header" aria-label="Game waiting header">
       <h1>LEAGUE OF SMITE</h1>
@@ -64,6 +68,12 @@
         <h2>{{ t('gameWaiting.title') }}</h2>
       </div>
 
+      <div class="socket-status" aria-label="Game WebSocket status">
+        <span :class="['socket-status-indicator', `is-${gameSocketStatus}`]" aria-hidden="true" />
+        <strong>{{ gameSocketStatusLabel }}</strong>
+        <p>{{ gameSocketDetailLabel }}</p>
+      </div>
+
       <div class="loading-meter" aria-label="Payload loading progress">
         <div class="loading-meter-row">
           <strong>{{ loadingProgress }}%</strong>
@@ -84,13 +94,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { calculateGameWaitingProgress } from '@/services/gameWaitingProgress'
+import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
 
 import backgroundImageUrl from '../../img/background.png'
 
@@ -99,6 +110,17 @@ const router = useRouter()
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
 const gameWaitingPayload = shallowRef()
 const payloadErrorMessage = ref('')
+const gameSocketStatus = ref('idle')
+const gameSocketLastEvent = ref('')
+const gameSocketErrorMessage = ref('')
+const gameSocketBothReady = ref(false)
+const gameSocketPlayerLeftUserId = ref('')
+let closeGameWebSocket = () => {}
+let sendGameSocketRttPong = (seq = 0) => {
+  void seq
+}
+let isActive = false
+let hasFinalGameSocketFailure = false
 
 const opponentName = computed(
   () => gameWaitingPayload.value?.opponent?.nickname ?? t('gameWaiting.unknownOpponent'),
@@ -118,8 +140,55 @@ const loadingProgress = computed(() => loadingProgressState.value.progress)
 const loadingStatusLabel = computed(() =>
   loadingProgress.value >= 100 ? t('gameWaiting.ready') : t('gameWaiting.pending'),
 )
+const gameSocketStatusLabel = computed(() => {
+  if (gameSocketStatus.value === 'connecting') {
+    return t('gameWaiting.socketConnecting')
+  }
+
+  if (gameSocketStatus.value === 'connected') {
+    return t('gameWaiting.socketConnected')
+  }
+
+  if (gameSocketStatus.value === 'preloading') {
+    return t('gameWaiting.videoPreloading')
+  }
+
+  if (gameSocketStatus.value === 'readySent') {
+    return t('gameWaiting.readySent')
+  }
+
+  if (gameSocketStatus.value === 'waitingOpponent') {
+    return t('gameWaiting.waitingOpponentReady')
+  }
+
+  if (gameSocketStatus.value === 'bothReady') {
+    return t('gameWaiting.bothReady')
+  }
+
+  if (gameSocketStatus.value === 'rttMeasuring') {
+    return t('gameWaiting.rttMeasuring')
+  }
+
+  if (gameSocketStatus.value === 'failed') {
+    return t('gameWaiting.websocketFailed')
+  }
+
+  return t('gameWaiting.socketPending')
+})
+const gameSocketDetailLabel = computed(() => {
+  if (gameSocketLastEvent.value === 'PLAYER_LEFT') {
+    return `${t('gameWaiting.playerLeft')} ${gameSocketPlayerLeftUserId.value}`.trim()
+  }
+
+  if (gameSocketErrorMessage.value !== '') {
+    return gameSocketErrorMessage.value
+  }
+
+  return t('gameWaiting.socketDetail')
+})
 
 onMounted(() => {
+  isActive = true
   const routeGameRoomIdParam = route.params.gameRoomId
   const gameRoomId = Array.isArray(routeGameRoomIdParam)
     ? String(routeGameRoomIdParam[0] ?? '').trim()
@@ -138,6 +207,12 @@ onMounted(() => {
   }
 
   gameWaitingPayload.value = payload
+  connectWaitingWebSocket(payload)
+})
+
+onUnmounted(() => {
+  isActive = false
+  closeWaitingWebSocket()
 })
 
 function returnToMatch() {
@@ -147,6 +222,123 @@ function returnToMatch() {
 function returnToMatchWithPayloadError() {
   payloadErrorMessage.value = t('gameWaiting.payloadMissing')
   returnToMatch()
+}
+
+function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
+  gameSocketStatus.value = 'connecting'
+  gameSocketErrorMessage.value = ''
+  gameSocketLastEvent.value = ''
+  gameSocketBothReady.value = false
+  gameSocketPlayerLeftUserId.value = ''
+  hasFinalGameSocketFailure = false
+  closeWaitingWebSocket()
+
+  try {
+    const connection = connectGameWebSocket(payload.game.webSocketUrl, {
+      onOpen: () => {
+        if (!canHandleGameSocketCallback()) {
+          return
+        }
+
+        gameSocketStatus.value = 'connected'
+      },
+      onMessage: (message) => {
+        if (!canHandleGameSocketCallback()) {
+          return
+        }
+
+        handleGameSocketMessage(message)
+      },
+      onError: (error) => {
+        if (!canHandleGameSocketCallback()) {
+          return
+        }
+
+        failGameSocket(error instanceof Error ? error.message : t('gameWaiting.websocketFailed'))
+      },
+      onClose: () => {
+        if (!canHandleGameSocketCallback()) {
+          return
+        }
+
+        failGameSocket(t('gameWaiting.websocketClosed'))
+      },
+    })
+
+    closeGameWebSocket = connection.close
+    sendGameSocketRttPong = (seq = 0) => connection.sendRttPong(seq)
+  } catch (error) {
+    failGameSocket(error instanceof Error ? error.message : t('gameWaiting.websocketFailed'))
+  }
+}
+
+function handleGameSocketMessage(message = {}) {
+  const messageType = String(Reflect.get(message, 'type') ?? '')
+  const payload = Reflect.get(message, 'payload')
+  gameSocketLastEvent.value = messageType
+
+  if (messageType === 'PLAYER_JOINED') {
+    gameSocketStatus.value = 'connected'
+    return
+  }
+
+  if (messageType === 'PLAYER_READY') {
+    const bothReady = Reflect.get(Object(payload), 'bothReady') === true
+    gameSocketBothReady.value = bothReady
+    gameSocketStatus.value = bothReady ? 'bothReady' : 'waitingOpponent'
+    return
+  }
+
+  if (messageType === 'PLAYER_LEFT') {
+    gameSocketStatus.value = 'waitingOpponent'
+    gameSocketPlayerLeftUserId.value = String(Reflect.get(Object(payload), 'userId') ?? '').trim()
+    return
+  }
+
+  if (messageType === 'RTT_PING') {
+    const seq = Reflect.get(Object(payload), 'seq')
+    gameSocketStatus.value = 'rttMeasuring'
+
+    if (Number.isFinite(seq)) {
+      sendGameSocketRttPong(Number(seq))
+    }
+
+    return
+  }
+
+  if (
+    messageType === 'GAME_WAITING_TIMEOUT' ||
+    messageType === 'GAME_START_FAILED' ||
+    messageType === 'ERROR'
+  ) {
+    failGameSocket(resolveGameSocketFailureMessage(payload))
+  }
+}
+
+function resolveGameSocketFailureMessage(payload = {}) {
+  const reason = Reflect.get(Object(payload), 'reason')
+
+  return typeof reason === 'string' && reason.trim() !== ''
+    ? reason
+    : t('gameWaiting.websocketFailed')
+}
+
+function failGameSocket(message = t('gameWaiting.websocketFailed')) {
+  hasFinalGameSocketFailure = true
+  gameSocketStatus.value = 'failed'
+  gameSocketErrorMessage.value = message
+}
+
+function canHandleGameSocketCallback() {
+  return isActive && !hasFinalGameSocketFailure
+}
+
+function closeWaitingWebSocket() {
+  closeGameWebSocket()
+  closeGameWebSocket = () => {}
+  sendGameSocketRttPong = (seq = 0) => {
+    void seq
+  }
 }
 
 function getLoadingStepLabel(key = '') {
@@ -431,6 +623,67 @@ function getLoadingStepLabel(key = '') {
   color: var(--waiting-violet);
 }
 
+.socket-status {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(206, 224, 255, 0.08);
+}
+
+.socket-status-indicator {
+  width: 9px;
+  height: 9px;
+  background: rgba(221, 230, 246, 0.5);
+  border-radius: 50%;
+}
+
+.socket-status-indicator.is-connected,
+.socket-status-indicator.is-readySent,
+.socket-status-indicator.is-waitingOpponent,
+.socket-status-indicator.is-bothReady {
+  background: var(--waiting-cyan);
+  box-shadow: 0 0 12px rgba(98, 244, 237, 0.54);
+}
+
+.socket-status-indicator.is-rttMeasuring,
+.socket-status-indicator.is-preloading,
+.socket-status-indicator.is-connecting {
+  background: var(--waiting-violet);
+  box-shadow: 0 0 12px rgba(215, 185, 255, 0.44);
+}
+
+.socket-status-indicator.is-failed {
+  background: var(--waiting-pink);
+  box-shadow: 0 0 12px rgba(255, 182, 178, 0.46);
+}
+
+.socket-status strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 900;
+  color: #f6f8ff;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.socket-status p {
+  grid-column: 2;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--waiting-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .loading-meter-row {
   display: flex;
   align-items: end;
@@ -596,9 +849,19 @@ function getLoadingStepLabel(key = '') {
     margin-bottom: 10px;
   }
 
+  .socket-status {
+    padding: 7px 8px;
+    margin-bottom: 8px;
+  }
+
   .status-copy p,
-  .loading-meter-row span {
+  .loading-meter-row span,
+  .socket-status p {
     font-size: 0.64rem;
+  }
+
+  .socket-status strong {
+    font-size: 0.66rem;
   }
 
   .status-copy h2 {
