@@ -34,34 +34,34 @@ flowchart TD
 
 ## Backend Contract
 
-| 항목 | 기준 |
-| ---- | ---- |
-| Game WebSocket endpoint | `/ws/game/{gameRoomId}?token={accessToken}` |
-| Connection source | `match_response_result.game.webSocketUrl` |
-| Token 전달 | native WebSocket 제약으로 query parameter `token` 사용 |
-| Ready command | `CLIENT_READY` |
-| RTT response | `RTT_PONG` |
-| Timeout event | `GAME_WAITING_TIMEOUT` |
-| Start failure event | `GAME_START_FAILED` |
-| Countdown / start | `COUNTDOWN`, `GAME_START` |
+| 항목                    | 기준                                                                  |
+| ----------------------- | --------------------------------------------------------------------- |
+| Game WebSocket endpoint | `/ws/game/{gameRoomId}`                                               |
+| Connection source       | `match_response_result.game.webSocketUrl`에 access token query append |
+| Token 전달              | native WebSocket 제약으로 query parameter `token` 사용                |
+| Ready command           | `CLIENT_READY`                                                        |
+| RTT response            | `RTT_PONG`                                                            |
+| Timeout event           | `GAME_WAITING_TIMEOUT`                                                |
+| Start failure event     | `GAME_START_FAILED`                                                   |
+| Countdown / start       | `COUNTDOWN`, `GAME_START`                                             |
 
 저장된 game waiting payload:
 
 ```ts
 interface GameWaitingPayload {
-  matchId: string
+  matchId: string;
   opponent: {
-    userId: number
-    nickname: string
-    tier: string
-    tierScore: number
-  } | null
+    userId: number;
+    nickname: string;
+    tier: string;
+    tierScore: number;
+  } | null;
   game: {
-    gameRoomId: number
-    videoUrl: string
-    webSocketUrl: string
-  }
-  receivedAt: string
+    gameRoomId: number;
+    videoUrl: string;
+    webSocketUrl: string;
+  };
+  receivedAt: string;
 }
 ```
 
@@ -70,15 +70,15 @@ interface GameWaitingPayload {
 ```ts
 type GameWebSocketClientMessage =
   | {
-      type: 'CLIENT_READY'
-      payload: {}
+      type: "CLIENT_READY";
+      payload: {};
     }
   | {
-      type: 'RTT_PONG'
+      type: "RTT_PONG";
       payload: {
-        seq: number
-      }
-    }
+        seq: number;
+      };
+    };
 ```
 
 서버 메시지:
@@ -86,58 +86,66 @@ type GameWebSocketClientMessage =
 ```ts
 type GameWaitingServerMessage =
   | {
-      type: 'PLAYER_JOINED'
-      payload: { userId: number }
+      type: "PLAYER_JOINED";
+      payload: { userId: number };
     }
   | {
-      type: 'PLAYER_READY'
-      payload: { userId: number; bothReady: boolean }
+      type: "PLAYER_READY";
+      payload: { userId: number; bothReady: boolean };
     }
   | {
-      type: 'PLAYER_LEFT'
-      payload: { userId: number }
+      type: "PLAYER_LEFT";
+      payload: { userId: number };
     }
   | {
-      type: 'RTT_PING'
-      payload: { seq: number }
+      type: "RTT_PING";
+      payload: { seq: number };
     }
   | {
-      type: 'GAME_WAITING_TIMEOUT'
-      payload: { gameRoomId: number; reason: string; action: 'GO_TO_MATCH_START' }
-    }
-  | {
-      type: 'GAME_START_FAILED'
-      payload: { gameRoomId: number; reason: string; action: 'GO_TO_MATCH_START' }
-    }
-  | {
-      type: 'COUNTDOWN'
+      type: "GAME_WAITING_TIMEOUT";
       payload: {
-        gameRoomId: number
-        serverTime: number
-        startAt: number
-        countdownDisplaySeconds: number
-      }
+        gameRoomId: number;
+        reason: string;
+        action: "GO_TO_MATCH_START";
+      };
     }
   | {
-      type: 'GAME_START'
+      type: "GAME_START_FAILED";
       payload: {
-        gameRoomId: number
-        serverTime: number
-        startAt: number
+        gameRoomId: number;
+        reason: string;
+        action: "GO_TO_MATCH_START";
+      };
+    }
+  | {
+      type: "COUNTDOWN";
+      payload: {
+        gameRoomId: number;
+        serverTime: number;
+        startAt: number;
+        countdownDisplaySeconds: number;
+      };
+    }
+  | {
+      type: "GAME_START";
+      payload: {
+        gameRoomId: number;
+        serverTime: number;
+        startAt: number;
         scenario: {
-          dragonMaxHp: number
-          durationMs: number
+          dragonMaxHp: number;
+          durationMs: number;
           hpTimeline: {
-            timeMs: number
-            hp: number
-          }[]
-        }
-      }
+            timeMs: number;
+            hp: number;
+          }[];
+        };
+      };
     }
   | {
-      type: 'ERROR'
-      payload: { code: string; reason: string }
-    }
+      type: "ERROR";
+      payload: { code: string; reason: string };
+    };
 ```
 
 프론트 처리 기준:
@@ -286,17 +294,17 @@ type GameWaitingServerMessage =
 
 ### 8. 문서 정합성 구현
 
-- [ ] `front-plan.md` 4번 매칭 페이지 구현 완료 체크 정리.
-- [ ] `front-plan.md` 5번 매칭 성사 모달 구현 완료 체크 정리.
-- [ ] `front-plan.md` 6번 매칭 수락/거절 커맨드 구현 완료 체크 정리.
-- [ ] `front-plan.md` 7번 매칭 응답 결과 화면 전환 구현 완료 체크 정리.
-- [ ] `front-plan.md` 8번 게임 대기방 WebSocket 구현 범위와 issue-86 범위 정합성 확인.
-- [ ] `front-plan.md` 9번 게임 시작 처리 구현은 후속으로 유지.
-- [ ] issue-84의 "game waiting WebSocket은 후속 이슈" 문구와 issue-86 연결 확인.
-- [ ] `docs/project/websocket client.md`와 URL/token/READY/RTT/timeout 정책 정합성 확인.
-- [ ] `docs/project/policy.md`의 GAME_START 이전 실패 복귀 정책 정합성 확인.
-- [ ] backend issue-40/42와 WebSocket/timeout 정책 정합성 확인.
-- [ ] 이번 이슈 PR 메시지 섹션 작성.
+- [x] `front-plan.md` 4번 매칭 페이지 구현 완료 체크 정리.
+- [x] `front-plan.md` 5번 매칭 성사 모달 구현 완료 체크 정리.
+- [x] `front-plan.md` 6번 매칭 수락/거절 커맨드 구현 완료 체크 정리.
+- [x] `front-plan.md` 7번 매칭 응답 결과 화면 전환 구현 완료 체크 정리.
+- [x] `front-plan.md` 8번 게임 대기방 WebSocket 구현 범위와 issue-86 범위 정합성 확인.
+- [x] `front-plan.md` 9번 게임 시작 처리 구현은 후속으로 유지.
+- [x] issue-84의 "game waiting WebSocket은 후속 이슈" 문구와 issue-86 연결 확인.
+- [x] `docs/project/websocket client.md`와 URL/token/READY/RTT/timeout 정책 정합성 확인.
+- [x] `docs/project/policy.md`의 GAME_START 이전 실패 복귀 정책 정합성 확인.
+- [x] backend issue-40/42와 WebSocket/timeout 정책 정합성 확인.
+- [x] 이번 이슈 PR 메시지 섹션 작성.
 
 ### 9. 검증
 
