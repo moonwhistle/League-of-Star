@@ -105,6 +105,7 @@ import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
 
 import backgroundImageUrl from '../../img/background.png'
 
+const GAME_WAITING_CLIENT_WATCHDOG_MS = 30000
 const route = useRoute()
 const router = useRouter()
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
@@ -117,6 +118,7 @@ const gameSocketBothReady = ref(false)
 const gameSocketPlayerLeftUserId = ref('')
 const videoPreloadElement = shallowRef()
 let cleanupVideoPreloadListeners = () => {}
+let gameWaitingWatchdogId = 0
 let closeGameWebSocket = () => {}
 let sendGameSocketClientReady = () => {}
 let sendGameSocketRttPong = (seq = 0) => {
@@ -237,6 +239,7 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
   hasSentClientReady = false
   hasFinalGameSocketFailure = false
   closeWaitingWebSocket()
+  startGameWaitingWatchdog()
 
   try {
     const connection = connectGameWebSocket(payload.game.webSocketUrl, {
@@ -259,14 +262,16 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
           return
         }
 
-        failGameSocket(error instanceof Error ? error.message : t('gameWaiting.websocketFailed'))
+        failGameSocketAndReturnToMatch(
+          error instanceof Error ? error.message : t('gameWaiting.websocketFailed'),
+        )
       },
       onClose: () => {
         if (!canHandleGameSocketCallback()) {
           return
         }
 
-        failGameSocket(t('gameWaiting.websocketClosed'))
+        failGameSocketAndReturnToMatch(t('gameWaiting.websocketClosed'))
       },
     })
 
@@ -274,8 +279,30 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
     sendGameSocketClientReady = connection.sendClientReady
     sendGameSocketRttPong = (seq = 0) => connection.sendRttPong(seq)
   } catch (error) {
-    failGameSocket(error instanceof Error ? error.message : t('gameWaiting.websocketFailed'))
+    failGameSocketAndReturnToMatch(
+      error instanceof Error ? error.message : t('gameWaiting.websocketFailed'),
+    )
   }
+}
+
+function startGameWaitingWatchdog() {
+  clearGameWaitingWatchdog()
+  gameWaitingWatchdogId = window.setTimeout(() => {
+    if (!canHandleGameSocketCallback()) {
+      return
+    }
+
+    failGameSocketAndReturnToMatch(t('gameWaiting.watchdogTimeout'))
+  }, GAME_WAITING_CLIENT_WATCHDOG_MS)
+}
+
+function clearGameWaitingWatchdog() {
+  if (gameWaitingWatchdogId === 0) {
+    return
+  }
+
+  window.clearTimeout(gameWaitingWatchdogId)
+  gameWaitingWatchdogId = 0
 }
 
 function startGameVideoPreload(videoUrl = '') {
@@ -347,6 +374,11 @@ function handleGameSocketMessage(message = {}) {
     const bothReady = Reflect.get(Object(payload), 'bothReady') === true
     gameSocketBothReady.value = bothReady
     gameSocketStatus.value = bothReady ? 'bothReady' : 'waitingOpponent'
+
+    if (bothReady) {
+      clearGameWaitingWatchdog()
+    }
+
     return
   }
 
@@ -358,6 +390,7 @@ function handleGameSocketMessage(message = {}) {
 
   if (messageType === 'RTT_PING') {
     const seq = Reflect.get(Object(payload), 'seq')
+    clearGameWaitingWatchdog()
     gameSocketStatus.value = 'rttMeasuring'
 
     if (Number.isFinite(seq)) {
@@ -372,7 +405,7 @@ function handleGameSocketMessage(message = {}) {
     messageType === 'GAME_START_FAILED' ||
     messageType === 'ERROR'
   ) {
-    failGameSocket(resolveGameSocketFailureMessage(payload))
+    failGameSocketAndReturnToMatch(resolveGameSocketFailureMessage(payload))
   }
 }
 
@@ -386,6 +419,7 @@ function resolveGameSocketFailureMessage(payload = {}) {
 
 function failGameSocket(message = t('gameWaiting.websocketFailed')) {
   hasFinalGameSocketFailure = true
+  clearGameWaitingWatchdog()
   cleanupGameVideoPreload()
   gameSocketStatus.value = 'failed'
   gameSocketErrorMessage.value = message
@@ -402,6 +436,7 @@ function canHandleGameSocketCallback() {
 }
 
 function closeWaitingWebSocket() {
+  clearGameWaitingWatchdog()
   cleanupGameVideoPreload()
   closeGameWebSocket()
   closeGameWebSocket = () => {}

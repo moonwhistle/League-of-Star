@@ -58,6 +58,7 @@ interface GameWebSocketTestHandlers {
   onOpen?: (event: Event) => void
   onMessage?: (message: unknown, event: MessageEvent) => void
   onError?: (error: unknown) => void
+  onClose?: (event: CloseEvent) => void
 }
 
 function getGameWebSocketHandlers() {
@@ -115,6 +116,7 @@ describe('GameWaitingPage', () => {
   afterEach(() => {
     restoreCreateElement()
     restoreCreateElement = () => {}
+    vi.useRealTimers()
   })
 
   it('reads the stored game waiting payload for the current route gameRoomId', async () => {
@@ -398,6 +400,149 @@ describe('GameWaitingPage', () => {
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
+  it('returns to match when the client watchdog expires', async () => {
+    vi.useFakeTimers()
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+
+    vi.advanceTimersByTime(29999)
+    await flushPromises()
+
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      '게임 대기 시간이 초과되었습니다.',
+    )
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
+  it('clears the client watchdog when both players are ready', async () => {
+    vi.useFakeTimers()
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'PLAYER_READY',
+        payload: {
+          userId: 2,
+          bothReady: true,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    vi.advanceTimersByTime(30000)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('bothReady')
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+    expect(gameWebSocketMock.state.connection.close).not.toHaveBeenCalled()
+  })
+
+  it('clears the client watchdog when RTT starts', async () => {
+    vi.useFakeTimers()
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'RTT_PING',
+        payload: {
+          seq: 8,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    vi.advanceTimersByTime(30000)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('rttMeasuring')
+    expect(gameWebSocketMock.state.connection.sendRttPong).toHaveBeenCalledWith(8)
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+    expect(gameWebSocketMock.state.connection.close).not.toHaveBeenCalled()
+  })
+
+  it('returns to match on websocket error or close', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const errorWrapper = mount(GameWaitingPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onError?.(new Error('SOCKET_ERROR'))
+    await flushPromises()
+
+    expect(errorWrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(errorWrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      'SOCKET_ERROR',
+    )
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+
+    errorWrapper.unmount()
+    vi.clearAllMocks()
+    gameWebSocketMock.state.connection.close.mockClear()
+
+    const closeWrapper = mount(GameWaitingPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onClose?.(new CloseEvent('close'))
+    await flushPromises()
+
+    expect(closeWrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(closeWrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      '게임 대기 연결이 종료되었습니다.',
+    )
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
   it('marks final websocket failures and ignores late callbacks', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',
@@ -430,6 +575,8 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('RTT_FAILED')
     expect(wrapper.text()).toContain('게임 대기 연결 실패')
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
 
     handlers.onOpen?.(new Event('open'))
     handlers.onMessage?.(

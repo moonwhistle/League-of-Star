@@ -240,15 +240,15 @@ type GameWaitingServerMessage =
 
 ### 5. Timeout / 실패 복귀 구현
 
-- [ ] waiting page 진입 시 client 30초 watchdog 시작 구현.
-- [ ] `PLAYER_READY bothReady=true` 또는 `RTT_PING` 수신 시 watchdog 정리 구현.
-- [ ] watchdog 만료 시 실패 안내 후 `/match` 복귀 구현.
-- [ ] WebSocket handshake 실패 또는 open 전 close 발생 시 `/match` 복귀 구현.
-- [ ] WebSocket error/close 발생 시 `/match` 복귀 구현.
-- [ ] `GAME_WAITING_TIMEOUT` 수신 시 WebSocket 정리 후 `/match` 복귀 구현.
-- [ ] `GAME_START_FAILED` 수신 시 WebSocket 정리 후 `/match` 복귀 구현.
-- [ ] 실패 복귀 시 match join/leave API는 호출하지 않음.
-- [ ] 실패 복귀 시 큐 자동 복귀는 하지 않음.
+- [x] waiting page 진입 시 client 30초 watchdog 시작 구현.
+- [x] `PLAYER_READY bothReady=true` 또는 `RTT_PING` 수신 시 watchdog 정리 구현.
+- [x] watchdog 만료 시 실패 안내 후 `/match` 복귀 구현.
+- [x] WebSocket handshake 실패 또는 open 전 close 발생 시 `/match` 복귀 구현.
+- [x] WebSocket error/close 발생 시 `/match` 복귀 구현.
+- [x] `GAME_WAITING_TIMEOUT` 수신 시 WebSocket 정리 후 `/match` 복귀 구현.
+- [x] `GAME_START_FAILED` 수신 시 WebSocket 정리 후 `/match` 복귀 구현.
+- [x] 실패 복귀 시 match join/leave API는 호출하지 않음.
+- [x] 실패 복귀 시 큐 자동 복귀는 하지 않음.
 
 ### 6. Game Waiting UI / Locale 구현
 
