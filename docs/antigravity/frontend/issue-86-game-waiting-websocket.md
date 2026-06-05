@@ -231,12 +231,12 @@ type GameWaitingServerMessage =
 
 ### 4. MP4 preload + CLIENT_READY 구현
 
-- [ ] `game.videoUrl`로 hidden preload video element 또는 `HTMLVideoElement` 기반 preload 구현.
-- [ ] preload 성공 시 `CLIENT_READY` 1회 전송 구현.
-- [ ] preload 실패 시 WebSocket close 후 `/match` 복귀 구현.
-- [ ] preload 완료 전 WebSocket failure 발생 시 listener/timer 정리 구현.
-- [ ] unmount 시 preload listener 정리 구현.
-- [ ] `CLIENT_READY` 중복 전송 방지 guard 구현.
+- [x] `game.videoUrl`로 hidden preload video element 또는 `HTMLVideoElement` 기반 preload 구현.
+- [x] preload 성공 시 `CLIENT_READY` 1회 전송 구현.
+- [x] preload 실패 시 WebSocket close 후 `/match` 복귀 구현.
+- [x] preload 완료 전 WebSocket failure 발생 시 listener/timer 정리 구현.
+- [x] unmount 시 preload listener 정리 구현.
+- [x] `CLIENT_READY` 중복 전송 방지 guard 구현.
 
 ### 5. Timeout / 실패 복귀 구현
 

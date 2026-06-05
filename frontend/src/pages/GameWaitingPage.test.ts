@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
@@ -51,6 +51,8 @@ vi.mock('@/services/realtime/gameWebSocket', () => ({
 }))
 
 const connectGameWebSocketMock = vi.mocked(connectGameWebSocket)
+let createdVideoElements: HTMLVideoElement[] = []
+let restoreCreateElement = () => {}
 
 interface GameWebSocketTestHandlers {
   onOpen?: (event: Event) => void
@@ -66,10 +68,22 @@ function getGameWebSocketHandlers() {
   return gameWebSocketMock.state.handlers as GameWebSocketTestHandlers
 }
 
+function emitLatestVideoPreloadEvent(type: string) {
+  const video = createdVideoElements.at(-1)
+
+  if (video === undefined) {
+    throw new Error('Video preload element was not created.')
+  }
+
+  video.dispatchEvent(new Event(type))
+}
+
 describe('GameWaitingPage', () => {
   beforeEach(() => {
+    restoreCreateElement()
     vi.clearAllMocks()
     window.sessionStorage.clear()
+    createdVideoElements = []
     routeMock.params.gameRoomId = '100'
     routerReplaceMock.mockResolvedValue(undefined)
     gameWebSocketMock.state.handlers = undefined
@@ -77,7 +91,30 @@ describe('GameWaitingPage', () => {
     gameWebSocketMock.state.connection.sendRttPong.mockClear()
     gameWebSocketMock.state.connection.sendSmite.mockClear()
     gameWebSocketMock.state.connection.close.mockClear()
+    const originalCreateElement = document.createElement.bind(document)
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((
+      tagName: string,
+      options?: ElementCreationOptions,
+    ) => {
+      const element = originalCreateElement(tagName, options)
+
+      if (tagName.toLowerCase() === 'video') {
+        createdVideoElements.push(element as HTMLVideoElement)
+        Object.defineProperty(element, 'load', {
+          configurable: true,
+          value: vi.fn(),
+        })
+      }
+
+      return element
+    }) as typeof document.createElement)
+    restoreCreateElement = () => createElementSpy.mockRestore()
     setLocale('ko')
+  })
+
+  afterEach(() => {
+    restoreCreateElement()
+    restoreCreateElement = () => {}
   })
 
   it('reads the stored game waiting payload for the current route gameRoomId', async () => {
@@ -145,8 +182,8 @@ describe('GameWaitingPage', () => {
     handlers.onOpen?.(new Event('open'))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('connected')
-    expect(wrapper.text()).toContain('대기방 연결됨')
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('preloading')
+    expect(wrapper.text()).toContain('전장 데이터 확인 중')
 
     handlers.onMessage?.(
       {
@@ -195,6 +232,104 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('bothReady')
     expect(wrapper.get('main').attributes('data-game-socket-both-ready')).toBe('true')
     expect(wrapper.text()).toContain('양쪽 준비 완료')
+  })
+
+  it('preloads the game video after websocket open and sends CLIENT_READY once', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: {
+        userId: 2,
+        nickname: 'Voidwalker',
+        tier: 'Gold IV',
+        tierScore: 13,
+      },
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('preloading')
+    expect(createdVideoElements).toHaveLength(1)
+    expect(createdVideoElements[0]?.getAttribute('src')).toBe('/assets/game/dragon-view.mp4')
+    expect(createdVideoElements[0]?.load).toHaveBeenCalledTimes(1)
+
+    emitLatestVideoPreloadEvent('loadeddata')
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('readySent')
+    expect(wrapper.text()).toContain('준비 신호 전송됨')
+
+    emitLatestVideoPreloadEvent('canplaythrough')
+    emitLatestVideoPreloadEvent('loadeddata')
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes the websocket and returns to match when video preload fails', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/missing.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onOpen?.(new Event('open'))
+    emitLatestVideoPreloadEvent('error')
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      '전장 데이터를 불러오지 못했습니다.',
+    )
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
+  })
+
+  it('does not send CLIENT_READY when preload resolves after unmount', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+    wrapper.unmount()
+    emitLatestVideoPreloadEvent('loadeddata')
+    await flushPromises()
+
+    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
   })
 
   it('responds to RTT_PING and keeps COUNTDOWN/GAME_START as safe waiting events', async () => {

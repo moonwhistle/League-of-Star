@@ -115,12 +115,16 @@ const gameSocketLastEvent = ref('')
 const gameSocketErrorMessage = ref('')
 const gameSocketBothReady = ref(false)
 const gameSocketPlayerLeftUserId = ref('')
+const videoPreloadElement = shallowRef()
+let cleanupVideoPreloadListeners = () => {}
 let closeGameWebSocket = () => {}
+let sendGameSocketClientReady = () => {}
 let sendGameSocketRttPong = (seq = 0) => {
   void seq
 }
 let isActive = false
 let hasFinalGameSocketFailure = false
+let hasSentClientReady = false
 
 const opponentName = computed(
   () => gameWaitingPayload.value?.opponent?.nickname ?? t('gameWaiting.unknownOpponent'),
@@ -230,6 +234,7 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
   gameSocketLastEvent.value = ''
   gameSocketBothReady.value = false
   gameSocketPlayerLeftUserId.value = ''
+  hasSentClientReady = false
   hasFinalGameSocketFailure = false
   closeWaitingWebSocket()
 
@@ -240,7 +245,7 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
           return
         }
 
-        gameSocketStatus.value = 'connected'
+        startGameVideoPreload(payload.game.videoUrl)
       },
       onMessage: (message) => {
         if (!canHandleGameSocketCallback()) {
@@ -266,9 +271,65 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
     })
 
     closeGameWebSocket = connection.close
+    sendGameSocketClientReady = connection.sendClientReady
     sendGameSocketRttPong = (seq = 0) => connection.sendRttPong(seq)
   } catch (error) {
     failGameSocket(error instanceof Error ? error.message : t('gameWaiting.websocketFailed'))
+  }
+}
+
+function startGameVideoPreload(videoUrl = '') {
+  cleanupGameVideoPreload()
+  gameSocketStatus.value = 'preloading'
+
+  const video = document.createElement('video')
+  videoPreloadElement.value = video
+  video.preload = 'auto'
+  video.muted = true
+  video.playsInline = true
+
+  const completePreload = () => {
+    if (videoPreloadElement.value !== video || !canHandleGameSocketCallback()) {
+      return
+    }
+
+    cleanupGameVideoPreload()
+    sendClientReadyOnce()
+  }
+  const failPreload = () => {
+    if (videoPreloadElement.value !== video || !canHandleGameSocketCallback()) {
+      return
+    }
+
+    failGameSocketAndReturnToMatch(t('gameWaiting.videoPreloadFailed'))
+  }
+
+  video.addEventListener('loadeddata', completePreload)
+  video.addEventListener('canplaythrough', completePreload)
+  video.addEventListener('error', failPreload)
+  cleanupVideoPreloadListeners = () => {
+    video.removeEventListener('loadeddata', completePreload)
+    video.removeEventListener('canplaythrough', completePreload)
+    video.removeEventListener('error', failPreload)
+  }
+
+  video.src = videoUrl
+  video.load()
+}
+
+function sendClientReadyOnce() {
+  if (hasSentClientReady || !canHandleGameSocketCallback()) {
+    return
+  }
+
+  try {
+    hasSentClientReady = true
+    sendGameSocketClientReady()
+    gameSocketStatus.value = 'readySent'
+  } catch (error) {
+    failGameSocketAndReturnToMatch(
+      error instanceof Error ? error.message : t('gameWaiting.websocketFailed'),
+    )
   }
 }
 
@@ -325,8 +386,15 @@ function resolveGameSocketFailureMessage(payload = {}) {
 
 function failGameSocket(message = t('gameWaiting.websocketFailed')) {
   hasFinalGameSocketFailure = true
+  cleanupGameVideoPreload()
   gameSocketStatus.value = 'failed'
   gameSocketErrorMessage.value = message
+}
+
+function failGameSocketAndReturnToMatch(message = t('gameWaiting.websocketFailed')) {
+  failGameSocket(message)
+  closeWaitingWebSocket()
+  returnToMatch()
 }
 
 function canHandleGameSocketCallback() {
@@ -334,11 +402,19 @@ function canHandleGameSocketCallback() {
 }
 
 function closeWaitingWebSocket() {
+  cleanupGameVideoPreload()
   closeGameWebSocket()
   closeGameWebSocket = () => {}
+  sendGameSocketClientReady = () => {}
   sendGameSocketRttPong = (seq = 0) => {
     void seq
   }
+}
+
+function cleanupGameVideoPreload() {
+  cleanupVideoPreloadListeners()
+  cleanupVideoPreloadListeners = () => {}
+  videoPreloadElement.value = undefined
 }
 
 function getLoadingStepLabel(key = '') {
