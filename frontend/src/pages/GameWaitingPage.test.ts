@@ -17,11 +17,16 @@ const routeMock = vi.hoisted(() => ({
 const routerReplaceMock = vi.hoisted(() => vi.fn())
 const routerPushMock = vi.hoisted(() => vi.fn())
 const routeLeaveGuardsMock = vi.hoisted((): unknown[] => [])
+const gameWebSocketHandoffMock = vi.hoisted(() => ({
+  handoffGameWebSocket: vi.fn(),
+  takeGameWebSocketHandoff: vi.fn(),
+}))
 const gameWebSocketMock = vi.hoisted(() => {
   const state = {
     handlers: undefined,
     connection: {
       socket: {},
+      setHandlers: vi.fn(),
       sendClientReady: vi.fn(),
       sendRttPong: vi.fn(),
       sendSmite: vi.fn(),
@@ -55,6 +60,11 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/services/realtime/gameWebSocket', () => ({
   connectGameWebSocket: gameWebSocketMock.connect,
+}))
+
+vi.mock('@/services/realtime/gameWebSocketHandoff', () => ({
+  handoffGameWebSocket: gameWebSocketHandoffMock.handoffGameWebSocket,
+  takeGameWebSocketHandoff: gameWebSocketHandoffMock.takeGameWebSocketHandoff,
 }))
 
 const connectGameWebSocketMock = vi.mocked(connectGameWebSocket)
@@ -106,10 +116,13 @@ describe('GameWaitingPage', () => {
     routerReplaceMock.mockResolvedValue(undefined)
     routerPushMock.mockResolvedValue(undefined)
     gameWebSocketMock.state.handlers = undefined
+    gameWebSocketMock.state.connection.setHandlers.mockClear()
     gameWebSocketMock.state.connection.sendClientReady.mockClear()
     gameWebSocketMock.state.connection.sendRttPong.mockClear()
     gameWebSocketMock.state.connection.sendSmite.mockClear()
     gameWebSocketMock.state.connection.close.mockClear()
+    gameWebSocketHandoffMock.handoffGameWebSocket.mockClear()
+    gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReset()
     routeLeaveGuardsMock.length = 0
     const originalCreateElement = document.createElement.bind(document)
     const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((
@@ -620,7 +633,12 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('0')
     expect(wrapper.text()).toContain('게임 시작 정보 저장됨')
     expect(wrapper.text()).toContain('서버가 확정한 시작 데이터로 전장 화면으로 이동하는 중입니다.')
-    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(gameWebSocketMock.state.connection.setHandlers).toHaveBeenCalledWith()
+    expect(gameWebSocketHandoffMock.handoffGameWebSocket).toHaveBeenCalledWith(
+      '100',
+      gameWebSocketMock.state.connection,
+    )
+    expect(gameWebSocketMock.state.connection.close).not.toHaveBeenCalled()
     expect(routerPushMock).toHaveBeenCalledWith({
       name: ROUTE_NAMES.gamePlay,
       params: {
@@ -873,6 +891,9 @@ describe('GameWaitingPage', () => {
   })
 
   it('keeps a failed state when moving to play route fails', async () => {
+    gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReturnValueOnce(
+      gameWebSocketMock.state.connection,
+    )
     routerPushMock.mockRejectedValueOnce(new Error('NAVIGATION_BLOCKED'))
     saveGameWaitingPayload({
       matchId: 'match-1',
@@ -914,6 +935,12 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toContain(
       'NAVIGATION_BLOCKED',
     )
+    expect(gameWebSocketHandoffMock.handoffGameWebSocket).toHaveBeenCalledWith(
+      '100',
+      gameWebSocketMock.state.connection,
+    )
+    expect(gameWebSocketHandoffMock.takeGameWebSocketHandoff).toHaveBeenCalledWith('100')
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 

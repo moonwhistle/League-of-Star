@@ -15,6 +15,33 @@ const routeMock = vi.hoisted(() => ({
 }))
 const routerReplaceMock = vi.hoisted(() => vi.fn())
 const routeLeaveGuardsMock = vi.hoisted((): unknown[] => [])
+const gameWebSocketHandoffMock = vi.hoisted(() => ({
+  takeGameWebSocketHandoff: vi.fn(),
+}))
+const gameWebSocketMock = vi.hoisted(() => {
+  const state = {
+    handlers: undefined,
+    connection: {
+      socket: {},
+      setHandlers: vi.fn(),
+      sendClientReady: vi.fn(),
+      sendRttPong: vi.fn(),
+      sendSmite: vi.fn(),
+      close: vi.fn(),
+    },
+  }
+  const connect = vi.fn((url = '', handlers = {}) => {
+    void url
+    state.handlers = handlers
+
+    return state.connection
+  })
+
+  return {
+    connect,
+    state,
+  }
+})
 
 vi.mock('vue-router', () => ({
   onBeforeRouteLeave: (guard: unknown) => {
@@ -26,7 +53,22 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
+vi.mock('@/services/realtime/gameWebSocket', () => ({
+  connectGameWebSocket: gameWebSocketMock.connect,
+}))
+
+vi.mock('@/services/realtime/gameWebSocketHandoff', () => ({
+  takeGameWebSocketHandoff: gameWebSocketHandoffMock.takeGameWebSocketHandoff,
+}))
+
 const { setLocale } = useLocale()
+
+interface GameWebSocketTestHandlers {
+  onOpen?: (event: Event) => void
+  onMessage?: (message: unknown, event: MessageEvent) => void
+  onError?: (error: unknown) => void
+  onClose?: (event: CloseEvent) => void
+}
 
 function getLatestRouteLeaveGuard() {
   const guard = routeLeaveGuardsMock.at(-1)
@@ -38,6 +80,14 @@ function getLatestRouteLeaveGuard() {
   return guard as (to?: unknown) => unknown
 }
 
+function getGameWebSocketHandlers() {
+  if (gameWebSocketMock.state.handlers === undefined) {
+    throw new Error('Game WebSocket handlers were not registered.')
+  }
+
+  return gameWebSocketMock.state.handlers as GameWebSocketTestHandlers
+}
+
 describe('GamePlayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -46,6 +96,11 @@ describe('GamePlayPage', () => {
     routeMock.params.gameRoomId = '100'
     routerReplaceMock.mockResolvedValue(undefined)
     routeLeaveGuardsMock.length = 0
+    gameWebSocketMock.state.handlers = undefined
+    gameWebSocketMock.connect.mockClear()
+    gameWebSocketMock.state.connection.setHandlers.mockClear()
+    gameWebSocketMock.state.connection.close.mockClear()
+    gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReset()
     setLocale('ko')
   })
 
@@ -69,6 +124,8 @@ describe('GamePlayPage', () => {
       '/assets/game/dragon-view.mp4',
     )
     expect(wrapper.get('main').attributes('data-game-websocket-url')).toBe('/ws/game/100')
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('connecting')
+    expect(wrapper.get('main').attributes('data-game-socket-smite-ready')).toBe('true')
     expect(wrapper.text()).toContain('전장 시작 데이터 확인됨')
     expect(wrapper.text()).toContain('서버 시작 시각 기준으로 대기 중')
     expect(wrapper.text()).toContain('게임룸')
@@ -77,7 +134,93 @@ describe('GamePlayPage', () => {
     expect(wrapper.text()).toContain('10000')
     expect(wrapper.text()).toContain('진행 시간')
     expect(wrapper.text()).toContain('15000')
+    expect(wrapper.text()).toContain('전장 연결 중')
     expect(wrapper.find('[data-testid="smite-button"]').exists()).toBe(false)
+    expect(gameWebSocketMock.connect).toHaveBeenCalledWith('/ws/game/100', expect.any(Object))
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('uses a handed off game websocket before reconnecting from storage', async () => {
+    gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReturnValueOnce(
+      gameWebSocketMock.state.connection,
+    )
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    expect(gameWebSocketHandoffMock.takeGameWebSocketHandoff).toHaveBeenCalledWith('100')
+    expect(gameWebSocketMock.state.connection.setHandlers).toHaveBeenCalledWith(expect.any(Object))
+    expect(gameWebSocketMock.connect).not.toHaveBeenCalled()
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('handoff')
+    expect(wrapper.get('main').attributes('data-game-socket-smite-ready')).toBe('true')
+    expect(wrapper.text()).toContain('대기방 연결 인계됨')
+  })
+
+  it('handles play websocket ERROR and GAME_RESULT without moving to match', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('connected')
+
+    handlers.onMessage?.(
+      {
+        type: 'ERROR',
+        payload: {
+          code: 'GAME_ERROR',
+          reason: 'SERVER_SIDE_ERROR',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-game-socket-smite-ready')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('ERROR')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      'SERVER_SIDE_ERROR',
+    )
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+
+    handlers.onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: {
+          gameRoomId: 100,
+          result: 'PLAYER1_WIN',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('resultReceived')
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('true')
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('renders reconnect failures in place instead of returning to match', async () => {
+    gameWebSocketMock.connect.mockImplementationOnce(() => {
+      throw new Error('RECONNECT_FAILED')
+    })
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-game-socket-smite-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      'RECONNECT_FAILED',
+    )
+    expect(wrapper.text()).toContain('RECONNECT_FAILED')
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
@@ -114,6 +257,7 @@ describe('GamePlayPage', () => {
     wrapper.unmount()
 
     expect(removeEventListenerSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function))
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
   })
 
   it('confirms route leave while valid play state is active', async () => {

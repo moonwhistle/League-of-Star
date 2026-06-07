@@ -207,13 +207,13 @@ interface ErrorServerMessage {
 
 ### 4. Game WebSocket handoff / reconnect 구현
 
-- [ ] waiting에서 play로 Game WebSocket 연결을 handoff하는 구조 설계.
-- [ ] `GAME_START` 성공 후 waiting에서 WebSocket을 즉시 close하지 않도록 정책 조정.
-- [ ] play가 handoff 받은 WebSocket으로 `SMITE`, `ERROR`, `GAME_RESULT`를 수신할 수 있게 연결.
-- [ ] handoff가 없는 직접 진입/새로고침은 저장된 `webSocketUrl`로 재연결 허용.
-- [ ] access token은 기존 native WebSocket 정책대로 query parameter로 붙임.
-- [ ] play unmount 시 WebSocket 정리.
-- [ ] 재연결 실패 시 `/match` 자동 복귀 대신 play 화면 내 오류 표시 우선.
+- [x] waiting에서 play로 Game WebSocket 연결을 handoff하는 구조 설계.
+- [x] `GAME_START` 성공 후 waiting에서 WebSocket을 즉시 close하지 않도록 정책 조정.
+- [x] play가 handoff 받은 WebSocket으로 `SMITE`, `ERROR`, `GAME_RESULT`를 처리할 수 있게 연결.
+- [x] handoff가 없는 직접 진입/새로고침은 저장된 `webSocketUrl`로 재연결 허용.
+- [x] access token은 기존 native WebSocket 정책대로 query parameter로 붙임.
+- [x] play unmount 시 WebSocket 정리.
+- [x] 재연결 실패 시 `/match` 자동 복귀 대신 play 화면 내 오류 표시 우선.
 
 ### 5. MP4 / countdown / HP HUD 구현
 

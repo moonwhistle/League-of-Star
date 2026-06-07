@@ -104,6 +104,15 @@ const messages = {
     'gamePlay.payloadMissing': '게임 시작 정보를 찾을 수 없습니다. 매칭 화면으로 돌아갑니다.',
     'gamePlay.leaveWarning':
       '게임 진행 중에 이동하면 화면 복구가 필요할 수 있습니다. 그래도 이동하시겠습니까?',
+    'gamePlay.socketStatus': '연결 상태',
+    'gamePlay.socketPending': '연결 대기',
+    'gamePlay.socketHandoff': '대기방 연결 인계됨',
+    'gamePlay.socketConnecting': '전장 연결 중',
+    'gamePlay.socketConnected': '전장 연결됨',
+    'gamePlay.socketError': '전장 연결 오류',
+    'gamePlay.socketErrorDetail': '전장 연결을 확인하지 못했습니다.',
+    'gamePlay.socketClosed': '전장 연결이 종료되었습니다.',
+    'gamePlay.resultReceived': '결과 수신됨',
   },
   en: {
     'login.email': 'Email',
@@ -204,6 +213,15 @@ const messages = {
     'gamePlay.durationMs': 'Duration',
     'gamePlay.payloadMissing': 'Game start data is missing. Returning to matchmaking.',
     'gamePlay.leaveWarning': 'Leaving during the game may require screen recovery. Continue?',
+    'gamePlay.socketStatus': 'Connection',
+    'gamePlay.socketPending': 'Connection pending',
+    'gamePlay.socketHandoff': 'Waiting room connection handed off',
+    'gamePlay.socketConnecting': 'Connecting battle',
+    'gamePlay.socketConnected': 'Battle connected',
+    'gamePlay.socketError': 'Battle connection error',
+    'gamePlay.socketErrorDetail': 'Could not verify the battle connection.',
+    'gamePlay.socketClosed': 'Battle connection closed.',
+    'gamePlay.resultReceived': 'Result received',
   },
 } as const
 

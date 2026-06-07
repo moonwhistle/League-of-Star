@@ -115,6 +115,10 @@ import { saveGameStartPayloadFromMessage } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { calculateGameWaitingProgress } from '@/services/gameWaitingProgress'
 import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
+import {
+  handoffGameWebSocket,
+  takeGameWebSocketHandoff,
+} from '@/services/realtime/gameWebSocketHandoff'
 
 import backgroundImageUrl from '../../img/background.png'
 
@@ -133,6 +137,7 @@ const gameCountdownStartAt = ref(0)
 const gameCountdownDisplaySeconds = ref(0)
 const gameCountdownRemainingSeconds = ref(0)
 const videoPreloadElement = shallowRef()
+const gameWebSocketConnection = shallowRef()
 let cleanupVideoPreloadListeners = () => {}
 let gameWaitingWatchdogId = 0
 let gameCountdownTimerId = 0
@@ -388,6 +393,7 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
       },
     })
 
+    gameWebSocketConnection.value = connection
     closeGameWebSocket = connection.close
     sendGameSocketClientReady = connection.sendClientReady
     sendGameSocketRttPong = (seq = 0) => connection.sendRttPong(seq)
@@ -591,7 +597,7 @@ function handleGameStartMessage(payload = {}) {
   gameSocketStatus.value = 'starting'
   gameSocketErrorMessage.value = ''
   hasCompletedGameStartTransition = true
-  closeWaitingWebSocket()
+  handoffWaitingWebSocket(routeGameRoomId)
 
   void router
     .push({
@@ -607,6 +613,7 @@ function handleGameStartMessage(payload = {}) {
 
       const routeErrorMessage =
         error instanceof Error && error.message.trim() !== '' ? ` ${error.message}` : ''
+      takeGameWebSocketHandoff(routeGameRoomId)?.close()
       hasCompletedGameStartTransition = false
       failGameSocket(`${t('gameWaiting.gameStartTransitionFailed')}${routeErrorMessage}`.trim())
     })
@@ -669,6 +676,25 @@ function closeWaitingWebSocket() {
   resetGameCountdown()
   cleanupGameVideoPreload()
   closeGameWebSocket()
+  gameWebSocketConnection.value = undefined
+  closeGameWebSocket = () => {}
+  sendGameSocketClientReady = () => {}
+  sendGameSocketRttPong = (seq = 0) => {
+    void seq
+  }
+}
+
+function handoffWaitingWebSocket(gameRoomId = '') {
+  clearGameWaitingWatchdog()
+  resetGameCountdown()
+  cleanupGameVideoPreload()
+
+  if (gameWebSocketConnection.value !== undefined) {
+    gameWebSocketConnection.value.setHandlers()
+    handoffGameWebSocket(gameRoomId, gameWebSocketConnection.value)
+  }
+
+  gameWebSocketConnection.value = undefined
   closeGameWebSocket = () => {}
   sendGameSocketClientReady = () => {}
   sendGameSocketRttPong = (seq = 0) => {

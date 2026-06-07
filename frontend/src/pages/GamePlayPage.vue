@@ -12,6 +12,11 @@
     :data-game-current-hp="currentHp"
     :data-game-video-url="playState?.videoUrl ?? ''"
     :data-game-websocket-url="playState?.webSocketUrl ?? ''"
+    :data-game-socket-status="gameSocketStatus"
+    :data-game-socket-last-event="gameSocketLastEvent"
+    :data-game-socket-error-message="gameSocketErrorMessage"
+    :data-game-result-received="gameResultReceived"
+    :data-game-socket-smite-ready="canSendGameSocketSmite"
   >
     <header class="game-play-header" aria-label="Game play header">
       <h1>LEAGUE OF SMITE</h1>
@@ -40,7 +45,14 @@
           <dt>{{ t('gamePlay.durationMs') }}</dt>
           <dd>{{ playState.durationMs }}</dd>
         </div>
+        <div>
+          <dt>{{ t('gamePlay.socketStatus') }}</dt>
+          <dd>{{ gameSocketStatusLabel }}</dd>
+        </div>
       </dl>
+      <p v-if="gameSocketErrorMessage !== ''" class="game-socket-error" role="alert">
+        {{ gameSocketErrorMessage }}
+      </p>
     </section>
 
     <p v-else class="payload-error" role="alert">
@@ -58,6 +70,8 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { getHpAtElapsedMs } from '@/game/hpScenario'
 import { readGameStartPayload } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
+import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
+import { takeGameWebSocketHandoff } from '@/services/realtime/gameWebSocketHandoff'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,7 +79,13 @@ const { nextLocaleLabel, t, toggleLocale } = useLocale()
 const gameStartPayload = shallowRef(readGameStartPayload('__missing__'))
 const gameWaitingPayload = shallowRef(readGameWaitingPayload('__missing__'))
 const nowMs = shallowRef(Date.now())
+const gameSocketStatus = shallowRef('idle')
+const gameSocketLastEvent = shallowRef('')
+const gameSocketErrorMessage = shallowRef('')
+const gameResultReceived = shallowRef(false)
+const playGameWebSocketConnection = shallowRef()
 let elapsedTimerId = 0
+let closePlayWebSocket = () => {}
 
 const playState = computed(() => {
   if (gameStartPayload.value === null || gameWaitingPayload.value === null) {
@@ -88,6 +108,30 @@ const elapsedMs = computed(() =>
 const currentHp = computed(() =>
   playState.value === null ? 0 : getHpAtElapsedMs(playState.value.scenario, elapsedMs.value),
 )
+const canSendGameSocketSmite = computed(() => playGameWebSocketConnection.value !== undefined)
+const gameSocketStatusLabel = computed(() => {
+  if (gameSocketStatus.value === 'handoff') {
+    return t('gamePlay.socketHandoff')
+  }
+
+  if (gameSocketStatus.value === 'connecting') {
+    return t('gamePlay.socketConnecting')
+  }
+
+  if (gameSocketStatus.value === 'connected') {
+    return t('gamePlay.socketConnected')
+  }
+
+  if (gameSocketStatus.value === 'resultReceived') {
+    return t('gamePlay.resultReceived')
+  }
+
+  if (gameSocketStatus.value === 'error') {
+    return t('gamePlay.socketError')
+  }
+
+  return t('gamePlay.socketPending')
+})
 
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
@@ -112,10 +156,14 @@ onMounted(() => {
   elapsedTimerId = window.setInterval(() => {
     nowMs.value = Date.now()
   }, 250)
+  connectPlayWebSocket(gameRoomId, waitingPayload.game.webSocketUrl)
 })
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  closePlayWebSocket()
+  playGameWebSocketConnection.value = undefined
+  closePlayWebSocket = () => {}
 
   if (elapsedTimerId !== 0) {
     window.clearInterval(elapsedTimerId)
@@ -147,6 +195,76 @@ function shouldWarnBeforeLeaving() {
 
 function returnToMatch() {
   void router.replace({ name: ROUTE_NAMES.match })
+}
+
+function connectPlayWebSocket(gameRoomId = '', webSocketUrl = '') {
+  const handlers = {
+    onOpen: () => {
+      gameSocketStatus.value = 'connected'
+      gameSocketErrorMessage.value = ''
+    },
+    onMessage: (message = {}) => {
+      handlePlayWebSocketMessage(message)
+    },
+    onError: handlePlayWebSocketError,
+    onClose: () => {
+      if (gameSocketStatus.value === 'resultReceived') {
+        return
+      }
+
+      gameSocketStatus.value = 'error'
+      gameSocketErrorMessage.value = t('gamePlay.socketClosed')
+    },
+  }
+  const handedOffConnection = takeGameWebSocketHandoff(gameRoomId)
+
+  if (handedOffConnection != null) {
+    handedOffConnection.setHandlers(handlers)
+    playGameWebSocketConnection.value = handedOffConnection
+    closePlayWebSocket = handedOffConnection.close
+    gameSocketStatus.value = 'handoff'
+    gameSocketErrorMessage.value = ''
+    return
+  }
+
+  try {
+    gameSocketStatus.value = 'connecting'
+    const connection = connectGameWebSocket(webSocketUrl, handlers)
+    playGameWebSocketConnection.value = connection
+    closePlayWebSocket = connection.close
+  } catch (error) {
+    playGameWebSocketConnection.value = undefined
+    gameSocketStatus.value = 'error'
+    gameSocketErrorMessage.value =
+      error instanceof Error ? error.message : t('gamePlay.socketErrorDetail')
+  }
+}
+
+function handlePlayWebSocketError() {
+  const error = arguments[0]
+  gameSocketStatus.value = 'error'
+  gameSocketErrorMessage.value =
+    error instanceof Error ? error.message : t('gamePlay.socketErrorDetail')
+}
+
+function handlePlayWebSocketMessage(message = {}) {
+  const messageType = String(Reflect.get(message, 'type') ?? '')
+  const payload = Reflect.get(message, 'payload')
+  gameSocketLastEvent.value = messageType
+
+  if (messageType === 'ERROR') {
+    const reason = Reflect.get(Object(payload), 'reason')
+    gameSocketStatus.value = 'error'
+    gameSocketErrorMessage.value =
+      typeof reason === 'string' && reason.trim() !== '' ? reason : t('gamePlay.socketErrorDetail')
+    return
+  }
+
+  if (messageType === 'GAME_RESULT') {
+    gameResultReceived.value = true
+    gameSocketStatus.value = 'resultReceived'
+    gameSocketErrorMessage.value = ''
+  }
 }
 
 function readRouteGameRoomId() {
@@ -282,6 +400,14 @@ function readRouteGameRoomId() {
   color: #ffd9d6;
   background: rgba(36, 10, 18, 0.82);
   border: 1px solid rgba(255, 182, 178, 0.28);
+}
+
+.game-socket-error {
+  padding: 10px 12px;
+  margin: 18px 0 0;
+  color: #ffd9d6;
+  background: rgba(36, 10, 18, 0.72);
+  border: 1px solid rgba(255, 182, 178, 0.26);
 }
 
 @media (max-width: 640px) {
