@@ -146,7 +146,7 @@ interface StoredGameStartPayload {
 - [x] `COUNTDOWN`과 `GAME_START`가 같은 `startAt`을 써야 한다는 정책 문서 반영.
 - [x] `GAME_START` 수신 후 play route 이동 정책 문서 반영.
 - [x] 실제 시작 기준은 route 이동 시점이 아니라 `GAME_START.payload.startAt`이라는 정책 문서 반영.
-- [ ] `COUNTDOWN` payload를 page handler에서 countdown 상태에 사용하도록 구현.
+- [x] `COUNTDOWN` payload를 page handler에서 countdown 상태에 사용하도록 구현.
 - [ ] `GAME_START` payload를 storage helper에 저장하도록 구현.
 
 ### 2. Game start payload storage 구현
@@ -162,14 +162,15 @@ interface StoredGameStartPayload {
 
 ### 3. GameWaitingPage countdown 처리 구현
 
-- [ ] WebSocket 상태 모델에 countdown 표시 상태 추가.
-- [ ] `COUNTDOWN` 수신 시 `gameRoomId`, `serverTime`, `startAt`, `countdownDisplaySeconds` 저장.
-- [ ] route param `gameRoomId`와 `COUNTDOWN.payload.gameRoomId` 불일치 시 실패 복귀.
-- [ ] `startAt`까지 남은 시간을 계산하는 timer 구현.
-- [ ] 남은 시간이 `countdownDisplaySeconds` 이하가 되면 `3`, `2`, `1` 표시.
-- [ ] 메시지를 늦게 받아 남은 시간이 2초대이면 `2`부터 표시 가능하도록 구현.
-- [ ] countdown timer는 unmount, 실패 복귀, `GAME_START` 처리 시 정리.
-- [ ] Game Waiting loading bar는 payload 수신율 의미로 유지하고 countdown 진행률과 섞지 않음.
+- [x] WebSocket 상태 모델에 countdown 표시 상태 추가.
+- [x] `COUNTDOWN` 수신 시 `gameRoomId`, `serverTime`, `startAt`, `countdownDisplaySeconds` 저장.
+- [x] route param `gameRoomId`와 `COUNTDOWN.payload.gameRoomId` 불일치 시 실패 복귀.
+- [x] `startAt`까지 남은 시간을 계산하는 timer 구현.
+- [x] 남은 시간이 `countdownDisplaySeconds` 이하가 되면 `3`, `2`, `1` 표시.
+- [x] 메시지를 늦게 받아 남은 시간이 2초대이면 `2`부터 표시 가능하도록 구현.
+- [x] countdown timer는 unmount, 실패 복귀 시 정리.
+- [ ] countdown timer는 `GAME_START` 처리 시 정리.
+- [x] Game Waiting loading bar는 payload 수신율 의미로 유지하고 countdown 진행률과 섞지 않음.
 
 ### 4. GameWaitingPage GAME_START 처리 구현
 
@@ -193,7 +194,7 @@ interface StoredGameStartPayload {
 
 ### 6. Locale 구현
 
-- [ ] Game Waiting countdown 상태 문구 한/영 추가.
+- [x] Game Waiting countdown 상태 문구 한/영 추가.
 - [ ] Game Waiting game start 저장/이동 상태 문구 한/영 추가.
 - [ ] Game Waiting start payload 오류 문구 한/영 추가.
 - [ ] Game Play start payload missing 문구 한/영 추가.
@@ -203,14 +204,15 @@ interface StoredGameStartPayload {
 
 - [ ] game start payload 저장/조회 단위 테스트.
 - [ ] malformed payload, route param 불일치, storage missing 테스트.
-- [ ] `COUNTDOWN` 수신 시 countdown 상태와 문구 표시 테스트.
-- [ ] countdown 남은 시간이 늦게 시작되는 경우 `2` 또는 `1`부터 표시 가능한지 테스트.
+- [x] `COUNTDOWN` 수신 시 countdown 상태와 문구 표시 테스트.
+- [x] countdown 남은 시간이 늦게 시작되는 경우 `2` 또는 `1`부터 표시 가능한지 테스트.
 - [ ] `GAME_START` 수신 시 payload 저장 테스트.
 - [ ] `GAME_START` 수신 시 `/game/:gameRoomId/play` 이동 테스트.
 - [ ] `COUNTDOWN.startAt`과 `GAME_START.startAt` 불일치 시 play 이동 금지 테스트.
 - [ ] `GAME_START.payload.gameRoomId`와 route param 불일치 시 play 이동 금지 테스트.
 - [ ] `GAME_START` 이후 늦은 WebSocket close/error callback 무시 테스트.
-- [ ] unmount 시 countdown timer 정리 테스트.
+- [x] `COUNTDOWN.payload.gameRoomId`와 route param 불일치 시 실패 복귀 테스트.
+- [x] unmount 시 countdown timer 정리 테스트.
 - [ ] GamePlayPage payload missing 또는 mismatch 시 `/match` 복귀 테스트.
 - [ ] GamePlayPage 유효 payload 표시 테스트.
 - [ ] locale toggle 시 countdown/start 문구 전환 테스트.

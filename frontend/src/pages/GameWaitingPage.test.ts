@@ -339,7 +339,9 @@ describe('GameWaitingPage', () => {
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
   })
 
-  it('responds to RTT_PING and keeps COUNTDOWN/GAME_START as safe waiting events', async () => {
+  it('responds to RTT_PING and renders COUNTDOWN without moving to play yet', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
@@ -376,13 +378,25 @@ describe('GameWaitingPage', () => {
         type: 'COUNTDOWN',
         payload: {
           gameRoomId: 100,
-          serverTime: 1,
-          startAt: 2,
+          serverTime: Date.now(),
+          startAt: Date.now() + 2500,
           countdownDisplaySeconds: 3,
         },
       },
       new MessageEvent('message'),
     )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('countdown')
+    expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('COUNTDOWN')
+    expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('3')
+    expect(wrapper.get('main').attributes('data-game-countdown-start-at')).toBe(
+      String(Date.now() + 2500),
+    )
+    expect(wrapper.text()).toContain('게임 시작 예고')
+    expect(wrapper.text()).toContain('서버가 확정한 시작 시각까지 대기하는 중입니다.')
+    expect(wrapper.text()).toContain('시작까지')
+
     handlers.onMessage?.(
       {
         type: 'GAME_START',
@@ -401,9 +415,87 @@ describe('GameWaitingPage', () => {
     )
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('rttMeasuring')
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('countdown')
     expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('GAME_START')
     expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('can start the countdown from 2 when COUNTDOWN is received late', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'COUNTDOWN',
+        payload: {
+          gameRoomId: 100,
+          serverTime: Date.now(),
+          startAt: Date.now() + 1200,
+          countdownDisplaySeconds: 3,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('2')
+
+    vi.advanceTimersByTime(1000)
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('1')
+  })
+
+  it('returns to match when COUNTDOWN belongs to a different gameRoomId', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'COUNTDOWN',
+        payload: {
+          gameRoomId: 101,
+          serverTime: Date.now(),
+          startAt: Date.now() + 3000,
+          countdownDisplaySeconds: 3,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      '게임 시작 정보가 올바르지 않습니다.',
+    )
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
   it('returns to match when the client watchdog expires', async () => {
@@ -764,7 +856,7 @@ describe('GameWaitingPage', () => {
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
   })
 
-  it('cleans websocket, watchdog, and preload listeners on unmount', async () => {
+  it('cleans websocket, watchdog, countdown timer, and preload listeners on unmount', async () => {
     vi.useFakeTimers()
     saveGameWaitingPayload({
       matchId: 'match-1',
@@ -782,6 +874,18 @@ describe('GameWaitingPage', () => {
     const handlers = getGameWebSocketHandlers()
 
     handlers.onOpen?.(new Event('open'))
+    handlers.onMessage?.(
+      {
+        type: 'COUNTDOWN',
+        payload: {
+          gameRoomId: 100,
+          serverTime: Date.now(),
+          startAt: Date.now() + 3000,
+          countdownDisplaySeconds: 3,
+        },
+      },
+      new MessageEvent('message'),
+    )
     await wrapper.vm.$nextTick()
     wrapper.unmount()
     vi.advanceTimersByTime(30000)
