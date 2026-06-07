@@ -326,10 +326,14 @@ type GameWaitingServerMessage =
 - `PLAYER_READY bothReady=true`도 게임 시작이 아니며 RTT 단계 진입 신호로만 본다.
 - `RTT_PING`에는 즉시 `RTT_PONG`으로 응답한다.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`, WebSocket close/error, client watchdog 만료는 `/match` 복귀로 처리한다.
+- invalid JSON 수신은 정상 백엔드 메시지가 아니므로 프로토콜 위반 또는 중간 계층 payload 손상으로 보고 실패 복귀 경로로 처리한다.
+- client 30초 watchdog은 백엔드 timeout의 source of truth가 아니라 사용자를 무한 대기 상태에 두지 않기 위한 UX fallback이다.
+- `/match` 복귀 라우팅이 실패해도 WebSocket, timer, preload listener 정리 상태를 유지하고 실패 상태를 화면에 남긴다.
 - GAME_START 이전 실패는 유효한 판이 아니므로 큐 자동 복귀나 LP/전적 표시 흐름을 만들지 않는다.
 - `COUNTDOWN`, `GAME_START` route 전환은 이번 이슈에서 하지 않는다.
 - WebSocket 재접속/복구는 이번 이슈에서 하지 않는다.
 - Game Waiting loading bar는 payload 수신율이며 WebSocket progress가 아니다.
+- `data-game-socket-*` 속성은 테스트와 디버깅에서 상태 전이를 관찰하기 위한 observable state로 유지한다.
 - 상태 관리는 page local state로 유지하고 Pinia를 도입하지 않는다.
 - 새 패키지를 추가하지 않는다.
 
@@ -433,6 +437,9 @@ flowchart TD
 - WebSocket 재접속/복구는 이번 범위가 아님.
 - `COUNTDOWN`, `GAME_START`, game play, SMITE, result summary는 후속 이슈에서 구현함.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`는 `/match` 복귀 기준으로 처리함.
+- invalid JSON은 백엔드 정상 응답이 아니므로 안전한 실패 복귀 대상으로 처리함.
+- client 30초 watchdog은 백엔드 timeout 판정 기준이 아니라 UX fallback임.
+- `data-game-socket-*` 속성은 테스트/디버깅 관찰용 상태 노출임.
 - 실패 복귀 시 match join/leave API를 호출하지 않음.
 - 새 패키지는 추가하지 않음.
 - 검증 완료함: `format`, `lint`, `typecheck`, 전체 test `109 passed`, production build, desktop/mobile overflow 확인.

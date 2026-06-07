@@ -10,6 +10,8 @@
     :data-game-socket-last-event="gameSocketLastEvent"
     :data-game-socket-both-ready="gameSocketBothReady"
     :data-game-socket-error-message="gameSocketErrorMessage"
+    :data-game-countdown-seconds="visibleCountdownSeconds"
+    :data-game-countdown-start-at="gameCountdownStartAt"
   >
     <header class="game-waiting-header" aria-label="Game waiting header">
       <h1>LEAGUE OF SMITE</h1>
@@ -21,6 +23,16 @@
     <p v-if="payloadErrorMessage !== ''" class="payload-error" role="alert">
       {{ payloadErrorMessage }}
     </p>
+
+    <section
+      v-if="visibleCountdownSeconds > 0"
+      class="countdown-overlay"
+      aria-label="Game start countdown"
+      aria-live="polite"
+    >
+      <span>{{ t('gameWaiting.countdownNumber') }}</span>
+      <strong :key="visibleCountdownSeconds">{{ visibleCountdownSeconds }}</strong>
+    </section>
 
     <section class="game-waiting-stage" aria-label="Game waiting details">
       <section class="combatant-panel is-player" aria-label="Player info">
@@ -99,6 +111,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { saveGameStartPayloadFromMessage } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { calculateGameWaitingProgress } from '@/services/gameWaitingProgress'
 import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
@@ -116,9 +129,13 @@ const gameSocketLastEvent = ref('')
 const gameSocketErrorMessage = ref('')
 const gameSocketBothReady = ref(false)
 const gameSocketPlayerLeftUserId = ref('')
+const gameCountdownStartAt = ref(0)
+const gameCountdownDisplaySeconds = ref(0)
+const gameCountdownRemainingSeconds = ref(0)
 const videoPreloadElement = shallowRef()
 let cleanupVideoPreloadListeners = () => {}
 let gameWaitingWatchdogId = 0
+let gameCountdownTimerId = 0
 let closeGameWebSocket = () => {}
 let sendGameSocketClientReady = () => {}
 let sendGameSocketRttPong = (seq = 0) => {
@@ -126,6 +143,7 @@ let sendGameSocketRttPong = (seq = 0) => {
 }
 let isActive = false
 let hasFinalGameSocketFailure = false
+let hasCompletedGameStartTransition = false
 let hasSentClientReady = false
 
 const opponentName = computed(
@@ -145,6 +163,12 @@ const loadingSteps = computed(() =>
 const loadingProgress = computed(() => loadingProgressState.value.progress)
 const loadingStatusLabel = computed(() =>
   loadingProgress.value >= 100 ? t('gameWaiting.ready') : t('gameWaiting.pending'),
+)
+const visibleCountdownSeconds = computed(() =>
+  gameCountdownRemainingSeconds.value > 0 &&
+  gameCountdownRemainingSeconds.value <= gameCountdownDisplaySeconds.value
+    ? gameCountdownRemainingSeconds.value
+    : 0,
 )
 const gameSocketStatusLabel = computed(() => {
   if (gameSocketStatus.value === 'connecting') {
@@ -173,6 +197,14 @@ const gameSocketStatusLabel = computed(() => {
 
   if (gameSocketStatus.value === 'rttMeasuring') {
     return t('gameWaiting.rttMeasuring')
+  }
+
+  if (gameSocketStatus.value === 'countdown') {
+    return t('gameWaiting.countdown')
+  }
+
+  if (gameSocketStatus.value === 'starting') {
+    return t('gameWaiting.gameStarting')
   }
 
   if (gameSocketStatus.value === 'failed') {
@@ -218,15 +250,20 @@ const gameSocketDetailLabel = computed(() => {
     return t('gameWaiting.rttMeasuringDetail')
   }
 
+  if (gameSocketStatus.value === 'countdown') {
+    return t('gameWaiting.countdownDetail')
+  }
+
+  if (gameSocketStatus.value === 'starting') {
+    return t('gameWaiting.gameStartingDetail')
+  }
+
   return t('gameWaiting.socketDetail')
 })
 
 onMounted(() => {
   isActive = true
-  const routeGameRoomIdParam = route.params.gameRoomId
-  const gameRoomId = Array.isArray(routeGameRoomIdParam)
-    ? String(routeGameRoomIdParam[0] ?? '').trim()
-    : String(routeGameRoomIdParam ?? '').trim()
+  const gameRoomId = readRouteGameRoomId()
 
   if (gameRoomId === '') {
     returnToMatchWithPayloadError()
@@ -250,7 +287,17 @@ onUnmounted(() => {
 })
 
 function returnToMatch() {
-  void router.replace({ name: ROUTE_NAMES.match })
+  void router.replace({ name: ROUTE_NAMES.match }).catch((error) => {
+    if (!isActive) {
+      return
+    }
+
+    const routeErrorMessage =
+      error instanceof Error && error.message.trim() !== '' ? ` ${error.message}` : ''
+    gameSocketStatus.value = 'failed'
+    gameSocketErrorMessage.value =
+      `${gameSocketErrorMessage.value || t('gameWaiting.websocketFailed')} ${t('gameWaiting.returnFailed')}${routeErrorMessage}`.trim()
+  })
 }
 
 function returnToMatchWithPayloadError() {
@@ -264,8 +311,10 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
   gameSocketLastEvent.value = ''
   gameSocketBothReady.value = false
   gameSocketPlayerLeftUserId.value = ''
+  resetGameCountdown()
   hasSentClientReady = false
   hasFinalGameSocketFailure = false
+  hasCompletedGameStartTransition = false
   closeWaitingWebSocket()
   startGameWaitingWatchdog()
 
@@ -428,6 +477,16 @@ function handleGameSocketMessage(message = {}) {
     return
   }
 
+  if (messageType === 'COUNTDOWN') {
+    handleCountdownMessage(payload)
+    return
+  }
+
+  if (messageType === 'GAME_START') {
+    handleGameStartMessage(payload)
+    return
+  }
+
   if (
     messageType === 'GAME_WAITING_TIMEOUT' ||
     messageType === 'GAME_START_FAILED' ||
@@ -445,9 +504,115 @@ function resolveGameSocketFailureMessage(payload = {}) {
     : t('gameWaiting.websocketFailed')
 }
 
+function handleCountdownMessage(payload = {}) {
+  const gameRoomId = Reflect.get(Object(payload), 'gameRoomId')
+  const serverTime = Reflect.get(Object(payload), 'serverTime')
+  const startAt = Reflect.get(Object(payload), 'startAt')
+  const countdownDisplaySeconds = Reflect.get(Object(payload), 'countdownDisplaySeconds')
+
+  if (
+    !Number.isFinite(gameRoomId) ||
+    !Number.isFinite(serverTime) ||
+    !Number.isFinite(startAt) ||
+    !Number.isFinite(countdownDisplaySeconds) ||
+    countdownDisplaySeconds <= 0 ||
+    normalizeGameRoomId(gameRoomId) !== readRouteGameRoomId()
+  ) {
+    failGameSocketAndReturnToMatch(t('gameWaiting.startPayloadInvalid'))
+    return
+  }
+
+  clearGameWaitingWatchdog()
+  gameSocketStatus.value = 'countdown'
+  gameCountdownStartAt.value = Number(startAt)
+  gameCountdownDisplaySeconds.value = Number(countdownDisplaySeconds)
+  startGameCountdownTimer()
+}
+
+function handleGameStartMessage(payload = {}) {
+  const gameRoomId = Reflect.get(Object(payload), 'gameRoomId')
+  const startAt = Reflect.get(Object(payload), 'startAt')
+  const routeGameRoomId = readRouteGameRoomId()
+
+  if (
+    !Number.isFinite(gameRoomId) ||
+    !Number.isFinite(startAt) ||
+    normalizeGameRoomId(gameRoomId) !== routeGameRoomId ||
+    (gameCountdownStartAt.value !== 0 && Number(startAt) !== gameCountdownStartAt.value)
+  ) {
+    failGameSocketAndReturnToMatch(t('gameWaiting.startPayloadInvalid'))
+    return
+  }
+
+  const storedPayload = saveGameStartPayloadFromMessage(payload)
+
+  if (storedPayload === null) {
+    failGameSocketAndReturnToMatch(t('gameWaiting.startPayloadInvalid'))
+    return
+  }
+
+  clearGameWaitingWatchdog()
+  gameSocketStatus.value = 'starting'
+  gameSocketErrorMessage.value = ''
+  hasCompletedGameStartTransition = true
+  closeWaitingWebSocket()
+
+  void router
+    .push({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: routeGameRoomId,
+      },
+    })
+    .catch((error) => {
+      if (!isActive) {
+        return
+      }
+
+      const routeErrorMessage =
+        error instanceof Error && error.message.trim() !== '' ? ` ${error.message}` : ''
+      hasCompletedGameStartTransition = false
+      failGameSocket(`${t('gameWaiting.gameStartTransitionFailed')}${routeErrorMessage}`.trim())
+    })
+}
+
+function startGameCountdownTimer() {
+  clearGameCountdownTimer()
+  updateGameCountdownRemainingSeconds()
+  gameCountdownTimerId = window.setInterval(updateGameCountdownRemainingSeconds, 250)
+}
+
+function updateGameCountdownRemainingSeconds() {
+  gameCountdownRemainingSeconds.value = Math.max(
+    0,
+    Math.ceil((gameCountdownStartAt.value - Date.now()) / 1000),
+  )
+
+  if (gameCountdownRemainingSeconds.value <= 0) {
+    clearGameCountdownTimer()
+  }
+}
+
+function clearGameCountdownTimer() {
+  if (gameCountdownTimerId === 0) {
+    return
+  }
+
+  window.clearInterval(gameCountdownTimerId)
+  gameCountdownTimerId = 0
+}
+
+function resetGameCountdown() {
+  clearGameCountdownTimer()
+  gameCountdownStartAt.value = 0
+  gameCountdownDisplaySeconds.value = 0
+  gameCountdownRemainingSeconds.value = 0
+}
+
 function failGameSocket(message = t('gameWaiting.websocketFailed')) {
   hasFinalGameSocketFailure = true
   clearGameWaitingWatchdog()
+  resetGameCountdown()
   cleanupGameVideoPreload()
   gameSocketStatus.value = 'failed'
   gameSocketErrorMessage.value = message
@@ -460,11 +625,12 @@ function failGameSocketAndReturnToMatch(message = t('gameWaiting.websocketFailed
 }
 
 function canHandleGameSocketCallback() {
-  return isActive && !hasFinalGameSocketFailure
+  return isActive && !hasFinalGameSocketFailure && !hasCompletedGameStartTransition
 }
 
 function closeWaitingWebSocket() {
   clearGameWaitingWatchdog()
+  resetGameCountdown()
   cleanupGameVideoPreload()
   closeGameWebSocket()
   closeGameWebSocket = () => {}
@@ -472,6 +638,18 @@ function closeWaitingWebSocket() {
   sendGameSocketRttPong = (seq = 0) => {
     void seq
   }
+}
+
+function readRouteGameRoomId() {
+  const routeGameRoomIdParam = route.params.gameRoomId
+
+  return Array.isArray(routeGameRoomIdParam)
+    ? String(routeGameRoomIdParam[0] ?? '').trim()
+    : String(routeGameRoomIdParam ?? '').trim()
+}
+
+function normalizeGameRoomId(gameRoomId = '') {
+  return String(gameRoomId).trim()
 }
 
 function cleanupGameVideoPreload() {
@@ -679,7 +857,7 @@ function getLoadingStepLabel(key = '') {
   overflow-wrap: anywhere;
   font-size: clamp(1.45rem, 3vw, 2.25rem);
   font-weight: 900;
-  line-height: 1.05;
+  line-height: 1.18;
   text-align: center;
   color: #edf1ff;
 }
@@ -789,6 +967,8 @@ function getLoadingStepLabel(key = '') {
 }
 
 .socket-status-indicator.is-rttMeasuring,
+.socket-status-indicator.is-countdown,
+.socket-status-indicator.is-starting,
 .socket-status-indicator.is-preloading,
 .socket-status-indicator.is-connecting {
   background: var(--waiting-violet);
@@ -822,6 +1002,62 @@ function getLoadingStepLabel(key = '') {
   white-space: normal;
 }
 
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: clamp(10px, 2vh, 18px);
+  place-content: center;
+  place-items: center;
+  pointer-events: none;
+  background: rgba(3, 7, 18, 0.44);
+  backdrop-filter: blur(4px);
+}
+
+.countdown-overlay span {
+  max-width: min(520px, calc(100vw - 40px));
+  overflow: hidden;
+  font-size: clamp(0.82rem, 2vw, 1.05rem);
+  font-weight: 900;
+  color: rgba(245, 248, 255, 0.78);
+  text-align: center;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.countdown-overlay strong {
+  display: block;
+  min-width: 0;
+  font-size: clamp(7rem, 26vw, 18rem);
+  font-weight: 900;
+  line-height: 1.18;
+  color: rgba(245, 248, 255, 0.82);
+  text-align: center;
+  text-shadow:
+    0 0 30px rgba(98, 244, 237, 0.64),
+    0 0 80px rgba(215, 185, 255, 0.36);
+  animation: countdown-pulse 920ms ease-out both;
+}
+
+@keyframes countdown-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  28% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.68;
+    transform: scale(1.08);
+  }
+}
+
 .loading-meter-row {
   display: flex;
   align-items: end;
@@ -832,7 +1068,7 @@ function getLoadingStepLabel(key = '') {
 
 .loading-meter-row strong {
   font-size: clamp(1.5rem, 4vw, 2.4rem);
-  line-height: 1;
+  line-height: 1.15;
   color: var(--waiting-cyan);
   text-shadow: 0 0 16px rgba(98, 244, 237, 0.52);
 }
@@ -956,7 +1192,7 @@ function getLoadingStepLabel(key = '') {
   .combatant-body h2 {
     margin-bottom: 10px;
     font-size: 0.92rem;
-    line-height: 1.1;
+    line-height: 1.2;
   }
 
   .combatant-body dl > div {
