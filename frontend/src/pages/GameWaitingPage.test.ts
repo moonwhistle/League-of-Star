@@ -16,6 +16,7 @@ const routeMock = vi.hoisted(() => ({
 }))
 const routerReplaceMock = vi.hoisted(() => vi.fn())
 const routerPushMock = vi.hoisted(() => vi.fn())
+const routeLeaveGuardsMock = vi.hoisted((): unknown[] => [])
 const gameWebSocketMock = vi.hoisted(() => {
   const state = {
     handlers: undefined,
@@ -42,6 +43,9 @@ const gameWebSocketMock = vi.hoisted(() => {
 const { setLocale } = useLocale()
 
 vi.mock('vue-router', () => ({
+  onBeforeRouteLeave: (guard: unknown) => {
+    routeLeaveGuardsMock.push(guard)
+  },
   useRoute: () => routeMock,
   useRouter: () => ({
     replace: routerReplaceMock,
@@ -72,6 +76,16 @@ function getGameWebSocketHandlers() {
   return gameWebSocketMock.state.handlers as GameWebSocketTestHandlers
 }
 
+function getLatestRouteLeaveGuard() {
+  const guard = routeLeaveGuardsMock.at(-1)
+
+  if (guard === undefined) {
+    throw new Error('Route leave guard was not registered.')
+  }
+
+  return guard as (to?: unknown) => unknown
+}
+
 function emitLatestVideoPreloadEvent(type: string) {
   const video = createdVideoElements.at(-1)
 
@@ -96,6 +110,7 @@ describe('GameWaitingPage', () => {
     gameWebSocketMock.state.connection.sendRttPong.mockClear()
     gameWebSocketMock.state.connection.sendSmite.mockClear()
     gameWebSocketMock.state.connection.close.mockClear()
+    routeLeaveGuardsMock.length = 0
     const originalCreateElement = document.createElement.bind(document)
     const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((
       tagName: string,
@@ -343,6 +358,59 @@ describe('GameWaitingPage', () => {
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
   })
 
+  it('warns before browser refresh while waiting payload is active', async () => {
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const wrapper = mount(GameWaitingPage)
+    await flushPromises()
+    const event = new Event('beforeunload', { cancelable: true })
+
+    window.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
+    wrapper.unmount()
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function))
+  })
+
+  it('confirms route leave while waiting and follows the user choice', async () => {
+    const confirmSpy = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    mount(GameWaitingPage)
+    await flushPromises()
+    const guard = getLatestRouteLeaveGuard()
+
+    expect(guard({ name: ROUTE_NAMES.match })).toBe(false)
+    expect(guard({ name: ROUTE_NAMES.match })).toBe(true)
+    expect(confirmSpy).toHaveBeenCalledWith(
+      '게임 대기 중에 이동하면 현재 연결이 끊길 수 있습니다. 그래도 이동하시겠습니까?',
+    )
+  })
+
   it('responds to RTT_PING and renders COUNTDOWN before game start', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))
@@ -560,6 +628,45 @@ describe('GameWaitingPage', () => {
       },
     })
     expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('allows the normal transition to play without route leave confirmation', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        videoUrl: '/assets/game/dragon-view.mp4',
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'GAME_START',
+        payload: {
+          gameRoomId: 100,
+          serverTime: Date.now(),
+          startAt: Date.now() + 2500,
+          scenario: {
+            dragonMaxHp: 10000,
+            durationMs: 15000,
+            hpTimeline: [],
+          },
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(getLatestRouteLeaveGuard()({ name: ROUTE_NAMES.gamePlay })).toBe(true)
+    expect(confirmSpy).not.toHaveBeenCalled()
   })
 
   it('uses GAME_START as the source of truth when COUNTDOWN was not received', async () => {

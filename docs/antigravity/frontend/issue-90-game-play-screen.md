@@ -196,13 +196,13 @@ interface ErrorServerMessage {
 
 ### 3. Refresh / leave guard 구현
 
-- [ ] waiting page에 `beforeunload` 경고 추가.
-- [ ] play page에 `beforeunload` 경고 추가.
-- [ ] waiting page 내부 route leave guard 추가.
-- [ ] play page 내부 route leave guard 추가.
-- [ ] 정상 `/game/:gameRoomId/play` 전환은 waiting route leave guard에서 허용.
-- [ ] 새로고침 후 waiting은 저장된 waiting payload로 WebSocket/preload 흐름 복구 시도.
-- [ ] 새로고침 후 play는 저장된 start payload와 waiting payload로 화면 복구 시도.
+- [x] waiting page에 `beforeunload` 경고 추가.
+- [x] play page에 `beforeunload` 경고 추가.
+- [x] waiting page 내부 route leave guard 추가.
+- [x] play page 내부 route leave guard 추가.
+- [x] 정상 `/game/:gameRoomId/play` 전환은 waiting route leave guard에서 허용.
+- [x] 새로고침 후 waiting은 저장된 waiting payload로 WebSocket/preload 흐름 복구 시도.
+- [x] 새로고침 후 play는 저장된 start payload와 waiting payload로 화면 복구 시도.
 - [ ] 새로고침 후 `smiteSent`가 저장되어 있으면 SMITE button을 다시 활성화하지 않음.
 
 ### 4. Game WebSocket handoff / reconnect 구현

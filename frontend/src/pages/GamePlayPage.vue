@@ -51,7 +51,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
@@ -90,6 +90,7 @@ const currentHp = computed(() =>
 )
 
 onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
   const gameRoomId = readRouteGameRoomId()
 
   if (gameRoomId === '') {
@@ -114,11 +115,35 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+
   if (elapsedTimerId !== 0) {
     window.clearInterval(elapsedTimerId)
     elapsedTimerId = 0
   }
 })
+
+onBeforeRouteLeave(() => {
+  if (!shouldWarnBeforeLeaving()) {
+    return true
+  }
+
+  return window.confirm(t('gamePlay.leaveWarning'))
+})
+
+function handleBeforeUnload() {
+  if (!shouldWarnBeforeLeaving()) {
+    return
+  }
+
+  const event = arguments[0]
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+function shouldWarnBeforeLeaving() {
+  return playState.value !== null
+}
 
 function returnToMatch() {
   void router.replace({ name: ROUTE_NAMES.match })

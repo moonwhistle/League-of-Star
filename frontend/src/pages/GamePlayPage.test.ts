@@ -14,8 +14,12 @@ const routeMock = vi.hoisted(() => ({
   },
 }))
 const routerReplaceMock = vi.hoisted(() => vi.fn())
+const routeLeaveGuardsMock = vi.hoisted((): unknown[] => [])
 
 vi.mock('vue-router', () => ({
+  onBeforeRouteLeave: (guard: unknown) => {
+    routeLeaveGuardsMock.push(guard)
+  },
   useRoute: () => routeMock,
   useRouter: () => ({
     replace: routerReplaceMock,
@@ -24,6 +28,16 @@ vi.mock('vue-router', () => ({
 
 const { setLocale } = useLocale()
 
+function getLatestRouteLeaveGuard() {
+  const guard = routeLeaveGuardsMock.at(-1)
+
+  if (guard === undefined) {
+    throw new Error('Route leave guard was not registered.')
+  }
+
+  return guard as (to?: unknown) => unknown
+}
+
 describe('GamePlayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -31,6 +45,7 @@ describe('GamePlayPage', () => {
     window.sessionStorage.clear()
     routeMock.params.gameRoomId = '100'
     routerReplaceMock.mockResolvedValue(undefined)
+    routeLeaveGuardsMock.length = 0
     setLocale('ko')
   })
 
@@ -82,6 +97,41 @@ describe('GamePlayPage', () => {
 
     expect(wrapper.get('main').attributes('data-game-elapsed-ms')).toBe('3000')
     expect(wrapper.get('main').attributes('data-game-current-hp')).toBe('8000')
+  })
+
+  it('warns before browser refresh while valid play state is active', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    const event = new Event('beforeunload', { cancelable: true })
+
+    window.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
+    wrapper.unmount()
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function))
+  })
+
+  it('confirms route leave while valid play state is active', async () => {
+    const confirmSpy = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+    saveValidPlayPayloads()
+
+    mount(GamePlayPage)
+    await flushPromises()
+    const guard = getLatestRouteLeaveGuard()
+
+    expect(guard({ name: ROUTE_NAMES.match })).toBe(false)
+    expect(guard({ name: ROUTE_NAMES.match })).toBe(true)
+    expect(confirmSpy).toHaveBeenCalledWith(
+      '게임 진행 중에 이동하면 화면 복구가 필요할 수 있습니다. 그래도 이동하시겠습니까?',
+    )
   })
 
   it('returns to match when the GAME_START payload is missing', async () => {

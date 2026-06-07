@@ -107,7 +107,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
@@ -263,6 +263,7 @@ const gameSocketDetailLabel = computed(() => {
 
 onMounted(() => {
   isActive = true
+  window.addEventListener('beforeunload', handleBeforeUnload)
   const gameRoomId = readRouteGameRoomId()
 
   if (gameRoomId === '') {
@@ -283,8 +284,43 @@ onMounted(() => {
 
 onUnmounted(() => {
   isActive = false
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   closeWaitingWebSocket()
 })
+
+onBeforeRouteLeave((to) => {
+  if (isAllowedGameStartRouteLeave(to)) {
+    return true
+  }
+
+  if (!shouldWarnBeforeLeaving()) {
+    return true
+  }
+
+  return window.confirm(t('gameWaiting.leaveWarning'))
+})
+
+function handleBeforeUnload() {
+  if (!shouldWarnBeforeLeaving()) {
+    return
+  }
+
+  const event = arguments[0]
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+function shouldWarnBeforeLeaving() {
+  return (
+    gameWaitingPayload.value !== undefined &&
+    !hasFinalGameSocketFailure &&
+    !hasCompletedGameStartTransition
+  )
+}
+
+function isAllowedGameStartRouteLeave(to = {}) {
+  return hasCompletedGameStartTransition && Reflect.get(Object(to), 'name') === ROUTE_NAMES.gamePlay
+}
 
 function returnToMatch() {
   void router.replace({ name: ROUTE_NAMES.match }).catch((error) => {
