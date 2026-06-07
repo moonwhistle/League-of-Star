@@ -81,7 +81,11 @@ const messages = {
     'gameWaiting.countdown': '게임 시작 예고',
     'gameWaiting.countdownDetail': '서버가 확정한 시작 시각까지 대기하는 중입니다.',
     'gameWaiting.countdownNumber': '시작까지',
+    'gameWaiting.gameStarting': '게임 시작 정보 저장됨',
+    'gameWaiting.gameStartingDetail':
+      '서버가 확정한 시작 데이터로 전장 화면으로 이동하는 중입니다.',
     'gameWaiting.startPayloadInvalid': '게임 시작 정보가 올바르지 않습니다.',
+    'gameWaiting.gameStartTransitionFailed': '게임 화면 이동에 실패했습니다.',
     'gameWaiting.websocketFailed': '게임 대기 연결 실패',
     'gameWaiting.websocketClosed': '게임 대기 연결이 종료되었습니다.',
     'gameWaiting.watchdogTimeout': '게임 대기 시간이 초과되었습니다.',
@@ -167,7 +171,11 @@ const messages = {
     'gameWaiting.countdown': 'Game start incoming',
     'gameWaiting.countdownDetail': 'Waiting for the server-confirmed start time.',
     'gameWaiting.countdownNumber': 'Starting in',
+    'gameWaiting.gameStarting': 'Game start data saved',
+    'gameWaiting.gameStartingDetail':
+      'Moving to the battle screen with the server-confirmed start data.',
     'gameWaiting.startPayloadInvalid': 'Game start data is invalid.',
+    'gameWaiting.gameStartTransitionFailed': 'Failed to open the game screen.',
     'gameWaiting.websocketFailed': 'Game waiting connection failed',
     'gameWaiting.websocketClosed': 'Game waiting connection closed.',
     'gameWaiting.watchdogTimeout': 'Game waiting timed out.',

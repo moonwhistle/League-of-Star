@@ -147,7 +147,7 @@ interface StoredGameStartPayload {
 - [x] `GAME_START` 수신 후 play route 이동 정책 문서 반영.
 - [x] 실제 시작 기준은 route 이동 시점이 아니라 `GAME_START.payload.startAt`이라는 정책 문서 반영.
 - [x] `COUNTDOWN` payload를 page handler에서 countdown 상태에 사용하도록 구현.
-- [ ] `GAME_START` payload를 storage helper에 저장하도록 구현.
+- [x] `GAME_START` payload를 storage helper에 저장하도록 구현.
 
 ### 2. Game start payload storage 구현
 
@@ -169,19 +169,19 @@ interface StoredGameStartPayload {
 - [x] 남은 시간이 `countdownDisplaySeconds` 이하가 되면 `3`, `2`, `1` 표시.
 - [x] 메시지를 늦게 받아 남은 시간이 2초대이면 `2`부터 표시 가능하도록 구현.
 - [x] countdown timer는 unmount, 실패 복귀 시 정리.
-- [ ] countdown timer는 `GAME_START` 처리 시 정리.
+- [x] countdown timer는 `GAME_START` 처리 시 정리.
 - [x] Game Waiting loading bar는 payload 수신율 의미로 유지하고 countdown 진행률과 섞지 않음.
 
 ### 4. GameWaitingPage GAME_START 처리 구현
 
-- [ ] `GAME_START` 수신 시 route param `gameRoomId`와 payload `gameRoomId` 일치 검증.
-- [ ] `COUNTDOWN`을 먼저 받은 경우 `COUNTDOWN.startAt`과 `GAME_START.startAt` 일치 검증.
-- [ ] `COUNTDOWN` 없이 `GAME_START`가 먼저 오면 `GAME_START` payload를 source of truth로 저장.
-- [ ] `GAME_START` payload를 `sessionStorage`에 저장.
-- [ ] 저장 성공 후 WebSocket, watchdog, countdown timer, preload listener 정리.
-- [ ] `GAME_START`를 final transition으로 표시해 늦은 close/error callback 무시.
-- [ ] `/game/:gameRoomId/play` 이동 구현.
-- [ ] play route 이동 실패 시 waiting 화면에 실패 상태를 유지하고 error message 표시.
+- [x] `GAME_START` 수신 시 route param `gameRoomId`와 payload `gameRoomId` 일치 검증.
+- [x] `COUNTDOWN`을 먼저 받은 경우 `COUNTDOWN.startAt`과 `GAME_START.startAt` 일치 검증.
+- [x] `COUNTDOWN` 없이 `GAME_START`가 먼저 오면 `GAME_START` payload를 source of truth로 저장.
+- [x] `GAME_START` payload를 `sessionStorage`에 저장.
+- [x] 저장 성공 후 WebSocket, watchdog, countdown timer, preload listener 정리.
+- [x] `GAME_START`를 final transition으로 표시해 늦은 close/error callback 무시.
+- [x] `/game/:gameRoomId/play` 이동 구현.
+- [x] play route 이동 실패 시 waiting 화면에 실패 상태를 유지하고 error message 표시.
 
 ### 5. GamePlayPage 최소 연결 구현
 
@@ -195,22 +195,22 @@ interface StoredGameStartPayload {
 ### 6. Locale 구현
 
 - [x] Game Waiting countdown 상태 문구 한/영 추가.
-- [ ] Game Waiting game start 저장/이동 상태 문구 한/영 추가.
-- [ ] Game Waiting start payload 오류 문구 한/영 추가.
+- [x] Game Waiting game start 저장/이동 상태 문구 한/영 추가.
+- [x] Game Waiting start payload 오류 문구 한/영 추가.
 - [ ] Game Play start payload missing 문구 한/영 추가.
 - [ ] Locale toggle 시 countdown/start 상태 문구가 전환되는지 확인.
 
 ### 7. Test 구현
 
-- [ ] game start payload 저장/조회 단위 테스트.
-- [ ] malformed payload, route param 불일치, storage missing 테스트.
+- [x] game start payload 저장/조회 단위 테스트.
+- [x] malformed payload, route param 불일치, storage missing 테스트.
 - [x] `COUNTDOWN` 수신 시 countdown 상태와 문구 표시 테스트.
 - [x] countdown 남은 시간이 늦게 시작되는 경우 `2` 또는 `1`부터 표시 가능한지 테스트.
-- [ ] `GAME_START` 수신 시 payload 저장 테스트.
-- [ ] `GAME_START` 수신 시 `/game/:gameRoomId/play` 이동 테스트.
-- [ ] `COUNTDOWN.startAt`과 `GAME_START.startAt` 불일치 시 play 이동 금지 테스트.
-- [ ] `GAME_START.payload.gameRoomId`와 route param 불일치 시 play 이동 금지 테스트.
-- [ ] `GAME_START` 이후 늦은 WebSocket close/error callback 무시 테스트.
+- [x] `GAME_START` 수신 시 payload 저장 테스트.
+- [x] `GAME_START` 수신 시 `/game/:gameRoomId/play` 이동 테스트.
+- [x] `COUNTDOWN.startAt`과 `GAME_START.startAt` 불일치 시 play 이동 금지 테스트.
+- [x] `GAME_START.payload.gameRoomId`와 route param 불일치 시 play 이동 금지 테스트.
+- [x] `GAME_START` 이후 늦은 WebSocket close/error callback 무시 테스트.
 - [x] `COUNTDOWN.payload.gameRoomId`와 route param 불일치 시 실패 복귀 테스트.
 - [x] unmount 시 countdown timer 정리 테스트.
 - [ ] GamePlayPage payload missing 또는 mismatch 시 `/match` 복귀 테스트.
@@ -219,7 +219,7 @@ interface StoredGameStartPayload {
 
 ### 8. 문서 정합성 구현
 
-- [ ] `front-plan.md` 9번 `게임 시작 처리 구현` 범위와 issue-88 범위 정합성 확인.
+- [x] `front-plan.md` 9번 `게임 시작 처리 구현` 범위와 issue-88 범위 정합성 확인.
 - [ ] 구현 완료 후 `front-plan.md` 9번 `게임 시작 처리 구현`을 `[x]`로 체크.
 - [ ] 구현 완료 후 `front-plan.md`의 `## Issue Split Recommendation`에서 `게임 시작 처리 구현`을 `[x]`로 체크.
 - [ ] `front-plan.md` 10번 `게임 플레이 화면 구현`은 후속으로 유지.
@@ -233,14 +233,14 @@ interface StoredGameStartPayload {
 
 ### 9. 검증
 
-- [ ] `npm run test -- GameWaitingPage gameStart` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] desktop viewport에서 countdown/start UI overflow 확인.
-- [ ] mobile viewport에서 countdown/start UI overflow 확인.
+- [x] `npm run test -- GameWaitingPage gameStart` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] desktop viewport에서 countdown/start UI overflow 확인.
+- [x] mobile viewport에서 countdown/start UI overflow 확인.
 
 ## Implementation Policy
 

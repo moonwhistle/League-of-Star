@@ -111,6 +111,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { saveGameStartPayloadFromMessage } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { calculateGameWaitingProgress } from '@/services/gameWaitingProgress'
 import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
@@ -142,6 +143,7 @@ let sendGameSocketRttPong = (seq = 0) => {
 }
 let isActive = false
 let hasFinalGameSocketFailure = false
+let hasCompletedGameStartTransition = false
 let hasSentClientReady = false
 
 const opponentName = computed(
@@ -201,6 +203,10 @@ const gameSocketStatusLabel = computed(() => {
     return t('gameWaiting.countdown')
   }
 
+  if (gameSocketStatus.value === 'starting') {
+    return t('gameWaiting.gameStarting')
+  }
+
   if (gameSocketStatus.value === 'failed') {
     return t('gameWaiting.websocketFailed')
   }
@@ -246,6 +252,10 @@ const gameSocketDetailLabel = computed(() => {
 
   if (gameSocketStatus.value === 'countdown') {
     return t('gameWaiting.countdownDetail')
+  }
+
+  if (gameSocketStatus.value === 'starting') {
+    return t('gameWaiting.gameStartingDetail')
   }
 
   return t('gameWaiting.socketDetail')
@@ -304,6 +314,7 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
   resetGameCountdown()
   hasSentClientReady = false
   hasFinalGameSocketFailure = false
+  hasCompletedGameStartTransition = false
   closeWaitingWebSocket()
   startGameWaitingWatchdog()
 
@@ -471,6 +482,11 @@ function handleGameSocketMessage(message = {}) {
     return
   }
 
+  if (messageType === 'GAME_START') {
+    handleGameStartMessage(payload)
+    return
+  }
+
   if (
     messageType === 'GAME_WAITING_TIMEOUT' ||
     messageType === 'GAME_START_FAILED' ||
@@ -511,6 +527,53 @@ function handleCountdownMessage(payload = {}) {
   gameCountdownStartAt.value = Number(startAt)
   gameCountdownDisplaySeconds.value = Number(countdownDisplaySeconds)
   startGameCountdownTimer()
+}
+
+function handleGameStartMessage(payload = {}) {
+  const gameRoomId = Reflect.get(Object(payload), 'gameRoomId')
+  const startAt = Reflect.get(Object(payload), 'startAt')
+  const routeGameRoomId = readRouteGameRoomId()
+
+  if (
+    !Number.isFinite(gameRoomId) ||
+    !Number.isFinite(startAt) ||
+    normalizeGameRoomId(gameRoomId) !== routeGameRoomId ||
+    (gameCountdownStartAt.value !== 0 && Number(startAt) !== gameCountdownStartAt.value)
+  ) {
+    failGameSocketAndReturnToMatch(t('gameWaiting.startPayloadInvalid'))
+    return
+  }
+
+  const storedPayload = saveGameStartPayloadFromMessage(payload)
+
+  if (storedPayload === null) {
+    failGameSocketAndReturnToMatch(t('gameWaiting.startPayloadInvalid'))
+    return
+  }
+
+  clearGameWaitingWatchdog()
+  gameSocketStatus.value = 'starting'
+  gameSocketErrorMessage.value = ''
+  hasCompletedGameStartTransition = true
+  closeWaitingWebSocket()
+
+  void router
+    .push({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: routeGameRoomId,
+      },
+    })
+    .catch((error) => {
+      if (!isActive) {
+        return
+      }
+
+      const routeErrorMessage =
+        error instanceof Error && error.message.trim() !== '' ? ` ${error.message}` : ''
+      hasCompletedGameStartTransition = false
+      failGameSocket(`${t('gameWaiting.gameStartTransitionFailed')}${routeErrorMessage}`.trim())
+    })
 }
 
 function startGameCountdownTimer() {
@@ -562,7 +625,7 @@ function failGameSocketAndReturnToMatch(message = t('gameWaiting.websocketFailed
 }
 
 function canHandleGameSocketCallback() {
-  return isActive && !hasFinalGameSocketFailure
+  return isActive && !hasFinalGameSocketFailure && !hasCompletedGameStartTransition
 }
 
 function closeWaitingWebSocket() {
@@ -905,6 +968,7 @@ function getLoadingStepLabel(key = '') {
 
 .socket-status-indicator.is-rttMeasuring,
 .socket-status-indicator.is-countdown,
+.socket-status-indicator.is-starting,
 .socket-status-indicator.is-preloading,
 .socket-status-indicator.is-connecting {
   background: var(--waiting-violet);

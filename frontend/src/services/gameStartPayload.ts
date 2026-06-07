@@ -11,7 +11,7 @@ export interface StoredGameStartPayload {
 }
 
 export function saveGameStartPayloadFromMessage(
-  messagePayload: GameStartPayload,
+  messagePayload: unknown,
 ): StoredGameStartPayload | null {
   if (!isGameStartPayload(messagePayload)) {
     return null
