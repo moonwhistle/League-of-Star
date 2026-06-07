@@ -282,20 +282,24 @@ interface StoredGameStartPayload {
 
 `/game/:gameRoomId/waiting` 화면에서 Game WebSocket `COUNTDOWN`, `GAME_START`를 처리해 게임 시작 payload를 저장하고 `/game/:gameRoomId/play`로 전환함.
 
-이번 PR의 핵심은 Game Waiting 화면을 **게임 시작 직전 이벤트 수신 구간**까지 확장하되, 실제 게임 플레이 UI 책임은 `/game/:gameRoomId/play` 후속 이슈로 넘기는 것임. `GAME_START`는 scenario source of truth이고, route 이동이 일어나도 실제 시작 기준은 payload의 `startAt`으로 유지함.
+이번 PR의 핵심은 Game Waiting 화면을 **게임 시작 직전 이벤트 수신 구간**까지 확장하되, 실제 게임 플레이 UI 책임은 후속 이슈로 넘기는 것임. `COUNTDOWN`은 시작 예고이고, `GAME_START`가 `serverTime`, `startAt`, `scenario`의 source of truth임. route 이동이 일어나도 실제 게임 시작 기준은 이동 시각이 아니라 백엔드가 확정한 `GAME_START.payload.startAt`으로 유지함.
 
 ```mermaid
 flowchart TD
     A["Game Waiting WebSocket<br/>READY + RTT 완료"] --> B["COUNTDOWN 수신"]
     B --> C["startAt 기준 countdown 표시"]
     C --> D["GAME_START 수신"]
-    D --> E{"payload 유효?"}
-    E -->|no| F["WebSocket/timer 정리"]
+    D --> E{"gameRoomId / startAt / scenario 유효?"}
+    E -->|no| F["WebSocket/watchdog/timer 정리"]
     F --> G["/match 복귀"]
-    E -->|yes| H["serverTime/startAt/scenario 저장"]
-    H --> I["WebSocket/timer 정리"]
-    I --> J["/game/:gameRoomId/play 이동"]
-    J --> K["Play 화면은 startAt 기준 대기"]
+    E -->|yes| H["GAME_START payload sessionStorage 저장"]
+    H --> I["전환 완료 guard 설정"]
+    I --> J["WebSocket/watchdog/countdown/preload 정리"]
+    J --> K["/game/:gameRoomId/play 이동"]
+    K --> L["Play 최소 연결<br/>저장 payload 조회"]
+    L --> M{"payload 유효?"}
+    M -->|no| N["/match 복귀"]
+    M -->|yes| O["startAt/scenario 확인<br/>후속 HUD 대기"]
 ```
 
 핵심 정책:
@@ -304,6 +308,8 @@ flowchart TD
 - `GAME_START`가 시작 데이터와 scenario의 source of truth임.
 - `GAME_START` 수신 후 play route로 이동하지만 실제 시작 기준은 `startAt`임.
 - `COUNTDOWN`과 `GAME_START`가 모두 있으면 같은 `startAt`을 사용해야 함.
+- `COUNTDOWN` 없이 `GAME_START`가 먼저 와도 payload가 유효하면 저장 후 play로 이동함.
+- `GAME_START` 이후 늦은 WebSocket close/error callback은 실패 복귀로 덮어쓰지 않음.
 - server/client clock 보정은 이번 PR에서 하지 않음.
 - Game Waiting loading bar는 payload 수신율 의미로 유지함.
 - 실제 MP4 재생, HP bar, SMITE, `GAME_RESULT`는 후속 이슈 범위임.
@@ -314,6 +320,9 @@ flowchart TD
 - `GAME_START` payload는 `gameRoomId`, `serverTime`, `startAt`, `scenario`를 사용함.
 - `scenario`는 `dragonMaxHp`, `durationMs`, `hpTimeline`으로 구성됨.
 - 프론트는 백엔드가 내려준 `serverTime`, `startAt`을 그대로 저장함.
+- route param `gameRoomId`와 payload `gameRoomId`가 다르면 잘못된 메시지로 보고 시작하지 않음.
+- `COUNTDOWN.startAt`과 `GAME_START.startAt`이 다르면 백엔드 동기화 계약 위반으로 보고 시작하지 않음.
+- `/game/:gameRoomId/play`는 `smite.gameStartPayload:{gameRoomId}`를 읽고, payload가 없거나 route와 맞지 않으면 `/match`로 복귀함.
 - `GAME_START` 이전 실패는 유효한 판이 아니므로 record/LP/큐 자동 복귀 흐름을 만들지 않음.
 
 ## 📚 Changes
@@ -322,19 +331,28 @@ flowchart TD
   서버는 `startAt` 전에 `COUNTDOWN`을 미리 보내며, 프론트는 남은 시간이 표시 구간에 들어왔을 때 countdown을 렌더링함. 메시지를 늦게 받으면 `3`이 아니라 `2` 또는 `1`부터 보일 수 있지만, 실제 시작 기준은 계속 `startAt`임.
 
 - `GAME_START`를 시작 데이터의 source of truth로 저장함.
-  scenario를 route state가 아니라 `sessionStorage`에 저장해 새로고침과 route 이동 사이의 최소 지속성을 확보함. 기존 game waiting payload 저장 정책과 같은 방식이므로 새 전역 store나 패키지를 추가하지 않음.
+  scenario를 route state가 아니라 `sessionStorage`에 저장해 route 이동 이후에도 play 화면이 같은 시작 데이터를 읽게 함. 기존 game waiting payload 저장 정책과 같은 방식이므로 새 전역 store나 패키지를 추가하지 않음.
+
+- WebSocket payload를 저장 전 검증함.
+  `GAME_START` 메시지는 백엔드 이벤트지만 프론트는 런타임 payload shape를 그대로 신뢰하지 않음. `gameRoomId`, `serverTime`, `startAt`, `scenario`, `hpTimeline` 구조를 검증한 뒤 저장해 malformed payload가 play route까지 전파되지 않게 함.
 
 - waiting과 play의 책임을 분리함.
-  waiting은 `COUNTDOWN`, `GAME_START`를 받고 안전하게 play로 넘기는 역할만 담당함. play 화면은 저장된 시작 데이터를 확인하지만, 실제 MP4/HUD/SMITE 구현은 다음 이슈에서 처리함.
+  waiting은 `COUNTDOWN`, `GAME_START`를 받고 안전하게 play로 넘기는 역할만 담당함. play 화면은 저장된 시작 데이터를 확인하고 후속 HUD가 사용할 `startAt` 기반 elapsed/HP 계산값만 연결함. 실제 MP4/HUD/SMITE 구현은 다음 이슈에서 처리함.
 
 - `startAt` 검증을 엄격하게 유지함.
   `COUNTDOWN`과 `GAME_START`가 서로 다른 `startAt`을 가지면 두 클라이언트의 시작 기준이 어긋날 수 있으므로 시작하지 않음. 이는 백엔드가 두 메시지에 같은 `startAt`을 사용한다는 계약을 프론트에서도 방어하는 처리임.
 
+- `GAME_START` 이후 전환을 final 상태로 다룸.
+  저장과 route 이동이 시작된 뒤 WebSocket close/error가 늦게 들어올 수 있으므로, 전환 완료 guard를 두어 waiting 화면이 다시 실패 복귀로 흔들리지 않게 함. 이는 성공 전환 기준을 WebSocket close가 아니라 `GAME_START` payload 저장과 play route 이동으로 분리하기 위한 처리임.
+
 - 실패 복귀 정책을 issue-86과 동일하게 유지함.
   `GAME_START` 이전 실패는 아직 유효한 판이 아니므로 LP, 전적, 큐 자동 복귀와 섞지 않고 `/match`로 복귀함. 실패 복귀 시 match join/leave API도 호출하지 않음.
 
+- loading bar 의미를 유지함.
+  Game Waiting loading bar는 match/game/video/socket payload 수신율만 나타냄. countdown 진행률, WebSocket readiness, 실제 게임 시작 준비율과 섞지 않아 기존 UI 의미가 바뀌지 않게 함.
+
 - 문서 정합성을 같이 관리함.
-  `front-plan.md`의 9번 구현 단계와 `Issue Split Recommendation` 체크 상태를 구현 완료 후 함께 갱신하고, 10번 이후 play/result/summary 범위는 후속으로 유지함.
+  `front-plan.md`의 9번 구현 단계와 `Issue Split Recommendation` 체크 상태를 `[x]`로 갱신하고, 10번 이후 play/result/summary 범위는 후속으로 유지함. issue-86에서 후속으로 남긴 `COUNTDOWN`, `GAME_START`, scenario 저장, play route 이동 범위를 issue-88에서 닫음.
 
 ## 📝 Note
 
@@ -342,8 +360,12 @@ flowchart TD
 - `SMITE` 전송과 `GAME_RESULT` 수신 후 result route 이동은 후속 이슈에서 구현함.
 - Game summary API 호출은 후속 결과 화면 이슈에서 구현함.
 - clock skew 보정과 WebSocket 재접속/복구는 이번 범위가 아님.
+- 실패 복귀 시 match join/leave API를 호출하지 않고 큐 자동 복귀도 하지 않음.
 - 새 패키지는 추가하지 않음.
-- 검증 예정: `format`, `lint`, `typecheck`, 전체 test, production build, desktop/mobile overflow 확인.
+- 검증 완료: `format`, `lint`, `typecheck`, 전체 test, production build 통과함.
+- 브라우저 검증 완료: desktop `1440x900`, mobile `390x844`에서 play 최소 연결 화면의 horizontal overflow 없음.
+- 관련 테스트: `GameWaitingPage`, `GamePlayPage`, `gameStartPayload`, `hpScenario` 대상 테스트 통과함.
+- 테스트 결과: 전체 테스트 14 files / 127 tests 통과함.
 
 ## 📌 Related Issue
 
