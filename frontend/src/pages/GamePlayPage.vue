@@ -3,10 +3,15 @@
   <main
     class="game-play-page"
     :data-game-start-payload-ready="gameStartPayload !== null"
+    :data-game-waiting-payload-ready="gameWaitingPayload !== null"
+    :data-game-play-state-ready="playState !== null"
     :data-game-room-id="gameStartPayload?.gameRoomId ?? ''"
     :data-game-start-at="gameStartPayload?.startAt ?? ''"
+    :data-game-duration-ms="playState?.durationMs ?? ''"
     :data-game-elapsed-ms="elapsedMs"
     :data-game-current-hp="currentHp"
+    :data-game-video-url="playState?.videoUrl ?? ''"
+    :data-game-websocket-url="playState?.webSocketUrl ?? ''"
   >
     <header class="game-play-header" aria-label="Game play header">
       <h1>LEAGUE OF SMITE</h1>
@@ -15,29 +20,25 @@
       </button>
     </header>
 
-    <section
-      v-if="gameStartPayload !== null"
-      class="game-start-status"
-      aria-label="Game start data"
-    >
+    <section v-if="playState !== null" class="game-start-status" aria-label="Game start data">
       <p>{{ t('gamePlay.status') }}</p>
       <h2>{{ t('gamePlay.title') }}</h2>
       <dl>
         <div>
           <dt>{{ t('gamePlay.gameRoom') }}</dt>
-          <dd>{{ gameStartPayload.gameRoomId }}</dd>
+          <dd>{{ playState.gameRoomId }}</dd>
         </div>
         <div>
           <dt>{{ t('gamePlay.startAt') }}</dt>
-          <dd>{{ gameStartPayload.startAt }}</dd>
+          <dd>{{ playState.startAt }}</dd>
         </div>
         <div>
           <dt>{{ t('gamePlay.dragonMaxHp') }}</dt>
-          <dd>{{ gameStartPayload.scenario.dragonMaxHp }}</dd>
+          <dd>{{ playState.scenario.dragonMaxHp }}</dd>
         </div>
         <div>
           <dt>{{ t('gamePlay.durationMs') }}</dt>
-          <dd>{{ gameStartPayload.scenario.durationMs }}</dd>
+          <dd>{{ playState.durationMs }}</dd>
         </div>
       </dl>
     </section>
@@ -49,26 +50,43 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { getHpAtElapsedMs } from '@/game/hpScenario'
 import { readGameStartPayload } from '@/services/gameStartPayload'
+import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 
 const route = useRoute()
 const router = useRouter()
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
-const gameStartPayload = shallowRef(readGameStartPayload(readRouteGameRoomId()))
+const gameStartPayload = shallowRef(readGameStartPayload('__missing__'))
+const gameWaitingPayload = shallowRef(readGameWaitingPayload('__missing__'))
+const nowMs = shallowRef(Date.now())
+let elapsedTimerId = 0
+
+const playState = computed(() => {
+  if (gameStartPayload.value === null || gameWaitingPayload.value === null) {
+    return null
+  }
+
+  return {
+    gameRoomId: gameStartPayload.value.gameRoomId,
+    startAt: gameStartPayload.value.startAt,
+    durationMs: gameStartPayload.value.scenario.durationMs,
+    scenario: gameStartPayload.value.scenario,
+    videoUrl: gameWaitingPayload.value.game.videoUrl,
+    webSocketUrl: gameWaitingPayload.value.game.webSocketUrl,
+  }
+})
 
 const elapsedMs = computed(() =>
-  gameStartPayload.value === null ? 0 : Math.max(0, Date.now() - gameStartPayload.value.startAt),
+  playState.value === null ? 0 : Math.max(0, nowMs.value - playState.value.startAt),
 )
 const currentHp = computed(() =>
-  gameStartPayload.value === null
-    ? 0
-    : getHpAtElapsedMs(gameStartPayload.value.scenario, elapsedMs.value),
+  playState.value === null ? 0 : getHpAtElapsedMs(playState.value.scenario, elapsedMs.value),
 )
 
 onMounted(() => {
@@ -80,13 +98,26 @@ onMounted(() => {
   }
 
   const payload = readGameStartPayload(gameRoomId)
+  const waitingPayload = readGameWaitingPayload(gameRoomId)
 
-  if (payload === null) {
+  if (payload === null || waitingPayload === null) {
     returnToMatch()
     return
   }
 
   gameStartPayload.value = payload
+  gameWaitingPayload.value = waitingPayload
+  nowMs.value = Date.now()
+  elapsedTimerId = window.setInterval(() => {
+    nowMs.value = Date.now()
+  }, 250)
+})
+
+onUnmounted(() => {
+  if (elapsedTimerId !== 0) {
+    window.clearInterval(elapsedTimerId)
+    elapsedTimerId = 0
+  }
 })
 
 function returnToMatch() {
