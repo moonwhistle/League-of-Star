@@ -4,7 +4,7 @@
 
 Vue 프론트엔드의 `/game/:gameRoomId/waiting` 페이지에서 Game WebSocket `COUNTDOWN`, `GAME_START` 이벤트를 실제 게임 시작 흐름으로 연결한다.
 
-이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `9. [ ] 게임 시작 처리 구현`을 구현 기준으로 삼는다. Issue 86에서 Game Waiting WebSocket 연결, MP4 preload, `CLIENT_READY`, READY 대기, RTT 응답, 실패 복귀까지 완료했고, `COUNTDOWN`, `GAME_START`는 수신 가능하게만 두었다. 이번 이슈에서는 그 후속으로 countdown 표시, `GAME_START` payload 저장, `/game/:gameRoomId/play` 이동을 구현한다.
+이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `9. [x] 게임 시작 처리 구현`을 구현 기준으로 삼는다. Issue 86에서 Game Waiting WebSocket 연결, MP4 preload, `CLIENT_READY`, READY 대기, RTT 응답, 실패 복귀까지 완료했고, `COUNTDOWN`, `GAME_START`는 수신 가능하게만 두었다. 이번 이슈에서는 그 후속으로 countdown 표시, `GAME_START` payload 저장, `/game/:gameRoomId/play` 이동을 구현한다.
 
 핵심은 `GAME_START`를 실제 게임 시작 데이터의 source of truth로 삼되, 클라이언트가 즉시 게임이 시작됐다고 판단하지 않는 것이다. 서버는 `COUNTDOWN`과 `GAME_START`를 `startAt` 전에 미리 전송하고, 프론트는 `GAME_START` 수신 후 play route로 이동하되 실제 게임 시작 기준은 payload의 `startAt`으로 유지한다.
 
@@ -185,20 +185,20 @@ interface StoredGameStartPayload {
 
 ### 5. GamePlayPage 최소 연결 구현
 
-- [ ] `/game/:gameRoomId/play`에서 저장된 game start payload 조회.
-- [ ] payload 없음, parse 실패, route param 불일치 시 `/match` 복귀.
-- [ ] 유효 payload가 있으면 `gameRoomId`, `startAt`, `dragonMaxHp`, `durationMs`를 내부 상태로 보관.
-- [ ] 화면에는 이번 이슈 범위가 시작 데이터 수신/대기임을 나타내는 최소 상태만 표시.
-- [ ] 실제 MP4, HP bar, SMITE HUD는 구현하지 않음.
-- [ ] `startAt` 기준 runtime 계산은 후속 play UI가 사용할 수 있도록 `getHpAtElapsedMs` helper와 연결 가능한 구조로 유지.
+- [x] `/game/:gameRoomId/play`에서 저장된 game start payload 조회.
+- [x] payload 없음, parse 실패, route param 불일치 시 `/match` 복귀.
+- [x] 유효 payload가 있으면 `gameRoomId`, `startAt`, `dragonMaxHp`, `durationMs`를 내부 상태로 보관.
+- [x] 화면에는 이번 이슈 범위가 시작 데이터 수신/대기임을 나타내는 최소 상태만 표시.
+- [x] 실제 MP4, HP bar, SMITE HUD는 구현하지 않음.
+- [x] `startAt` 기준 runtime 계산은 후속 play UI가 사용할 수 있도록 `getHpAtElapsedMs` helper와 연결 가능한 구조로 유지.
 
 ### 6. Locale 구현
 
 - [x] Game Waiting countdown 상태 문구 한/영 추가.
 - [x] Game Waiting game start 저장/이동 상태 문구 한/영 추가.
 - [x] Game Waiting start payload 오류 문구 한/영 추가.
-- [ ] Game Play start payload missing 문구 한/영 추가.
-- [ ] Locale toggle 시 countdown/start 상태 문구가 전환되는지 확인.
+- [x] Game Play start payload missing 문구 한/영 추가.
+- [x] Locale toggle 시 countdown/start 상태 문구가 전환되는지 확인.
 
 ### 7. Test 구현
 
@@ -213,23 +213,23 @@ interface StoredGameStartPayload {
 - [x] `GAME_START` 이후 늦은 WebSocket close/error callback 무시 테스트.
 - [x] `COUNTDOWN.payload.gameRoomId`와 route param 불일치 시 실패 복귀 테스트.
 - [x] unmount 시 countdown timer 정리 테스트.
-- [ ] GamePlayPage payload missing 또는 mismatch 시 `/match` 복귀 테스트.
-- [ ] GamePlayPage 유효 payload 표시 테스트.
-- [ ] locale toggle 시 countdown/start 문구 전환 테스트.
+- [x] GamePlayPage payload missing 또는 mismatch 시 `/match` 복귀 테스트.
+- [x] GamePlayPage 유효 payload 표시 테스트.
+- [x] locale toggle 시 countdown/start 문구 전환 테스트.
 
 ### 8. 문서 정합성 구현
 
 - [x] `front-plan.md` 9번 `게임 시작 처리 구현` 범위와 issue-88 범위 정합성 확인.
-- [ ] 구현 완료 후 `front-plan.md` 9번 `게임 시작 처리 구현`을 `[x]`로 체크.
-- [ ] 구현 완료 후 `front-plan.md`의 `## Issue Split Recommendation`에서 `게임 시작 처리 구현`을 `[x]`로 체크.
-- [ ] `front-plan.md` 10번 `게임 플레이 화면 구현`은 후속으로 유지.
-- [ ] `front-plan.md` 11번 `게임 결과 WebSocket 처리 구현`은 후속으로 유지.
-- [ ] `front-plan.md` 12번 `게임 결과 Summary 화면 구현`은 후속으로 유지.
-- [ ] issue-86의 `COUNTDOWN`, `GAME_START` 후속 이슈 문구와 issue-88 연결 확인.
-- [ ] `docs/project/websocket client.md`의 `COUNTDOWN`, `GAME_START` 클라이언트 처리 정책과 정합성 확인.
-- [ ] `docs/project/policy.md`의 GAME_START 시작 동기화 정책과 정합성 확인.
-- [ ] backend issue-46의 `startAt`, countdown, scenario 전달 정책과 정합성 확인.
-- [ ] 이번 이슈 PR 메시지 섹션 작성.
+- [x] 구현 완료 후 `front-plan.md` 9번 `게임 시작 처리 구현`을 `[x]`로 체크.
+- [x] 구현 완료 후 `front-plan.md`의 `## Issue Split Recommendation`에서 `게임 시작 처리 구현`을 `[x]`로 체크.
+- [x] `front-plan.md` 10번 `게임 플레이 화면 구현`은 후속으로 유지.
+- [x] `front-plan.md` 11번 `게임 결과 WebSocket 처리 구현`은 후속으로 유지.
+- [x] `front-plan.md` 12번 `게임 결과 Summary 화면 구현`은 후속으로 유지.
+- [x] issue-86의 `COUNTDOWN`, `GAME_START` 후속 이슈 문구와 issue-88 연결 확인.
+- [x] `docs/project/websocket client.md`의 `COUNTDOWN`, `GAME_START` 클라이언트 처리 정책과 정합성 확인.
+- [x] `docs/project/policy.md`의 GAME_START 시작 동기화 정책과 정합성 확인.
+- [x] backend issue-46의 `startAt`, countdown, scenario 전달 정책과 정합성 확인.
+- [x] 이번 이슈 PR 메시지 섹션 작성.
 
 ### 9. 검증
 
@@ -241,6 +241,7 @@ interface StoredGameStartPayload {
 - [x] `npm run build` 검증.
 - [x] desktop viewport에서 countdown/start UI overflow 확인.
 - [x] mobile viewport에서 countdown/start UI overflow 확인.
+- [x] `npm run test -- GamePlayPage gameStartPayload hpScenario` 검증.
 
 ## Implementation Policy
 

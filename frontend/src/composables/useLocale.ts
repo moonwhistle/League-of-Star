@@ -93,6 +93,13 @@ const messages = {
     'gameWaiting.returnFailed': '매칭 화면 복귀에 실패했습니다.',
     'gameWaiting.playerLeft': '상대 연결 이탈',
     'gameWaiting.socketDetail': '게임 시작 전 연결 상태를 확인하는 중',
+    'gamePlay.title': '전장 시작 데이터 확인됨',
+    'gamePlay.status': '서버 시작 시각 기준으로 대기 중',
+    'gamePlay.gameRoom': '게임룸',
+    'gamePlay.startAt': '시작 시각',
+    'gamePlay.dragonMaxHp': '드래곤 최대 HP',
+    'gamePlay.durationMs': '진행 시간',
+    'gamePlay.payloadMissing': '게임 시작 정보를 찾을 수 없습니다. 매칭 화면으로 돌아갑니다.',
   },
   en: {
     'login.email': 'Email',
@@ -183,6 +190,13 @@ const messages = {
     'gameWaiting.returnFailed': 'Failed to return to matchmaking.',
     'gameWaiting.playerLeft': 'Opponent disconnected',
     'gameWaiting.socketDetail': 'Checking the connection before game start',
+    'gamePlay.title': 'Battle start data confirmed',
+    'gamePlay.status': 'Waiting on the server start time',
+    'gamePlay.gameRoom': 'Game room',
+    'gamePlay.startAt': 'Start time',
+    'gamePlay.dragonMaxHp': 'Dragon max HP',
+    'gamePlay.durationMs': 'Duration',
+    'gamePlay.payloadMissing': 'Game start data is missing. Returning to matchmaking.',
   },
 } as const
 

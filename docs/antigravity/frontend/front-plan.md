@@ -204,7 +204,7 @@ type GameWaitingServerMessage =
 - Game Waiting loading bar는 payload 수신율로 유지하고 WebSocket progress와 섞지 않음.
 - WebSocket 재접속/복구는 후속 작업으로 보류.
 
-### 9. [ ] 게임 시작 처리 구현
+### 9. [x] 게임 시작 처리 구현
 
 - `COUNTDOWN` 수신 시 countdown 표시 구현.
 - `GAME_START` 수신 시 `serverTime`, `startAt`, `scenario` 저장 구현.
@@ -365,7 +365,7 @@ Accept: text/event-stream
 - [ ] 매칭 수락/거절 커맨드 구현.
 - [ ] 매칭 응답 결과 화면 전환 구현.
 - [ ] 게임 대기방 WebSocket 구현.
-- [ ] 게임 시작 처리 구현.
+- [x] 게임 시작 처리 구현.
 - [ ] 게임 플레이 화면 구현.
 - [ ] 게임 결과 WebSocket 처리 구현.
 - [ ] 게임 결과 Summary 화면 구현.
