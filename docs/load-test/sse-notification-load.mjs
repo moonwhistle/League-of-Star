@@ -319,7 +319,7 @@ function userFor(index) {
   const prefix = `sse${normalized.slice(-8)}`;
 
   return {
-    email: `${namespace}-${index}@load.smite`,
+    email: `${namespace}-${index}@load.leagueofstar`,
     password,
     nickname: `${prefix}${index.toString(36)}`.slice(0, 16),
   };

@@ -355,7 +355,7 @@ V1은 steady 상황에서는 사용할 수 있지만, 10,000명 burst에서는 �
 - [x] **대기열 크기 Gauge 최적화**
   - `match_queue_size`: 전체 큐 스캔 대신 티어별 ZSET 크기 조회로 측정
 - [x] **Grafana 대시보드 갱신**
-  - 매칭 엔진 개선 비교용 지표 중심으로 `docs/grafana/smite-match-queue-dashboard.json` 구성
+  - 매칭 엔진 개선 비교용 지표 중심으로 `docs/grafana/league-of-star-match-queue-dashboard.json` 구성
 
 ### 7. 테스트 코드 작성
 - [x] **`MatchEngineServiceTest` 단위 테스트 작성**
@@ -413,7 +413,7 @@ V1은 steady 상황에서는 사용할 수 있지만, 10,000명 burst에서는 �
 
 - [x] **로컬 부하 테스트 실행 환경 구성**
   - `infra/local/docker-compose-infra.yml`로 MySQL, Redis 실행
-    - `smite-local` Docker network 생성
+    - `league-of-star-local` Docker network 생성
   - `infra/local/docker-compose-monitoring.yml`로 Prometheus, Grafana 실행
   - `league-of-star-api` 인스턴스 2개 실행
     - Instance A: `server.port=8080`

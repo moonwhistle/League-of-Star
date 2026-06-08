@@ -107,9 +107,9 @@
 
 - 사용자에게 노출되는 서비스명은 **League of Star**로 통일한다.
 - 사용자에게 노출되는 전투 입력명은 **LIGHTNING / 라이트닝**, 대상명은 **Star Core / 스타 코어**로 통일한다.
-- 현재 백엔드 WebSocket wire type은 호환성을 위해 `{ "type": "SMITE", "payload": null }`을 유지한다. 프론트의 버튼/문구는 LIGHTNING이지만, 서버에 전송하는 message type은 백엔드가 변경되기 전까지 `SMITE`가 source of truth다.
-- 현재 DB/API 레거시 식별자 `smite_time_ms`, `dragon_hp_at_smite`, `smiteTimeMs`, `dragonHpAtSmite`, `dragonMaxHp`는 schema/wire 호환을 위해 유지할 수 있다. 문서에서는 개념상 LIGHTNING/스타 코어 값으로 설명하되, 실제 필드명은 레거시 식별자임을 명확히 구분한다.
-- 신규 프론트 저장 key와 표시 문구는 `league-of-star.*`, LIGHTNING, Star Core를 우선 사용하며, 기존 사용자 세션 복구를 위해 `smite.*` key는 읽기 fallback으로만 유지한다.
+- 현재 백엔드 WebSocket wire type은 호환성을 위해 `{ "type": "LIGHTNING", "payload": null }`을 유지한다. 프론트의 버튼/문구는 LIGHTNING이지만, 서버에 전송하는 message type은 백엔드가 변경되기 전까지 `LIGHTNING`가 source of truth다.
+- 현재 DB/API 레거시 식별자 `lightning_time_ms`, `star_core_hp_at_lightning`, `lightningTimeMs`, `starCoreHpAtLightning`, `starCoreMaxHp`는 schema/wire 호환을 위해 유지할 수 있다. 문서에서는 개념상 LIGHTNING/스타 코어 값으로 설명하되, 실제 필드명은 레거시 식별자임을 명확히 구분한다.
+- 신규 프론트 저장 key와 표시 문구는 `league-of-star.*`, LIGHTNING, Star Core를 우선 사용하며, 기존 사용자 세션 복구를 위해 `lightning.*` key는 읽기 fallback으로만 유지한다.
 
 ### 2.1 게임 기본 규칙
 
@@ -171,7 +171,7 @@
 - WebSocket 미연결 유저에게는 실시간 WebSocket 이벤트를 보낼 수 없다. timeout 후 늦게 WebSocket handshake를 시도하면 gameRoom이 이미 `ABORTED`이므로 연결을 거부하고, 클라이언트는 start 버튼 화면으로 복귀한다.
 - WebSocket에 연결되어 있던 유저에게만 `GAME_WAITING_TIMEOUT` 이벤트를 전송한 뒤 연결을 닫는다.
 - `GAME_START` 이전 timeout 후 두 유저는 start 버튼 화면으로 복귀한다. 큐 자동 복귀는 하지 않는다.
-- `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 LIGHTNING action은 그대로 유효하다. 현재 WebSocket wire type은 레거시 `SMITE`다.
+- `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 LIGHTNING action은 그대로 유효하다. 현재 WebSocket wire type은 레거시 `LIGHTNING`다.
 - `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
 - 서버 timer/scheduler는 `naturalDeathAt = startAt + scenario.durationMs`를 최초 자연사 deadline으로 등록한다.
 - LIGHTNING 실패 action이 저장되면 원본 scenario HP에서 누적 LIGHTNING 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있다.
@@ -183,7 +183,7 @@
 - LIGHTNING으로 승/패가 확정되거나 두 유저가 모두 LIGHTNING을 소모해 `DRAW`가 확정된 경우에도 `game:end:pending` member cleanup은 필수로 하지 않는다. DB의 `game_rooms.status`가 최종 기준이며, 후속 game end scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
 - 자연사 종료 정산은 DB gameRoom 결과 확정을 먼저 수행하고, 연결된 local WebSocket session이 있으면 `GAME_RESULT`를 보낸다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
 - 자연사 종료 후 pending cleanup은 WebSocket 전송 성공의 의미가 아니라 DB 기준으로 정산 완료된 후보를 제거하는 의미다. cleanup을 생략하면 이미 종료된 gameRoom이 scheduler tick마다 반복 조회될 수 있다.
-- `GAME_RESULT.reason`은 종료 사유에 따라 `SMITE_KILL`, `BOTH_SMITES_USED_DRAW`, `NATURAL_DEATH_DRAW`를 사용한다.
+- `GAME_RESULT.reason`은 종료 사유에 따라 `LIGHTNING_KILL`, `BOTH_LIGHTNINGS_USED_DRAW`, `NATURAL_DEATH_DRAW`를 사용한다.
 - record/LP/배치/승급전 반영은 gameRoom 결과 확정 및 `GAME_RESULT` 전송 흐름과 분리한다. `game_rooms`/`game_participants` 결과 확정 이후 Step 9 record/rank 정산이 `game_records` 생성과 LP/RankSeries 반영을 별도 transaction으로 처리한다.
 
 ### 2.5 서버 권위 타임스탬프 (공정성 핵심)
@@ -193,11 +193,11 @@
 #### 판정 방식: 서버 권위 (Server-Authoritative)
 
 ```
-1. 클라이언트 → 서버: WebSocket으로 LIGHTNING 의도를 전송. 현재 wire type은 레거시 `"SMITE"`이며 시간 정보 없음
+1. 클라이언트 → 서버: WebSocket으로 LIGHTNING 의도를 전송. 현재 wire type은 레거시 `"LIGHTNING"`이며 시간 정보 없음
 2. 서버: 수신 시각을 직접 기록 (server_receive_time)
 3. 서버: 판정 시점 계산
-   → smite_time = server_receive_time - game_start_time
-4. 서버: 시나리오에서 smite_time 시점의 HP를 역산
+   → lightning_time = server_receive_time - game_start_time
+4. 서버: 시나리오에서 lightning_time 시점의 HP를 역산
 5. 서버: HP ≤ 1200이면 킬 성공
 ```
 
@@ -209,13 +209,13 @@
 - RTT 측정은 `GAME_START` 전 연결 품질 검사와 비정상 네트워크 환경 차단에만 사용
 - LIGHTNING 판정은 실제 롤 라이트닝 감각에 맞춰 서버가 받은 입력 순서를 기준으로 처리
 - 스타 코어 초기 HP는 `10000`, LIGHTNING 데미지는 `1200` 고정값으로 둔다.
-- `game_actions.dragon_hp_at_smite`는 레거시 컬럼명이며, scenario 원본 HP가 아니라 이전 LIGHTNING 데미지를 반영한 이번 LIGHTNING 적용 전 현재 스타 코어 HP를 저장한다.
+- `game_actions.star_core_hp_at_lightning`는 레거시 컬럼명이며, scenario 원본 HP가 아니라 이전 LIGHTNING 데미지를 반영한 이번 LIGHTNING 적용 전 현재 스타 코어 HP를 저장한다.
 - `game_actions`는 유저당 1회 LIGHTNING 입력 기록으로 유지하고, 승패 기록과 LP/배치/승급전 반영은 `game_records`에서 처리한다.
 - 킬 실패한 LIGHTNING도 이후 HP 판정에는 `1200` 데미지로 반영한다.
-- `afterHp = max(0, dragonHpAtSmite - 1200)`은 응답 payload에서 계산하고 DB에는 저장하지 않는다.
-- `smiteTimeMs`가 HP timeline step 사이에 있으면 인접한 두 step의 HP를 선형 보간해 base HP를 계산한다.
-- `smiteTimeMs < 100`은 게임 시작 직후 비정상적으로 빠른 입력으로 보고 action을 저장하지 않는다.
-- `smiteTimeMs`가 scenario 범위를 벗어나면 action을 저장하지 않는다.
+- `afterHp = max(0, starCoreHpAtLightning - 1200)`은 응답 payload에서 계산하고 DB에는 저장하지 않는다.
+- `lightningTimeMs`가 HP timeline step 사이에 있으면 인접한 두 step의 HP를 선형 보간해 base HP를 계산한다.
+- `lightningTimeMs < 100`은 게임 시작 직후 비정상적으로 빠른 입력으로 보고 action을 저장하지 않는다.
+- `lightningTimeMs`가 scenario 범위를 벗어나면 action을 저장하지 않는다.
   - `startAt` 이전 입력은 무효 입력으로 본다.
   - scenario 종료 이후 입력은 자연사 이후 입력이므로 후속 종료 정산 흐름에서 현재 gameRoom 결과를 기준으로 처리한다.
 
@@ -307,9 +307,9 @@ LIGHTNING 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에�
 | 규칙 | 내용 |
 |------|------|
 | **시나리오 전달 시점** | 게임 카운트다운 완료 후 시작 시점에만 전달 (사전 유출 차단) |
-| **입력 검증** | 클라이언트는 LIGHTNING 의도만 전송. 현재 wire type은 레거시 `"SMITE"`이며 시간 정보 포함 시 요청 무효 처리 |
+| **입력 검증** | 클라이언트는 LIGHTNING 의도만 전송. 현재 wire type은 레거시 `"LIGHTNING"`이며 시간 정보 포함 시 요청 무효 처리 |
 | **셀프 매칭 방지** | 동일 IP에서 양쪽 플레이어 접속 시 매칭 차단 |
-| **입력 시점 판정** | 게임 시작 후 비정상적으로 빠른 입력 (`smiteTimeMs < 100`) 또는 scenario 범위 밖 입력은 무효 처리 |
+| **입력 시점 판정** | 게임 시작 후 비정상적으로 빠른 입력 (`lightningTimeMs < 100`) 또는 scenario 범위 밖 입력은 무효 처리 |
 | **요청 중복 차단** | 동일 게임에서 2회 이상 LIGHTNING 요청 수신 시 첫 번째만 유효 |
 
 ### 2.7 WebSocket 라우팅 정책

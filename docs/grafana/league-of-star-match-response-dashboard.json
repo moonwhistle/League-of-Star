@@ -10,12 +10,12 @@
     }
   ],
   "title": "리그 오브 스마이트 - 매칭 응답",
-  "uid": "smite-match-response",
+  "uid": "league-of-star-match-response",
   "timezone": "browser",
   "refresh": "10s",
   "schemaVersion": 38,
   "tags": [
-    "smite",
+    "lightning",
     "matching",
     "response",
     "timeout"
@@ -34,7 +34,7 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "query": "label_values(up{job=\"smite-api\"}, instance)",
+        "query": "label_values(up{job=\"league-of-star-api\"}, instance)",
         "refresh": 1,
         "sort": 1,
         "multi": true,

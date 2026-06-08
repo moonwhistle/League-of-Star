@@ -677,7 +677,7 @@ eventSource.onerror = () => {
   - `MODE=connection`: SSE 연결 유지 및 heartbeat 안정성 테스트
   - `MODE=match`: SSE 연결 후 `joinQueue`를 호출해 실제 `match_found` 수신까지 확인
 - SSE 전용 Grafana 대시보드를 추가했습니다.
-  - `docs/grafana/smite-sse-notification-dashboard.json`
+  - `docs/grafana/league-of-star-sse-notification-dashboard.json`
   - 활성 연결 수, 연결 종료 사유, 이벤트 전송 성공/실패율, 전송 p95/p99, JVM Thread/Thread 상태/Heap/CPU, Tomcat Thread/Connection을 확인합니다.
 - SSE 부하 테스트 실행법과 MVC vs Netty 비교 기준을 `docs/load-test/README.md`에 정리했습니다.
 

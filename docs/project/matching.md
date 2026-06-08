@@ -201,7 +201,7 @@ gameRoom 생성 성공
    game=null
 ```
 
-매칭 SSE는 `match_response_result`까지 담당하고, `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/SMITE/종료는 gameRoom WebSocket이 담당합니다.
+매칭 SSE는 `match_response_result`까지 담당하고, `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/LIGHTNING/종료는 gameRoom WebSocket이 담당합니다.
 `match_response_result`는 해당 matchId의 매칭 응답 최종 이벤트이며, 클라이언트의 SSE close 여부는 `action`별로 다릅니다.
 `GO_TO_GAME_WAITING`과 `GO_TO_MATCH_START`는 매칭 SSE를 닫습니다.
 `RETURN_TO_MATCHING`은 백엔드가 이미 기존 `entryTime/tierScore`로 큐 복귀를 완료한 뒤 발행하므로, 클라이언트는 매칭 SSE를 유지하고 `join/leave`를 호출하지 않습니다.

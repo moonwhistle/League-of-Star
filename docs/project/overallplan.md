@@ -13,9 +13,9 @@
 ### 1.1 명칭 전환 및 레거시 계약
 
 - 사용자에게 노출되는 세계관은 **League of Star / LIGHTNING / Star Core**로 통일한다.
-- 현재 백엔드 WebSocket 메시지 타입과 DB/API 일부 필드는 기존 구현 호환을 위해 `SMITE`, `smiteTimeMs`, `dragonHpAtSmite`, `dragonMaxHp` 같은 레거시 식별자를 유지할 수 있다.
-- 프론트는 새 저장 key `league-of-star.*`를 우선 사용하되, 진행 중 세션 복구를 위해 기존 `smite.*` key를 읽기 fallback으로 유지한다.
-- 백엔드가 wire/schema migration을 완료하기 전까지 프론트의 LIGHTNING 입력은 `{ "type": "SMITE", "payload": null }` 전송 계약을 따른다.
+- 현재 백엔드 WebSocket 메시지 타입과 DB/API 일부 필드는 기존 구현 호환을 위해 `LIGHTNING`, `lightningTimeMs`, `starCoreHpAtLightning`, `starCoreMaxHp` 같은 레거시 식별자를 유지할 수 있다.
+- 프론트는 새 저장 key `league-of-star.*`를 우선 사용하되, 진행 중 세션 복구를 위해 기존 `lightning.*` key를 읽기 fallback으로 유지한다.
+- 백엔드가 wire/schema migration을 완료하기 전까지 프론트의 LIGHTNING 입력은 `{ "type": "LIGHTNING", "payload": null }` 전송 계약을 따른다.
 
 ---
 
@@ -114,10 +114,10 @@ HP: ████░██████░░█░░████░░█░░�
 
 ```
 1. 유저: 스타 코어 위에 마우스 올림 + 키(D/F) 입력
-2. 클라이언트 → 서버: LIGHTNING 의도 전송. 현재 wire type은 레거시 "SMITE"이며 시간 정보 없음
+2. 클라이언트 → 서버: LIGHTNING 의도 전송. 현재 wire type은 레거시 "LIGHTNING"이며 시간 정보 없음
 3. 서버: 수신 시각 직접 기록 (server_receive_time)
-4. 서버: smite_time = server_receive_time - game_start_time
-5. 서버: 시나리오에서 smite_time 시점의 HP 역산
+4. 서버: lightning_time = server_receive_time - game_start_time
+5. 서버: 시나리오에서 lightning_time 시점의 HP 역산
 6. HP ≤ 1200 → 킬 성공 (Lightning Secured)
 7. HP > 1200 → 킬 실패 (Lightning Failed)
 ```
@@ -276,20 +276,20 @@ gap = 상대_티어점수 - 내_티어점수
 ## 6. 멀티모듈 구조
 
 ```
-smite/
-├── smite-api/              # API 모듈
+league-of-star/
+├── league-of-star-api/              # API 모듈
 │   ├── controller/         # REST Controller, WebSocket Handler
 │   ├── dto/                # Request/Response DTO
 │   ├── config/             # Security, WebSocket, OAuth2 설정
 │   └── service/            # 서비스 구현체 (Auth, Match, Game, Ranking)
 │
-├── smite-core/             # Core 모듈 (도메인 + 게임 로직)
+├── league-of-star-core/             # Core 모듈 (도메인 + 게임 로직)
 │   ├── domain/             # 엔티티 (User, Match, GameRecord, Tier...)
 │   ├── repository/         # JPA Repository 인터페이스
 │   ├── game/               # 게임 판정 로직 (시나리오 생성, Rewind 판정)
 │   └── service/            # 서비스 인터페이스
 │
-├── smite-infra-redis/      # Redis 인프라 모듈
+├── league-of-star-infra-redis/      # Redis 인프라 모듈
 │   ├── config/             # Redis 설정
 │   ├── matching/           # 매칭 큐 구현 (Redis Sorted Set 등)
 │   └── session/            # 세션/캐시 관리
@@ -302,16 +302,16 @@ smite/
 ### 모듈 의존성
 
 ```
-smite-api → smite-core, smite-infra-redis
-smite-infra-redis → smite-core
-smite-core → (독립, JPA/Hibernate만 의존)
+league-of-star-api → league-of-star-core, league-of-star-infra-redis
+league-of-star-infra-redis → league-of-star-core
+league-of-star-core → (독립, JPA/Hibernate만 의존)
 ```
 
 | 모듈 | 책임 | 주요 의존성 |
 |------|------|------------|
-| **smite-api** | 컨트롤러, WebSocket, 보안 설정, 서비스 조합 | Spring Web, Security, WebSocket |
-| **smite-core** | 도메인 엔티티, 게임 판정 로직, Repository | JPA, 순수 Java |
-| **smite-infra-redis** | 매칭 큐, 세션 관리, 캐시 | Spring Data Redis |
+| **league-of-star-api** | 컨트롤러, WebSocket, 보안 설정, 서비스 조합 | Spring Web, Security, WebSocket |
+| **league-of-star-core** | 도메인 엔티티, 게임 판정 로직, Repository | JPA, 순수 Java |
+| **league-of-star-infra-redis** | 매칭 큐, 세션 관리, 캐시 | Spring Data Redis |
 
 ---
 
@@ -376,7 +376,7 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 ### 9.3 통신 방식
 
 - 매칭 알림은 브라우저 기본 `EventSource`로 수신합니다.
-- 게임방 대기/RTT/카운트다운/SMITE/종료는 native `WebSocket`으로 JSON 메시지를 주고받습니다.
+- 게임방 대기/RTT/카운트다운/LIGHTNING/종료는 native `WebSocket`으로 JSON 메시지를 주고받습니다.
 - STOMP.js, SockJS fallback은 MVP에서 사용하지 않습니다.
   RTT 측정과 LIGHTNING 입력 경로를 단순하고 일관되게 유지하기 위해 WebSocket 단일 경로를 사용합니다.
 
@@ -405,7 +405,7 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 | 2026-04-17 | 초안 작성 및 전체 기획 확정 |
 | 2026-04-24 | 프론트엔드 기술 스택 고도화 (PixiJS, Web Worker 도입) |
 | 2026-04-27 | 통합 시리즈 아키텍처(RankSeries) 도입 및 도메인 정규화 |
-| 2026-05-13 | 매칭 SSE는 `match_response_result`까지, 게임 준비/RTT/카운트다운/SMITE/종료는 WebSocket으로 처리하는 흐름 반영. gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 정책 추가 |
+| 2026-05-13 | 매칭 SSE는 `match_response_result`까지, 게임 준비/RTT/카운트다운/LIGHTNING/종료는 WebSocket으로 처리하는 흐름 반영. gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 정책 추가 |
 | 2026-05-19 | RTT 5회 median 측정, per-ping 2500ms timeout, GAME_START 이전 실패 시 `GAME_START_FAILED` 복귀 정책 반영 |
 | 2026-05-13 | MVP 프론트엔드 기술 스택을 React/TypeScript/Vite, EventSource, native WebSocket, HTML video + React/CSS overlay로 단순화. PixiJS/Web Worker/OffscreenCanvas/STOMP/SockJS는 MVP 이후 검토로 이동 |
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GAME_SETUP_FAILED` reason 기준으로 start 버튼 화면 복귀하도록 정책 조정 |

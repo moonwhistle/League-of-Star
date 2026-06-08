@@ -11,10 +11,10 @@
 ```mermaid
 flowchart TD
     User["Authenticated User"]
-    Controller["smite-api<br/>MatchController"]
-    QueueService["smite-api<br/>MatchQueueService"]
-    RankReadService["smite-core<br/>RankReadService"]
-    MatchService["smite-matching<br/>MatchService"]
+    Controller["league-of-star-api<br/>MatchController"]
+    QueueService["league-of-star-api<br/>MatchQueueService"]
+    RankReadService["league-of-star-core<br/>RankReadService"]
+    MatchService["league-of-star-matching<br/>MatchService"]
 
     User -->|"POST / match join<br/>DELETE / match leave"| Controller
     Controller --> QueueService
@@ -60,7 +60,7 @@ flowchart TD
 | `matching:queue:{tierScore}` | Sorted Set | **entryTime** (ms) | **userId** (Long) |
 | `match:session:{matchId}` | Hash (TTL 60분) | - | `{matchId, userA, userB, status}` |
 
-> **[Core 연동]** `tierScore`는 `com.sang.smite.domain.rank.domain.vo.Rank` 클래스의 `getTierScore()` 공식을 따릅니다.
+> **[Core 연동]** `tierScore`는 `com.sang.leagueofstar.domain.rank.domain.vo.Rank` 클래스의 `getTierScore()` 공식을 따릅니다.
 > - **범위**: 1 (아이언 IV) ~ 28 (다이아몬드 I)
 > - **공식**: `(Tier_Level - 1) * 4 + (4 - Division_Value) + 1`
 

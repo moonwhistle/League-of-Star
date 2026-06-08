@@ -28,11 +28,11 @@ API_BASE_URLS=http://localhost:8080,http://localhost:8081
 Redis 초기화 명령어
 
 ```bash
-docker exec smite-redis sh -c 'for key in $(redis-cli --scan --pattern "match:status:*"); do redis-cli del "$key"; done'
-docker exec smite-redis sh -c 'for key in $(redis-cli --scan --pattern "matching:queue:*"); do redis-cli del "$key"; done'
-docker exec smite-redis sh -c 'for key in $(redis-cli --scan --pattern "match:session:*"); do redis-cli del "$key"; done'
-docker exec smite-redis redis-cli del match:response:timeout:pending
-docker exec smite-redis redis-cli del match:response:timeout:processing
+docker exec league-of-star-redis sh -c 'for key in $(redis-cli --scan --pattern "match:status:*"); do redis-cli del "$key"; done'
+docker exec league-of-star-redis sh -c 'for key in $(redis-cli --scan --pattern "matching:queue:*"); do redis-cli del "$key"; done'
+docker exec league-of-star-redis sh -c 'for key in $(redis-cli --scan --pattern "match:session:*"); do redis-cli del "$key"; done'
+docker exec league-of-star-redis redis-cli del match:response:timeout:pending
+docker exec league-of-star-redis redis-cli del match:response:timeout:processing
 ```
 
 ## Join Queue
@@ -188,7 +188,7 @@ one_reject_other_silent:
 
 Grafana에서는 다음 대시보드를 봅니다.
 
-- 매칭 엔진: `docs/grafana/smite-match-queue-dashboard.json`
-- 매칭 응답/timeout: `docs/grafana/smite-match-response-dashboard.json`
+- 매칭 엔진: `docs/grafana/league-of-star-match-queue-dashboard.json`
+- 매칭 응답/timeout: `docs/grafana/league-of-star-match-response-dashboard.json`
   - `Load Test Totals`: 부하테스트 총량 추이와 legend 합계
   - `JVM / 애플리케이션 리소스`: CPU, Heap/Non-Heap, GC, Thread, SSE active connection

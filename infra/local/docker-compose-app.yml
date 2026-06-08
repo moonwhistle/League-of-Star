@@ -1,40 +1,40 @@
 services:
-  smite-api-1:
+  league-of-star-api-1:
     build:
       context: ../../backend
-      dockerfile: smite-api/Dockerfile
-    container_name: smite-api-1
+      dockerfile: league-of-star-api/Dockerfile
+    container_name: league-of-star-api-1
     ports:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: local
       SERVER_PORT: 8080
-      SPRING_DATASOURCE_URL: jdbc:mysql://smite-mysql:3306/smite?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-      SPRING_DATASOURCE_USERNAME: smite
-      SPRING_DATASOURCE_PASSWORD: smite1234
-      SPRING_DATA_REDIS_HOST: smite-redis
+      SPRING_DATASOURCE_URL: jdbc:mysql://league-of-star-mysql:3306/league_of_star?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: league_of_star
+      SPRING_DATASOURCE_PASSWORD: league_of_star1234
+      SPRING_DATA_REDIS_HOST: league-of-star-redis
       SPRING_DATA_REDIS_PORT: 6379
     networks:
-      - smite-local
+      - league-of-star-local
 
-  smite-api-2:
+  league-of-star-api-2:
     build:
       context: ../../backend
-      dockerfile: smite-api/Dockerfile
-    container_name: smite-api-2
+      dockerfile: league-of-star-api/Dockerfile
+    container_name: league-of-star-api-2
     ports:
       - "8081:8080"
     environment:
       SPRING_PROFILES_ACTIVE: local
       SERVER_PORT: 8080
-      SPRING_DATASOURCE_URL: jdbc:mysql://smite-mysql:3306/smite?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-      SPRING_DATASOURCE_USERNAME: smite
-      SPRING_DATASOURCE_PASSWORD: smite1234
-      SPRING_DATA_REDIS_HOST: smite-redis
+      SPRING_DATASOURCE_URL: jdbc:mysql://league-of-star-mysql:3306/league_of_star?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: league_of_star
+      SPRING_DATASOURCE_PASSWORD: league_of_star1234
+      SPRING_DATA_REDIS_HOST: league-of-star-redis
       SPRING_DATA_REDIS_PORT: 6379
     networks:
-      - smite-local
+      - league-of-star-local
 
 networks:
-  smite-local:
+  league-of-star-local:
     external: true

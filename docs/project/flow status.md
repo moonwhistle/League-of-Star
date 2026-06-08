@@ -5,7 +5,7 @@
 범위:
 
 - 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, `CLIENT_READY`, game waiting timeout, `GAME_WAITING_TIMEOUT`, RTT 측정 정책, `COUNTDOWN`, `GAME_START` 진입 정책
-- 제외: SMITE, game record/LP 반영
+- 제외: LIGHTNING, game record/LP 반영
 - 게임 대기 WebSocket timeout 기준: gameRoom `createdAt`부터 **30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 모두 완료되어야 함**
 
 ## 1. Overall Flow

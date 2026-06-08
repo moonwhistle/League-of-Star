@@ -487,8 +487,8 @@ flowchart TD
   - `overduePendingSize(nowMillis)`
   - `deadlineOfPending(matchId)`
 - Grafana 대시보드를 갱신했습니다.
-  - 매칭 엔진 대시보드: `docs/grafana/smite-match-queue-dashboard.json`
-  - 매칭 응답 전용 대시보드: `docs/grafana/smite-match-response-dashboard.json`
+  - 매칭 엔진 대시보드: `docs/grafana/league-of-star-match-queue-dashboard.json`
+  - 매칭 응답 전용 대시보드: `docs/grafana/league-of-star-match-response-dashboard.json`
   - 엔진 대시보드에서는 `match_response_*` 패널을 제거했습니다.
   - 응답 대시보드는 accept/reject와 timeout 운영 질문을 분리해서 확인하도록 구성했습니다.
   - 추가 패널:
@@ -942,8 +942,8 @@ API-2 User API:  match-1 accept 요청
   - `match_response_timeout_processing_backlog`
   - `match_response_timeout_processing_delay_seconds`
 - 매칭 엔진 대시보드와 매칭 응답 대시보드를 분리했습니다.
-  - `smite-match-queue-dashboard.json`
-  - `smite-match-response-dashboard.json`
+  - `league-of-star-match-queue-dashboard.json`
+  - `league-of-star-match-response-dashboard.json`
 - `match-response-timeout-load.mjs`를 추가해 다음 시나리오를 검증할 수 있게 했습니다.
   - both accept
   - accept then reject

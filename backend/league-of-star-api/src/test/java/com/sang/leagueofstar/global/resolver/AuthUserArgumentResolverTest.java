@@ -33,7 +33,7 @@ class AuthUserArgumentResolverTest {
         // given
         AuthenticatedUser principal = new AuthenticatedUser(
                 123L,
-                "test@smite.com",
+                "test@leagueofstar.com",
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
         SecurityContextHolder.getContext().setAuthentication(

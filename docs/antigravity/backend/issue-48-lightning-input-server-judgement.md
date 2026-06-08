@@ -66,8 +66,8 @@ flowchart TD
 
 ### 1. LIGHTNING 정책과 저장 의미 확정
 
-- [x] `DRAGON_INITIAL_HP = 10000`, `LIGHTNING_DAMAGE = 1200` 정책을 코드 상수와 문서 기준으로 맞춘다.
-- [x] `dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 이전 LIGHTNING 데미지를 반영한 LIGHTNING 적용 전 현재 HP로 정의한다.
+- [x] `STAR_CORE_INITIAL_HP = 10000`, `LIGHTNING_DAMAGE = 1200` 정책을 코드 상수와 문서 기준으로 맞춘다.
+- [x] `star_core_hp_at_lightning`는 scenario 원본 HP가 아니라, 이전 LIGHTNING 데미지를 반영한 LIGHTNING 적용 전 현재 HP로 정의한다.
 - [x] 킬 실패한 LIGHTNING도 이후 판정 HP에서 `1200` 데미지로 반영한다.
 - [x] `is_kill=true`는 LIGHTNING 적용 전 현재 HP가 `1200` 이하였다는 의미로 정의한다.
 - [x] `afterHp = max(0, starCoreHpAtLightning - 1200)`은 응답 payload에서 계산해 전달하고 DB에는 저장하지 않는다.
@@ -96,12 +96,12 @@ flowchart TD
 
 ### 4. 패키지 책임 분리
 
-- [x] `league-of-star-api/game/smite` 패키지를 추가해 LIGHTNING 입력 use-case를 분리한다.
+- [x] `league-of-star-api/game/lightning` 패키지를 추가해 LIGHTNING 입력 use-case를 분리한다.
   - `common/constant`: API 레벨 LIGHTNING 상수
   - `domain`: LIGHTNING 처리 결과, 실패 사유, 결과 확정 여부 등 use-case 값 객체
   - `dto`: WebSocket 응답 payload
   - `service`: `GameLightningService`, `GameLightningWebSocketSender`
-- [x] `league-of-star-api/game/websocket`은 메시지 수신/전송 경로만 담당하고, 판정 로직은 `game/smite/service`로 위임한다.
+- [x] `league-of-star-api/game/websocket`은 메시지 수신/전송 경로만 담당하고, 판정 로직은 `game/lightning/service`로 위임한다.
 - [x] `league-of-star-core/domain/game`에는 DB 상태와 도메인 규칙을 둔다.
   - `GameAction` 생성/조회
   - `GameActionRepository` 조회 메서드
@@ -209,9 +209,9 @@ flowchart TD
 - [x] `GameActionRepository`에 `findByGameRoomIdAndUserId(...)`를 추가한다.
 - [x] `GameActionRepository`에 gameRoom 단위 action 정렬 조회 메서드를 추가한다.
   - 정렬 기준: `serverReceiveTimeMs ASC`, `id ASC`
-- [x] `GameAction.smite(...)` 정적 팩토리로 LIGHTNING action 생성 의미와 `isKill` 계산 기준을 명확히 한다.
-- [x] DDL 문서에서 `dragon_hp_at_smite` 의미를 “이전 LIGHTNING 데미지 반영 후, 이번 LIGHTNING 적용 전 HP”로 명확히 한다.
-- [x] DDL 문서에서 `rtt_ms` 컬럼을 제거하고 `smite_time_ms` 의미를 “서버 수신 시각 기준 게임 시작 후 경과 ms”로 수정한다.
+- [x] `GameAction.lightning(...)` 정적 팩토리로 LIGHTNING action 생성 의미와 `isKill` 계산 기준을 명확히 한다.
+- [x] DDL 문서에서 `star_core_hp_at_lightning` 의미를 “이전 LIGHTNING 데미지 반영 후, 이번 LIGHTNING 적용 전 HP”로 명확히 한다.
+- [x] DDL 문서에서 `rtt_ms` 컬럼을 제거하고 `lightning_time_ms` 의미를 “서버 수신 시각 기준 게임 시작 후 경과 ms”로 수정한다.
 - [x] `game_actions`는 유저당 1회 입력 기록으로 유지하고, record/LP 결과 저장은 `game_records`에서 처리한다.
 
 ### 13. 실패/예외 응답

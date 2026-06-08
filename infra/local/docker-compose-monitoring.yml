@@ -1,9 +1,9 @@
 services:
   prometheus:
     image: prom/prometheus:latest
-    container_name: smite-prometheus
+    container_name: league-of-star-prometheus
     networks:
-      - smite-local
+      - league-of-star-local
     ports:
       - "9090:9090"
     volumes:
@@ -13,9 +13,9 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: smite-grafana
+    container_name: league-of-star-grafana
     networks:
-      - smite-local
+      - league-of-star-local
     ports:
       - "3000:3000"
     environment:
@@ -28,5 +28,5 @@ volumes:
   grafana-data:
 
 networks:
-  smite-local:
+  league-of-star-local:
     external: true

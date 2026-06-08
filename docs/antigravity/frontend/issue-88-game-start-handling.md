@@ -123,7 +123,7 @@ interface StoredGameStartPayload {
 이번 이슈에서 제외한다.
 
 - `/game/:gameRoomId/play` 실제 MP4 video 표시 구현.
-- HP bar, countdown, smite button HUD 구현.
+- HP bar, countdown, lightning button HUD 구현.
 - `requestAnimationFrame` 기반 HP 표시 구현.
 - LIGHTNING 클릭 시 `{ type: 'LIGHTNING', payload: null }` 전송 구현.
 - `ERROR` 수신 시 play 화면 내 message 표시 구현.

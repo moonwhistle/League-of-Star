@@ -1,16 +1,16 @@
 services:
   mysql:
     image: mysql:8.0
-    container_name: smite-mysql
+    container_name: league-of-star-mysql
     networks:
-      - smite-local
+      - league-of-star-local
     ports:
       - "127.0.0.1:3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root1234
-      MYSQL_DATABASE: smite
-      MYSQL_USER: smite
-      MYSQL_PASSWORD: smite1234
+      MYSQL_DATABASE: league_of_star
+      MYSQL_USER: league_of_star
+      MYSQL_PASSWORD: league_of_star1234
       TZ: Asia/Seoul
     volumes:
       - mysql-data:/var/lib/mysql
@@ -18,9 +18,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: smite-redis
+    container_name: league-of-star-redis
     networks:
-      - smite-local
+      - league-of-star-local
     ports:
       - "127.0.0.1:6379:6379"
 
@@ -28,5 +28,5 @@ volumes:
   mysql-data:
 
 networks:
-  smite-local:
-    name: smite-local
+  league-of-star-local:
+    name: league-of-star-local

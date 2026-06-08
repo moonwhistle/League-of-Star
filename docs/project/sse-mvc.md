@@ -18,8 +18,8 @@ sequenceDiagram
     autonumber
     actor UserA as User A Client
     actor UserB as User B Client
-    participant Api1 as smite-api-1
-    participant Api2 as smite-api-2
+    participant Api1 as league-of-star-api-1
+    participant Api2 as league-of-star-api-2
     participant Registry1 as SseConnectionRegistry(api-1)
     participant Registry2 as SseConnectionRegistry(api-2)
     participant Queue as Match Queue API
@@ -82,7 +82,7 @@ sequenceDiagram
 
 Pub/Sub 메시지는 모든 API 인스턴스가 받습니다. 하지만 SSE 연결 객체는 각 API 인스턴스의 메모리에만 존재합니다.
 
-따라서 `smite-api-1`은 자기 인스턴스에 연결된 `userA`에게만 전송하고, `smite-api-2`는 자기 인스턴스에 연결된 `userB`에게만 전송합니다.
+따라서 `league-of-star-api-1`은 자기 인스턴스에 연결된 `userA`에게만 전송하고, `league-of-star-api-2`는 자기 인스턴스에 연결된 `userB`에게만 전송합니다.
 
 이 구조 덕분에 매칭 엔진이 어느 API 인스턴스에서 실행되더라도, 다른 인스턴스에 연결된 사용자에게도 `match_found` 알림을 전달할 수 있습니다.
 

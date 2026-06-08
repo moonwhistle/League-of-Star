@@ -4,15 +4,15 @@
 
 범위:
 
-- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, LIGHTNING 입력 wire type `SMITE`, `GAME_RESULT`, 클라이언트 복구 정책, `ERROR`
+- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, LIGHTNING 입력 wire type `LIGHTNING`, `GAME_RESULT`, 클라이언트 복구 정책, `ERROR`
 - 제외: LIGHTNING 서버 판정 상세, game record/LP 반영
 
 ## 0. League of Star 명칭 및 WebSocket 호환 정책
 
 - 사용자에게 보이는 서비스명은 **League of Star**, 전투 입력명은 **LIGHTNING**, 대상명은 **Star Core**다.
-- 현재 백엔드 WebSocket client message type은 호환성을 위해 `SMITE`를 유지한다. 즉, 프론트 UI의 LIGHTNING 버튼은 `{ "type": "SMITE", "payload": null }`을 전송한다.
-- `SMITE`, `SMITE_KILL`, `BOTH_SMITES_USED_DRAW`, `INVALID_SMITE_*`, `smiteTimeMs`, `dragonHpAtSmite`는 현재 백엔드 wire/schema 식별자다. 문서에서는 새 개념명과 레거시 식별자를 함께 적어 프론트 표시 정책과 백엔드 계약을 분리한다.
-- 새 프론트 저장 key는 `league-of-star.*`를 우선 사용하고, 기존 `smite.*` key는 진행 중인 세션 복구용 읽기 fallback으로만 유지한다.
+- 현재 백엔드 WebSocket client message type은 호환성을 위해 `LIGHTNING`를 유지한다. 즉, 프론트 UI의 LIGHTNING 버튼은 `{ "type": "LIGHTNING", "payload": null }`을 전송한다.
+- `LIGHTNING`, `LIGHTNING_KILL`, `BOTH_LIGHTNINGS_USED_DRAW`, `INVALID_LIGHTNING_*`, `lightningTimeMs`, `starCoreHpAtLightning`는 현재 백엔드 wire/schema 식별자다. 문서에서는 새 개념명과 레거시 식별자를 함께 적어 프론트 표시 정책과 백엔드 계약을 분리한다.
+- 새 프론트 저장 key는 `league-of-star.*`를 우선 사용하고, 기존 `lightning.*` key는 진행 중인 세션 복구용 읽기 fallback으로만 유지한다.
 
 ## 1. 책임 경계
 
@@ -114,7 +114,7 @@ sequenceDiagram
   },
   "game": {
     "gameRoomId": 100,
-    "videoUrl": "/assets/game/dragon-view.mp4",
+    "videoUrl": "/assets/game/star-core-view.mp4",
     "webSocketUrl": "/ws/game/100"
   }
 }
@@ -542,7 +542,7 @@ sequenceDiagram
 |------|------|
 | `CLIENT_READY` | MP4 preload 등 대기 준비 완료 |
 | `RTT_PONG` | 서버 `RTT_PING`에 대한 RTT 측정 응답. payload의 `seq`를 그대로 반환 |
-| `SMITE` | GAME_START 이후 LIGHTNING 입력을 나타내는 레거시 wire type. payload는 `null`이어야 하며 클라이언트 timestamp를 넣지 않음 |
+| `LIGHTNING` | GAME_START 이후 LIGHTNING 입력을 나타내는 레거시 wire type. payload는 `null`이어야 하며 클라이언트 timestamp를 넣지 않음 |
 
 서버가 보내는 message type:
 
@@ -563,8 +563,8 @@ sequenceDiagram
 
 | reason | 의미 | 전송 방식 |
 |------|------|------|
-| `SMITE_KILL` | LIGHTNING 적용 후 effective HP가 0 이하가 되어 승패가 확정됨. reason 값은 레거시 계약상 `SMITE_KILL` 유지 | gameRoom session broadcast |
-| `BOTH_SMITES_USED_DRAW` | 두 유저가 모두 LIGHTNING을 사용했고 둘 다 처치하지 못해 즉시 DRAW 확정 | gameRoom session broadcast |
+| `LIGHTNING_KILL` | LIGHTNING 적용 후 effective HP가 0 이하가 되어 승패가 확정됨. reason 값은 레거시 계약상 `LIGHTNING_KILL` 유지 | gameRoom session broadcast |
+| `BOTH_LIGHTNINGS_USED_DRAW` | 두 유저가 모두 LIGHTNING을 사용했고 둘 다 처치하지 못해 즉시 DRAW 확정 | gameRoom session broadcast |
 | `NATURAL_DEATH_DRAW` | scheduler가 effective naturalDeathAt 이후 자연사 DRAW를 확정 | 연결된 local gameRoom session broadcast. 연결이 없으면 메시지 없이 DB 결과만 확정 |
 
 `GAME_RESULT` 예시:
@@ -582,8 +582,8 @@ sequenceDiagram
       {
         "userId": 1,
         "serverReceiveTime": 1716192010000,
-        "smiteTimeMs": 6000,
-        "dragonHpAtSmite": 3000,
+        "lightningTimeMs": 6000,
+        "starCoreHpAtLightning": 3000,
         "damage": 1200,
         "afterHp": 1800,
         "isKill": false
@@ -607,17 +607,17 @@ LIGHTNING 관련 `ERROR.payload.code`:
 
 | code | 의미 |
 |------|------|
-| `INVALID_SMITE_PAYLOAD` | `SMITE` payload가 비어 있지 않음 |
-| `INVALID_SMITE_STATE` | gameRoom 상태, startAt, scenario 등 LIGHTNING 처리 조건이 맞지 않음 |
+| `INVALID_LIGHTNING_PAYLOAD` | `LIGHTNING` payload가 비어 있지 않음 |
+| `INVALID_LIGHTNING_STATE` | gameRoom 상태, startAt, scenario 등 LIGHTNING 처리 조건이 맞지 않음 |
 | `NOT_GAME_PARTICIPANT` | WebSocket session user가 gameRoom 참가자가 아님 |
-| `SMITE_PROCESSING_FAILED` | 저장 중 복구 불가능한 DB 예외 등 서버 처리 실패 |
+| `LIGHTNING_PROCESSING_FAILED` | 저장 중 복구 불가능한 DB 예외 등 서버 처리 실패 |
 
 ## 13. LIGHTNING 입력 UI
 
 클라이언트는 `GAME_START` 이후 사용자가 LIGHTNING 버튼을 클릭하면 즉시 버튼을 비활성화합니다.
 
-- 현재 wire type `SMITE`는 gameRoom WebSocket으로 한 번만 전송합니다.
-- `SMITE` payload에는 클라이언트 timestamp를 포함하지 않으며 `null`로 전송합니다.
+- 현재 wire type `LIGHTNING`는 gameRoom WebSocket으로 한 번만 전송합니다.
+- `LIGHTNING` payload에는 클라이언트 timestamp를 포함하지 않으며 `null`로 전송합니다.
 - 같은 유저가 같은 gameRoom에서 중복 전송하더라도 서버는 첫 action만 유효하게 유지하고 새 중간 응답을 전송하지 않습니다.
 - 결과가 확정되지 않은 LIGHTNING에는 서버 응답이 없으며, 클라이언트는 `GAME_RESULT`를 받을 때만 종료 UI로 전환합니다.
 - 자연사 `DRAW`는 클라이언트 입력 없이 서버 scheduler가 확정할 수 있으므로, 플레이 중에는 LIGHTNING 응답이 없어도 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 받을 수 있습니다.
@@ -625,7 +625,7 @@ LIGHTNING 관련 `ERROR.payload.code`:
 
 ```json
 {
-  "type": "SMITE",
+  "type": "LIGHTNING",
   "payload": null
 }
 ```

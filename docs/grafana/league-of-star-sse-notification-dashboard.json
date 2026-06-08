@@ -9,12 +9,12 @@
     }
   ],
   "title": "리그 오브 스마이트 - SSE 매칭 알림",
-  "uid": "smite-sse-notification",
+  "uid": "league-of-star-sse-notification",
   "timezone": "browser",
   "refresh": "10s",
   "schemaVersion": 38,
   "tags": [
-    "smite",
+    "lightning",
     "sse",
     "notification"
   ],
@@ -32,7 +32,7 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "query": "label_values(up{job=\"smite-api\"}, instance)",
+        "query": "label_values(up{job=\"league-of-star-api\"}, instance)",
         "refresh": 1,
         "sort": 1,
         "multi": true,

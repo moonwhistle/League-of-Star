@@ -61,7 +61,7 @@ describe('LoginPage', () => {
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
       userId: 1,
-      nickname: 'smiter',
+      nickname: 'starcaster',
     })
 
     const wrapper = mount(LoginPage)
@@ -82,7 +82,7 @@ describe('LoginPage', () => {
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
       userId: 1,
-      nickname: 'smiter',
+      nickname: 'starcaster',
     })
 
     const wrapper = mount(LoginPage)
@@ -119,7 +119,7 @@ describe('LoginPage', () => {
             accessToken: 'access-token',
             refreshToken: 'refresh-token',
             userId: 1,
-            nickname: 'smiter',
+            nickname: 'starcaster',
           })
         }
       }),

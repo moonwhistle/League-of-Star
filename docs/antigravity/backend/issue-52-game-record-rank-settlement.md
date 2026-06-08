@@ -303,7 +303,7 @@ flowchart TD
 - [x] placement 완료 게임의 `rankAfter`/`lpAfter`가 최종 배정 결과로 저장되는지 검증
 - [x] promotion series 진행 중인 유저의 결과가 일반 LP 계산 없이 series에 반영되는지 검증
 - [x] promotion 성공/실패 게임의 `rankAfter`/`lpAfter`가 최종 결과로 저장되는지 검증
-- [x] LIGHTNING kill, both smite draw, natural death draw 경로에서 정산 호출이 연결되는지 API service test로 검증
+- [x] LIGHTNING kill, both lightning draw, natural death draw 경로에서 정산 호출이 연결되는지 API service test로 검증
 - [x] 이미 FINISHED인 current result 재응답과 scheduler no-op에서는 정산을 호출하지 않는지 검증
 - [x] 복구 scheduler가 FINISHED + record count 0 gameRoom을 재정산하는지 검증
 - [x] 복구 scheduler가 record count 1 gameRoom을 자동 보정하지 않는지 검증

@@ -237,7 +237,7 @@ sequenceDiagram
 ## 3. Game (게임 세션 상태)
 실제 게임이 진행되는 과정의 상태 흐름입니다.
 
-사용자-facing 입력명은 LIGHTNING이지만, 현재 WebSocket message type과 일부 reason/schema 이름은 레거시 `SMITE` 식별자를 유지합니다.
+사용자-facing 입력명은 LIGHTNING이지만, 현재 WebSocket message type과 일부 reason/schema 이름은 레거시 `LIGHTNING` 식별자를 유지합니다.
 
 ```mermaid
 stateDiagram-v2
@@ -249,13 +249,13 @@ stateDiagram-v2
     state IN_PROGRESS {
         [*] --> WAITING_ACTION: 라이트닝 대기
         WAITING_ACTION --> WAITING_ACTION: LIGHTNING 저장<br/>미처치 + 상대 입력 남음
-        WAITING_ACTION --> SMITE_KILL: LIGHTNING 저장<br/>HP 0 이하
-        WAITING_ACTION --> BOTH_SMITE_USED: 양쪽 LIGHTNING 저장<br/>미처치
+        WAITING_ACTION --> LIGHTNING_KILL: LIGHTNING 저장<br/>HP 0 이하
+        WAITING_ACTION --> BOTH_LIGHTNING_USED: 양쪽 LIGHTNING 저장<br/>미처치
         WAITING_ACTION --> WAITING_ACTION: GAME_START 이후 disconnect<br/>서버 timer/scheduler가 clock 유지
     }
     
-    SMITE_KILL --> FINISHED: 판정 완료 (Winner Decided)
-    BOTH_SMITE_USED --> FINISHED: 즉시 DRAW
+    LIGHTNING_KILL --> FINISHED: 판정 완료 (Winner Decided)
+    BOTH_LIGHTNING_USED --> FINISHED: 즉시 DRAW
     IN_PROGRESS --> FINISHED: effective naturalDeathAt 도달 후<br/>scheduler 자연사 DRAW 정산
     FINISHED --> RECORDED: Step 9 record/rank 정산 완료
     RECORDED --> MATCH_STATUS_CLEANED: Step 10 match:status IN_GAME 제거
@@ -279,9 +279,9 @@ stateDiagram-v2
 - 한 명만 LIGHTNING을 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 LIGHTNING 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있습니다.
 - deadline 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 상태 저장소 cleanup을 수행하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 등록된 deadline을 제거하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않습니다.
-- `IN_PROGRESS` 중 클라이언트는 gameRoom WebSocket으로 LIGHTNING 의도를 보낼 수 있습니다. 현재 wire type은 레거시 `SMITE`이며, 서버는 클라이언트 timestamp 없이 서버 수신 시각만 저장합니다.
+- `IN_PROGRESS` 중 클라이언트는 gameRoom WebSocket으로 LIGHTNING 의도를 보낼 수 있습니다. 현재 wire type은 레거시 `LIGHTNING`이며, 서버는 클라이언트 timestamp 없이 서버 수신 시각만 저장합니다.
 - LIGHTNING 판정 시각은 `serverReceiveTimeMs - startAt`으로 계산하며, median RTT 또는 `RTT_PONG` 측정값으로 보정하지 않습니다.
-- `smiteTimeMs < 100` 또는 scenario 범위 밖 LIGHTNING은 action으로 저장하지 않습니다.
+- `lightningTimeMs < 100` 또는 scenario 범위 밖 LIGHTNING은 action으로 저장하지 않습니다.
 - 서버는 저장된 HP scenario와 기존 `game_actions`를 기준으로 해당 시점 HP를 계산하고, 이전 LIGHTNING이 킬 실패였더라도 `1200` 데미지를 차감합니다.
 - 유저당 gameRoom당 LIGHTNING은 한 번만 저장하며, 중복 LIGHTNING은 새 action을 만들지 않습니다.
 - 결과가 확정되지 않은 LIGHTNING은 중간 응답을 전송하지 않습니다.

@@ -149,7 +149,7 @@ stateDiagram-v2
 | 게임 시작 | UPDATE | status=IN_PROGRESS, participants(PLAYING), game_start_time 기록 |
 | GAME_START 이전 timeout | UPDATE | gameRoom `createdAt` 기준 30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 완료되지 않으면 status=ABORTED, participants(ABORTED), game_records/LP 미반영 |
 | GAME_START 이후 disconnect | UPDATE 없음 또는 participant 상태만 DISCONNECTED. gameRoom은 IN_PROGRESS 유지 |
-| 게임 종료 | UPDATE | SMITE 즉시 종료 또는 서버 scheduler 자연사 정산이 scenario와 game_actions 기준으로 status=FINISHED, result/winner_id, participants(FINISHED), finished_at 확정 |
+| 게임 종료 | UPDATE | LIGHTNING 즉시 종료 또는 서버 scheduler 자연사 정산이 scenario와 game_actions 기준으로 status=FINISHED, result/winner_id, participants(FINISHED), finished_at 확정 |
 
 > Issue 50의 서버 종료 보장 흐름은 기존 `game_rooms`, `game_participants`, `game_actions` 구조를 사용하며 새 DB 컬럼/테이블을 추가하지 않습니다. 자연사 종료 후보 목록은 Redis `game:end:pending` ZSET으로 관리합니다.
 

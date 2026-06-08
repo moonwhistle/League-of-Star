@@ -2,15 +2,15 @@
 trigger: always_on
 ---
 
-# League of Smite — Project Context
+# League of Star — Project Context
 
 ---
 
 ## 프로젝트 개요
 
-- **서비스명**: League of Smite
+- **서비스명**: League of Star
 - **한 줄 소개**: 강타 타이밍을 겨루는 1v1 실시간 랭킹 대전 게임
-- **핵심 가치**: "prove your smite timing" — 정글러의 핵심 역량인 강타 싸움을 독립 게임으로 승화
+- **핵심 가치**: "prove your lightning timing" — 정글러의 핵심 역량인 강타 싸움을 독립 게임으로 승화
 
 ---
 
@@ -37,12 +37,12 @@ trigger: always_on
 ## 프로젝트 구조
 
 ```
-smite/
+league-of-star/
 ├── backend/                  # Gradle 루트
-│   ├── smite-api/            # API 모듈 (Controller, DTO, Config, Service 구현체)
-│   ├── smite-core/           # Core 모듈 (Entity, Repository, 게임 로직, Service 인터페이스)
-│   ├── smite-matching/       # 매칭 큐, 매칭 엔진, 수락/거절/timeout 정산
-│   └── smite-infra-redis/    # Redis 인프라 모듈 (매칭 큐, 세션 관리)
+│   ├── league-of-star-api/            # API 모듈 (Controller, DTO, Config, Service 구현체)
+│   ├── league-of-star-core/           # Core 모듈 (Entity, Repository, 게임 로직, Service 인터페이스)
+│   ├── league-of-star-matching/       # 매칭 큐, 매칭 엔진, 수락/거절/timeout 정산
+│   └── league-of-star-infra-redis/    # Redis 인프라 모듈 (매칭 큐, 세션 관리)
 ├── frontend/                 # Vue 3 + TypeScript + Vite
 └── docs/                     # 기획, 정책, DB 설계 문서
 ```
@@ -50,17 +50,17 @@ smite/
 ### 모듈 의존성 방향
 
 ```
-smite-api → smite-core
-smite-api → smite-matching
-smite-api → smite-infra-redis
-smite-matching → smite-core
-smite-matching → smite-infra-redis
-smite-infra-redis → smite-core
-smite-core → (독립, JPA/Hibernate만 의존)
+league-of-star-api → league-of-star-core
+league-of-star-api → league-of-star-matching
+league-of-star-api → league-of-star-infra-redis
+league-of-star-matching → league-of-star-core
+league-of-star-matching → league-of-star-infra-redis
+league-of-star-infra-redis → league-of-star-core
+league-of-star-core → (독립, JPA/Hibernate만 의존)
 ```
 
-- **역방향 의존 금지**: smite-core는 smite-api, smite-infra-redis에 절대 의존하지 않는다.
-- **smite-core는 순수 도메인**: Spring Web, Redis 등 인프라 기술에 의존하지 않는다.
+- **역방향 의존 금지**: league-of-star-core는 league-of-star-api, league-of-star-infra-redis에 절대 의존하지 않는다.
+- **league-of-star-core는 순수 도메인**: Spring Web, Redis 등 인프라 기술에 의존하지 않는다.
 
 ---
 
