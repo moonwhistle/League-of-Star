@@ -94,7 +94,7 @@ describe('MatchPage', () => {
   it('renders the match page lobby layout', () => {
     const wrapper = mount(MatchPage)
 
-    expect(wrapper.get('h1').text()).toBe('LEAGUE OF SMITE')
+    expect(wrapper.get('h1').text()).toBe('LEAGUE OF STAR')
     expect(wrapper.findAll('.match-actions .icon-button')).toHaveLength(2)
     expect(wrapper.find('[aria-label="전적 보기"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="로그아웃"]').exists()).toBe(true)

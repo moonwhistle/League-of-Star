@@ -4,7 +4,7 @@
 
 Vue 프론트엔드의 `/login` 페이지를 실제 로그인 화면으로 구현한다.
 
-현재 프론트엔드는 Vue + Vite + TypeScript 기반 skeleton과 `/login` route placeholder만 존재한다. 이번 이슈에서는 `frontend/img/loginView.png`를 화면 레퍼런스로 삼고, `frontend/img/background.png`를 실제 배경 이미지로 사용해 로그인 페이지 UI를 구현한다.
+현재 프론트엔드는 Vue + Vite + TypeScript 기반 skeleton과 `/login` route placeholder만 존재한다. 이번 이슈에서는 `frontend/img/loginView.png`를 화면 레퍼런스로 삼고, `frontend/img/background-new.png` 기반 선명화 asset인 `frontend/img/background-new-sharp.png`를 실제 배경 이미지로 사용해 로그인 페이지 UI를 구현한다.
 
 로그인 기능은 백엔드 `POST /api/v1/auth/login` 계약에 맞춰 email/password 인증 요청을 보내고, 성공 시 access token과 refresh token을 저장한 뒤 `/match`로 이동하는 흐름까지 구현한다.
 
@@ -14,7 +14,7 @@ Vue 프론트엔드의 `/login` 페이지를 실제 로그인 화면으로 구�
 
 ```mermaid
 flowchart TD
-    A["/login 진입"] --> B["background.png 배경 렌더링"]
+    A["/login 진입"] --> B["background-new-sharp.png 배경 렌더링"]
     B --> C[loginView.png 기준 로그인 패널 구현]
     C --> D[email/password 입력]
     D --> E[POST /api/v1/auth/login]
@@ -25,35 +25,35 @@ flowchart TD
 
 ## Backend Contract
 
-| 항목 | 기준 |
-|------|------|
-| Endpoint | `POST /api/v1/auth/login` |
-| Auth | public API. Authorization header 불필요 |
-| Request | `{ email: string, password: string }` |
-| Response | `{ accessToken: string, refreshToken: string, userId: number, nickname: string }` |
-| Success action | token 저장 후 `/match` 이동 |
-| Failure action | 전역 `ErrorResponse.message` 또는 client fallback message 표시 |
+| 항목           | 기준                                                                              |
+| -------------- | --------------------------------------------------------------------------------- |
+| Endpoint       | `POST /api/v1/auth/login`                                                         |
+| Auth           | public API. Authorization header 불필요                                           |
+| Request        | `{ email: string, password: string }`                                             |
+| Response       | `{ accessToken: string, refreshToken: string, userId: number, nickname: string }` |
+| Success action | token 저장 후 `/match` 이동                                                       |
+| Failure action | 전역 `ErrorResponse.message` 또는 client fallback message 표시                    |
 
 ## Asset 기준
 
-| Asset | 용도 | 기준 |
-|-------|------|------|
-| `frontend/img/background.png` | 로그인 페이지 full-screen 배경 | `LoginPage.vue`에서 import asset으로 사용 |
-| `frontend/img/loginView.png` | 디자인 레퍼런스 | 직접 화면에 통째로 올리지 않고 레이아웃/색상/간격 기준으로 사용 |
+| Asset                                   | 용도                           | 기준                                                            |
+| --------------------------------------- | ------------------------------ | --------------------------------------------------------------- |
+| `frontend/img/background-new-sharp.png` | 로그인 페이지 full-screen 배경 | `LoginPage.vue`에서 import asset으로 사용                       |
+| `frontend/img/loginView.png`            | 디자인 레퍼런스                | 직접 화면에 통째로 올리지 않고 레이아웃/색상/간격 기준으로 사용 |
 
 구현 기준:
 
 - 배경은 viewport 전체를 채우도록 구현.
 - 로그인 패널은 desktop에서 좌측 정렬 기준으로 구현.
 - 패널은 밝은 반투명 카드 톤으로 구현.
-- 타이틀은 `LEAGUE OF SMITE`, subtitle은 `PROVE YOUR REACTION`으로 구현.
+- 타이틀은 `LEAGUE OF STAR`, subtitle은 `MASTER YOUR LIGHTNING TIMING`으로 구현.
 - 입력 필드는 email/password 2개만 실제 동작 구현.
 - `FORGOT PASSWORD?`, `SIGN UP`, `Google`, `ABOUT THIS GAME`은 레퍼런스에 맞춰 표시하되 실제 기능 연결은 보류.
 - 모바일에서는 패널이 화면 중앙 또는 상단 중심으로 안정적으로 보이도록 반응형 구현.
 
 이미지 사용 정책:
 
-- `background.png`는 `src/pages/LoginPage.vue`에서 `../../img/background.png` 상대 경로 import로 사용.
+- `background-new-sharp.png`는 `src/pages/LoginPage.vue`에서 `../../img/background-new-sharp.png` 상대 경로 import로 사용.
 - `loginView.png`는 구현 산출물에 import하지 않고, 작업자가 레이아웃을 비교하는 기준 이미지로만 사용.
 - 이미지 파일을 이번 이슈에서 이동하지 않음.
 
@@ -109,7 +109,7 @@ flowchart TD
 ### 3. Login page UI 구현
 
 - [x] `src/pages/LoginPage.vue` placeholder 제거 구현.
-- [x] `background.png` full-screen 배경 적용 구현.
+- [x] `background-new-sharp.png` full-screen 배경 적용 구현.
 - [x] `loginView.png` 레퍼런스 기준 좌측 로그인 패널 구현.
 - [x] email input 구현.
 - [x] password input 구현.
@@ -172,7 +172,7 @@ flowchart TD
 
 - 로그인 화면은 이번 이슈에서 실제 구현하되, 인증 시스템 전체 고도화는 하지 않음.
 - UI는 `loginView.png`를 그대로 이미지로 붙이지 않고 Vue template/CSS로 재현.
-- `background.png`는 `LoginPage.vue`에서 import해 실제 화면 배경으로 사용.
+- `background-new-sharp.png`는 `LoginPage.vue`에서 import해 실제 화면 배경으로 사용.
 - Google 로그인 버튼은 표시만 구현하고 실제 OAuth endpoint 연결은 후속 작업으로 보류.
 - `SIGN UP`, `FORGOT PASSWORD?`, `ABOUT THIS GAME`은 표시만 구현하고 route 이동은 후속 작업으로 보류.
 - API 계약은 백엔드 `AuthController`와 RestDocs 기준을 따른다.
@@ -187,7 +187,7 @@ flowchart TD
 
 ## Acceptance Criteria
 
-- `/login` 진입 시 `background.png` 기반 full-screen 로그인 화면 표시.
+- `/login` 진입 시 `background-new-sharp.png` 기반 full-screen 로그인 화면 표시.
 - desktop에서 레퍼런스처럼 좌측 로그인 패널 표시.
 - mobile에서 패널과 입력 요소가 화면 밖으로 밀리지 않음.
 - email/password 입력 후 Login 클릭 시 `/api/v1/auth/login` 호출.
@@ -203,7 +203,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["/login 진입"] --> B["background.png 배경 렌더링"]
+    A["/login 진입"] --> B["background-new-sharp.png 배경 렌더링"]
     B --> C["loginView.png 레퍼런스 기반 로그인 UI 구현"]
     C --> D["email/password 입력"]
     D --> E["authService.login 호출"]
@@ -224,7 +224,7 @@ flowchart TD
 - 로그인 실패는 백엔드 `ErrorResponse.message`를 우선 표시하고, 예상하지 못한 오류는 client fallback message로 처리하도록 구현.
 - `.env`가 없는 local dev 환경에서도 로그인 페이지가 import 단계에서 죽지 않도록 `.env.example`과 동일한 기본 env fallback 정책 구현.
 - production 환경에서는 env 누락 시 localhost fallback으로 조용히 실행되지 않도록 필수 env 누락 오류를 발생시키는 정책 구현.
-- `loginView.png`는 디자인 레퍼런스로만 사용하고, `background.png`는 실제 배경 asset으로 import하여 화면 구성 구현.
+- `loginView.png`는 디자인 레퍼런스로만 사용하고, `background-new-sharp.png`는 실제 배경 asset으로 import하여 화면 구성 구현.
 - 모바일 viewport 검증 중 로그인 카드 잘림을 확인하여 카드 폭과 제목 크기를 보정하고, desktop/mobile 모두 입력 필드와 버튼이 화면 밖으로 넘치지 않도록 구현.
 - 회원가입, 비밀번호 찾기, Google OAuth, About this game은 백엔드/라우팅 후속 계약이 필요하므로 현재 PR에서는 표시만 구현.
 - 로그인 페이지 interaction은 service/router/token 저장소를 mock 처리하여 렌더링, submit, 성공 이동, 실패 메시지, loading disabled 상태를 검증하도록 구현.

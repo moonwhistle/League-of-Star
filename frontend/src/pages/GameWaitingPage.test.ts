@@ -174,7 +174,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-waiting-payload-ready')).toBe('true')
     expect(wrapper.get('main').attributes('data-game-room-id')).toBe('100')
     expect(wrapper.get('main').attributes('data-loading-progress')).toBe('100')
-    expect(wrapper.get('h1').text()).toBe('LEAGUE OF SMITE')
+    expect(wrapper.get('h1').text()).toBe('LEAGUE OF STAR')
     expect(wrapper.text()).toContain('게임 준비 중')
     expect(wrapper.text()).toContain('전투 데이터를 동기화하는 중')
     expect(wrapper.text()).toContain('Voidwalker')

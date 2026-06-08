@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 
-const LOCALE_STORAGE_KEY = 'smite.locale'
+const LOCALE_STORAGE_KEY = 'league-of-star.locale'
+const LEGACY_LOCALE_STORAGE_KEY = 'smite.locale'
 
 const messages = {
   ko: {
@@ -99,7 +100,7 @@ const messages = {
     'gamePlay.status': '서버 시작 시각 기준으로 대기 중',
     'gamePlay.gameRoom': '게임룸',
     'gamePlay.startAt': '시작 시각',
-    'gamePlay.dragonMaxHp': '드래곤 최대 HP',
+    'gamePlay.dragonMaxHp': '스타 코어 최대 HP',
     'gamePlay.durationMs': '진행 시간',
     'gamePlay.payloadMissing': '게임 시작 정보를 찾을 수 없습니다. 매칭 화면으로 돌아갑니다.',
     'gamePlay.leaveWarning':
@@ -113,6 +114,22 @@ const messages = {
     'gamePlay.socketErrorDetail': '전장 연결을 확인하지 못했습니다.',
     'gamePlay.socketClosed': '전장 연결이 종료되었습니다.',
     'gamePlay.resultReceived': '결과 수신됨',
+    'gamePlay.hpLabel': '스타 코어 HP',
+    'gamePlay.elapsedMs': '경과 시간',
+    'gamePlay.countdownLabel': '전투 시작',
+    'gamePlay.lightningButton': 'LIGHTNING',
+    'gamePlay.lightningSent': 'LIGHTNING 전송됨',
+    'gamePlay.targetLocked': '타겟 고정',
+    'gamePlay.dragonAirborne': '스타 코어 이동 중',
+    'gamePlay.videoPending': '영상 대기',
+    'gamePlay.videoLoading': '영상 로딩 중',
+    'gamePlay.videoReady': '영상 준비됨',
+    'gamePlay.videoPlaying': '영상 재생 중',
+    'gamePlay.videoError': '영상 오류',
+    'gamePlay.videoLoadFailed': '전장 영상을 불러오지 못했습니다.',
+    'gamePlay.videoPlayFailed': '전장 영상 재생을 시작하지 못했습니다.',
+    'gamePlay.naturalDeathWaiting':
+      '스타 코어 종료 시간이 지났습니다. 서버 결과를 기다리는 중입니다.',
   },
   en: {
     'login.email': 'Email',
@@ -209,7 +226,7 @@ const messages = {
     'gamePlay.status': 'Waiting on the server start time',
     'gamePlay.gameRoom': 'Game room',
     'gamePlay.startAt': 'Start time',
-    'gamePlay.dragonMaxHp': 'Dragon max HP',
+    'gamePlay.dragonMaxHp': 'Star core max HP',
     'gamePlay.durationMs': 'Duration',
     'gamePlay.payloadMissing': 'Game start data is missing. Returning to matchmaking.',
     'gamePlay.leaveWarning': 'Leaving during the game may require screen recovery. Continue?',
@@ -222,6 +239,21 @@ const messages = {
     'gamePlay.socketErrorDetail': 'Could not verify the battle connection.',
     'gamePlay.socketClosed': 'Battle connection closed.',
     'gamePlay.resultReceived': 'Result received',
+    'gamePlay.hpLabel': 'Star Core HP',
+    'gamePlay.elapsedMs': 'Elapsed',
+    'gamePlay.countdownLabel': 'Battle starts',
+    'gamePlay.lightningButton': 'LIGHTNING',
+    'gamePlay.lightningSent': 'LIGHTNING sent',
+    'gamePlay.targetLocked': 'Target locked',
+    'gamePlay.dragonAirborne': 'Star core moving',
+    'gamePlay.videoPending': 'Video pending',
+    'gamePlay.videoLoading': 'Loading video',
+    'gamePlay.videoReady': 'Video ready',
+    'gamePlay.videoPlaying': 'Playing video',
+    'gamePlay.videoError': 'Video error',
+    'gamePlay.videoLoadFailed': 'Failed to load the battle video.',
+    'gamePlay.videoPlayFailed': 'Failed to start battle video playback.',
+    'gamePlay.naturalDeathWaiting': 'Star core end time has passed. Waiting for the server result.',
   },
 } as const
 
@@ -256,7 +288,9 @@ export function useLocale() {
 }
 
 function readStoredLocale(): Locale {
-  const storedLocale = getStorage()?.getItem(LOCALE_STORAGE_KEY)
+  const storage = getStorage()
+  const storedLocale =
+    storage?.getItem(LOCALE_STORAGE_KEY) ?? storage?.getItem(LEGACY_LOCALE_STORAGE_KEY)
 
   return storedLocale === 'en' || storedLocale === 'ko' ? storedLocale : 'ko'
 }

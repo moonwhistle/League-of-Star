@@ -4,8 +4,15 @@
 
 범위:
 
-- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `SMITE`, `GAME_RESULT`, 클라이언트 복구 정책, `ERROR`
-- 제외: SMITE 서버 판정 상세, game record/LP 반영
+- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, LIGHTNING 입력 wire type `SMITE`, `GAME_RESULT`, 클라이언트 복구 정책, `ERROR`
+- 제외: LIGHTNING 서버 판정 상세, game record/LP 반영
+
+## 0. League of Star 명칭 및 WebSocket 호환 정책
+
+- 사용자에게 보이는 서비스명은 **League of Star**, 전투 입력명은 **LIGHTNING**, 대상명은 **Star Core**다.
+- 현재 백엔드 WebSocket client message type은 호환성을 위해 `SMITE`를 유지한다. 즉, 프론트 UI의 LIGHTNING 버튼은 `{ "type": "SMITE", "payload": null }`을 전송한다.
+- `SMITE`, `SMITE_KILL`, `BOTH_SMITES_USED_DRAW`, `INVALID_SMITE_*`, `smiteTimeMs`, `dragonHpAtSmite`는 현재 백엔드 wire/schema 식별자다. 문서에서는 새 개념명과 레거시 식별자를 함께 적어 프론트 표시 정책과 백엔드 계약을 분리한다.
+- 새 프론트 저장 key는 `league-of-star.*`를 우선 사용하고, 기존 `smite.*` key는 진행 중인 세션 복구용 읽기 fallback으로만 유지한다.
 
 ## 1. 책임 경계
 
@@ -317,7 +324,7 @@ sequenceDiagram
 - `GAME_START` 이전에는 gameRoom `createdAt` 기준 30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY`를 모두 완료하지 못하면 `ABORTED` 대상이 됩니다.
 - `GAME_START` 이후에는 WebSocket 연결이 끊겨도 gameRoom을 즉시 중단하지 않고 서버 timer/scheduler가 종료 판정을 완료합니다.
 - 서버는 `GAME_START` 확정 시 최초 `naturalDeathAt = startAt + scenario.durationMs`로 종료 정산 deadline을 등록합니다.
-- 한 명만 SMITE를 사용했고 처치하지 못한 경우 서버는 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 종료 정산 deadline을 앞당길 수 있습니다.
+- 한 명만 LIGHTNING을 사용했고 처치하지 못한 경우 서버는 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 종료 정산 deadline을 앞당길 수 있습니다.
 - deadline 등록 실패 시 서버는 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 상태 저장소 cleanup을 수행합니다. 연결된 클라이언트에는 `GAME_START_FAILED`를 전송하고 record/LP는 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송 실패 시 서버는 `GAME_START_FAILED` 전송 후 WebSocket을 닫고, 클라이언트는 start 버튼 화면으로 복귀합니다.
 
@@ -501,12 +508,12 @@ RTT 실패/초과 시 서버는 `GAME_START_FAILED`를 전송하고 연결을 �
 - `COUNTDOWN`을 받으면 `startAt`까지 남은 시간을 계산합니다.
 - 남은 시간이 3000ms 이하가 되면 `3, 2, 1` countdown을 렌더링합니다.
 - 메시지를 늦게 받아 남은 시간이 2초대이면 `2`부터 보여줄 수 있습니다. 그래도 실제 시작 기준은 `startAt`입니다.
-- `GAME_START`를 받으면 scenario를 저장하고, `startAt` 도달 시 MP4 재생과 HP overlay를 시작합니다.
+- `GAME_START`를 받으면 scenario를 저장하고, `startAt` 도달 시 play 화면의 HP UI를 시작합니다.
 - `COUNTDOWN`과 `GAME_START`의 `startAt`이 다르면 잘못된 서버 메시지로 보고 시작하지 않습니다.
 
 ## 12. 잘못된 메시지 처리
 
-클라이언트가 JSON 파싱이 불가능한 메시지나 server-only type을 보내면 백엔드는 `ERROR`를 응답합니다. SMITE 처리 중 잘못된 payload, 게임 상태 불일치, 참가자 불일치, 저장 실패가 발생해도 `ERROR`를 응답하고 WebSocket 연결은 유지합니다.
+클라이언트가 JSON 파싱이 불가능한 메시지나 server-only type을 보내면 백엔드는 `ERROR`를 응답합니다. LIGHTNING 처리 중 잘못된 payload, 게임 상태 불일치, 참가자 불일치, 저장 실패가 발생해도 `ERROR`를 응답하고 WebSocket 연결은 유지합니다.
 
 ```mermaid
 sequenceDiagram
@@ -535,7 +542,7 @@ sequenceDiagram
 |------|------|
 | `CLIENT_READY` | MP4 preload 등 대기 준비 완료 |
 | `RTT_PONG` | 서버 `RTT_PING`에 대한 RTT 측정 응답. payload의 `seq`를 그대로 반환 |
-| `SMITE` | GAME_START 이후 강타 입력. payload는 비어 있어야 하며 클라이언트 timestamp를 넣지 않음 |
+| `SMITE` | GAME_START 이후 LIGHTNING 입력을 나타내는 레거시 wire type. payload는 `null`이어야 하며 클라이언트 timestamp를 넣지 않음 |
 
 서버가 보내는 message type:
 
@@ -556,8 +563,8 @@ sequenceDiagram
 
 | reason | 의미 | 전송 방식 |
 |------|------|------|
-| `SMITE_KILL` | SMITE 적용 후 effective HP가 0 이하가 되어 승패가 확정됨 | gameRoom session broadcast |
-| `BOTH_SMITES_USED_DRAW` | 두 유저가 모두 SMITE를 사용했고 둘 다 처치하지 못해 즉시 DRAW 확정 | gameRoom session broadcast |
+| `SMITE_KILL` | LIGHTNING 적용 후 effective HP가 0 이하가 되어 승패가 확정됨. reason 값은 레거시 계약상 `SMITE_KILL` 유지 | gameRoom session broadcast |
+| `BOTH_SMITES_USED_DRAW` | 두 유저가 모두 LIGHTNING을 사용했고 둘 다 처치하지 못해 즉시 DRAW 확정 | gameRoom session broadcast |
 | `NATURAL_DEATH_DRAW` | scheduler가 effective naturalDeathAt 이후 자연사 DRAW를 확정 | 연결된 local gameRoom session broadcast. 연결이 없으면 메시지 없이 DB 결과만 확정 |
 
 `GAME_RESULT` 예시:
@@ -596,30 +603,30 @@ sequenceDiagram
 - summary `DRAW`는 `gameResult=DRAW`, `me.result=DRAW`, `opponent.result=DRAW`로 내려옵니다. `winnerUserId`는 승자 userId 필드라서 `DRAW`에서는 `null`입니다.
 - 참가자가 아닌 유저가 summary를 조회하면 `403`, 아직 `FINISHED`가 아닌 gameRoom이면 `409`로 처리됩니다.
 
-SMITE 관련 `ERROR.payload.code`:
+LIGHTNING 관련 `ERROR.payload.code`:
 
 | code | 의미 |
 |------|------|
 | `INVALID_SMITE_PAYLOAD` | `SMITE` payload가 비어 있지 않음 |
-| `INVALID_SMITE_STATE` | gameRoom 상태, startAt, scenario 등 SMITE 처리 조건이 맞지 않음 |
+| `INVALID_SMITE_STATE` | gameRoom 상태, startAt, scenario 등 LIGHTNING 처리 조건이 맞지 않음 |
 | `NOT_GAME_PARTICIPANT` | WebSocket session user가 gameRoom 참가자가 아님 |
 | `SMITE_PROCESSING_FAILED` | 저장 중 복구 불가능한 DB 예외 등 서버 처리 실패 |
 
-## 13. SMITE 입력 UI
+## 13. LIGHTNING 입력 UI
 
-클라이언트는 `GAME_START` 이후 사용자가 SMITE 버튼을 클릭하면 즉시 버튼을 비활성화합니다.
+클라이언트는 `GAME_START` 이후 사용자가 LIGHTNING 버튼을 클릭하면 즉시 버튼을 비활성화합니다.
 
-- `SMITE`는 gameRoom WebSocket으로 한 번만 전송합니다.
-- `SMITE` payload에는 클라이언트 timestamp를 포함하지 않으며 빈 object `{}` 또는 payload 생략만 허용합니다.
+- 현재 wire type `SMITE`는 gameRoom WebSocket으로 한 번만 전송합니다.
+- `SMITE` payload에는 클라이언트 timestamp를 포함하지 않으며 `null`로 전송합니다.
 - 같은 유저가 같은 gameRoom에서 중복 전송하더라도 서버는 첫 action만 유효하게 유지하고 새 중간 응답을 전송하지 않습니다.
-- 결과가 확정되지 않은 SMITE에는 서버 응답이 없으며, 클라이언트는 `GAME_RESULT`를 받을 때만 종료 UI로 전환합니다.
-- 자연사 `DRAW`는 클라이언트 입력 없이 서버 scheduler가 확정할 수 있으므로, 플레이 중에는 SMITE 응답이 없어도 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 받을 수 있습니다.
-- WebSocket이 끊겨 `GAME_RESULT`를 받지 못해도 서버 DB 결과가 최종 기준입니다. 재접속/늦은 SMITE 등으로 이미 `FINISHED`인 gameRoom 결과를 조회하게 되면 현재 session에 확정된 `GAME_RESULT`만 재응답됩니다.
+- 결과가 확정되지 않은 LIGHTNING에는 서버 응답이 없으며, 클라이언트는 `GAME_RESULT`를 받을 때만 종료 UI로 전환합니다.
+- 자연사 `DRAW`는 클라이언트 입력 없이 서버 scheduler가 확정할 수 있으므로, 플레이 중에는 LIGHTNING 응답이 없어도 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 받을 수 있습니다.
+- WebSocket이 끊겨 `GAME_RESULT`를 받지 못해도 서버 DB 결과가 최종 기준입니다. 재접속/늦은 LIGHTNING 등으로 이미 `FINISHED`인 gameRoom 결과를 조회하게 되면 현재 session에 확정된 `GAME_RESULT`만 재응답됩니다.
 
 ```json
 {
   "type": "SMITE",
-  "payload": {}
+  "payload": null
 }
 ```
 
@@ -671,7 +678,7 @@ stateDiagram-v2
 - `bothReady=true`를 `GAME_START`로 오해하지 않습니다.
 - RTT 성공을 `GAME_START`로 오해하지 않습니다.
 - `COUNTDOWN`과 `GAME_START`를 받아도 즉시 시작하지 않고, 같은 `startAt` 기준으로 대기한 뒤 게임을 시작합니다.
-- SMITE 버튼은 클릭 즉시 비활성화하고, 최종 `GAME_RESULT` 수신 전까지 중간 SMITE 응답을 기다리지 않습니다.
+- LIGHTNING 버튼은 클릭 즉시 비활성화하고, 최종 `GAME_RESULT` 수신 전까지 중간 LIGHTNING 응답을 기다리지 않습니다.
 
 ## 변경 이력
 

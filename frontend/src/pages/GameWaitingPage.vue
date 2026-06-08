@@ -14,7 +14,7 @@
     :data-game-countdown-start-at="gameCountdownStartAt"
   >
     <header class="game-waiting-header" aria-label="Game waiting header">
-      <h1>LEAGUE OF SMITE</h1>
+      <h1>LEAGUE OF STAR</h1>
       <button class="locale-toggle" type="button" @click="toggleLocale">
         {{ nextLocaleLabel }}
       </button>
@@ -120,7 +120,7 @@ import {
   takeGameWebSocketHandoff,
 } from '@/services/realtime/gameWebSocketHandoff'
 
-import backgroundImageUrl from '../../img/background.png'
+import backgroundImageUrl from '../../img/background-new-sharp.png'
 
 const GAME_WAITING_CLIENT_WATCHDOG_MS = 30000
 const route = useRoute()
@@ -761,8 +761,8 @@ function getLoadingStepLabel(key = '') {
   font-family: var(--font-sans);
   color: var(--waiting-text);
   background:
-    linear-gradient(180deg, rgba(5, 10, 24, 0.78), rgba(5, 10, 24, 0.92)),
-    linear-gradient(90deg, rgba(4, 9, 23, 0.88), rgba(4, 9, 23, 0.3) 50%, rgba(4, 9, 23, 0.88)),
+    linear-gradient(180deg, rgba(5, 10, 24, 0.42), rgba(5, 10, 24, 0.6)),
+    linear-gradient(90deg, rgba(4, 9, 23, 0.52), rgba(4, 9, 23, 0.12) 50%, rgba(4, 9, 23, 0.5)),
     var(--game-waiting-background-image) center / cover no-repeat;
 }
 

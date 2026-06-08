@@ -47,6 +47,24 @@ describe('gameWaitingPayload', () => {
     })
   })
 
+  it('reads legacy smite namespace payloads during the League of Star migration', () => {
+    window.sessionStorage.setItem(
+      'smite.gameWaitingPayload:100',
+      JSON.stringify({
+        matchId: 'match-1',
+        opponent: null,
+        game: {
+          gameRoomId: 100,
+          videoUrl: '/assets/game/dragon-view.mp4',
+          webSocketUrl: '/ws/game/100',
+        },
+        receivedAt: '2026-06-01T00:00:00.000Z',
+      }),
+    )
+
+    expect(readGameWaitingPayload(100)?.matchId).toBe('match-1')
+  })
+
   it('creates payloads from GO_TO_GAME_WAITING match results', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))

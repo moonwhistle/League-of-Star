@@ -1,6 +1,6 @@
-# League of Smite - Matching System Roadmap & Specification
+# League of Star - Matching System Roadmap & Specification
 
-이 문서는 League of Smite의 매칭 시스템이 초기 구축(Stage 1)부터 대규모 확장(Stage 3)까지 어떻게 진화하는지 상세 기술 명세를 정의합니다.
+이 문서는 League of Star의 매칭 시스템이 초기 구축(Stage 1)부터 대규모 확장(Stage 3)까지 어떻게 진화하는지 상세 기술 명세를 정의합니다.
 
 매칭 = 티어 큐 + FIFO 우선 + 대기 시간 기반 티어 확장 + Scheduler Batch 매칭 + 분산 락 + 원자적 제거
 ---

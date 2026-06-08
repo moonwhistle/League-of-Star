@@ -26,41 +26,41 @@ flowchart TD
 
 ## Backend Contract
 
-| 항목 | 기준 |
-| ---- | ---- |
-| Final event | SSE `match_response_result` |
-| Transition source | `match_response_result.action` |
-| Game waiting action | `GO_TO_GAME_WAITING` |
-| Start screen action | `GO_TO_MATCH_START` |
-| Queue return action | `RETURN_TO_MATCHING` |
-| Game waiting route | `/game/:gameRoomId/waiting` |
+| 항목                | 기준                           |
+| ------------------- | ------------------------------ |
+| Final event         | SSE `match_response_result`    |
+| Transition source   | `match_response_result.action` |
+| Game waiting action | `GO_TO_GAME_WAITING`           |
+| Start screen action | `GO_TO_MATCH_START`            |
+| Queue return action | `RETURN_TO_MATCHING`           |
+| Game waiting route  | `/game/:gameRoomId/waiting`    |
 
 `match_response_result` payload:
 
 ```ts
 interface MatchResponseResultNotification {
-  matchId: string
-  outcome: 'MATCHED' | 'FAILED'
+  matchId: string;
+  outcome: "MATCHED" | "FAILED";
   reason:
-    | 'BOTH_ACCEPTED'
-    | 'MY_REJECTED'
-    | 'OPPONENT_REJECTED'
-    | 'MY_TIMEOUT'
-    | 'OPPONENT_TIMEOUT'
-    | 'BOTH_TIMEOUT'
-    | 'GAME_SETUP_FAILED'
-  action: 'GO_TO_GAME_WAITING' | 'GO_TO_MATCH_START' | 'RETURN_TO_MATCHING'
+    | "BOTH_ACCEPTED"
+    | "MY_REJECTED"
+    | "OPPONENT_REJECTED"
+    | "MY_TIMEOUT"
+    | "OPPONENT_TIMEOUT"
+    | "BOTH_TIMEOUT"
+    | "GAME_SETUP_FAILED";
+  action: "GO_TO_GAME_WAITING" | "GO_TO_MATCH_START" | "RETURN_TO_MATCHING";
   opponent: {
-    userId: number
-    nickname: string
-    tier: string
-    tierScore: number
-  } | null
+    userId: number;
+    nickname: string;
+    tier: string;
+    tierScore: number;
+  } | null;
   game: {
-    gameRoomId: number
-    videoUrl: string
-    webSocketUrl: string
-  } | null
+    gameRoomId: number;
+    videoUrl: string;
+    webSocketUrl: string;
+  } | null;
 }
 ```
 
@@ -86,7 +86,7 @@ interface MatchResponseResultNotification {
 - action별 매칭 SSE close / 유지 정책 구현.
 - game waiting payload `sessionStorage` 저장/조회 구현.
 - `GameWaitingPage.vue` loading UI 구현.
-- `background.png` 기반 game waiting background 구현.
+- `background-new-sharp.png` 기반 game waiting background 구현.
 - `gameloading.png` 참고 디자인 기반 CSS 재현.
 - game waiting loading bar payload 확보율 구현.
 - game waiting loading bar 문구는 게임 시작 준비 완료가 아니라 payload 수신 상태로 표시.
@@ -140,7 +140,7 @@ interface MatchResponseResultNotification {
 
 - [x] `sessionStorage` 저장 helper 구현.
 - [x] `sessionStorage` 조회 helper 구현.
-- [x] 저장 key를 `smite.gameWaitingPayload:{gameRoomId}` 기준으로 구현.
+- [x] 저장 key를 `league-of-star.gameWaitingPayload:{gameRoomId}` 기준으로 구현하고, 기존 진행 세션 복구를 위해 `smite.gameWaitingPayload:{gameRoomId}` 읽기 fallback 유지.
 - [x] 저장 payload에 `matchId`, `opponent`, `game`, `receivedAt` 포함.
 - [x] route param `gameRoomId`와 저장 payload 불일치 시 안전 복귀 구현.
 - [x] payload 없음 또는 parse 실패 시 안전 복귀 구현.
@@ -148,10 +148,10 @@ interface MatchResponseResultNotification {
 ### 4. Game waiting UI 구현
 
 - [x] `GameWaitingPage.vue` placeholder 제거.
-- [x] `background.png` 기반 full-screen background 구현.
+- [x] `background-new-sharp.png` 기반 full-screen background 구현.
 - [x] `gameloading.png` 참고 디자인을 CSS로 재현.
 - [x] `gameloading.png` runtime import 금지 유지.
-- [x] `LEAGUE OF SMITE` title 구현.
+- [x] `LEAGUE OF STAR` title 구현.
 - [x] 게임 준비 중 title 구현.
 - [x] 상대 nickname / tier 표시 구현.
 - [x] `gameRoomId`, `matchId`는 화면 표시 없이 내부 저장/검증 상태로 유지.
@@ -323,7 +323,7 @@ flowchart TD
 
 - Game waiting UI는 참고 이미지를 그대로 삽입하지 않고 CSS로 재구성함.
   `gameloading.png`는 디자인 참고용이고 runtime asset이 아님.
-  실제 화면은 기존 `background.png`를 쓰고, desktop/mobile에서 loading 영역과 segment가 겹치지 않도록 반응형 레이아웃을 조정함.
+  실제 화면은 기존 `background-new-sharp.png`를 쓰고, desktop/mobile에서 loading 영역과 segment가 겹치지 않도록 반응형 레이아웃을 조정함.
 
 ## 📝 Note
 

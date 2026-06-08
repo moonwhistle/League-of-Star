@@ -39,7 +39,7 @@ gameRoom 생성 실패는 두 유저를 매칭 큐에 자동 복귀시키지 않
 클라이언트는 `reason=GAME_SETUP_FAILED`를 기준으로 안내 메시지를 보여준 뒤 start 버튼 화면으로 돌려보낸다.
 gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤트를 발행하지 않고, 생성된 gameRoom/participant를 `ABORTED`로 보상 처리한 뒤 동일하게 `GAME_SETUP_FAILED`로 정리한다.
 
-이번 이슈에서는 WebSocket 연결, RTT 측정, countdown, `GAME_START`, SMITE 판정, `game_actions`, `game_records` 저장은 구현하지 않는다.
+이번 이슈에서는 WebSocket 연결, RTT 측정, countdown, `GAME_START`, LIGHTNING 판정, `game_actions`, `game_records` 저장은 구현하지 않는다.
 
 ## 📚 Tasks
 

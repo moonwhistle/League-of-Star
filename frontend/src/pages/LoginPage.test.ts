@@ -38,8 +38,8 @@ describe('LoginPage', () => {
   it('renders the login page', () => {
     const wrapper = mount(LoginPage)
 
-    expect(wrapper.get('h1').text()).toBe('LEAGUE OF SMITE')
-    expect(wrapper.get('.login-heading p').text()).toBe('PROVE YOUR SMITE TIMING')
+    expect(wrapper.get('h1').text()).toBe('LEAGUE OF STAR')
+    expect(wrapper.get('.login-heading p').text()).toBe('MASTER YOUR LIGHTNING TIMING')
     expect(wrapper.find('#login-email').exists()).toBe(true)
     expect(wrapper.find('#login-password').exists()).toBe(true)
     expect(wrapper.get('.login-button').text()).toBe('로그인')

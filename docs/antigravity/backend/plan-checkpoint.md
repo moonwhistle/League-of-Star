@@ -59,7 +59,7 @@ flowchart TD
 - 양쪽 수락 시 `match_response_result` 발행 구현 완료
 - `match_response_result.game` payload는 `gameRoomId`, `videoUrl`, `webSocketUrl`을 포함한다.
 - `game_rooms`, `game_participants`, `game_actions`, `game_records` 도메인과 DDL은 준비됨
-- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, SMITE 입력 저장/판정, SMITE 즉시 종료, 서버 scheduler 자연사 종료 보장, `NATURAL_DEATH_DRAW` 결과 전송까지 구현됨
+- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, LIGHTNING 입력 저장/판정, SMITE 즉시 종료, 서버 scheduler 자연사 종료 보장, `NATURAL_DEATH_DRAW` 결과 전송까지 구현됨
 
 ## 2. 핵심 결정
 
@@ -116,7 +116,7 @@ flowchart TD
 - [x] scenario 생성/저장
 - [x] `match_response_result.game` payload에 `gameRoomId`, `videoUrl`, `webSocketUrl` 채우기
 - [x] gameRoom 생성 실패 시 `GO_TO_GAME_WAITING`을 발행하지 않고 매칭 성공 정산 실패로 격리할 정책 정의
-- [x] 이 단계에서는 WebSocket 연결/RTT/SMITE 판정은 구현하지 않음
+- [x] 이 단계에서는 WebSocket 연결/RTT/LIGHTNING 판정은 구현하지 않음
 
 ### Step 2. MP4 정적 서빙
 
@@ -176,7 +176,7 @@ flowchart TD
 - [x] MP4는 배경으로만 사용
 - [x] `GAME_START` 시 서버 기준 game end timer/scheduler 등록
 
-### Step 7. SMITE 입력과 서버 판정
+### Step 7. LIGHTNING 입력과 서버 판정
 
 - [x] 클라이언트는 WebSocket으로 `SMITE` 명령만 전송
 - [x] 서버는 `serverReceiveTime` 기록
@@ -184,10 +184,10 @@ flowchart TD
 - [x] scenario에서 HP 역산
 - [x] `game_actions` 저장
 - [x] 중복 SMITE 차단
-- [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리하되, SMITE 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리
-- [x] SMITE로 HP가 `0` 이하가 되면 gameRoom을 즉시 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast
-- [x] 두 유저가 모두 실패 SMITE를 사용하면 gameRoom을 즉시 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast
-- [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action 없이 현재 `GAME_RESULT`를 재응답
+- [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리하되, LIGHTNING 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리
+- [x] LIGHTNING으로 HP가 `0` 이하가 되면 gameRoom을 즉시 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast
+- [x] 두 유저가 모두 실패 LIGHTNING을 사용하면 gameRoom을 즉시 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast
+- [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 LIGHTNING은 새 action 없이 현재 `GAME_RESULT`를 재응답
 
 ### Step 8. 서버 timer/scheduler 기반 게임 종료 보장
 
@@ -523,10 +523,10 @@ WebSocket 미접속 또는 CLIENT_READY 미수신
 ```text
 GAME_START 이후 WebSocket disconnect
 -> disconnect 유저는 이후 추가 입력 불가
--> disconnect 전에 서버가 수신한 SMITE는 유효
+-> disconnect 전에 서버가 수신한 LIGHTNING은 유효
 -> WebSocket 연결이 모두 끊겨도 서버 timer/scheduler가 gameRoom 종료 작업 완료
 -> 게임 clock/scenario는 서버 기준으로 계속 진행
--> 상대가 유효한 SMITE로 처치하면 서버 최종 판정 결과대로 승/패 확정
+-> 상대가 유효한 LIGHTNING으로 처치하면 서버 최종 판정 결과대로 승/패 확정
 -> 상대가 처치하지 못하고 자연사하면 무승부
 -> 자연사 DRAW로 새로 종료되면 연결된 local session에 NATURAL_DEATH_DRAW GAME_RESULT 전송
 -> game_records 생성과 LP/배치/승급전 반영은 Issue 52에서 처리
@@ -587,7 +587,7 @@ gameRoom 생성 실패 mapping:
 - WebSocket 연결
 - RTT 측정
 - countdown
-- SMITE 판정
+- LIGHTNING 판정
 - game_actions/game_records 저장
 
 완료 기준:
@@ -729,8 +729,8 @@ gameRoom 생성 실패 mapping:
 
 완료 기준:
 
-- 한 유저가 SMITE를 보내면 서버가 성공/실패/판정 HP를 계산
-- 같은 유저의 두 번째 SMITE는 거부 또는 무시
+- 한 유저가 LIGHTNING을 보내면 서버가 성공/실패/판정 HP를 계산
+- 같은 유저의 두 번째 LIGHTNING은 거부 또는 무시
 - 판정 결과가 서버 로그와 DB에 남음
 
 ### Issue 50. 서버 timer/scheduler 기반 gameRoom 종료
@@ -742,7 +742,7 @@ gameRoom 생성 실패 mapping:
 범위:
 
 - [x] `GAME_START` 시 game end pending 등록
-- [x] HP scenario와 실패 SMITE action을 합성한 effective naturalDeathAt 기준 종료 scheduler 실행
+- [x] HP scenario와 실패 LIGHTNING action을 합성한 effective naturalDeathAt 기준 종료 scheduler 실행
 - [x] 종료 시점에 저장된 `game_actions`와 scenario 기준으로 자연사 `DRAW` 판정
 - [x] 양쪽 WebSocket이 모두 끊겨도 gameRoom 종료 처리 계속 진행
 - [x] 이미 `FINISHED`/`ABORTED` 된 gameRoom에 대한 종료 job no-op 처리

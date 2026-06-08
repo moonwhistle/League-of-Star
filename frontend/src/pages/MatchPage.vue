@@ -20,7 +20,7 @@
     :data-queue-error-message="queueErrorMessage"
   >
     <header class="match-app-bar" aria-label="Match navigation">
-      <h1>LEAGUE OF SMITE</h1>
+      <h1>LEAGUE OF STAR</h1>
       <button class="locale-toggle match-locale-toggle" type="button" @click="toggleLocale">
         {{ nextLocaleLabel }}
       </button>
@@ -74,7 +74,7 @@
         <ol class="ranking-list" aria-label="Top ranking">
           <li>
             <span>1</span>
-            <strong>Legendary Dragon</strong>
+            <strong>Legendary Star</strong>
             <em>3,492 LP</em>
           </li>
           <li>
@@ -226,7 +226,7 @@ import { saveGameWaitingPayloadFromMatchResult } from '@/services/gameWaitingPay
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
 
-import backgroundImageUrl from '../../img/background.png'
+import backgroundImageUrl from '../../img/background-new-sharp.png'
 import logoImageUrl from '../../img/logo.png'
 
 const streamStatus = ref('idle')
@@ -924,8 +924,8 @@ function closeErrorModal() {
   font-family: var(--font-sans);
   color: var(--match-text);
   background:
-    linear-gradient(90deg, rgba(4, 8, 22, 0.82), rgba(4, 8, 22, 0.22) 58%),
-    linear-gradient(0deg, rgba(4, 8, 22, 0.82), rgba(4, 8, 22, 0.1) 48%),
+    linear-gradient(90deg, rgba(4, 8, 22, 0.54), rgba(4, 8, 22, 0.08) 58%),
+    linear-gradient(0deg, rgba(4, 8, 22, 0.5), rgba(4, 8, 22, 0.04) 48%),
     var(--match-background-image) center / cover no-repeat;
 }
 
@@ -939,7 +939,7 @@ function closeErrorModal() {
   inset: 0;
   pointer-events: none;
   content: '';
-  background: rgba(2, 6, 16, 0.16);
+  background: rgba(2, 6, 16, 0.06);
 }
 
 .match-app-bar,
@@ -1181,24 +1181,24 @@ function closeErrorModal() {
 .match-cta-panel {
   align-self: end;
   justify-self: end;
-  width: min(380px, 100%);
+  width: min(318px, 100%);
   min-width: 0;
-  margin-bottom: clamp(20px, 6vh, 64px);
+  margin-bottom: clamp(8px, 3vh, 28px);
 }
 
 .rank-panel {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  padding: 18px;
-  margin-bottom: 16px;
-  border-right: 4px solid rgba(100, 242, 232, 0.42);
-  background: rgba(18, 27, 48, 0.74);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border-right: 3px solid rgba(100, 242, 232, 0.42);
+  background: rgba(18, 27, 48, 0.66);
 }
 
 .rank-panel strong {
-  font-size: 1.45rem;
+  font-size: 1.12rem;
 }
 
 .rank-progress {
@@ -1207,14 +1207,14 @@ function closeErrorModal() {
 }
 
 .rank-progress strong {
-  font-size: 1rem;
+  font-size: 0.84rem;
   color: var(--match-accent);
 }
 
 .progress-track {
   grid-column: 1 / -1;
   min-width: 0;
-  height: 8px;
+  height: 6px;
   overflow: hidden;
   background: rgba(142, 174, 196, 0.28);
 }
@@ -1231,16 +1231,16 @@ function closeErrorModal() {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 76px;
-  padding: 0 24px;
-  font-size: 1.35rem;
+  min-height: 56px;
+  padding: 0 18px;
+  font-size: 1.08rem;
   font-weight: 900;
   line-height: 1.15;
   color: #f8fbff;
   background: #162a42;
   border: 1px solid rgba(99, 242, 232, 0.48);
   border-radius: 4px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
 
 .primary-match-button:hover:not(:disabled) {
@@ -1259,8 +1259,8 @@ function closeErrorModal() {
 }
 
 .primary-match-button span {
-  margin-right: 12px;
-  font-size: 1rem;
+  margin-right: 8px;
+  font-size: 0.86rem;
 }
 
 .primary-match-button:disabled {
@@ -1272,19 +1272,20 @@ function closeErrorModal() {
 .secondary-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .secondary-actions button {
   min-width: 0;
-  min-height: 56px;
-  padding: 0 12px;
+  min-height: 42px;
+  padding: 0 10px;
   color: var(--match-text);
+  font-size: 0.86rem;
   line-height: 1.15;
   white-space: normal;
-  background: rgba(24, 31, 52, 0.86);
+  background: rgba(24, 31, 52, 0.76);
   border: 1px solid rgba(206, 224, 255, 0.12);
   border-radius: 4px;
 }
@@ -1618,8 +1619,8 @@ function closeErrorModal() {
   }
 
   .primary-match-button {
-    min-height: 64px;
-    font-size: 1.12rem;
+    min-height: 52px;
+    font-size: 1rem;
   }
 
   .secondary-actions {

@@ -120,24 +120,45 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-duration-ms')).toBe('15000')
     expect(wrapper.get('main').attributes('data-game-elapsed-ms')).toBe('2000')
     expect(wrapper.get('main').attributes('data-game-current-hp')).toBe('8667')
-    expect(wrapper.get('main').attributes('data-game-video-url')).toBe(
-      '/assets/game/dragon-view.mp4',
-    )
+    expect(wrapper.get('main').attributes('data-game-hp-percent')).toBe('87')
+    expect(wrapper.get('main').attributes('data-game-video-url')).toBeUndefined()
+    expect(wrapper.get('main').attributes('data-game-started')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('0')
     expect(wrapper.get('main').attributes('data-game-websocket-url')).toBe('/ws/game/100')
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('connecting')
-    expect(wrapper.get('main').attributes('data-game-socket-smite-ready')).toBe('true')
-    expect(wrapper.text()).toContain('전장 시작 데이터 확인됨')
-    expect(wrapper.text()).toContain('서버 시작 시각 기준으로 대기 중')
-    expect(wrapper.text()).toContain('게임룸')
-    expect(wrapper.text()).toContain('100')
-    expect(wrapper.text()).toContain('드래곤 최대 HP')
-    expect(wrapper.text()).toContain('10000')
-    expect(wrapper.text()).toContain('진행 시간')
-    expect(wrapper.text()).toContain('15000')
-    expect(wrapper.text()).toContain('전장 연결 중')
-    expect(wrapper.find('[data-testid="smite-button"]').exists()).toBe(false)
+    expect(wrapper.get('main').attributes('data-game-socket-lightning-ready')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-three-ready')).toBe('false')
+    expect(wrapper.find('video').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="three-scene"]').exists()).toBe(true)
+    expect(wrapper.find('.space-vignette').exists()).toBe(true)
+    expect(wrapper.find('.target-reticle').exists()).toBe(false)
+    expect(wrapper.find('.star-core-hp-slot').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
     expect(gameWebSocketMock.connect).toHaveBeenCalledWith('/ws/game/100', expect.any(Object))
     expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the galaxy background only before the server startAt', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:05.000Z'))
+    saveValidPlayPayloads({
+      startAt: Date.now() + 2800,
+    })
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-started')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('3')
+    expect(wrapper.get('main').attributes('data-game-elapsed-ms')).toBe('0')
+    expect(wrapper.get('main').attributes('data-game-current-hp')).toBe('10000')
+    expect(wrapper.find('[data-testid="three-scene"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+    expect(wrapper.text()).toBe('')
   })
 
   it('uses a handed off game websocket before reconnecting from storage', async () => {
@@ -153,8 +174,8 @@ describe('GamePlayPage', () => {
     expect(gameWebSocketMock.state.connection.setHandlers).toHaveBeenCalledWith(expect.any(Object))
     expect(gameWebSocketMock.connect).not.toHaveBeenCalled()
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('handoff')
-    expect(wrapper.get('main').attributes('data-game-socket-smite-ready')).toBe('true')
-    expect(wrapper.text()).toContain('대기방 연결 인계됨')
+    expect(wrapper.get('main').attributes('data-game-socket-lightning-ready')).toBe('true')
+    expect(wrapper.text()).toBe('')
   })
 
   it('handles play websocket ERROR and GAME_RESULT without moving to match', async () => {
@@ -182,7 +203,7 @@ describe('GamePlayPage', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
-    expect(wrapper.get('main').attributes('data-game-socket-smite-ready')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-socket-lightning-ready')).toBe('true')
     expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('ERROR')
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
       'SERVER_SIDE_ERROR',
@@ -216,11 +237,11 @@ describe('GamePlayPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
-    expect(wrapper.get('main').attributes('data-game-socket-smite-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-socket-lightning-ready')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
       'RECONNECT_FAILED',
     )
-    expect(wrapper.text()).toContain('RECONNECT_FAILED')
+    expect(wrapper.text()).toBe('')
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
@@ -238,8 +259,28 @@ describe('GamePlayPage', () => {
     vi.advanceTimersByTime(1000)
     await flushPromises()
 
-    expect(wrapper.get('main').attributes('data-game-elapsed-ms')).toBe('3000')
-    expect(wrapper.get('main').attributes('data-game-current-hp')).toBe('8000')
+    const nextElapsedMs = Number(wrapper.get('main').attributes('data-game-elapsed-ms'))
+    const nextHp = Number(wrapper.get('main').attributes('data-game-current-hp'))
+
+    expect(nextElapsedMs).toBeGreaterThanOrEqual(2980)
+    expect(nextElapsedMs).toBeLessThanOrEqual(3020)
+    expect(nextHp).toBeLessThan(8667)
+  })
+
+  it('shows natural death waiting after the scenario duration without moving routes', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:20.500Z'))
+    saveValidPlayPayloads({
+      startAt: Date.now() - 15500,
+    })
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-natural-death-waiting')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-current-hp')).toBe('0')
+    expect(wrapper.text()).toBe('')
+    expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
   it('warns before browser refresh while valid play state is active', async () => {
@@ -388,28 +429,30 @@ describe('GamePlayPage', () => {
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
-  it('toggles game play copy between Korean and English', async () => {
+  it('renders only the galaxy background without combat overlays or top navigation', async () => {
     saveValidPlayPayloads()
 
     const wrapper = mount(GamePlayPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('전장 시작 데이터 확인됨')
-    expect(wrapper.text()).toContain('게임룸')
-
-    await wrapper.get('.locale-toggle').trigger('click')
-
-    expect(wrapper.text()).toContain('Battle start data confirmed')
-    expect(wrapper.text()).toContain('Game room')
-    expect(wrapper.text()).toContain('Dragon max HP')
+    expect(wrapper.text()).toBe('')
+    expect(wrapper.find('.game-play-header').exists()).toBe(false)
+    expect(wrapper.find('.locale-toggle').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('LEAGUE OF STAR')
+    expect(wrapper.find('.star-core-hp-slot').exists()).toBe(false)
+    expect(wrapper.find('.target-reticle').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="three-scene"]').exists()).toBe(true)
   })
 })
 
-function saveValidPlayPayloads(): void {
+function saveValidPlayPayloads(options: { startAt?: number } = {}): void {
+  const startAt = options.startAt ?? Date.now() - 2000
+
   saveGameStartPayload({
     gameRoomId: 100,
     serverTime: Date.now() - 5000,
-    startAt: Date.now() - 2000,
+    startAt,
     scenario: {
       dragonMaxHp: 10000,
       durationMs: 15000,

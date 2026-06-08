@@ -1,4 +1,4 @@
-# League of Smite — Policy
+# League of Star — Policy
 
 ---
 
@@ -83,7 +83,7 @@
   - 같은 `matchId`에서 HTTP 응답과 SSE 최종 이벤트의 도착 순서는 보장하지 않는다.
   - `match_response_result` SSE 이벤트는 해당 `matchId`의 최종 이벤트이므로, 클라이언트는 이후 도착하는 HTTP 응답의 화면 전환 값보다 SSE 이벤트를 우선한다.
 - 매칭 SSE는 매칭 결과와 게임 대기 화면 진입 정보까지만 담당한다.
-  - `GO_TO_GAME_WAITING` 이후 게임 준비, RTT 측정, 카운트다운, 게임 시작, SMITE 입력, 게임 종료는 WebSocket으로 처리한다.
+  - `GO_TO_GAME_WAITING` 이후 게임 준비, RTT 측정, 카운트다운, 게임 시작, LIGHTNING 입력, 게임 종료는 WebSocket으로 처리한다.
   - 별도의 SSE `game_ready` 이벤트는 만들지 않는다.
 
 #### 매칭 정산 표
@@ -103,18 +103,26 @@
 
 ## 2. 게임 진행 정책
 
+### 2.0 League of Star 명칭 및 레거시 계약 정책
+
+- 사용자에게 노출되는 서비스명은 **League of Star**로 통일한다.
+- 사용자에게 노출되는 전투 입력명은 **LIGHTNING / 라이트닝**, 대상명은 **Star Core / 스타 코어**로 통일한다.
+- 현재 백엔드 WebSocket wire type은 호환성을 위해 `{ "type": "SMITE", "payload": null }`을 유지한다. 프론트의 버튼/문구는 LIGHTNING이지만, 서버에 전송하는 message type은 백엔드가 변경되기 전까지 `SMITE`가 source of truth다.
+- 현재 DB/API 레거시 식별자 `smite_time_ms`, `dragon_hp_at_smite`, `smiteTimeMs`, `dragonHpAtSmite`, `dragonMaxHp`는 schema/wire 호환을 위해 유지할 수 있다. 문서에서는 개념상 LIGHTNING/스타 코어 값으로 설명하되, 실제 필드명은 레거시 식별자임을 명확히 구분한다.
+- 신규 프론트 저장 key와 표시 문구는 `league-of-star.*`, LIGHTNING, Star Core를 우선 사용하며, 기존 사용자 세션 복구를 위해 `smite.*` key는 읽기 fallback으로만 유지한다.
+
 ### 2.1 게임 기본 규칙
 
 | 규칙 | 내용 |
 |------|------|
-| **몬스터** | 장로 드래곤 (Elder Dragon) |
-| **드래곤 초기 HP** | 10,000 |
-| **강타 데미지** | 1,200 (True Damage, 고정) |
+| **대상** | 스타 코어 (Star Core) |
+| **스타 코어 초기 HP** | 10,000 |
+| **라이트닝 데미지** | 1,200 (True Damage, 고정) |
 | **게임 제한 시간** | **8 ~ 17초** (매판 랜덤, 서버가 시나리오 생성 시 결정) |
-| **강타 입력** | 1인당 **1회만** 가능 |
-| **강타 사용 조건** | 드래곤 위에 마우스를 올린 상태에서 **D 또는 F 키** 입력 |
+| **라이트닝 입력** | 1인당 **1회만** 가능 |
+| **라이트닝 사용 조건** | 스타 코어 위에 마우스를 올린 상태에서 **D 또는 F 키** 입력 |
 | **HP 감소 패턴** | 200ms 단위 랜덤 버스트 (서버 사전 생성 시나리오) |
-| **몬스터 사망 시** | HP가 0에 도달하면 **즉시 게임 종료** |
+| **스타 코어 종료 시** | HP가 0에 도달하면 **즉시 게임 종료** |
 
 ### 2.1.1 HP 시나리오 생성 규칙
 
@@ -126,22 +134,22 @@
 - 각 시나리오는 짧은 정체 구간과 큰 burst 구간을 포함하도록 보정한다.
 - WebSocket/API 계층은 시나리오를 생성하지 않고, core의 `GameScenarioGenerator`가 생성 책임을 가진다.
 
-### 2.2 강타 입력 규칙
+### 2.2 라이트닝 입력 규칙
 
-- 드래곤 영역에 마우스 커서를 올린 상태에서 **D 또는 F 키를 누를 때** 강타 발동
-- 마우스가 드래곤 영역 밖에 있으면 키를 눌러도 **강타가 발동되지 않음**
-- 한 번 강타를 사용하면 **재사용 불가** (UI에서 비활성화)
-- 게임 종료까지 강타를 사용하지 않으면 → 자동으로 **미사용 처리**
+- 스타 코어 영역에 마우스 커서를 올린 상태에서 **D 또는 F 키를 누를 때** 라이트닝 발동
+- 마우스가 스타 코어 영역 밖에 있으면 키를 눌러도 **라이트닝이 발동되지 않음**
+- 한 번 라이트닝을 사용하면 **재사용 불가** (UI에서 비활성화)
+- 게임 종료까지 라이트닝을 사용하지 않으면 → 자동으로 **미사용 처리**
 
 ### 2.3 승패 판정
 
 | 상황 | 결과 |
 |------|------|
-| 한 명만 킬 성공 (HP ≤ 1200 시점에 강타) | 해당 플레이어 **승리** |
+| 한 명만 킬 성공 (HP ≤ 1200 시점에 라이트닝) | 해당 플레이어 **승리** |
 | 둘 다 킬 성공 | **먼저 누른 사람** 승리 (선착순) |
-| 둘 다 킬 실패 (드래곤 자연사) | **무승부** |
-| 한 명만 강타 사용 + 킬 실패 | **무승부** (자연사) |
-| 둘 다 강타 미사용 | **무승부** (자연사) |
+| 둘 다 킬 실패 (스타 코어 자연사) | **무승부** |
+| 한 명만 라이트닝 사용 + 킬 실패 | **무승부** (자연사) |
+| 둘 다 라이트닝 미사용 | **무승부** (자연사) |
 
 ### 2.4 게임 대기 timeout 및 디스커넥트 처리
 
@@ -149,8 +157,8 @@
 |------|------|
 | **GO_TO_GAME_WAITING 후 ~ CLIENT_READY 전** | gameRoom `createdAt`부터 **30초 안에 두 참가자가 WebSocket 연결과 `CLIENT_READY` 전송을 완료하지 못하면** gameRoom `ABORTED`. `game_records` 생성 없음, LP/배치/승급전 반영 없음 |
 | **CLIENT_READY 완료 후 ~ GAME_START 전 RTT 측정** | 각 유저별 RTT 5회 측정. median RTT 2000ms 초과, `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 gameRoom `ABORTED`. `game_records` 생성 없음, LP/배치/승급전 반영 없음 |
-| **GAME_START 이후 이탈** | disconnect 자체로 gameRoom을 `ABORTED` 처리하지 않음. 서버는 기존 gameStartTime, HP scenario, 수신된 SMITE 액션 기준으로 판을 끝까지 판정 |
-| **GAME_START 이후 상대만 이탈** | 상대가 이탈해도 내 자동 승리가 아님. 내가 유효한 SMITE로 처치하면 승리, 처치하지 못하고 자연사하면 무승부 |
+| **GAME_START 이후 이탈** | disconnect 자체로 gameRoom을 `ABORTED` 처리하지 않음. 서버는 기존 gameStartTime, HP scenario, 수신된 LIGHTNING 액션 기준으로 판을 끝까지 판정 |
+| **GAME_START 이후 상대만 이탈** | 상대가 이탈해도 내 자동 승리가 아님. 내가 유효한 LIGHTNING으로 처치하면 승리, 처치하지 못하고 자연사하면 무승부 |
 | **GAME_START 이후 양쪽 이탈** | 이미 수신된 액션이 없으면 자연사 기준 무승부. 이미 수신된 유효 액션이 있으면 해당 액션 기준으로 판정 |
 
 - `GAME_START` 이전 timeout은 아직 유효한 판이 시작되지 않은 실패이므로 두 플레이어 모두 점수 변동이 없다.
@@ -163,16 +171,16 @@
 - WebSocket 미연결 유저에게는 실시간 WebSocket 이벤트를 보낼 수 없다. timeout 후 늦게 WebSocket handshake를 시도하면 gameRoom이 이미 `ABORTED`이므로 연결을 거부하고, 클라이언트는 start 버튼 화면으로 복귀한다.
 - WebSocket에 연결되어 있던 유저에게만 `GAME_WAITING_TIMEOUT` 이벤트를 전송한 뒤 연결을 닫는다.
 - `GAME_START` 이전 timeout 후 두 유저는 start 버튼 화면으로 복귀한다. 큐 자동 복귀는 하지 않는다.
-- `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
+- `GAME_START` 이후 disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 LIGHTNING action은 그대로 유효하다. 현재 WebSocket wire type은 레거시 `SMITE`다.
 - `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
 - 서버 timer/scheduler는 `naturalDeathAt = startAt + scenario.durationMs`를 최초 자연사 deadline으로 등록한다.
-- SMITE 실패 action이 저장되면 원본 scenario HP에서 누적 SMITE 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있다.
+- LIGHTNING 실패 action이 저장되면 원본 scenario HP에서 누적 LIGHTNING 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있다.
 - `naturalDeathAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각이다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
 - 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않는다. 서버 종료 기준은 `startAt + scenario.durationMs`다.
 - `GAME_START` 확정 후 `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom과 participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않는다. 이 경우 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫으며, record와 LP/티어 변동은 반영하지 않는다.
 - `GAME_START` 메시지 전송에 실패하면 이미 등록된 `game:end:pending` deadline을 제거하고 gameRoom과 participants를 `ABORTED` 처리한다. 이 경우 match user status, RTT 상태, waiting 상태를 정리하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫는다.
 - game end scheduler는 `naturalDeathAt`에 도달한 gameRoom만 정산 대상으로 삼고, 정산 시 gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
-- SMITE로 승/패가 확정되거나 두 유저가 모두 SMITE를 소모해 `DRAW`가 확정된 경우에도 `game:end:pending` member cleanup은 필수로 하지 않는다. DB의 `game_rooms.status`가 최종 기준이며, 후속 game end scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
+- LIGHTNING으로 승/패가 확정되거나 두 유저가 모두 LIGHTNING을 소모해 `DRAW`가 확정된 경우에도 `game:end:pending` member cleanup은 필수로 하지 않는다. DB의 `game_rooms.status`가 최종 기준이며, 후속 game end scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
 - 자연사 종료 정산은 DB gameRoom 결과 확정을 먼저 수행하고, 연결된 local WebSocket session이 있으면 `GAME_RESULT`를 보낸다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
 - 자연사 종료 후 pending cleanup은 WebSocket 전송 성공의 의미가 아니라 DB 기준으로 정산 완료된 후보를 제거하는 의미다. cleanup을 생략하면 이미 종료된 gameRoom이 scheduler tick마다 반복 조회될 수 있다.
 - `GAME_RESULT.reason`은 종료 사유에 따라 `SMITE_KILL`, `BOTH_SMITES_USED_DRAW`, `NATURAL_DEATH_DRAW`를 사용한다.
@@ -185,7 +193,7 @@
 #### 판정 방식: 서버 권위 (Server-Authoritative)
 
 ```
-1. 클라이언트 → 서버: WebSocket으로 "SMITE" 액션만 전송 (시간 정보 없음)
+1. 클라이언트 → 서버: WebSocket으로 LIGHTNING 의도를 전송. 현재 wire type은 레거시 `"SMITE"`이며 시간 정보 없음
 2. 서버: 수신 시각을 직접 기록 (server_receive_time)
 3. 서버: 판정 시점 계산
    → smite_time = server_receive_time - game_start_time
@@ -196,14 +204,14 @@
 - 클라이언트는 **시간 정보를 전송하지 않음** → 시간 조작 원천 차단
 - 서버가 직접 측정한 수신 시각만 사용 → 판정의 신뢰성 확보
 - 서버 판정 시간은 로컬 타임존 시간이 아니라 UTC `Instant` 기반 epoch milliseconds로 기록한다.
-- DB의 `game_start_time`을 SMITE 판정에 사용할 때도 UTC 기준으로 epoch milliseconds로 변환해 `server_receive_time - game_start_time`을 계산한다.
-- RTT 보정은 SMITE 판정에 사용하지 않음
+- DB의 `game_start_time`을 LIGHTNING 판정에 사용할 때도 UTC 기준으로 epoch milliseconds로 변환해 `server_receive_time - game_start_time`을 계산한다.
+- RTT 보정은 LIGHTNING 판정에 사용하지 않음
 - RTT 측정은 `GAME_START` 전 연결 품질 검사와 비정상 네트워크 환경 차단에만 사용
-- SMITE 판정은 실제 롤 강타 감각에 맞춰 서버가 받은 입력 순서를 기준으로 처리
-- 드래곤 초기 HP는 `10000`, SMITE 데미지는 `1200` 고정값으로 둔다.
-- `game_actions.dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 이전 SMITE 데미지를 반영한 이번 SMITE 적용 전 현재 HP를 저장한다.
-- `game_actions`는 유저당 1회 SMITE 입력 기록으로 유지하고, 승패 기록과 LP/배치/승급전 반영은 `game_records`에서 처리한다.
-- 킬 실패한 SMITE도 이후 HP 판정에는 `1200` 데미지로 반영한다.
+- LIGHTNING 판정은 실제 롤 라이트닝 감각에 맞춰 서버가 받은 입력 순서를 기준으로 처리
+- 스타 코어 초기 HP는 `10000`, LIGHTNING 데미지는 `1200` 고정값으로 둔다.
+- `game_actions.dragon_hp_at_smite`는 레거시 컬럼명이며, scenario 원본 HP가 아니라 이전 LIGHTNING 데미지를 반영한 이번 LIGHTNING 적용 전 현재 스타 코어 HP를 저장한다.
+- `game_actions`는 유저당 1회 LIGHTNING 입력 기록으로 유지하고, 승패 기록과 LP/배치/승급전 반영은 `game_records`에서 처리한다.
+- 킬 실패한 LIGHTNING도 이후 HP 판정에는 `1200` 데미지로 반영한다.
 - `afterHp = max(0, dragonHpAtSmite - 1200)`은 응답 payload에서 계산하고 DB에는 저장하지 않는다.
 - `smiteTimeMs`가 HP timeline step 사이에 있으면 인접한 두 step의 HP를 선형 보간해 base HP를 계산한다.
 - `smiteTimeMs < 100`은 게임 시작 직후 비정상적으로 빠른 입력으로 보고 action을 저장하지 않는다.
@@ -223,7 +231,7 @@
 | **전체 측정 제한** | 5회 측정과 per-ping 2500ms timeout 기준 gameRoom RTT 측정은 최대 15초 안에 완료되어야 함 |
 | **실패 기준** | `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED` |
 | **초과 기준** | 5회 측정은 완료했지만 median RTT가 2000ms를 초과하면 `RTT_TOO_HIGH` |
-| **성공 상태 보존** | RTT `PASSED` 상태는 `GAME_START` 결정 전까지 유지하고, SMITE 판정에는 사용하지 않음 |
+| **성공 상태 보존** | RTT `PASSED` 상태는 `GAME_START` 결정 전까지 유지하고, LIGHTNING 판정에는 사용하지 않음 |
 
 #### GAME_START 시작 동기화
 
@@ -241,20 +249,20 @@
 
 #### 동시 판정 처리 (Tie-Breaking)
 
-SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 두 사용자의 SMITE가 거의 동시에 들어와도 서버가 기록한 수신 시각을 기준으로 처리한다.
+LIGHTNING 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 두 사용자의 LIGHTNING이 거의 동시에 들어와도 서버가 기록한 수신 시각을 기준으로 처리한다.
 
 | 규칙 | 내용 |
 |------|------|
 | **판정 기준** | `serverReceiveTimeMs`가 빠른 action부터 판정 |
 | **동일 수신 시각** | `id ASC` 순서로 판정 |
-| **HP 반영** | 앞선 SMITE가 킬 실패였더라도 이후 action의 현재 HP에서 `1200`을 차감 |
-| **결과 확정** | SMITE 적용 후 HP가 `0` 이하가 되면 즉시 `FINISHED`, 두 유저가 모두 실패하면 즉시 `DRAW` |
+| **HP 반영** | 앞선 LIGHTNING이 킬 실패였더라도 이후 action의 현재 HP에서 `1200`을 차감 |
+| **결과 확정** | LIGHTNING 적용 후 HP가 `0` 이하가 되면 즉시 `FINISHED`, 두 유저가 모두 실패하면 즉시 `DRAW` |
 
-- 서버는 처치 SMITE를 저장한 transaction에서 gameRoom 결과를 확정한다.
-- 두 유저가 모두 SMITE를 사용했고 둘 다 처치하지 못했다면 두 번째 실패 SMITE를 저장한 transaction에서 gameRoom을 `DRAW`로 확정한다.
-- 결과가 확정되지 않은 SMITE는 중간 응답을 전송하지 않는다.
-- SMITE로 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
-- 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE는 새 action으로 저장하지 않고 현재 session에 `GAME_RESULT`만 재응답한다.
+- 서버는 처치 LIGHTNING을 저장한 transaction에서 gameRoom 결과를 확정한다.
+- 두 유저가 모두 LIGHTNING을 사용했고 둘 다 처치하지 못했다면 두 번째 실패 LIGHTNING을 저장한 transaction에서 gameRoom을 `DRAW`로 확정한다.
+- 결과가 확정되지 않은 LIGHTNING은 중간 응답을 전송하지 않는다.
+- LIGHTNING으로 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
+- 이미 `FINISHED`인 gameRoom에 늦게 도착한 LIGHTNING은 새 action으로 저장하지 않고 현재 session에 `GAME_RESULT`만 재응답한다.
 - record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리한다. `game_records` 생성, LP 반영, 배치/승급전 처리는 Step 9 record/rank 정산에서 확정된 gameRoom 결과를 기준으로 수행한다.
 
 #### Step 9 record/rank 정산 정책
@@ -299,10 +307,10 @@ SMITE 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에서 �
 | 규칙 | 내용 |
 |------|------|
 | **시나리오 전달 시점** | 게임 카운트다운 완료 후 시작 시점에만 전달 (사전 유출 차단) |
-| **입력 검증** | 클라이언트는 "SMITE" 액션만 전송, 시간 정보 포함 시 요청 무효 처리 |
+| **입력 검증** | 클라이언트는 LIGHTNING 의도만 전송. 현재 wire type은 레거시 `"SMITE"`이며 시간 정보 포함 시 요청 무효 처리 |
 | **셀프 매칭 방지** | 동일 IP에서 양쪽 플레이어 접속 시 매칭 차단 |
 | **입력 시점 판정** | 게임 시작 후 비정상적으로 빠른 입력 (`smiteTimeMs < 100`) 또는 scenario 범위 밖 입력은 무효 처리 |
-| **요청 중복 차단** | 동일 게임에서 2회 이상 SMITE 요청 수신 시 첫 번째만 유효 |
+| **요청 중복 차단** | 동일 게임에서 2회 이상 LIGHTNING 요청 수신 시 첫 번째만 유효 |
 
 ### 2.7 WebSocket 라우팅 정책
 
@@ -569,7 +577,7 @@ Tier Score = (Tier_Level - 1) * 4 + (4 - Division_Value) + 1
 | 날짜 | 변경 내용 |
 |------|----------|
 | 2026-04-17 | 초안 작성 (매칭, 게임 진행, LP, 티어 & 승급, 배치, 계정 정책) |
-| 2026-04-17 | 매칭 거절 패널티 제거, 게임 시작 세팅 제거(D/F 둘 다 강타 발동으로 단순화), 게임 시간 랜덤, 마우스 호버 조건 추가, 서버 권위 타임스탬프 방식 전환, 승급전 3판 2승 필수(무승부 불인정) |
+| 2026-04-17 | 매칭 거절 패널티 제거, 게임 시작 세팅 제거(D/F 둘 다 라이트닝 발동으로 단순화), 게임 시간 랜덤, 마우스 호버 조건 추가, 서버 권위 타임스탬프 방식 전환, 승급전 3판 2승 필수(무승부 불인정) |
 | 2026-04-27 | 통합 시리즈 아키텍처(RankSeries) 도입 및 배치/승급 정책 일원화 |
 | 2026-05-13 | 양쪽 수락 후 gameRoom/scenario 생성 성공 시에만 `GO_TO_GAME_WAITING` 발행, gameRoom 생성 실패 시 `GAME_SETUP_FAILED` 실패 이벤트 발행, 매칭 SSE와 게임 WebSocket 책임 경계 반영 |
 | 2026-05-13 | gameRoom 생성 실패 시 자동 큐 복귀하지 않고 `GO_TO_MATCH_START`와 `GAME_SETUP_FAILED` reason으로 start 화면 복귀하도록 정책 변경 |

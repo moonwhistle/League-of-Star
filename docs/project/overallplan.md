@@ -1,4 +1,4 @@
-# League of Smite — Overall Plan
+# League of Star — Overall Plan
 
 ---
 
@@ -6,16 +6,23 @@
 
 | 항목 | 내용 |
 |------|------|
-| **서비스명** | League of Smite |
-| **한 줄 소개** | 강타 타이밍을 겨루는 1v1 실시간 랭킹 대전 게임 |
-| **핵심 가치** | "prove your smite timing" — 정글러의 핵심 역량인 강타 싸움을 독립 게임으로 승화 |
+| **서비스명** | League of Star |
+| **한 줄 소개** | 라이트닝 타이밍을 겨루는 1v1 실시간 랭킹 대전 게임 |
+| **핵심 가치** | "master your lightning timing" — 정글러의 핵심 역량인 라이트닝 싸움을 독립 게임으로 승화 |
+
+### 1.1 명칭 전환 및 레거시 계약
+
+- 사용자에게 노출되는 세계관은 **League of Star / LIGHTNING / Star Core**로 통일한다.
+- 현재 백엔드 WebSocket 메시지 타입과 DB/API 일부 필드는 기존 구현 호환을 위해 `SMITE`, `smiteTimeMs`, `dragonHpAtSmite`, `dragonMaxHp` 같은 레거시 식별자를 유지할 수 있다.
+- 프론트는 새 저장 key `league-of-star.*`를 우선 사용하되, 진행 중 세션 복구를 위해 기존 `smite.*` key를 읽기 fallback으로 유지한다.
+- 백엔드가 wire/schema migration을 완료하기 전까지 프론트의 LIGHTNING 입력은 `{ "type": "SMITE", "payload": null }` 전송 계약을 따른다.
 
 ---
 
 ## 2. 핵심 유저 플로우
 
 ```
-[로그인] → [매칭 대기] → [매칭 수락] → [강타 싸움 게임] → [결과 & LP 변동 확인]
+[로그인] → [매칭 대기] → [매칭 수락] → [라이트닝 싸움 게임] → [결과 & LP 변동 확인]
 ```
 
 ### 2.1 로그인
@@ -39,9 +46,9 @@
   - `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`는 매칭 SSE를 닫고, `RETURN_TO_MATCHING`은 백엔드 큐 복귀 완료 이벤트로 보고 SSE를 유지
   - 게임 대기 화면 진입 이후 준비/RTT/카운트다운/게임 시작/입력/종료는 WebSocket 담당
 
-### 2.3 강타 싸움 게임
-- 두 플레이어가 **동일한 드래곤의 HP 바**를 실시간으로 공유
-- 드래곤 HP가 **불규칙하게 감소** (서버에서 사전 생성한 시나리오 기반)
+### 2.3 라이트닝 싸움 게임
+- 두 플레이어가 **동일한 스타 코어의 HP 바**를 실시간으로 공유
+- 스타 코어 HP가 **불규칙하게 감소** (서버에서 사전 생성한 시나리오 기반)
 - MP4 배경은 gameRoom별로 만들지 않고 공통 static resource를 사용
 - `GAME_START` 이전 WebSocket 미접속/READY timeout은 **gameRoom `createdAt` 기준 30초**로 판단하며, 30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 완료되지 않으면 gameRoom `ABORTED`로 처리하고 전적/LP를 반영하지 않음
 - `GAME_START` 이후 disconnect는 게임을 중단하지 않고 서버 timer/scheduler, 시나리오, 수신 액션 기준으로 끝까지 판정
@@ -49,9 +56,9 @@
 - GAME_START 확정 시 최초 `naturalDeathAt = startAt + scenario.durationMs`로 종료 정산 deadline을 등록
 - deadline 등록 실패 시 `game:end:pending`, match user status, RTT/waiting 상태 cleanup을 시도하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않음
 - `COUNTDOWN`/`GAME_START` 전송 실패 시 등록된 deadline을 제거하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않음
-- 드래곤 위에 **마우스를 올린 상태**에서 **D 또는 F 키**를 눌러 강타 발동
-- 각 플레이어는 **단 한 번** 강타 사용 가능
-- 드래곤 HP가 0에 도달하면 **즉시 게임 종료**
+- 스타 코어 위에 **마우스를 올린 상태**에서 **D 또는 F 키**를 눌러 라이트닝 발동
+- 각 플레이어는 **단 한 번** 라이트닝 사용 가능
+- 스타 코어 HP가 0에 도달하면 **즉시 게임 종료**
 - **서버 권위 판정 시스템**으로 승패 결정 (상세: 3장)
 
 ### 2.4 결과 확인
@@ -73,22 +80,22 @@
 시나리오 = [(t₀, hp₀), (t₁, hp₁), (t₂, hp₂), ..., (tₙ, 0)]
 ```
 
-#### 드래곤 기본 사양
+#### 스타 코어 기본 사양
 
 | 항목 | 값 |
 |------|----|
-| **몬스터** | 장로 드래곤 (Elder Dragon) — 추후 바론, 전령 등 확장 가능한 구조로 설계 |
+| **대상** | 스타 코어 (Star Core) — 후속 캐릭터/오브젝트 확장 가능한 구조로 설계 |
 | **초기 HP** | 10,000 |
-| **강타 데미지** | 1,200 (킬존: HP ≤ 1200) |
+| **라이트닝 데미지** | 1,200 (킬존: HP ≤ 1200) |
 | **게임 제한 시간** | 8 ~ 17초 (매판 랜덤, 시나리오 생성 시 결정) |
 
 #### HP 감소 패턴: 랜덤 버스트 (Random Burst)
 
-챔피언들이 스킬/평타를 섞어 때리는 실제 LoL의 느낌을 시뮬레이션합니다.
+별빛 에너지와 전투 이펙트가 불규칙하게 누적되는 느낌을 시뮬레이션합니다.
 
 ```
 HP: ████░██████░░█░░████░░█░░░░░░░
-     팀원 스킬  평타  궁극기  평타
+     에너지 파동  잔광  폭발  잔광
 ```
 
 - HP가 **불규칙한 덩어리(버스트)** 단위로 감소
@@ -106,13 +113,13 @@ HP: ████░██████░░█░░████░░█░░�
 클라이언트는 시간 정보를 전송하지 않습니다. 서버가 직접 수신 시각을 기록하여 조작을 원천 차단합니다.
 
 ```
-1. 유저: 드래곤 위에 마우스 올림 + 키(D/F) 입력
-2. 클라이언트 → 서버: WebSocket으로 "SMITE" 액션만 전송 (시간 정보 없음)
+1. 유저: 스타 코어 위에 마우스 올림 + 키(D/F) 입력
+2. 클라이언트 → 서버: LIGHTNING 의도 전송. 현재 wire type은 레거시 "SMITE"이며 시간 정보 없음
 3. 서버: 수신 시각 직접 기록 (server_receive_time)
 4. 서버: smite_time = server_receive_time - game_start_time
 5. 서버: 시나리오에서 smite_time 시점의 HP 역산
-6. HP ≤ 1200 → 킬 성공 (Smite Secured)
-7. HP > 1200 → 킬 실패 (Smite Failed)
+6. HP ≤ 1200 → 킬 성공 (Lightning Secured)
+7. HP > 1200 → 킬 실패 (Lightning Failed)
 ```
 
 ### 3.3 승패 판정
@@ -120,10 +127,10 @@ HP: ████░██████░░█░░████░░█░░�
 | 상황 | 결과 |
 |------|------|
 | 한 명만 킬 성공 | 킬 성공한 플레이어 **승리** |
-| 둘 다 킬 성공 | **먼저 누른 사람** 승리 (선착순 — 먼저 강타를 성공시킨 시점에 드래곤 즉사) |
-| 둘 다 킬 실패 (드래곤이 자연사) | **무승부** |
+| 둘 다 킬 성공 | **먼저 누른 사람** 승리 (선착순 — 먼저 라이트닝을 성공시킨 시점에 스타 코어 즉사) |
+| 둘 다 킬 실패 (스타 코어가 자연사) | **무승부** |
 
-> **강타 데미지**: 1200 고정 (True Damage)
+> **라이트닝 데미지**: 1200 고정 (True Damage)
 
 ### 3.4 RTT 측정
 
@@ -131,8 +138,8 @@ HP: ████░██████░░█░░████░░█░░�
 - median RTT 2000ms 초과 시 게임 진입 차단 (안정적 환경에서 재시도 유도)
 - 각 `RTT_PING`은 2500ms 안에 응답해야 하며, 5회 측정 구조상 gameRoom 전체 RTT 측정은 최대 15초 안에 완료되어야 함
 - `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외는 `RTT_FAILED`로 처리
-- RTT 측정값은 `GAME_START` 전 연결 품질 검사에만 사용하고, SMITE 판정 보정에는 사용하지 않음
-- SMITE 판정은 `server_receive_time - game_start_time`으로 계산한 서버 기준 입력 시각만 사용
+- RTT 측정값은 `GAME_START` 전 연결 품질 검사에만 사용하고, LIGHTNING 판정 보정에는 사용하지 않음
+- LIGHTNING 판정은 `server_receive_time - game_start_time`으로 계산한 서버 기준 입력 시각만 사용
 
 ---
 
@@ -252,7 +259,7 @@ gap = 상대_티어점수 - 내_티어점수
 | **Pinia** | 후속 이슈에서 전역 상태가 필요해질 때 도입 검토 |
 | **TanStack Query Vue** | 후속 이슈에서 서버 상태 캐싱/무효화 요구가 명확해질 때 도입 검토 |
 | **Native EventSource** | 매칭 SSE 수신 |
-| **Native WebSocket** | 게임 준비, RTT, 카운트다운, SMITE 입력 |
+| **Native WebSocket** | 게임 준비, RTT, 카운트다운, LIGHTNING 입력 |
 | **HTML video + Vue/CSS overlay** | MP4 배경 재생, HP bar/HUD 렌더링 |
 | **Vitest + Vue Test Utils** | 프론트엔드 테스트 |
 
@@ -371,7 +378,7 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 - 매칭 알림은 브라우저 기본 `EventSource`로 수신합니다.
 - 게임방 대기/RTT/카운트다운/SMITE/종료는 native `WebSocket`으로 JSON 메시지를 주고받습니다.
 - STOMP.js, SockJS fallback은 MVP에서 사용하지 않습니다.
-  RTT 측정과 SMITE 입력 경로를 단순하고 일관되게 유지하기 위해 WebSocket 단일 경로를 사용합니다.
+  RTT 측정과 LIGHTNING 입력 경로를 단순하고 일관되게 유지하기 위해 WebSocket 단일 경로를 사용합니다.
 
 ### 9.4 WebSocket 멀티 인스턴스 라우팅
 

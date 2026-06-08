@@ -173,8 +173,8 @@ lock 비용 판단:
 
 - 최초 자연사 deadline은 `naturalDeathAt = startAt + scenario.durationMs`로 계산한다.
 - 정산 대상 조회 시작 시각은 `naturalDeathAt`으로 등록한다.
-- 한 명만 SMITE를 사용했고 처치하지 못한 경우 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 score를 앞당길 수 있다.
-- SMITE 판정 시각은 RTT 보정 없이 `serverReceiveTime - gameStartTime`을 사용한다.
+- 한 명만 LIGHTNING을 사용했고 처치하지 못한 경우 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 score를 앞당길 수 있다.
+- LIGHTNING 판정 시각은 RTT 보정 없이 `serverReceiveTime - gameStartTime`을 사용한다.
 - 고정 25초 같은 값은 실제 정산 deadline으로 쓰지 않는다. 필요하면 cleanup TTL 같은 안전장치에서 별도로 검토한다.
 
 구현 결과:
@@ -326,7 +326,7 @@ flowchart TD
   - 조건부 update(`where status = READY`)도 가능하지만, update 결과만으로는 엔티티의 `start()` 도메인 메서드 흐름이 약해지고, 이후 `startAt`, participant 상태, 메시지 전송, deadline 등록을 다시 조합해야 합니다.
   - DB row lock은 같은 gameRoom row 하나만 짧게 잠급니다. 먼저 lock을 잡은 요청만 `READY -> IN_PROGRESS`를 성공시키고, 나중 요청은 이미 `READY`가 아니므로 바로 중단됩니다. 그래서 시작 메시지와 deadline 등록도 한 번만 이어집니다.
   - lock 범위는 `READY -> IN_PROGRESS` 전환까지만 잡습니다. scenario 조회, Redis deadline 등록, WebSocket 전송까지 lock 안에 넣으면 외부 I/O 동안 DB row를 오래 잠그게 됩니다. 대신 전환 이후 실패는 `GameStartFailureProcessor`가 `ABORTED`로 보상합니다.
-- game end deadline은 고정 25초가 아니라 scenario duration 기준으로 계산합니다. 실제 드래곤 자연사 시각은 scenario가 표현하므로, 고정값은 정산 deadline이 아니라 cleanup TTL 같은 안전장치에서 다루는 편이 맞습니다.
+- game end deadline은 고정 25초가 아니라 scenario duration 기준으로 계산합니다. 실제 스타 코어 자연사 시각은 scenario가 표현하므로, 고정값은 정산 deadline이 아니라 cleanup TTL 같은 안전장치에서 다루는 편이 맞습니다.
 - `naturalDeathAt`은 정산 완료 시각이 아니라 scheduler가 해당 gameRoom을 정산 대상으로 집기 시작할 수 있는 시각입니다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리해야 합니다.
 - 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않습니다. 서버는 `startAt + scenario.durationMs`를 논리적 종료 시각으로 사용하고, 클라이언트 화면은 서버가 내려준 `startAt`과 scenario를 따라가는 표시 계층으로 봅니다.
 - deadline 등록 실패도 `game:end:pending` cleanup을 시도합니다. Redis write가 일부 반영된 뒤 예외가 발생할 수 있고, ZSET remove는 대상이 없어도 no-op이라 방어적으로 처리하는 편이 안전합니다.

@@ -183,7 +183,7 @@ type GameWaitingServerMessage =
 - `GAME_START` scenario 저장 구현.
 - `GAME_START` 수신 후 `/game/:gameRoomId/play` 이동 구현.
 - `/game/:gameRoomId/play` 실제 게임 플레이 UI 구현.
-- SMITE 버튼 및 `{ type: 'SMITE', payload: null }` 전송 구현.
+- LIGHTNING 버튼 및 `{ type: 'SMITE', payload: null }` 전송 구현.
 - `GAME_RESULT` 수신 후 결과 화면 이동 구현.
 - Game summary API 호출 구현.
 - WebSocket 재접속/복구 구현.

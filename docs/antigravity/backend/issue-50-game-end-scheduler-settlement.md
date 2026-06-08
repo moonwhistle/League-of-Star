@@ -4,20 +4,20 @@
 
 `GAME_START` 이후 등록된 `game:end:pending`을 서버 scheduler가 조회하고, WebSocket 연결 유무와 무관하게 gameRoom 종료를 보장한다.
 
-드래곤 HP scenario는 원본 자연 HP timeline으로 유지한다. 실제 판정 HP는 원본 scenario HP에서 이전 SMITE 데미지를 차감한 effective HP다. 따라서 SMITE 실패 action이 저장되면 드래곤 자연사 시각도 앞당겨질 수 있다.
+스타 코어 HP scenario는 원본 자연 HP timeline으로 유지한다. 실제 판정 HP는 원본 scenario HP에서 이전 LIGHTNING 데미지를 차감한 effective HP다. 따라서 SMITE 실패 action이 저장되면 스타 코어 자연사 시각도 앞당겨질 수 있다.
 
-자연사 deadline은 `effective HP가 0이 되는 최초 시각`이다. SMITE가 없는 경우에는 scenario 마지막 시점인 `startAt + durationMs`가 deadline이고, SMITE 실패로 누적 데미지가 생기면 effective HP 기준으로 deadline을 다시 계산해 `game:end:pending` score를 앞당긴다.
+자연사 deadline은 `effective HP가 0이 되는 최초 시각`이다. LIGHTNING이 없는 경우에는 scenario 마지막 시점인 `startAt + durationMs`가 deadline이고, SMITE 실패로 누적 데미지가 생기면 effective HP 기준으로 deadline을 다시 계산해 `game:end:pending` score를 앞당긴다.
 
-SMITE로 이미 `FINISHED`된 gameRoom은 결과를 바꾸지 않고 no-op 처리한다. 아직 `IN_PROGRESS`인 gameRoom은 자연사 기준 `DRAW`로 확정한다. `ABORTED` 상태도 no-op 처리한다.
+LIGHTNING으로 이미 `FINISHED`된 gameRoom은 결과를 바꾸지 않고 no-op 처리한다. 아직 `IN_PROGRESS`인 gameRoom은 자연사 기준 `DRAW`로 확정한다. `ABORTED` 상태도 no-op 처리한다.
 
 이번 이슈는 gameRoom 종료 보장, 자연사 `DRAW` 확정, `game:end:pending` cleanup, 중복 scheduler 실행에 대한 멱등성까지 다룬다. `game_records` 생성과 LP/배치/승급전 반영은 Step 9 범위로 분리한다.
 
 ### Policy Priority
 
 1. SMITE 적용 후 effective HP가 `0` 이하이면 즉시 승패를 확정한다.
-2. 두 유저가 모두 SMITE를 사용했고 kill이 없으면 즉시 `DRAW`로 확정한다.
-3. 한 명만 SMITE를 실패했고 게임이 아직 `IN_PROGRESS`이면 effective naturalDeathAt을 앞당긴다.
-4. 이후 추가 SMITE로 끝나지 않으면 scheduler가 effective naturalDeathAt에 자연사 `DRAW`를 확정한다.
+2. 두 유저가 모두 LIGHTNING을 사용했고 kill이 없으면 즉시 `DRAW`로 확정한다.
+3. 한 명만 LIGHTNING을 실패했고 게임이 아직 `IN_PROGRESS`이면 effective naturalDeathAt을 앞당긴다.
+4. 이후 추가 LIGHTNING으로 끝나지 않으면 scheduler가 effective naturalDeathAt에 자연사 `DRAW`를 확정한다.
 
 ### Feature Flow
 
@@ -27,7 +27,7 @@ flowchart TD
     B --> C{SMITE saved?}
     C -- Kill --> C1[Finish immediately<br/>WIN / LOSE]
     C -- Both users used<br/>No kill --> C2[Finish immediately<br/>DRAW]
-    C -- One failed SMITE<br/>IN_PROGRESS --> D[Recalculate effective naturalDeathAt<br/>scenario HP - prior SMITE damage]
+    C -- One failed SMITE<br/>IN_PROGRESS --> D[Recalculate effective naturalDeathAt<br/>scenario HP - prior LIGHTNING damage]
     D --> E[Update game:end:pending score<br/>only earlier deadline]
     C -- No SMITE --> F[Keep current deadline]
     C1 --> X[Scheduler later no-op]
@@ -109,7 +109,7 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 
 - [x] 원본 scenario는 수정하지 않고 자연 HP timeline으로 유지한다.
 - [x] effective HP는 `scenarioHpAt(timeMs) - priorSmiteDamageSum`으로 계산한다.
-- [x] SMITE 실패 action 저장 후 누적 SMITE 데미지를 반영해 effective HP가 최초로 `0` 이하가 되는 시각을 계산한다.
+- [x] SMITE 실패 action 저장 후 누적 LIGHTNING 데미지를 반영해 effective HP가 최초로 `0` 이하가 되는 시각을 계산한다.
 - [x] scenario step 사이에 deadline이 생기면 선형 보간 기준으로 최초 `0` 도달 시각을 계산한다.
 - [x] 계산된 naturalDeathAt이 현재 pending score보다 빠른 경우에만 score를 앞당긴다.
 - [x] 이미 SMITE kill 또는 양쪽 SMITE 실패 DRAW로 `FINISHED`된 경우에는 naturalDeathAt을 갱신하지 않는다.
@@ -173,8 +173,8 @@ Step 7은 SMITE 처치 또는 양쪽 SMITE 실패로 즉시 종료되는 경우�
 ## 📝 Note
 
 - DB 상태가 최종 기준이다. Redis `game:end:pending`은 scheduler 후보 목록일 뿐 결과의 source of truth가 아니다.
-- 자연사 종료는 effective HP 기준으로 즉시 대상이 된다. 서버 수신 시각이 effective naturalDeathAt을 지난 SMITE는 저장하지 않고 자연사 정산 결과를 따른다.
-- scenario는 원본 timeline으로 보존한다. SMITE 데미지는 action으로만 저장하고, 현재 HP와 자연사 deadline은 scenario와 action을 합성해 계산한다.
+- 자연사 종료는 effective HP 기준으로 즉시 대상이 된다. 서버 수신 시각이 effective naturalDeathAt을 지난 LIGHTNING은 저장하지 않고 자연사 정산 결과를 따른다.
+- scenario는 원본 timeline으로 보존한다. LIGHTNING 데미지는 action으로만 저장하고, 현재 HP와 자연사 deadline은 scenario와 action을 합성해 계산한다.
 - SMITE 즉시 종료와 scheduler 자연사 종료가 경합해도 gameRoom row lock과 상태 조건으로 한쪽만 결과를 확정해야 한다.
 - 자연사 종료는 `DRAW` 정책으로 처리한다. 이 정책은 현재 2인 게임과 유저당 SMITE 1회 정책을 전제로 한다.
 - `GAME_RESULT` 전송은 사용자 경험 보조 경로다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
@@ -220,7 +220,7 @@ flowchart TD
 
 - DB `game_rooms.status/result/winnerId`가 최종 source of truth임
 - Redis `game:end:pending`은 종료 후보 목록일 뿐 결과 저장소가 아님
-- 원본 HP scenario는 수정하지 않고, 저장된 SMITE action을 합성해 effective HP와 effective naturalDeathAt을 계산함
+- 원본 HP scenario는 수정하지 않고, 저장된 LIGHTNING action을 합성해 effective HP와 effective naturalDeathAt을 계산함
 - SMITE kill과 양쪽 실패 DRAW는 즉시 종료하고, scheduler는 이후 no-op으로 정리함
 - 자연사 종료는 `DRAW`로 확정하며, 연결된 local WebSocket session이 있으면 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 전송함
 - `game_records`, LP, 배치/승급전 반영은 이번 범위에서 제외하고 Step 9로 분리함
@@ -261,7 +261,7 @@ Trade-off:
 
 ### 원본 scenario 보존 + effective HP 합성
 
-자연 HP timeline은 그대로 유지하고, 실패 SMITE 데미지를 action으로만 누적 반영함.
+자연 HP timeline은 그대로 유지하고, 실패 LIGHTNING 데미지를 action으로만 누적 반영함.
 
 ```text
 effectiveHpAt(t) = scenarioHpAt(t) - savedSmiteCount * 1200

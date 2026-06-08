@@ -133,7 +133,8 @@ export interface GameStartPayload {
 }
 
 export interface GameStartScenario {
-  dragonMaxHp: number
+  starCoreMaxHp?: number
+  dragonMaxHp?: number
   durationMs: number
   hpTimeline: HpTimelineStep[]
 }

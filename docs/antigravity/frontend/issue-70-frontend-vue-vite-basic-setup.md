@@ -291,7 +291,7 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 1. 문서와 convention부터 Vue 기준으로 정리한다.
 2. `npm create vite@latest frontend -- --template vue-ts` 계열로 scaffold를 만든다.
-3. 예제 코드를 제거하고 League of Smite 앱 shell만 남긴다.
+3. 예제 코드를 제거하고 League of Star 앱 shell만 남긴다.
 4. Router, services, realtime, game, types, constants 디렉토리를 먼저 만든다.
 5. 실제 화면 기능은 넣지 않고 placeholder page와 확장 가능한 service signature만 둔다.
 6. `npm install` 후 `npm run build`, `npm run test`, `npm run lint`가 통과하도록 조정한다.
@@ -332,7 +332,7 @@ npm run dev
 - `frontend/`를 Vue 3 + TypeScript + Vite scaffold로 생성했다.
 - `npm install`로 `package-lock.json`을 생성했다.
 - Vite 예제 컴포넌트와 로고 자산을 제거했다.
-- `package.json` 이름을 `smite-frontend`로 정리하고 `typecheck` script를 추가했다.
+- `package.json` 이름을 `league-of-star-frontend`로 정리하고 `typecheck` script를 추가했다.
 - `.env.example`에 백엔드 API, WebSocket, 게임 MP4 URL 기본값을 추가했다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
 

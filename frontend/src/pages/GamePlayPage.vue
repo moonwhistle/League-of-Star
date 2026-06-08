@@ -1,5 +1,5 @@
 <template>
-  <!-- eslint-disable vue/max-attributes-per-line -->
+  <!-- eslint-disable vue/max-attributes-per-line, vue/html-self-closing -->
   <main
     class="game-play-page"
     :data-game-start-payload-ready="gameStartPayload !== null"
@@ -10,49 +10,29 @@
     :data-game-duration-ms="playState?.durationMs ?? ''"
     :data-game-elapsed-ms="elapsedMs"
     :data-game-current-hp="currentHp"
-    :data-game-video-url="playState?.videoUrl ?? ''"
     :data-game-websocket-url="playState?.webSocketUrl ?? ''"
+    :data-game-started="hasGameStarted"
+    :data-game-countdown-seconds="countdownSeconds"
+    :data-game-hp-percent="hpPercent"
+    :data-game-natural-death-waiting="isNaturalDeathWaiting"
     :data-game-socket-status="gameSocketStatus"
     :data-game-socket-last-event="gameSocketLastEvent"
     :data-game-socket-error-message="gameSocketErrorMessage"
     :data-game-result-received="gameResultReceived"
-    :data-game-socket-smite-ready="canSendGameSocketSmite"
+    :data-game-socket-lightning-ready="canSendGameSocketLightning"
+    :data-game-star-targeted="false"
+    :data-game-lightning-ready="false"
+    :data-game-lightning-sent="lightningSent"
+    :data-game-three-ready="isThreeSceneReady"
   >
-    <header class="game-play-header" aria-label="Game play header">
-      <h1>LEAGUE OF SMITE</h1>
-      <button class="locale-toggle" type="button" @click="toggleLocale">
-        {{ nextLocaleLabel }}
-      </button>
-    </header>
-
-    <section v-if="playState !== null" class="game-start-status" aria-label="Game start data">
-      <p>{{ t('gamePlay.status') }}</p>
-      <h2>{{ t('gamePlay.title') }}</h2>
-      <dl>
-        <div>
-          <dt>{{ t('gamePlay.gameRoom') }}</dt>
-          <dd>{{ playState.gameRoomId }}</dd>
-        </div>
-        <div>
-          <dt>{{ t('gamePlay.startAt') }}</dt>
-          <dd>{{ playState.startAt }}</dd>
-        </div>
-        <div>
-          <dt>{{ t('gamePlay.dragonMaxHp') }}</dt>
-          <dd>{{ playState.scenario.dragonMaxHp }}</dd>
-        </div>
-        <div>
-          <dt>{{ t('gamePlay.durationMs') }}</dt>
-          <dd>{{ playState.durationMs }}</dd>
-        </div>
-        <div>
-          <dt>{{ t('gamePlay.socketStatus') }}</dt>
-          <dd>{{ gameSocketStatusLabel }}</dd>
-        </div>
-      </dl>
-      <p v-if="gameSocketErrorMessage !== ''" class="game-socket-error" role="alert">
-        {{ gameSocketErrorMessage }}
-      </p>
+    <section v-if="playState !== null" class="game-arena" aria-label="Game play arena">
+      <canvas
+        ref="threeCanvas"
+        class="three-scene"
+        data-testid="three-scene"
+        aria-label="Galaxy space background"
+      />
+      <div class="space-vignette" aria-hidden="true" />
     </section>
 
     <p v-else class="payload-error" role="alert">
@@ -62,12 +42,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, shallowRef } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
-import { getHpAtElapsedMs } from '@/game/hpScenario'
+import { getHpAtElapsedMs, getScenarioMaxHp } from '@/game/hpScenario'
+import {
+  createNoopThreeGalaxyBackgroundSceneController,
+  createThreeGalaxyBackgroundScene,
+} from '@/game/threeGalaxyBackgroundScene'
 import { readGameStartPayload } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
@@ -75,7 +59,8 @@ import { takeGameWebSocketHandoff } from '@/services/realtime/gameWebSocketHando
 
 const route = useRoute()
 const router = useRouter()
-const { nextLocaleLabel, t, toggleLocale } = useLocale()
+const { t } = useLocale()
+const threeCanvas = shallowRef(null)
 const gameStartPayload = shallowRef(readGameStartPayload('__missing__'))
 const gameWaitingPayload = shallowRef(readGameWaitingPayload('__missing__'))
 const nowMs = shallowRef(Date.now())
@@ -84,8 +69,15 @@ const gameSocketLastEvent = shallowRef('')
 const gameSocketErrorMessage = shallowRef('')
 const gameResultReceived = shallowRef(false)
 const playGameWebSocketConnection = shallowRef()
-let elapsedTimerId = 0
+const lightningSent = shallowRef(false)
+const isThreeSceneReady = shallowRef(false)
+let animationFrameId = 0
 let closePlayWebSocket = () => {}
+let threeSceneController = createNoopThreeGalaxyBackgroundSceneController()
+let hasThreeSceneController = false
+
+const LIGHTNING_SENT_STORAGE_PREFIX = 'league-of-star.gamePlayLightningSent'
+const LEGACY_SMITE_SENT_STORAGE_PREFIX = 'smite.gamePlaySmiteSent'
 
 const playState = computed(() => {
   if (gameStartPayload.value === null || gameWaitingPayload.value === null) {
@@ -97,42 +89,41 @@ const playState = computed(() => {
     startAt: gameStartPayload.value.startAt,
     durationMs: gameStartPayload.value.scenario.durationMs,
     scenario: gameStartPayload.value.scenario,
-    videoUrl: gameWaitingPayload.value.game.videoUrl,
     webSocketUrl: gameWaitingPayload.value.game.webSocketUrl,
   }
 })
 
-const elapsedMs = computed(() =>
-  playState.value === null ? 0 : Math.max(0, nowMs.value - playState.value.startAt),
+const rawElapsedMs = computed(() =>
+  playState.value === null ? 0 : nowMs.value - playState.value.startAt,
+)
+const elapsedMs = computed(() => Math.max(0, rawElapsedMs.value))
+const hasGameStarted = computed(() => rawElapsedMs.value >= 0)
+const countdownSeconds = computed(() =>
+  playState.value === null || hasGameStarted.value
+    ? 0
+    : Math.max(1, Math.ceil((playState.value.startAt - nowMs.value) / 1000)),
 )
 const currentHp = computed(() =>
   playState.value === null ? 0 : getHpAtElapsedMs(playState.value.scenario, elapsedMs.value),
 )
-const canSendGameSocketSmite = computed(() => playGameWebSocketConnection.value !== undefined)
-const gameSocketStatusLabel = computed(() => {
-  if (gameSocketStatus.value === 'handoff') {
-    return t('gamePlay.socketHandoff')
+const hpPercent = computed(() => {
+  if (playState.value === null || getScenarioMaxHp(playState.value.scenario) <= 0) {
+    return 0
   }
 
-  if (gameSocketStatus.value === 'connecting') {
-    return t('gamePlay.socketConnecting')
-  }
-
-  if (gameSocketStatus.value === 'connected') {
-    return t('gamePlay.socketConnected')
-  }
-
-  if (gameSocketStatus.value === 'resultReceived') {
-    return t('gamePlay.resultReceived')
-  }
-
-  if (gameSocketStatus.value === 'error') {
-    return t('gamePlay.socketError')
-  }
-
-  return t('gamePlay.socketPending')
+  return Math.min(
+    100,
+    Math.max(0, Math.round((currentHp.value / getScenarioMaxHp(playState.value.scenario)) * 100)),
+  )
 })
 
+const canSendGameSocketLightning = computed(() => playGameWebSocketConnection.value !== undefined)
+const isNaturalDeathWaiting = computed(
+  () =>
+    playState.value !== null &&
+    elapsedMs.value >= playState.value.durationMs &&
+    !gameResultReceived.value,
+)
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
   const gameRoomId = readRouteGameRoomId()
@@ -152,10 +143,11 @@ onMounted(() => {
 
   gameStartPayload.value = payload
   gameWaitingPayload.value = waitingPayload
-  nowMs.value = Date.now()
-  elapsedTimerId = window.setInterval(() => {
-    nowMs.value = Date.now()
-  }, 250)
+  lightningSent.value = readLightningSent(gameRoomId)
+  void nextTick(() => {
+    initializeThreeScene()
+    startFrameLoop()
+  })
   connectPlayWebSocket(gameRoomId, waitingPayload.game.webSocketUrl)
 })
 
@@ -165,10 +157,8 @@ onUnmounted(() => {
   playGameWebSocketConnection.value = undefined
   closePlayWebSocket = () => {}
 
-  if (elapsedTimerId !== 0) {
-    window.clearInterval(elapsedTimerId)
-    elapsedTimerId = 0
-  }
+  stopFrameLoop()
+  disposeThreeScene()
 })
 
 onBeforeRouteLeave(() => {
@@ -240,6 +230,25 @@ function connectPlayWebSocket(gameRoomId = '', webSocketUrl = '') {
   }
 }
 
+function startFrameLoop() {
+  stopFrameLoop()
+
+  const updateFrame = () => {
+    nowMs.value = Date.now()
+    updateThreeScene()
+    animationFrameId = window.requestAnimationFrame(updateFrame)
+  }
+
+  updateFrame()
+}
+
+function stopFrameLoop() {
+  if (animationFrameId !== 0) {
+    window.cancelAnimationFrame(animationFrameId)
+    animationFrameId = 0
+  }
+}
+
 function handlePlayWebSocketError() {
   const error = arguments[0]
   gameSocketStatus.value = 'error'
@@ -274,27 +283,75 @@ function readRouteGameRoomId() {
     ? String(routeGameRoomIdParam[0] ?? '').trim()
     : String(routeGameRoomIdParam ?? '').trim()
 }
+
+function buildLightningSentStorageKey(gameRoomId = '') {
+  return `${LIGHTNING_SENT_STORAGE_PREFIX}:${gameRoomId}`
+}
+
+function buildLegacySmiteSentStorageKey(gameRoomId = '') {
+  return `${LEGACY_SMITE_SENT_STORAGE_PREFIX}:${gameRoomId}`
+}
+
+function readLightningSent(gameRoomId = '') {
+  try {
+    return (
+      window.sessionStorage.getItem(buildLightningSentStorageKey(gameRoomId)) === 'true' ||
+      window.sessionStorage.getItem(buildLegacySmiteSentStorageKey(gameRoomId)) === 'true'
+    )
+  } catch {
+    return false
+  }
+}
+
+function initializeThreeScene() {
+  const canvas = threeCanvas.value
+
+  if (canvas === null) {
+    isThreeSceneReady.value = false
+    return
+  }
+
+  disposeThreeScene()
+
+  const nextThreeSceneController = createThreeGalaxyBackgroundScene(canvas, {
+    onReadyChange: (nextIsReady) => {
+      isThreeSceneReady.value = nextIsReady
+    },
+  })
+  threeSceneController =
+    nextThreeSceneController ?? createNoopThreeGalaxyBackgroundSceneController()
+  hasThreeSceneController = nextThreeSceneController !== null
+  updateThreeScene()
+}
+
+function updateThreeScene() {
+  if (!hasThreeSceneController) {
+    return
+  }
+
+  threeSceneController.update(elapsedMs.value, hpPercent.value, currentHp.value)
+}
+
+function disposeThreeScene() {
+  if (!hasThreeSceneController) {
+    isThreeSceneReady.value = false
+    return
+  }
+
+  threeSceneController.dispose()
+  threeSceneController = createNoopThreeGalaxyBackgroundSceneController()
+  hasThreeSceneController = false
+}
 </script>
 
 <style scoped>
 .game-play-page {
-  --game-play-panel: rgba(6, 12, 30, 0.84);
-  --game-play-line: rgba(102, 240, 232, 0.22);
-  --game-play-cyan: #62f4ed;
-  --game-play-pink: #ffb6b2;
-  --game-play-text: #f5f8ff;
-  --game-play-muted: rgba(221, 230, 246, 0.68);
-
-  display: grid;
-  grid-template-rows: auto 1fr;
   width: 100%;
   min-height: 100dvh;
   overflow: hidden;
   font-family: var(--font-sans);
-  color: var(--game-play-text);
-  background:
-    linear-gradient(180deg, rgba(5, 10, 24, 0.86), rgba(5, 10, 24, 0.95)),
-    url('../../img/background.png') center / cover no-repeat;
+  color: #f8f5ff;
+  background: linear-gradient(90deg, #3a2427 0%, #261520 36%, #120b18 68%, #050713 100%);
 }
 
 .game-play-page,
@@ -302,97 +359,40 @@ function readRouteGameRoomId() {
   box-sizing: border-box;
 }
 
-.game-play-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 68px;
-  padding: 0 clamp(20px, 4vw, 42px);
-  border-bottom: 1px solid rgba(206, 224, 255, 0.1);
-}
-
-.game-play-header h1 {
-  margin: 0;
+.game-arena {
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
   overflow: hidden;
-  font-size: 1.42rem;
-  font-weight: 900;
-  color: #f0d7ff;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  container-type: size;
 }
 
-.locale-toggle {
-  width: 42px;
-  height: 32px;
-  color: var(--game-play-muted);
-  background: rgba(8, 15, 34, 0.7);
-  border: 1px solid rgba(206, 224, 255, 0.18);
-  border-radius: 4px;
-  font-size: 0.76rem;
-  font-weight: 900;
+.three-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+  user-select: none;
 }
 
-.game-start-status {
-  align-self: center;
-  width: min(760px, calc(100% - 40px));
-  margin: 0 auto;
-  padding: clamp(22px, 4vw, 34px);
-  background: var(--game-play-panel);
-  border: 1px solid var(--game-play-line);
-}
-
-.game-start-status p,
-.game-start-status h2 {
-  margin: 0;
-}
-
-.game-start-status p {
-  font-size: 0.78rem;
-  font-weight: 900;
-  color: var(--game-play-cyan);
-  text-transform: uppercase;
-}
-
-.game-start-status h2 {
-  margin-top: 8px;
-  font-size: clamp(1.4rem, 4vw, 2.3rem);
-  font-weight: 900;
-  line-height: 1.18;
-  color: #f6f8ff;
-}
-
-.game-start-status dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  margin: 24px 0 0;
-}
-
-.game-start-status div {
-  min-width: 0;
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.game-start-status dt {
-  margin-bottom: 4px;
-  font-size: 0.68rem;
-  font-weight: 900;
-  color: var(--game-play-muted);
-  text-transform: uppercase;
-}
-
-.game-start-status dd {
-  margin: 0;
-  overflow: hidden;
-  font-size: 0.94rem;
-  font-weight: 900;
-  color: #f6f8ff;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.space-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 46%, rgba(255, 225, 188, 0.14), transparent 32%),
+    radial-gradient(circle at 44% 42%, rgba(255, 65, 205, 0.1), transparent 35%),
+    linear-gradient(90deg, rgba(255, 219, 190, 0.1), transparent 34%, rgba(3, 5, 18, 0.5)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 44%, rgba(3, 4, 12, 0.32));
 }
 
 .payload-error {
+  position: relative;
+  z-index: 3;
   align-self: center;
   width: min(620px, calc(100% - 40px));
   padding: 12px 16px;
@@ -400,19 +400,5 @@ function readRouteGameRoomId() {
   color: #ffd9d6;
   background: rgba(36, 10, 18, 0.82);
   border: 1px solid rgba(255, 182, 178, 0.28);
-}
-
-.game-socket-error {
-  padding: 10px 12px;
-  margin: 18px 0 0;
-  color: #ffd9d6;
-  background: rgba(36, 10, 18, 0.72);
-  border: 1px solid rgba(255, 182, 178, 0.26);
-}
-
-@media (max-width: 640px) {
-  .game-start-status dl {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

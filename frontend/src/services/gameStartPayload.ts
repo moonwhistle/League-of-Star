@@ -1,6 +1,7 @@
 import type { GameRoomId, GameStartPayload, GameStartScenario, HpTimelineStep } from '@/types/game'
 
-const GAME_START_PAYLOAD_KEY_PREFIX = 'smite.gameStartPayload:'
+const GAME_START_PAYLOAD_KEY_PREFIX = 'league-of-star.gameStartPayload:'
+const LEGACY_GAME_START_PAYLOAD_KEY_PREFIX = 'smite.gameStartPayload:'
 
 export interface StoredGameStartPayload {
   gameRoomId: GameRoomId
@@ -48,7 +49,9 @@ export function readGameStartPayload(gameRoomId: string | number): StoredGameSta
   }
 
   const normalizedGameRoomId = normalizeGameRoomId(gameRoomId)
-  const storedPayload = storage.getItem(buildGameStartPayloadKey(normalizedGameRoomId))
+  const storedPayload =
+    storage.getItem(buildGameStartPayloadKey(normalizedGameRoomId)) ??
+    storage.getItem(buildLegacyGameStartPayloadKey(normalizedGameRoomId))
 
   if (storedPayload === null) {
     return null
@@ -73,6 +76,10 @@ export function readGameStartPayload(gameRoomId: string | number): StoredGameSta
 
 export function buildGameStartPayloadKey(gameRoomId: string | number): string {
   return `${GAME_START_PAYLOAD_KEY_PREFIX}${normalizeGameRoomId(gameRoomId)}`
+}
+
+function buildLegacyGameStartPayloadKey(gameRoomId: string | number): string {
+  return `${LEGACY_GAME_START_PAYLOAD_KEY_PREFIX}${normalizeGameRoomId(gameRoomId)}`
 }
 
 function isStoredGameStartPayload(payload: unknown): payload is StoredGameStartPayload {
@@ -109,7 +116,7 @@ function isGameStartScenario(scenario: unknown): scenario is GameStartScenario {
   }
 
   return (
-    Number.isFinite(scenario.dragonMaxHp) &&
+    (Number.isFinite(scenario.starCoreMaxHp) || Number.isFinite(scenario.dragonMaxHp)) &&
     Number.isFinite(scenario.durationMs) &&
     Array.isArray(scenario.hpTimeline) &&
     scenario.hpTimeline.every(isHpTimelineStep)

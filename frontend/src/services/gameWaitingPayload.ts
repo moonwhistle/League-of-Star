@@ -4,7 +4,8 @@ import type {
   MatchResponseResultNotification,
 } from '@/types/match'
 
-const GAME_WAITING_PAYLOAD_KEY_PREFIX = 'smite.gameWaitingPayload:'
+const GAME_WAITING_PAYLOAD_KEY_PREFIX = 'league-of-star.gameWaitingPayload:'
+const LEGACY_GAME_WAITING_PAYLOAD_KEY_PREFIX = 'smite.gameWaitingPayload:'
 
 export interface GameWaitingPayload {
   matchId: string
@@ -50,7 +51,9 @@ export function readGameWaitingPayload(gameRoomId: string | number): GameWaiting
   }
 
   const normalizedGameRoomId = normalizeGameRoomId(gameRoomId)
-  const storedPayload = storage.getItem(buildGameWaitingPayloadKey(normalizedGameRoomId))
+  const storedPayload =
+    storage.getItem(buildGameWaitingPayloadKey(normalizedGameRoomId)) ??
+    storage.getItem(buildLegacyGameWaitingPayloadKey(normalizedGameRoomId))
 
   if (storedPayload === null) {
     return null
@@ -75,6 +78,10 @@ export function readGameWaitingPayload(gameRoomId: string | number): GameWaiting
 
 export function buildGameWaitingPayloadKey(gameRoomId: string | number): string {
   return `${GAME_WAITING_PAYLOAD_KEY_PREFIX}${normalizeGameRoomId(gameRoomId)}`
+}
+
+function buildLegacyGameWaitingPayloadKey(gameRoomId: string | number): string {
+  return `${LEGACY_GAME_WAITING_PAYLOAD_KEY_PREFIX}${normalizeGameRoomId(gameRoomId)}`
 }
 
 function isGameWaitingPayload(payload: unknown): payload is GameWaitingPayload {

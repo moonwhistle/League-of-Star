@@ -4,7 +4,7 @@
 
 Vue 프론트엔드의 `/match` 페이지를 실제 매칭 시작/취소 화면으로 구현한다.
 
-현재 `/match` 페이지는 `GET /api/v1/notifications/match/stream` SSE client와 event payload 보관 골격을 가지고 있다. 이번 이슈에서는 `frontend/img/matchingPage.jpeg`를 화면 레퍼런스로 삼고, `frontend/img/background.png`를 실제 배경 이미지로 사용해 매칭 페이지 UI를 구현한다.
+현재 `/match` 페이지는 `GET /api/v1/notifications/match/stream` SSE client와 event payload 보관 골격을 가지고 있다. 이번 이슈에서는 `frontend/img/matchingPage.jpeg`를 화면 레퍼런스로 삼고, `frontend/img/background-new.png` 기반 선명화 asset인 `frontend/img/background-new-sharp.png`를 실제 배경 이미지로 사용해 매칭 페이지 UI를 구현한다.
 
 매칭 기능은 백엔드 `POST /api/v1/match/join`, `DELETE /api/v1/match/leave` 계약에 맞춰 매칭 대기열 진입/취소 요청을 보낸다. 단, `/match` 화면 진입 즉시 SSE를 열지 않고, 사용자가 매칭 시작을 클릭했을 때 먼저 SSE를 연결한 뒤 `connected` 이벤트를 받은 다음 `join` 요청을 보낸다.
 
@@ -35,19 +35,19 @@ flowchart TD
 
 ## Backend Contract
 
-| 항목 | 기준 |
-|------|------|
-| Match stream | `GET /api/v1/notifications/match/stream` |
-| Match stream auth | `Authorization: Bearer {accessToken}` |
+| 항목                | 기준                                                 |
+| ------------------- | ---------------------------------------------------- |
+| Match stream        | `GET /api/v1/notifications/match/stream`             |
+| Match stream auth   | `Authorization: Bearer {accessToken}`                |
 | Match stream timing | 매칭 시작 클릭 후, `POST /api/v1/match/join` 호출 전 |
-| Match join | `POST /api/v1/match/join` |
-| Match leave | `DELETE /api/v1/match/leave` |
-| Join/Leave auth | `Authorization: Bearer {accessToken}` |
-| Join/Leave body | 없음 |
-| Join success | `200 OK` |
-| Leave success | `200 OK` |
-| Join failure | `400 BAD_REQUEST`, `409 CONFLICT`, `500` 계열 가능 |
-| Leave failure | `400 BAD_REQUEST`, `500` 계열 가능 |
+| Match join          | `POST /api/v1/match/join`                            |
+| Match leave         | `DELETE /api/v1/match/leave`                         |
+| Join/Leave auth     | `Authorization: Bearer {accessToken}`                |
+| Join/Leave body     | 없음                                                 |
+| Join success        | `200 OK`                                             |
+| Leave success       | `200 OK`                                             |
+| Join failure        | `400 BAD_REQUEST`, `409 CONFLICT`, `500` 계열 가능   |
+| Leave failure       | `400 BAD_REQUEST`, `500` 계열 가능                   |
 
 프론트 처리 기준:
 
@@ -63,10 +63,10 @@ flowchart TD
 
 ## Asset 기준
 
-| Asset | 용도 | 기준 |
-|-------|------|------|
-| `frontend/img/background.png` | 매칭 페이지 full-screen 배경 | `MatchPage.vue`에서 import asset으로 사용 |
-| `frontend/img/matchingPage.jpeg` | 디자인 레퍼런스 | 직접 화면에 통째로 올리지 않고 레이아웃/색상/간격 기준으로 사용 |
+| Asset                                   | 용도                         | 기준                                                            |
+| --------------------------------------- | ---------------------------- | --------------------------------------------------------------- |
+| `frontend/img/background-new-sharp.png` | 매칭 페이지 full-screen 배경 | `MatchPage.vue`에서 import asset으로 사용                       |
+| `frontend/img/matchingPage.jpeg`        | 디자인 레퍼런스              | 직접 화면에 통째로 올리지 않고 레이아웃/색상/간격 기준으로 사용 |
 
 구현 기준:
 
@@ -79,7 +79,7 @@ flowchart TD
 
 이미지 사용 정책:
 
-- `background.png`는 `src/pages/MatchPage.vue`에서 `../../img/background.png` 상대 경로 import로 사용.
+- `background-new-sharp.png`는 `src/pages/MatchPage.vue`에서 `../../img/background-new-sharp.png` 상대 경로 import로 사용.
 - `matchingPage.jpeg`는 구현 산출물에 import하지 않고, 작업자가 레이아웃을 비교하는 기준 이미지로만 사용.
 - 이미지 파일을 이번 이슈에서 이동하지 않음.
 
@@ -88,7 +88,7 @@ flowchart TD
 이번 이슈에 포함한다.
 
 - `/match` page placeholder UI 제거 구현.
-- `background.png` full-screen 배경 적용 구현.
+- `background-new-sharp.png` full-screen 배경 적용 구현.
 - `matchingPage.jpeg` 레퍼런스 기준 매칭 페이지 레이아웃 구현.
 - 상단 app bar 구현.
 - 좌측 ranking/profile placeholder panel 구현.
@@ -147,7 +147,7 @@ flowchart TD
 ### 3. Match page UI 구현
 
 - [x] `MatchPage.vue` placeholder 제거 구현.
-- [x] `background.png` full-screen 배경 적용 구현.
+- [x] `background-new-sharp.png` full-screen 배경 적용 구현.
 - [x] 상단 app bar 구현.
 - [x] 좌측 user profile placeholder 구현.
 - [x] 좌측 ranking summary placeholder 구현.
@@ -252,7 +252,7 @@ flowchart TD
 
 ## Acceptance Criteria
 
-- `/match` 진입 시 `background.png` 기반 full-screen 매칭 페이지 표시.
+- `/match` 진입 시 `background-new-sharp.png` 기반 full-screen 매칭 페이지 표시.
 - desktop에서 레퍼런스처럼 좌측 panel과 우측 하단 CTA 영역 표시.
 - mobile에서 주요 CTA와 상태 text가 화면 밖으로 밀리지 않음.
 - `/match` 진입만으로 SSE stream이 자동 연결되지 않음.
@@ -335,7 +335,7 @@ flowchart TD
 - queue error와 stream error는 사용자가 요구한 대로 visible status UI로 노출하지 않고 `data-*` 상태로 남김. 매칭 버튼 주변의 핵심 CTA를 단순하게 유지하면서도 테스트와 디버깅에서 상태를 확인할 수 있게 하기 위한 절충.
 - pending join/leave는 `AbortController`로 취소 가능하게 구성하고, page unmount 시 stream close와 pending request abort를 수행함. 다만 page 이탈 자동 leave는 서버 queue 정책과 UX 영향이 별도로 결정되어야 하므로 이번 이슈에서 구현하지 않음.
 - 랭킹/프로필/현재 랭크는 placeholder로 유지함. 백엔드 join 계약이 rank/tierScore를 request에서 받지 않고 서버 내부에서 조회하는 구조이므로, 프론트는 매칭 요청에 랭크 정보를 싣거나 계산하지 않음. 실제 랭킹 API 계약이 확정되기 전까지는 UI 구조만 준비함.
-- `/match` UI는 `matchingPage.jpeg`를 직접 렌더링하지 않고 디자인 레퍼런스로만 사용함. 실제 화면은 `background.png` asset과 scoped CSS로 구성해 버튼 상태, locale 전환, responsive layout, 테스트 가능한 DOM 구조 유지함.
+- `/match` UI는 `matchingPage.jpeg`를 직접 렌더링하지 않고 디자인 레퍼런스로만 사용함. 실제 화면은 `background-new-sharp.png` asset과 scoped CSS로 구성해 버튼 상태, locale 전환, responsive layout, 테스트 가능한 DOM 구조 유지함.
 - 데스크톱은 좌측 랭킹 panel과 우측 하단 CTA를 분리하고, 모바일은 CTA와 상태가 화면 밖으로 밀리지 않도록 1열 layout으로 전환함. 매칭 화면은 메인 화면이므로 hero/landing page가 아니라 즉시 조작 가능한 lobby 화면으로 구성함.
 - 테스트는 단순 렌더링 확인이 아니라 계약 순서를 검증함. mount 시 SSE 미연결, 클릭 즉시 timer 표시, `connected` 전 join 미호출, `connected` 후 join 호출, join 시작 전 cancel local reset, join/leave 성공·실패 상태 전환, stream error cleanup, unmount close, late callback 무시를 검증해 백엔드 계약과 프론트 상태 모델이 어긋나지 않게 함.
 

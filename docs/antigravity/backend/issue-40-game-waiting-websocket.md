@@ -5,7 +5,7 @@
 `GO_TO_GAME_WAITING` 이후 gameRoom별 WebSocket 연결을 열고, 참가자 인증 및 연결/READY 상태를 관리한다.
 
 이 이슈는 게임 대기방의 연결/READY 상태 관리까지만 다룬다.
-미접속/READY timeout 실행 처리, RTT 측정, countdown, `GAME_START`, scenario 전달, SMITE 판정, `game_actions`, `game_records` 저장은 후속 이슈에서 구현한다.
+미접속/READY timeout 실행 처리, RTT 측정, countdown, `GAME_START`, scenario 전달, LIGHTNING 판정, `game_actions`, `game_records` 저장은 후속 이슈에서 구현한다.
 
 매칭 SSE는 `match_response_result`까지 담당한다.
 클라이언트는 `GO_TO_GAME_WAITING` 수신 시 매칭 SSE `EventSource.close()`를 호출하고, `game.webSocketUrl`로 gameRoom WebSocket에 연결한다.
@@ -48,7 +48,7 @@ native WebSocket 선택 이유:
 | :--- | :--- | :--- | :--- |
 | 메시지 규모 | `CLIENT_READY`, 입장/이탈, 이후 RTT/SMITE처럼 소수의 명령 중심 | topic/subscribe/send 구조에 적합 | 현재 게임 대기방은 단순 명령형 통신이므로 native WebSocket이 충분함 |
 | room 구조 | gameRoom 1개에 플레이어 2명 | 여러 topic, lobby, spectator, broadcast fan-out에 유리 | MVP는 1:1 gameRoom 기준이라 broker 추상화가 과함 |
-| 지연/판정 제어 | handler에서 수신 시각, session, 상태를 직접 제어하기 쉬움 | broker/message mapping 계층을 거침 | 이후 RTT/SMITE 판정까지 고려하면 서버 수신 제어가 명확한 native WebSocket이 유리함 |
+| 지연/판정 제어 | handler에서 수신 시각, session, 상태를 직접 제어하기 쉬움 | broker/message mapping 계층을 거침 | 이후 RTT/LIGHTNING 판정까지 고려하면 서버 수신 제어가 명확한 native WebSocket이 유리함 |
 | 구현 복잡도 | message envelope, session registry를 직접 구현해야 함 | 프레임/구독/라우팅 모델을 제공 | 현재 필요한 기능이 작아서 직접 구현 비용이 낮음 |
 | 프론트 연동 | 브라우저 기본 `WebSocket` API 사용 | STOMP client 의존성 필요 | 단순한 프론트 기술 스택 정책과 native WebSocket이 더 잘 맞음 |
 | 확장성 | 다중 서버 fan-out, 재구독, 복잡한 topic은 직접 설계 필요 | broker/subscribe 기반 확장에 유리 | 관전, lobby chat, 다중 topic, broker fan-out이 필요해질 때 STOMP를 재검토함 |
@@ -349,10 +349,10 @@ timeout 발생
 - `GAME_START` 이후에는 이미 유효한 판이 시작된 상태이므로 disconnect만으로 gameRoom을 `ABORTED` 처리하지 않는다.
 - disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
 - `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
-- 서버 timer/scheduler는 HP scenario의 종료 시각 또는 몬스터 사망 시각까지 진행한 뒤 최종 판정을 수행한다.
+- 서버 timer/scheduler는 HP scenario의 종료 시각 또는 스타 코어 종료 시각까지 진행한 뒤 최종 판정을 수행한다.
 - 서버는 기존 gameStartTime, HP scenario, 서버 수신 액션 기준으로 게임을 끝까지 판정한다.
-- 상대가 유효한 SMITE로 처치에 성공하면 서버 최종 판정 결과대로 승/패를 기록한다.
-- 상대가 처치하지 못하고 드래곤이 자연사하면 무승부로 기록하고 LP는 변동하지 않는다.
+- 상대가 유효한 LIGHTNING으로 처치에 성공하면 서버 최종 판정 결과대로 승/패를 기록한다.
+- 상대가 처치하지 못하고 스타 코어가 자연사하면 무승부로 기록하고 LP는 변동하지 않는다.
 - 양쪽 모두 disconnect해도 이미 수신된 액션이 없으면 자연사 기준 무승부로 본다.
 
 ### 9. 테스트
@@ -444,7 +444,7 @@ flowchart TD
 - 이번 이슈는 게임 대기방 WebSocket 기반만 만든다.
 - 미접속/READY timeout 실행 처리는 후속 이슈에서 구현한다.
 - RTT 측정, countdown, `GAME_START`, scenario 전달은 후속 이슈에서 구현한다.
-- SMITE 입력과 서버 판정은 후속 이슈에서 구현한다.
+- LIGHTNING 입력과 서버 판정은 후속 이슈에서 구현한다.
 - MVP에서는 native WebSocket + JSON message를 사용한다.
 - STOMP/SockJS, Redis 기반 WebSocket session 공유, 다중 서버 fan-out은 MVP 이후 검토한다.
 
