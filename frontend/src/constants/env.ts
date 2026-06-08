@@ -1,7 +1,7 @@
 const DEFAULT_ENV = {
   VITE_API_BASE_URL: 'http://localhost:8080',
   VITE_WS_BASE_URL: 'ws://localhost:8080',
-  VITE_GAME_VIDEO_URL: '/assets/game/dragon-view.mp4',
+  VITE_GAME_VIDEO_URL: '/assets/game/star-core-view.mp4',
 } as const
 
 function getEnv(name: keyof typeof DEFAULT_ENV): string {

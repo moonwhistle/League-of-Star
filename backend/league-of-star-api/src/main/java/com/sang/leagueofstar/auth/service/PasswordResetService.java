@@ -25,7 +25,7 @@ public class PasswordResetService {
     private static final String RESET_LINK_TAG = "[PASSWORD RESET LINK]";
     private static final String RESET_URL_TEMPLATE = BASE_URL + AuthPath.PASSWORD_RESET_BASE + AuthPath.RESET_SUBMIT + "?token=%s";
 
-    private static final String RESET_SUBJECT = "[League of Smite] 비밀번호 재설정 안내";
+    private static final String RESET_SUBJECT = "[League of Star] 비밀번호 재설정 안내";
     private static final String RESET_CONTENT_TEMPLATE = "안녕하세요. 비밀번호 재설정을 위해 아래 링크를 클릭해 주세요.\n\n%s\n\n링크는 10분 동안 유효합니다.";
 
     private final UserReadService userReadService;

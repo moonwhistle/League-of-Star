@@ -46,7 +46,7 @@ native WebSocket 선택 이유:
 
 | 비교 항목 | native WebSocket | STOMP/SockJS | 현재 판단 |
 | :--- | :--- | :--- | :--- |
-| 메시지 규모 | `CLIENT_READY`, 입장/이탈, 이후 RTT/SMITE처럼 소수의 명령 중심 | topic/subscribe/send 구조에 적합 | 현재 게임 대기방은 단순 명령형 통신이므로 native WebSocket이 충분함 |
+| 메시지 규모 | `CLIENT_READY`, 입장/이탈, 이후 RTT/LIGHTNING처럼 소수의 명령 중심 | topic/subscribe/send 구조에 적합 | 현재 게임 대기방은 단순 명령형 통신이므로 native WebSocket이 충분함 |
 | room 구조 | gameRoom 1개에 플레이어 2명 | 여러 topic, lobby, spectator, broadcast fan-out에 유리 | MVP는 1:1 gameRoom 기준이라 broker 추상화가 과함 |
 | 지연/판정 제어 | handler에서 수신 시각, session, 상태를 직접 제어하기 쉬움 | broker/message mapping 계층을 거침 | 이후 RTT/LIGHTNING 판정까지 고려하면 서버 수신 제어가 명확한 native WebSocket이 유리함 |
 | 구현 복잡도 | message envelope, session registry를 직접 구현해야 함 | 프레임/구독/라우팅 모델을 제공 | 현재 필요한 기능이 작아서 직접 구현 비용이 낮음 |
@@ -57,43 +57,43 @@ native WebSocket 선택 이유:
 
 ### 1. 현재 구조와 패키지 경계 확정
 
-- [x] `smite-api`에는 현재 `game.adapter`, `game.service`만 있으므로 WebSocket 전용 패키지를 새로 둔다.
-- [x] `smite-api`가 WebSocket endpoint, handshake, session registry, message handler를 담당한다.
-- [x] `smite-core`가 gameRoom 존재/상태/participant 검증을 담당한다.
-- [x] `smite-matching`은 이번 이슈에서 변경하지 않는다.
+- [x] `league-of-star-api`에는 현재 `game.adapter`, `game.service`만 있으므로 WebSocket 전용 패키지를 새로 둔다.
+- [x] `league-of-star-api`가 WebSocket endpoint, handshake, session registry, message handler를 담당한다.
+- [x] `league-of-star-core`가 gameRoom 존재/상태/participant 검증을 담당한다.
+- [x] `league-of-star-matching`은 이번 이슈에서 변경하지 않는다.
 - [x] `ParticipantStatus.READY`는 DB 게임 참가자 준비 상태, WebSocket `CLIENT_READY`는 대기방 연결 이후 클라이언트 준비 신호로 분리한다.
 - [x] API WebSocket 계층에서 `GameRoomRepository`를 직접 호출하지 않는다.
 
 패키지 기준:
 
 ```text
-smite-api
-  com.sang.smite.game.adapter
-  com.sang.smite.game.service
-  com.sang.smite.game.config
-  com.sang.smite.game.websocket
-  com.sang.smite.game.websocket.handler
-  com.sang.smite.game.websocket.interceptor
-  com.sang.smite.game.websocket.resolver
-  com.sang.smite.game.websocket.dto
-  com.sang.smite.game.websocket.session
-  com.sang.smite.auth.infrastructure.jwt
-  com.sang.smite.common.path.security
+league-of-star-api
+  com.sang.leagueofstar.game.adapter
+  com.sang.leagueofstar.game.service
+  com.sang.leagueofstar.game.config
+  com.sang.leagueofstar.game.websocket
+  com.sang.leagueofstar.game.websocket.handler
+  com.sang.leagueofstar.game.websocket.interceptor
+  com.sang.leagueofstar.game.websocket.resolver
+  com.sang.leagueofstar.game.websocket.dto
+  com.sang.leagueofstar.game.websocket.session
+  com.sang.leagueofstar.auth.infrastructure.jwt
+  com.sang.leagueofstar.common.path.security
 
-smite-core
-  com.sang.smite.domain.game.service
-  com.sang.smite.domain.game.repository
-  com.sang.smite.domain.game.domain
-  com.sang.smite.domain.game.domain.vo
-  com.sang.smite.common.exception
+league-of-star-core
+  com.sang.leagueofstar.domain.game.service
+  com.sang.leagueofstar.domain.game.repository
+  com.sang.leagueofstar.domain.game.domain
+  com.sang.leagueofstar.domain.game.domain.vo
+  com.sang.leagueofstar.common.exception
 
-smite-matching
+league-of-star-matching
   변경 없음
 ```
 
 ### 2. WebSocket 의존성과 endpoint 설정
 
-- [x] `smite-api`에 `spring-boot-starter-websocket` 의존성 추가
+- [x] `league-of-star-api`에 `spring-boot-starter-websocket` 의존성 추가
 - [x] `GameWebSocketConfig`를 `@Configuration`, `@EnableWebSocket`으로 추가
 - [x] native WebSocket handler를 `/ws/game/{gameRoomId}`에 등록
 - [x] handshake interceptor를 handler 등록에 연결
@@ -104,11 +104,11 @@ smite-matching
 변경 파일:
 
 ```text
-backend/smite-api/build.gradle
-backend/smite-api/src/main/java/com/sang/smite/game/config/GameWebSocketConfig.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitingWebSocketHandler.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/interceptor/GameWebSocketHandshakeInterceptor.java
-backend/smite-api/src/main/java/com/sang/smite/common/path/security/SecurityPath.java
+backend/league-of-star-api/build.gradle
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/config/GameWebSocketConfig.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/handler/GameWaitingWebSocketHandler.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/interceptor/GameWebSocketHandshakeInterceptor.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/common/path/security/SecurityPath.java
 ```
 
 구현 상태:
@@ -136,12 +136,12 @@ backend/smite-api/src/main/java/com/sang/smite/common/path/security/SecurityPath
 추가/변경 파일:
 
 ```text
-backend/smite-api/src/main/java/com/sang/smite/auth/infrastructure/jwt/JwtTokenResolver.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/interceptor/GameWebSocketHandshakeInterceptor.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/resolver/GameWebSocketPathResolver.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/session/GameWebSocketSessionAttribute.java
-backend/smite-core/src/main/java/com/sang/smite/domain/game/service/GameRoomReadService.java
-backend/smite-core/src/main/java/com/sang/smite/domain/game/domain/GameRoom.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/auth/infrastructure/jwt/JwtTokenResolver.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/interceptor/GameWebSocketHandshakeInterceptor.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/resolver/GameWebSocketPathResolver.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/session/GameWebSocketSessionAttribute.java
+backend/league-of-star-core/src/main/java/com/sang/leagueofstar/domain/game/service/GameRoomReadService.java
+backend/league-of-star-core/src/main/java/com/sang/leagueofstar/domain/game/domain/GameRoom.java
 ```
 
 처리 흐름:
@@ -177,13 +177,13 @@ beforeHandshake
 추가/변경 파일:
 
 ```text
-backend/smite-core/src/main/java/com/sang/smite/domain/game/service/GameRoomReadService.java
-backend/smite-core/src/main/java/com/sang/smite/domain/game/domain/GameRoom.java
+backend/league-of-star-core/src/main/java/com/sang/leagueofstar/domain/game/service/GameRoomReadService.java
+backend/league-of-star-core/src/main/java/com/sang/leagueofstar/domain/game/domain/GameRoom.java
 ```
 
 주의:
 
-- `smite-api` WebSocket 계층은 JPA repository를 직접 호출하지 않는다.
+- `league-of-star-api` WebSocket 계층은 JPA repository를 직접 호출하지 않는다.
 - gameRoom 검증은 core service를 통해 수행한다.
 
 ### 5. WebSocket session registry 구현
@@ -201,13 +201,13 @@ backend/smite-core/src/main/java/com/sang/smite/domain/game/domain/GameRoom.java
 추가 파일:
 
 ```text
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/session/GameRoomWebSocketSessionRegistry.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/session/GameRoomWebSocketSession.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/session/GameRoomWebSocketSessionRegistry.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/session/GameRoomWebSocketSession.java
 ```
 
 정책:
 
-- WebSocket connection은 서버 인스턴스 로컬 자원이므로 registry는 `smite-api`에 둔다.
+- WebSocket connection은 서버 인스턴스 로컬 자원이므로 registry는 `league-of-star-api`에 둔다.
 - registry는 API 인스턴스 local memory 기반이므로, 멀티 인스턴스 환경에서는 같은 `gameRoomId`의 두 참가자가 같은 API 인스턴스로 라우팅되어야 한다.
 - MVP 멀티 인스턴스 정책은 `/ws/game/{gameRoomId}`의 `gameRoomId` 기반 sticky routing이다.
 - sticky 기준은 userId가 아니라 gameRoomId다. userId 기준 sticky는 같은 gameRoom의 두 유저가 서로 다른 인스턴스로 갈 수 있다.
@@ -257,9 +257,9 @@ sticky routing과 pub/sub 트레이드오프:
 추가 파일:
 
 ```text
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketClientMessage.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketServerMessage.java
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketMessageType.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/dto/GameWebSocketClientMessage.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/dto/GameWebSocketServerMessage.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/dto/GameWebSocketMessageType.java
 ```
 
 구현 상태:
@@ -289,7 +289,7 @@ backend/smite-api/src/main/java/com/sang/smite/game/websocket/dto/GameWebSocketM
 추가 파일:
 
 ```text
-backend/smite-api/src/main/java/com/sang/smite/game/websocket/handler/GameWaitingWebSocketHandler.java
+backend/league-of-star-api/src/main/java/com/sang/leagueofstar/game/websocket/handler/GameWaitingWebSocketHandler.java
 ```
 
 구현 상태:
@@ -347,7 +347,7 @@ timeout 발생
 `GAME_START` 이후 disconnect는 위 timeout 정책과 분리한다.
 
 - `GAME_START` 이후에는 이미 유효한 판이 시작된 상태이므로 disconnect만으로 gameRoom을 `ABORTED` 처리하지 않는다.
-- disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `SMITE` 액션은 그대로 유효하다.
+- disconnect한 유저는 이후 추가 입력을 할 수 없지만, disconnect 전에 서버가 수신한 `LIGHTNING` 액션은 그대로 유효하다.
 - `GAME_START` 이후에는 WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료한다.
 - 서버 timer/scheduler는 HP scenario의 종료 시각 또는 스타 코어 종료 시각까지 진행한 뒤 최종 판정을 수행한다.
 - 서버는 기존 gameStartTime, HP scenario, 서버 수신 액션 기준으로 게임을 끝까지 판정한다.

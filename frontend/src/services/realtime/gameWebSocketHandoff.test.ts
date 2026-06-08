@@ -59,7 +59,7 @@ function createConnection(): GameWebSocketConnection {
     setHandlers: vi.fn(),
     sendClientReady: vi.fn(),
     sendRttPong: vi.fn(),
-    sendSmite: vi.fn(),
+    sendLightning: vi.fn(),
     close: vi.fn(),
   }
 }

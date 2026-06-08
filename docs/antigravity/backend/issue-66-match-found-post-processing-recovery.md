@@ -71,19 +71,19 @@ flowchart TD
 
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
-| 매칭 후보 탐색과 queue 원자 제거 | `smite-matching` `domain/service` | FIFO 정렬, 후보 선택, `atomicPairRemove`, 후처리 호출 |
-| match found 후처리 | `smite-matching` `domain/service` | session 저장, timeout 등록, user status 전환, event 발행, 실패 보상 |
-| Redis queue 저장소 | `smite-matching` `repository`, `infrastructure/redis` | `MatchTicket` add/remove/findAll/atomicPairRemove |
-| Redis user status 저장소 | `smite-matching` `repository`, `infrastructure/redis` | `MATCHING`, `FOUND`, `ACCEPTED`, `IN_GAME` 등 점유 상태 저장 |
-| Redis match session 저장소 | `smite-matching` `repository`, `infrastructure/redis` | `match:session:{matchId}` 저장/조회/삭제 |
-| Redis timeout index | `smite-matching` `repository`, `infrastructure/redis` | response timeout pending/processing ZSET 관리 |
-| timeout 정산 | `smite-matching` `domain/service`, `scheduler` | 10초 deadline 이후 실패 조합 정산 |
-| match_found 알림 fan-out | `smite-api` `notification/match` | Spring event 수신, Redis Pub/Sub publish/subscribe, SSE 전송 |
-| MatchTicket / MatchSession | `smite-core` `domain/match/domain` | 매칭 ticket/session value object |
+| 매칭 후보 탐색과 queue 원자 제거 | `league-of-star-matching` `domain/service` | FIFO 정렬, 후보 선택, `atomicPairRemove`, 후처리 호출 |
+| match found 후처리 | `league-of-star-matching` `domain/service` | session 저장, timeout 등록, user status 전환, event 발행, 실패 보상 |
+| Redis queue 저장소 | `league-of-star-matching` `repository`, `infrastructure/redis` | `MatchTicket` add/remove/findAll/atomicPairRemove |
+| Redis user status 저장소 | `league-of-star-matching` `repository`, `infrastructure/redis` | `MATCHING`, `FOUND`, `ACCEPTED`, `IN_GAME` 등 점유 상태 저장 |
+| Redis match session 저장소 | `league-of-star-matching` `repository`, `infrastructure/redis` | `match:session:{matchId}` 저장/조회/삭제 |
+| Redis timeout index | `league-of-star-matching` `repository`, `infrastructure/redis` | response timeout pending/processing ZSET 관리 |
+| timeout 정산 | `league-of-star-matching` `domain/service`, `scheduler` | 10초 deadline 이후 실패 조합 정산 |
+| match_found 알림 fan-out | `league-of-star-api` `notification/match` | Spring event 수신, Redis Pub/Sub publish/subscribe, SSE 전송 |
+| MatchTicket / MatchSession | `league-of-star-core` `domain/match/domain` | 매칭 ticket/session value object |
 
-- 이번 이슈의 주 구현 위치는 `smite-matching`의 `MatchFoundService`임.
+- 이번 이슈의 주 구현 위치는 `league-of-star-matching`의 `MatchFoundService`임.
 - `MatchPairingService`의 paired 처리 시점과 scheduler 구조는 유지함.
-- `smite-api` notification 계층의 Pub/Sub/SSE 구조는 변경하지 않음.
+- `league-of-star-api` notification 계층의 Pub/Sub/SSE 구조는 변경하지 않음.
 - `MatchTicket` schema와 Redis queue key 구조는 변경하지 않음.
 - `MatchSession` schema와 timeout scheduler 구조는 변경하지 않음.
 
@@ -255,7 +255,7 @@ flowchart TD
 - [x] timeout cleanup helper를 추가해 `timeoutStore.cleanup(matchId)` 실패를 격리함.
 - [x] 한 보상 작업 실패가 다른 보상 작업을 중단하지 않도록 각 보상 단위를 별도 try-catch로 분리함.
 - [x] 새 helper는 `MatchFoundService` 내부 private method로 유지하고 외부 API로 노출하지 않음.
-- [x] 불필요한 추상화나 새 service 분리는 하지 않고 현재 `smite-matching` 패키지 경계를 유지함.
+- [x] 불필요한 추상화나 새 service 분리는 하지 않고 현재 `league-of-star-matching` 패키지 경계를 유지함.
 
 구현 기준은 다음과 같음.
 
@@ -307,7 +307,7 @@ flowchart TD
 
 ### 11. 검증
 
-- [x] `./gradlew :smite-matching:test`를 실행함.
+- [x] `./gradlew :league-of-star-matching:test`를 실행함.
 - [x] `./gradlew test`를 실행함.
 - [x] 신규 `MatchFoundServiceTest`가 정상/실패/보상 경로를 모두 통과하는지 확인함.
 - [x] 기존 `MatchPairingServiceTest`, `MatchResponseResultServiceTest`, timeout scheduler 테스트가 통과하는지 확인함.
@@ -322,7 +322,7 @@ flowchart TD
 - `MatchFoundEvent` 발행 실패는 session/status/timeout을 되돌리지 않고 기존 timeout scheduler 정산에 위임함.
 - `MatchPairingService`는 기존처럼 `atomicPairRemove` 성공 즉시 paired 처리하고, 후처리 실패가 발생해도 scan loop를 계속 진행함.
 - 동일 userId 셀프 매칭 방지, metric/Grafana 추가, outbox/saga 기반 보장형 복구는 이번 이슈에서 제외함.
-- 검증 결과 `MatchFoundServiceTest`, `MatchPairingServiceTest`, `MatchResponseResultServiceTest`, `MatchResponseTimeoutSchedulerTest`, `:smite-matching:test`, 전체 `./gradlew test`가 통과함.
+- 검증 결과 `MatchFoundServiceTest`, `MatchPairingServiceTest`, `MatchResponseResultServiceTest`, `MatchResponseTimeoutSchedulerTest`, `:league-of-star-matching:test`, 전체 `./gradlew test`가 통과함.
 
 ## 변경 이력
 
@@ -559,7 +559,7 @@ flowchart LR
 
 검증한 명령.
 
-- `./gradlew :smite-matching:test`
+- `./gradlew :league-of-star-matching:test`
 - `./gradlew test`
 - `./gradlew build`
 - `./gradlew clean build --parallel --no-build-cache`

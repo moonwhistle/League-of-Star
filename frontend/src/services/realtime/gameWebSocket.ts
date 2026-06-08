@@ -19,7 +19,7 @@ export interface GameWebSocketConnection {
   setHandlers: (handlers?: GameWebSocketHandlers) => void
   sendClientReady: () => void
   sendRttPong: (seq: number) => void
-  sendSmite: () => void
+  sendLightning: () => void
   close: (code?: number, reason?: string) => void
 }
 
@@ -52,7 +52,7 @@ export function connectGameWebSocket(
     },
     sendClientReady: () => sendMessage(socket, { type: 'CLIENT_READY', payload: {} }),
     sendRttPong: (seq) => sendMessage(socket, { type: 'RTT_PONG', payload: { seq } }),
-    sendSmite: () => sendMessage(socket, { type: 'SMITE', payload: null }),
+    sendLightning: () => sendMessage(socket, { type: 'LIGHTNING', payload: null }),
     close: (code, reason) => {
       if (isClosed) {
         return

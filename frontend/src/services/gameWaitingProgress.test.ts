@@ -17,7 +17,7 @@ function createPayload(overrides: Partial<GameWaitingPayload> = {}): GameWaiting
     },
     game: {
       gameRoomId: 100,
-      videoUrl: '/assets/game/dragon-view.mp4',
+      videoUrl: '/assets/game/star-core-view.mp4',
       webSocketUrl: '/ws/game/100',
     },
     receivedAt: '2026-06-01T00:00:00.000Z',

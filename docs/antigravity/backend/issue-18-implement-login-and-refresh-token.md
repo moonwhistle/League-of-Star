@@ -15,7 +15,7 @@ sequenceDiagram
     participant C as Client
     participant A as AuthController
     participant S as AuthService
-    participant R as Redis (smite-infra-redis)
+    participant R as Redis (league-of-star-infra-redis)
     participant DB as MySQL (Users Table)
 
     Note over C, DB: [ 로그인 프로세스 ]
@@ -48,17 +48,17 @@ sequenceDiagram
 
 ## 3. 계층별 작업 내역
 
-### smite-api
+### league-of-star-api
 - **Controller**: `AuthController`에 `/login`, `/refresh`, `/logout` 엔드포인트 추가.
 - **Service**: `AuthService`에 로그인/갱신/로그아웃 비즈니스 로직 구현.
 - **Security**: `JwtTokenProvider` 확장 (RT 발급 및 검증 로직 추가).
 - **Common**: `ApiErrorCode` 추가 및 DTO(`LoginRequest`, `LoginResponse`, `TokenRefreshRequest`) 정의.
 
-### smite-core
+### league-of-star-core
 - **Domain**: (필요 시) `User` 엔티티와 연관된 추가 정보 조회 메서드 보완.
 - **Service**: `UserReadService`의 사용자 조회 로직 활용.
 
-### smite-infra-redis
+### league-of-star-infra-redis
 - **Infrastructure**: 리프레시 토큰 저장을 위한 Redis 연동 로직 (Repository 또는 Template) 확인 및 적용.
 
 ## 4. 보안 고려사항
@@ -75,7 +75,7 @@ sequenceDiagram
 ### 2026-04-24: 전 기능 구현 완료
 - `ApiErrorCode` 에러 코드 추가 (`AUTH_LOGIN_FAILED`, `AUTH_INVALID_REFRESH_TOKEN` 등)
 - `JwtTokenProvider` 확장: 리프레시 토큰 생성 메서드 및 만료 시간 설정 추가
-- `smite-infra-redis` 모듈 내 `RefreshToken` 엔티티 및 Repository 구현
+- `league-of-star-infra-redis` 모듈 내 `RefreshToken` 엔티티 및 Repository 구현
 - 로그인 및 토큰 갱신을 위한 요청/응답 DTO 정의 완료
 - `AuthService` 내 로그인, 토큰 갱신(Rotation), 로그아웃 비즈니스 로직 구현 및 리팩터링 완료
 - `AuthController` 엔드포인트 구현 완료

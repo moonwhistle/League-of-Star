@@ -34,7 +34,7 @@ flowchart TD
 | Match notification | `GET /api/v1/notifications/match/stream` | native `EventSource` wrapper 확장 자리 준비 |
 | Game WebSocket | `/ws/game/{gameRoomId}` | native `WebSocket` wrapper 확장 자리 준비 |
 | Game summary | `GET /api/v1/games/{gameId}/summary` | summary API 타입/서비스 확장 자리 준비 |
-| Static game asset | `/assets/game/dragon-view.mp4` | asset URL 상수와 game rendering 확장 자리 준비 |
+| Static game asset | `/assets/game/star-core-view.mp4` | asset URL 상수와 game rendering 확장 자리 준비 |
 
 이번 이슈에서는 위 API를 실제로 호출하는 사용자 플로우를 완성하지 않는다. 다만 이후 이슈에서 바로 기능을 얹을 수 있도록 환경변수, 서비스 레이어, 타입 디렉토리, 라우트 shell을 만든다.
 
@@ -163,7 +163,7 @@ types/constants -> no app dependency
 ```env
 VITE_API_BASE_URL=http://localhost:8080
 VITE_WS_BASE_URL=ws://localhost:8080
-VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
+VITE_GAME_VIDEO_URL=/assets/game/star-core-view.mp4
 ```
 
 로컬 개발 기준:
@@ -196,7 +196,7 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 - 회원가입/비밀번호 찾기 화면 구현
 - 매칭 start/accept/reject UI 구현
 - SSE 연결 플로우 완성
-- WebSocket 게임 준비/RTT/SMITE 플로우 완성
+- WebSocket 게임 준비/RTT/LIGHTNING 플로우 완성
 - HP bar, countdown, video overlay 구현
 - 결과 화면 summary polling 구현
 - Pinia 도입
@@ -374,7 +374,7 @@ npm run dev
 - match SSE payload 타입은 `src/types/match.ts`에 위치시켰다.
 - `src/services/realtime/gameWebSocket.ts`에 native `WebSocket` 기반 game room wrapper를 추가했다.
 - game WebSocket URL은 백엔드 handshake 계약에 맞춰 `?token={accessToken}`을 붙인다.
-- game WebSocket client command는 `CLIENT_READY`, `RTT_PONG`, `SMITE` 전송 함수로 노출했다.
+- game WebSocket client command는 `CLIENT_READY`, `RTT_PONG`, `LIGHTNING` 전송 함수로 노출했다.
 - game WebSocket server/client envelope 타입은 `src/types/game.ts`에 위치시켰다.
 - reconnect, heartbeat 처리, RTT 측정 orchestration은 후속 기능 이슈에서 구현한다.
 - 현재 백엔드 SSE 인증은 `Authorization: Bearer` 헤더 기반이고 native `EventSource`는 custom header를 지원하지 않는다. 후속 SSE 연결 플로우 구현 전 백엔드 인증 방식을 cookie 또는 query token 등 native EventSource와 호환되는 방식으로 정리해야 한다.
@@ -461,7 +461,7 @@ flowchart TD
 
 - Realtime wrapper는 native API를 유지하되 orchestration 제외.
   - 매칭 알림은 백엔드 정책대로 `match_found`, `match_response_result`까지 SSE가 담당하므로 `EventSource` wrapper만 구성.
-  - 게임 대기/RTT/카운트다운/SMITE/종료는 백엔드 WebSocket 경로가 담당하므로 `WebSocket` wrapper와 client command 함수만 구성.
+  - 게임 대기/RTT/카운트다운/LIGHTNING/종료는 백엔드 WebSocket 경로가 담당하므로 `WebSocket` wrapper와 client command 함수만 구성.
   - WebSocket handshake는 백엔드가 `/ws/game/{gameRoomId}?token={accessToken}`을 요구하므로 token query를 붙이는 구조로 정렬.
   - reconnect, heartbeat 처리, RTT 측정 orchestration은 후속 기능 이슈에서 실제 화면 상태와 함께 구현 예정.
 

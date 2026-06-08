@@ -81,7 +81,7 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 결정 사항:
 
 - 기존 코드 컨벤션에 맞춰 `CreateGameRoomUseCase` 인터페이스 대신 `GameRoomCommandService`를 둔다.
-- `smite-core` game 도메인은 `matchId`, SSE payload, URL 조립을 알지 않는다.
+- `league-of-star-core` game 도메인은 `matchId`, SSE payload, URL 조립을 알지 않는다.
 - `GameRoomCommandService`는 `GameRoom` 생성, participant 추가, 기본 scenario 생성, 저장까지만 담당한다.
 - HP scenario 길이는 gameRoom 생성 시 8초 이상 17초 이하로 랜덤 결정한다.
 - HP scenario는 1초 단위 step으로 구성하고, 시작 HP는 10000, 마지막 step HP는 0으로 둔다.
@@ -103,8 +103,8 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 결정 사항:
 
 - `GameRoomCommandService`는 DB 저장만 담당한다.
-- `GameRoomSetupService`는 `smite-api`의 game service에 둔다.
-- `smite-matching`은 gameRoom 생성, MP4 URL, WebSocket URL 조립을 알지 않는다.
+- `GameRoomSetupService`는 `league-of-star-api`의 game service에 둔다.
+- `league-of-star-matching`은 gameRoom 생성, MP4 URL, WebSocket URL 조립을 알지 않는다.
 - 고정 MP4 URL은 `/assets/game/star-core-view.mp4`로 반환한다.
 - Spring Boot static resource 경로는 준비되어 있으며, 실제 MP4 파일은 로컬/배포 환경에서 배치한다.
 - game WebSocket URL은 `/ws/game/{gameRoomId}` 형식으로 반환한다.
@@ -120,8 +120,8 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 
 결정 사항:
 
-- `smite-matching`은 `GameSetupPort`만 알고 실제 gameRoom 생성 구현은 모른다.
-- `smite-api`의 `GameSetupPortAdapter`가 `GameRoomSetupService`를 호출해 gameRoom을 생성한다.
+- `league-of-star-matching`은 `GameSetupPort`만 알고 실제 gameRoom 생성 구현은 모른다.
+- `league-of-star-api`의 `GameSetupPortAdapter`가 `GameRoomSetupService`를 호출해 gameRoom을 생성한다.
 - 양쪽 accept 완료 시 gameRoom 생성이 먼저 성공해야 match session을 `ACCEPTED`로 저장한다.
 - gameRoom 생성 성공 후 두 유저 Redis status는 `IN_GAME`으로 전환한다.
 - gameRoom 생성 성공 후 발행되는 `match_response_result` 이벤트에는 game payload를 포함한다.
@@ -253,7 +253,7 @@ gameRoom 생성 성공
 - gameRoom 생성 실패 시 두 유저는 start 버튼 화면으로 돌아갈 수 있는 실패 이벤트를 받는다.
 - gameRoom 생성 후 Redis 상태 전환 실패 시 gameRoom/participant는 `ABORTED`로 보상 처리된다.
 - gameRoom 생성 후 Redis 상태 전환 실패 시 `GO_TO_GAME_WAITING`은 발행되지 않는다.
-- WebSocket/RTT/SMITE/game_records는 이번 이슈에서 구현하지 않는다.
+- WebSocket/RTT/LIGHTNING/game_records는 이번 이슈에서 구현하지 않는다.
 
 ## 변경 이력
 
@@ -320,9 +320,9 @@ flowchart TD
 ```
 
 - 관심사 분리
-  - `smite-core`: gameRoom 저장과 도메인 로직
-  - `smite-matching`: 매칭 상태 전이, Redis 상태 정리, 결과 이벤트 발행
-  - `smite-api`: gameRoom setup orchestration, static MP4/WebSocket URL 조립
+  - `league-of-star-core`: gameRoom 저장과 도메인 로직
+  - `league-of-star-matching`: 매칭 상태 전이, Redis 상태 정리, 결과 이벤트 발행
+  - `league-of-star-api`: gameRoom setup orchestration, static MP4/WebSocket URL 조립
   - matching은 `GameSetupPort`만 의존하고 실제 gameRoom 생성 구현은 api adapter에서 연결
 
 - gameRoom 생성 실패 처리

@@ -9,8 +9,8 @@ Step 7/8은 gameRoom 종료 확정까지만 담당한다. Step 9는 종료된 ga
 ```mermaid
 flowchart TD
     A{Game finished source}
-    A -->|SMITE kill| B[gameRoom FINISHED<br/>PLAYER1_WIN or PLAYER2_WIN]
-    A -->|Both failed SMITE| C[gameRoom FINISHED<br/>DRAW]
+    A -->|LIGHTNING kill| B[gameRoom FINISHED<br/>PLAYER1_WIN or PLAYER2_WIN]
+    A -->|Both failed LIGHTNING| C[gameRoom FINISHED<br/>DRAW]
     A -->|Natural death| D[gameRoom FINISHED<br/>DRAW]
 
     B --> E[RecordRankSettlementService]
@@ -204,7 +204,7 @@ flowchart TD
 
 ### 1. 종료 결과 정산 책임 경계 확정
 
-- [x] Step 7 SMITE kill 종료, 양쪽 실패 SMITE DRAW 종료, Step 8 자연사 DRAW 종료 이후 record/rank 정산을 호출할 지점 확정
+- [x] Step 7 LIGHTNING kill 종료, 양쪽 실패 LIGHTNING DRAW 종료, Step 8 자연사 DRAW 종료 이후 record/rank 정산을 호출할 지점 확정
 - [x] gameRoom 종료 확정 transaction과 record/rank 정산 transaction을 분리
 - [x] record/rank 정산 실패가 WebSocket 결과 전송과 gameRoom `FINISHED` 확정을 rollback하지 않도록 구성
 - [x] DB outbox/event 기반 비동기 정산은 MVP 범위에서 제외하고 후속 이슈로 분리
@@ -213,7 +213,7 @@ flowchart TD
 
 ### 2. core gameRoom 결과 해석 primitive 추가
 
-- [x] `smite-core` game domain/service 영역에 FINISHED gameRoom 결과를 참가자 관점 result로 변환하는 로직 추가
+- [x] `league-of-star-core` game domain/service 영역에 FINISHED gameRoom 결과를 참가자 관점 result로 변환하는 로직 추가
 - [x] `GameResult.PLAYER1_WIN`이면 첫 participant는 `WIN`, 두 번째 participant는 `LOSS`로 변환
 - [x] `GameResult.PLAYER2_WIN`이면 첫 participant는 `LOSS`, 두 번째 participant는 `WIN`으로 변환
 - [x] `GameResult.DRAW`이면 두 participant 모두 `DRAW`로 변환
@@ -222,7 +222,7 @@ flowchart TD
 
 ### 3. GameRecord 생성 service 구현
 
-- [x] `smite-core` `domain/record/service` 패키지를 추가하고 record 생성 책임을 둔다.
+- [x] `league-of-star-core` `domain/record/service` 패키지를 추가하고 record 생성 책임을 둔다.
 - [x] `GameRecordRepository`에 `countByGameRoomId`, `findByGameRoomId` 추가
 - [x] `game_records`의 `uk_game_records_room_user` unique 제약을 멱등성 보조 장치로 사용
 - [x] record 생성 전 gameRoom이 `FINISHED`인지 검증
@@ -261,11 +261,11 @@ flowchart TD
 
 ### 6. API 종료 흐름 연결
 
-- [x] `smite-api` 게임 종료 orchestration 영역에서 record/rank 정산 service를 호출
-- [x] SMITE kill로 새로 `FINISHED` 된 경우에만 정산 호출
-- [x] 양쪽 실패 SMITE DRAW로 새로 `FINISHED` 된 경우에만 정산 호출
+- [x] `league-of-star-api` 게임 종료 orchestration 영역에서 record/rank 정산 service를 호출
+- [x] LIGHTNING kill로 새로 `FINISHED` 된 경우에만 정산 호출
+- [x] 양쪽 실패 LIGHTNING DRAW로 새로 `FINISHED` 된 경우에만 정산 호출
 - [x] 자연사 DRAW로 새로 `FINISHED` 된 경우에만 정산 호출
-- [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 SMITE current result 재응답에서는 정산을 다시 호출하지 않음
+- [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 LIGHTNING current result 재응답에서는 정산을 다시 호출하지 않음
 - [x] scheduler no-op 케이스에서는 정산 호출하지 않음
 - [x] abort 흐름에서는 record/rank 정산을 호출하지 않음
 - [x] 정산 실패 로그에 gameRoomId, result, winnerId, record count를 포함
@@ -279,7 +279,7 @@ flowchart TD
 - [x] unique constraint 충돌은 완료 판단 기준이 아니라 동시성 보조 방어선으로 처리
 - [x] FINISHED인데 record count가 2가 아닌 gameRoom을 조회하는 복구 scheduler 추가
 - [x] 복구 scheduler는 `count == 0`만 재정산하고 `count == 1`은 로깅/알림 대상으로 분리
-- [x] SMITE 종료와 scheduler 종료가 경합해도 하나의 gameRoom 결과만 record로 남는지 검증
+- [x] LIGHTNING 종료와 scheduler 종료가 경합해도 하나의 gameRoom 결과만 record로 남는지 검증
 - [x] rank 반영 중 예외 발생 시 record insert가 rollback되는지 검증
 
 ### 8. 조회/API 후속 분리
@@ -303,7 +303,7 @@ flowchart TD
 - [x] placement 완료 게임의 `rankAfter`/`lpAfter`가 최종 배정 결과로 저장되는지 검증
 - [x] promotion series 진행 중인 유저의 결과가 일반 LP 계산 없이 series에 반영되는지 검증
 - [x] promotion 성공/실패 게임의 `rankAfter`/`lpAfter`가 최종 결과로 저장되는지 검증
-- [x] SMITE kill, both smite draw, natural death draw 경로에서 정산 호출이 연결되는지 API service test로 검증
+- [x] LIGHTNING kill, both smite draw, natural death draw 경로에서 정산 호출이 연결되는지 API service test로 검증
 - [x] 이미 FINISHED인 current result 재응답과 scheduler no-op에서는 정산을 호출하지 않는지 검증
 - [x] 복구 scheduler가 FINISHED + record count 0 gameRoom을 재정산하는지 검증
 - [x] 복구 scheduler가 record count 1 gameRoom을 자동 보정하지 않는지 검증
@@ -369,7 +369,7 @@ flowchart TD
   - `2`: 참가자 2명분 정산 완료로 보고 no-op
   - `1`: record/rank 반영이 일부만 완료됐을 수 있는 불완전 정산으로 보고 예외/복구 대상 처리
 - `uk_game_records_room_user` unique constraint는 정산 완료 판단 기준이 아니라 동시성 마지막 방어선으로 둠.
-- 이 구조는 SMITE 즉시 종료, 자연사 scheduler, recovery scheduler가 같은 gameRoom을 동시에 보더라도 lock 안에서 같은 완료 판단을 하도록 만든 선택임.
+- 이 구조는 LIGHTNING 즉시 종료, 자연사 scheduler, recovery scheduler가 같은 gameRoom을 동시에 보더라도 lock 안에서 같은 완료 판단을 하도록 만든 선택임.
 - 트레이드오프: unique constraint 충돌만으로 멱등성을 처리하면 rank 누적 전적/LP가 이미 반영된 뒤 record insert에서 실패하는 중간 상태를 설명하기 어렵기 때문에, DB row lock + record count를 1차 정책으로 둠. 대신 lock 구간이 생기지만 gameRoom 단위 정산이라 contention 범위를 작게 제한함.
 - `count == 1`을 자동 보정하지 않는 이유는 남은 1행만 채우는 순간 이미 반영됐을 수 있는 rank 변화와 record snapshot의 정합성을 복구하기 어렵기 때문임. 따라서 자동 수정보다 운영 탐지/로그를 선택함.
 

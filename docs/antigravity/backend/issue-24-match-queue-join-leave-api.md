@@ -10,7 +10,7 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
 
 ## 📚 Tasks
 
-### 1. 유저 매칭 상태 관리 (smite-matching)
+### 1. 유저 매칭 상태 관리 (league-of-star-matching)
 
 - [x] **`MatchUserStatusStore` 인터페이스 정의** (`matching/repository/`)
     - `setStatusIfAbsent(Long userId, MatchStatus status, long ttlSeconds): boolean`: SETNX — 원자적 상태 저장, 이미 존재하면 false
@@ -22,7 +22,7 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
     - TTL: 30분 (무한 대기 방지 — 서버 장애 시 자동 만료)
     - 구현 기술: `RedissonClient.getBucket().setIfAbsent()` (SETNX 보장)
 
-### 2. MatchService 구현 (smite-matching)
+### 2. MatchService 구현 (league-of-star-matching)
 
 - [x] **`MatchService` 클래스** (`matching/service/`)
     - `joinQueue(Long userId, int tierScore)`: 대기열 진입
@@ -34,14 +34,14 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
         3. 제거 성공(true) 시에만 `removeStatus` 호출 (매칭 엔진 선점 경합 방어)
         4. 제거 실패(false) — 엔진이 이미 꺼내간 경우 → `NOT_IN_QUEUE` 예외
 
-### 3. 에러 코드 추가 (smite-matching)
+### 3. 에러 코드 추가 (league-of-star-matching)
 
 - [x] **`MatchingErrorCode` 추가**
     - `ALREADY_IN_QUEUE` (409): 이미 매칭 대기열에 있는 유저 — SETNX 실패
     - `NOT_IN_QUEUE` (400): 대기열에 없는 유저가 취소 시도 / 엔진이 이미 선점한 경우
     - `MATCH_QUEUE_ADD_ERROR` (500): Redis ZADD 중 오류 발생 (롤백 수행)
 
-### 4. API 엔드포인트 (smite-api)
+### 4. API 엔드포인트 (league-of-star-api)
 
 - [x] **`MatchController`** (`api/match/controller/`)
     - `POST /api/v1/match/join`: 매칭 대기열 진입
@@ -54,7 +54,7 @@ Redis로 유저의 현재 매칭 상태를 관리하여 중복 진입을 방지�
 
 - [x] **`MatchFacade` 또는 `MatchController` 내에서 티어 조회 처리**
     - 현재 인증 유저의 `UserRankInfo`에서 `tierScore` 계산
-    - `Rank.getTierScore()` 공식 사용 (`smite-core` 참조)
+    - `Rank.getTierScore()` 공식 사용 (`league-of-star-core` 참조)
 
 ### 5. 테스트
 
@@ -173,7 +173,7 @@ SETNX 성공 시 Redis 대기열 추가
 
 ## 📚 Changes
 
-### smite-matching 모듈
+### league-of-star-matching 모듈
 
 | 파일 | 변경 내용 |
 |------|----------|
@@ -186,7 +186,7 @@ SETNX 성공 시 Redis 대기열 추가
 | `MatchingErrorCode` | `ALREADY_IN_QUEUE`(409), `NOT_IN_QUEUE`(400), `MATCH_QUEUE_ADD_ERROR`(500) 추가 |
 | `MatchingException` | `cause` 파라미터 생성자 추가 (예외 체이닝 지원) |
 
-### smite-core 모듈
+### league-of-star-core 모듈
 
 | 파일 | 변경 내용 |
 |------|----------|
@@ -194,7 +194,7 @@ SETNX 성공 시 Redis 대기열 추가
 | `RankReadService` | CQRS 패턴에 맞춰 `RankQueryService` → `RankReadService`로 네이밍 변경 |
 | `CoreErrorCode` | `RANK_NOT_FOUND` 추가 |
 
-### smite-api 모듈
+### league-of-star-api 모듈
 
 | 파일 | 변경 내용 |
 |------|----------|

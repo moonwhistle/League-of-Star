@@ -23,7 +23,7 @@ flowchart TD
 
     J --> M{"Both users<br/>PASSED?"}
     M -->|"yes"| N["Step 6 can proceed<br/>GAME_START + scenario"]
-    N --> NA["RTT is not used<br/>for SMITE judgment"]
+    N --> NA["RTT is not used<br/>for LIGHTNING judgment"]
     M -->|"no"| C
 
     K --> O["Abort gameRoom<br/>READY -> ABORTED"]
@@ -42,7 +42,7 @@ RTT 측정은 무한 대기하지 않는다. 각 `RTT_PING`은 2500ms 안에 `RT
 
 RTT 실패는 아직 `GAME_START` 이전 실패이므로 gameRoom을 `ABORTED`로 정리하고, `game_records`, LP, 배치/승급전에는 반영하지 않는다. 연결된 WebSocket session에는 `GAME_START_FAILED`를 전송한 뒤 close하고, 클라이언트는 start 버튼 화면으로 복귀한다.
 
-RTT가 성공한 경우 Redis RTT 상태는 `GAME_START` 진입 조건 확인에만 사용한다. RTT median은 `SMITE` 판정 보정값으로 사용하지 않는다.
+RTT가 성공한 경우 Redis RTT 상태는 `GAME_START` 진입 조건 확인에만 사용한다. RTT median은 `LIGHTNING` 판정 보정값으로 사용하지 않는다.
 
 이번 이슈에서는 `startAt` 결정, `COUNTDOWN`, HP scenario 전달, gameRoom `IN_PROGRESS` 전환은 구현하지 않는다. 이 작업들은 다음 `GAME_START와 HP 시나리오 전달` 단계에서 처리한다.
 
@@ -283,7 +283,7 @@ local memory / 동시성 기준:
 ## 📝 Note
 
 - `PENDING`, `PASSED`, `FAILED`는 Redis RTT 측정 상태이며 DB gameRoom status가 아니다.
-- RTT 성공 상태는 Step 6 GAME_START 조건 확인에 사용한다. LIGHTNING 판정은 `smiteTimeMs = serverReceiveTime - gameStartTime`으로 계산한다.
+- RTT 성공 상태는 Step 6 GAME_START 조건 확인에 사용한다. LIGHTNING 판정은 `lightningTimeMs = serverReceiveTime - gameStartTime`으로 계산한다.
 - `GAME_START_FAILED`의 reason은 클라이언트 분기보다 운영/디버깅 목적이 크다.
 - 클라이언트는 `GAME_START_FAILED` reason과 관계없이 start 버튼 화면으로 복귀한다.
 - `COUNTDOWN`은 이번 이슈가 아니라 Step 6에서 `startAt`, scenario, `IN_PROGRESS` 전환과 함께 처리한다.
@@ -504,7 +504,7 @@ flowchart TD
 
 ## 📝 Note
 
-- RTT 성공 상태는 Step 6 GAME_START 조건 확인에 사용합니다. 이후 LIGHTNING 판정은 RTT 보정 없이 `smiteTimeMs = serverReceiveTime - gameStartTime`으로 계산합니다.
+- RTT 성공 상태는 Step 6 GAME_START 조건 확인에 사용합니다. 이후 LIGHTNING 판정은 RTT 보정 없이 `lightningTimeMs = serverReceiveTime - gameStartTime`으로 계산합니다.
 - RTT 실패 reason은 Redis HASH에 저장하지 않습니다. reason은 이벤트/로그 구분용이고, 저장 상태는 `PENDING`, `PASSED`, `FAILED`만 유지해 단순화했습니다.
 - 게임 종료 후 `game:rtt:{gameRoomId}` cleanup은 후속 게임 종료 흐름에서 처리합니다.
 - `COUNTDOWN`, `GAME_START`, HP scenario 전달, `IN_PROGRESS` 전환은 다음 Step 6 범위입니다.

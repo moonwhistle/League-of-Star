@@ -1,7 +1,6 @@
 import { computed, ref } from 'vue'
 
 const LOCALE_STORAGE_KEY = 'league-of-star.locale'
-const LEGACY_LOCALE_STORAGE_KEY = 'smite.locale'
 
 const messages = {
   ko: {
@@ -100,7 +99,7 @@ const messages = {
     'gamePlay.status': '서버 시작 시각 기준으로 대기 중',
     'gamePlay.gameRoom': '게임룸',
     'gamePlay.startAt': '시작 시각',
-    'gamePlay.dragonMaxHp': '스타 코어 최대 HP',
+    'gamePlay.starCoreMaxHp': '스타 코어 최대 HP',
     'gamePlay.durationMs': '진행 시간',
     'gamePlay.payloadMissing': '게임 시작 정보를 찾을 수 없습니다. 매칭 화면으로 돌아갑니다.',
     'gamePlay.leaveWarning':
@@ -120,7 +119,7 @@ const messages = {
     'gamePlay.lightningButton': 'LIGHTNING',
     'gamePlay.lightningSent': 'LIGHTNING 전송됨',
     'gamePlay.targetLocked': '타겟 고정',
-    'gamePlay.dragonAirborne': '스타 코어 이동 중',
+    'gamePlay.starCoreAirborne': '스타 코어 이동 중',
     'gamePlay.videoPending': '영상 대기',
     'gamePlay.videoLoading': '영상 로딩 중',
     'gamePlay.videoReady': '영상 준비됨',
@@ -226,7 +225,7 @@ const messages = {
     'gamePlay.status': 'Waiting on the server start time',
     'gamePlay.gameRoom': 'Game room',
     'gamePlay.startAt': 'Start time',
-    'gamePlay.dragonMaxHp': 'Star core max HP',
+    'gamePlay.starCoreMaxHp': 'Star core max HP',
     'gamePlay.durationMs': 'Duration',
     'gamePlay.payloadMissing': 'Game start data is missing. Returning to matchmaking.',
     'gamePlay.leaveWarning': 'Leaving during the game may require screen recovery. Continue?',
@@ -245,7 +244,7 @@ const messages = {
     'gamePlay.lightningButton': 'LIGHTNING',
     'gamePlay.lightningSent': 'LIGHTNING sent',
     'gamePlay.targetLocked': 'Target locked',
-    'gamePlay.dragonAirborne': 'Star core moving',
+    'gamePlay.starCoreAirborne': 'Star core moving',
     'gamePlay.videoPending': 'Video pending',
     'gamePlay.videoLoading': 'Loading video',
     'gamePlay.videoReady': 'Video ready',
@@ -289,8 +288,7 @@ export function useLocale() {
 
 function readStoredLocale(): Locale {
   const storage = getStorage()
-  const storedLocale =
-    storage?.getItem(LOCALE_STORAGE_KEY) ?? storage?.getItem(LEGACY_LOCALE_STORAGE_KEY)
+  const storedLocale = storage?.getItem(LOCALE_STORAGE_KEY)
 
   return storedLocale === 'en' || storedLocale === 'ko' ? storedLocale : 'ko'
 }

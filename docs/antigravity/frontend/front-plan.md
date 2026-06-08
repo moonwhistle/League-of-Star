@@ -13,7 +13,7 @@
 - 게임 WebSocket은 백엔드가 내려준 `game.webSocketUrl`을 source로 사용하고, access token은 query parameter로 붙여 연결.
 - 게임 결과 화면의 summary 조회는 현재 백엔드 기준 `gameId = gameRoomId`로 처리.
 - SSE는 백엔드의 `Authorization: Bearer` 계약을 유지하고, native `EventSource` 대신 `@microsoft/fetch-event-source`로 header 기반 연결을 구현.
-- 사용자-facing 명칭은 League of Star / LIGHTNING / Star Core로 통일하되, 현재 백엔드 WebSocket wire type `SMITE`와 `smiteTimeMs`, `dragonHpAtSmite`, `dragonMaxHp` 레거시 payload 필드는 호환 계약으로 유지.
+- 사용자-facing 명칭은 League of Star / LIGHTNING / Star Core로 통일하되, 현재 백엔드 WebSocket wire type `LIGHTNING`와 `lightningTimeMs`, `starCoreHpAtLightning`, `starCoreMaxHp` 레거시 payload 필드는 호환 계약으로 유지.
 
 ```mermaid
 flowchart TD
@@ -35,7 +35,7 @@ flowchart TD
     N --> O[COUNTDOWN]
     O --> P[GAME_START]
     P --> Q[게임 플레이 화면]
-    Q --> R[LIGHTNING<br/>wire type SMITE]
+    Q --> R[LIGHTNING<br/>wire type LIGHTNING]
     R --> S[GAME_RESULT]
     S --> T[게임 결과 Summary 조회]
 ```
@@ -218,7 +218,7 @@ interface GameStartPayload {
   startAt: number;
   scenario: {
     starCoreMaxHp?: number;
-    dragonMaxHp?: number; // legacy backend payload
+    starCoreMaxHp?: number; // legacy backend payload
     durationMs: number;
     hpTimeline: {
       timeMs: number;
@@ -239,7 +239,7 @@ interface GameStartPayload {
 - 배경 animation은 별 평면 이동이 아니라 viewer/camera 기준의 느린 시점 회전으로 구현.
 - HP bar, countdown, LIGHTNING button HUD는 후속 전투 UI 단계로 보류.
 - `requestAnimationFrame` 기반 배경 animation 구현.
-- LIGHTNING 클릭 UI와 `{ type: 'SMITE', payload: null }` 전송은 후속 전투 UI 단계로 보류.
+- LIGHTNING 클릭 UI와 `{ type: 'LIGHTNING', payload: null }` 전송은 후속 전투 UI 단계로 보류.
 - `ERROR` 수신 상태는 data attribute로 유지하고 message 표시는 후속 전투 UI 단계로 보류.
 - `GAME_RESULT` 수신 전까지 결과 화면 이동 금지.
 - Play 화면에서는 MP4 렌더링과 MP4 좌표 tracking을 사용하지 않음.
@@ -260,8 +260,8 @@ interface GameResultPayload {
   actions: {
     userId: number;
     serverReceiveTime: number;
-    smiteTimeMs: number;
-    dragonHpAtSmite: number;
+    lightningTimeMs: number;
+    starCoreHpAtLightning: number;
     damage: number;
     afterHp: number;
     isKill: boolean;
@@ -332,7 +332,7 @@ type GameSummaryResponse =
 - `RTT_PING` 수신 시 `RTT_PONG` 전송 검증.
 - `COUNTDOWN` 수신 시 countdown 상태 표시 검증.
 - `GAME_START` 수신 시 play 이동 및 scenario 저장 검증.
-- LIGHTNING 클릭 시 전송되는 레거시 `SMITE` payload가 `null`인지 검증.
+- LIGHTNING 클릭 시 전송되는 레거시 `LIGHTNING` payload가 `null`인지 검증.
 - `GAME_RESULT` 수신 후 result 이동 검증.
 - summary `PENDING` polling 검증.
 - summary `DONE` 결과 표시 검증.

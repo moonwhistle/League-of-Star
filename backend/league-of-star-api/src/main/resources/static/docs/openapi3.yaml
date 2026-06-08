@@ -1,7 +1,7 @@
 openapi: 3.0.1
 info:
-  title: League of Smite API
-  description: League of Smite API 명세서
+  title: League of Star API
+  description: League of Star API 명세서
   version: 1.0.0
 servers:
 - url: http://localhost:8080
@@ -368,7 +368,7 @@ paths:
         - `action`: `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`, `RETURN_TO_MATCHING`\n\
         - `opponent`: 상대 `userId`, `nickname`, `tier`, `tierScore`\n- `game`: 성공 시\
         \ 게임 대기 화면 진입 payload, 실패 시 `null`\n- `game.gameRoomId`: 생성된 게임방 ID\n- `game.videoUrl`:\
-        \ 공통 MP4 static resource URL. MVP 기본값은 `/assets/game/dragon-view.mp4`\n- `game.webSocketUrl`:\
+        \ 공통 MP4 static resource URL. MVP 기본값은 `/assets/game/star-core-view.mp4`\n- `game.webSocketUrl`:\
         \ gameRoom WebSocket URL. MVP 기본 형식은 `/ws/game/{gameRoomId}`\n\nAction mapping:\n\
         - `GO_TO_GAME_WAITING`: `game` payload를 사용해 게임 진행 대기 화면으로 이동\n- `GO_TO_MATCH_START`:\
         \ 매칭 start 버튼 화면으로 복귀\n- `RETURN_TO_MATCHING`: 기존 우선순위로 매칭 대기 상태 복귀\n\nResult\

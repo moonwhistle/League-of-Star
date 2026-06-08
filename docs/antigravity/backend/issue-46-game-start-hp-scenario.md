@@ -73,7 +73,7 @@ flowchart TD
 - HP scenario 원본은 gameRoom 생성 시 저장되는 `GameRoom.scenarioData`를 사용한다.
 - Core에는 저장된 scenario를 읽기 위한 `GameRoomReadService.getScenarioData(gameRoomId)`만 추가했다.
 - API 계층에서는 `GameStartScenarioPayload`로 WebSocket payload에 실을 형태를 확정했다.
-- Payload는 `dragonMaxHp`, `durationMs`, `hpTimeline`만 포함한다.
+- Payload는 `starCoreMaxHp`, `durationMs`, `hpTimeline`만 포함한다.
 - `hpTimeline`의 각 step은 `timeMs`, `hp`로 구성한다.
 - 클라이언트는 이후 `GAME_START.startAt`을 기준으로 `elapsedMs = now - startAt`을 계산하고, `hpTimeline`에서 현재 HP를 렌더링한다.
 - MP4 preload 여부는 이 단계에서 다시 확인하지 않는다. MP4는 배경 재생이고, HP bar overlay는 scenario payload와 `startAt` 기준으로 계산한다.
@@ -167,7 +167,7 @@ lock 비용 판단:
 ### 6. game end timer/scheduler 등록 지점 정의
 
 - [x] `GAME_START` 확정 시 서버 기준 game end deadline을 등록한다.
-- [x] SMITE 미입력, 정상 종료, timeout 종료 흐름에서 재사용할 수 있게 등록 지점을 분리한다.
+- [x] LIGHTNING 미입력, 정상 종료, timeout 종료 흐름에서 재사용할 수 있게 등록 지점을 분리한다.
 
 정책:
 

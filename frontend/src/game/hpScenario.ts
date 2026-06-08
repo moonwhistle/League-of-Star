@@ -36,7 +36,7 @@ export function getHpAtElapsedMs(scenario: GameStartScenario, elapsedMs: number)
 }
 
 export function getScenarioMaxHp(scenario: GameStartScenario): number {
-  return scenario.starCoreMaxHp ?? scenario.dragonMaxHp ?? 0
+  return scenario.starCoreMaxHp
 }
 
 function interpolateHp(

@@ -140,7 +140,7 @@ interface MatchResponseResultNotification {
 
 - [x] `sessionStorage` 저장 helper 구현.
 - [x] `sessionStorage` 조회 helper 구현.
-- [x] 저장 key를 `league-of-star.gameWaitingPayload:{gameRoomId}` 기준으로 구현하고, 기존 진행 세션 복구를 위해 `smite.gameWaitingPayload:{gameRoomId}` 읽기 fallback 유지.
+- [x] 저장 key를 `league-of-star.gameWaitingPayload:{gameRoomId}` 기준으로 구현하고, League of Star 계약 전환 이후 기존 namespace 읽기 fallback은 제거.
 - [x] 저장 payload에 `matchId`, `opponent`, `game`, `receivedAt` 포함.
 - [x] route param `gameRoomId`와 저장 payload 불일치 시 안전 복귀 구현.
 - [x] payload 없음 또는 parse 실패 시 안전 복귀 구현.

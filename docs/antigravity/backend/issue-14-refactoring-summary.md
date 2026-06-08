@@ -14,7 +14,7 @@
 - **성능 최적화**: `JwtAuthenticationFilter`에서 `ObjectMapper`를 매번 생성하지 않고 빈 주입 방식으로 변경하여 자원 효율을 높였습니다.
 
 ### 2. 리포지토리 스캔 영역 분리 (Log Clean-up)
-- **JPA/Redis 격리**: JPA는 `com.sang.smite.domain`, Redis는 `com.sang.smite.infra.redis`만 스캔하도록 설정하여 서로 다른 기술 간의 인터페이스 혼선(Identificaton Error)을 제거했습니다.
+- **JPA/Redis 격리**: JPA는 `com.sang.leagueofstar.domain`, Redis는 `com.sang.leagueofstar.infra.redis`만 스캔하도록 설정하여 서로 다른 기술 간의 인터페이스 혼선(Identificaton Error)을 제거했습니다.
 - **설정 내재화**: 각 모듈이 자신의 기술 설정을 스스로 관리하도록 `RedisRepositoryConfig` 등을 모듈 내부로 이동시켜 캡슐화했습니다.
 
 ### 3. GitHub Actions 워크플로우 고도화

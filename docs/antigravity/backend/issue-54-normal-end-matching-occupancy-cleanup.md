@@ -61,14 +61,14 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
-| game 종료 orchestration | `smite-api` `game/record` 하위 service | cleanup 호출 시점 결정, 실패 격리, 기존 record/rank recovery와 연결 |
-| matching 상태 변경 | `smite-matching` `matching/command` | `IN_GAME` 상태일 때만 `match:status` 제거 |
-| Redis 저장소 | `smite-matching` `matching/infrastructure/redis` | 기존 `MatchUserStatusStore` 구현 재사용 |
-| gameRoom/record 조회 | `smite-core` `domain/game`, `domain/record` service | FINISHED 여부, 참가자, record count 정책 제공 |
+| game 종료 orchestration | `league-of-star-api` `game/record` 하위 service | cleanup 호출 시점 결정, 실패 격리, 기존 record/rank recovery와 연결 |
+| matching 상태 변경 | `league-of-star-matching` `matching/command` | `IN_GAME` 상태일 때만 `match:status` 제거 |
+| Redis 저장소 | `league-of-star-matching` `matching/infrastructure/redis` | 기존 `MatchUserStatusStore` 구현 재사용 |
+| gameRoom/record 조회 | `league-of-star-core` `domain/game`, `domain/record` service | FINISHED 여부, 참가자, record count 정책 제공 |
 
 - API 모듈에서 `RedisMatchUserStatusStore`나 matching repository를 직접 import하지 않는다.
 - API는 `MatchUserStatusCommandService` 같은 matching command service만 호출한다.
-- `smite-core`는 Redis/matching 구현을 알지 않는다.
+- `league-of-star-core`는 Redis/matching 구현을 알지 않는다.
 - cleanup 완료 여부를 DB gameRoom 결과 상태로 표현하지 않는다.
 
 ### Redis Cleanup 대상 정책
@@ -100,7 +100,7 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 ### 2. matching command service 보강
 
-- [x] `smite-matching` `MatchUserStatusCommandService`에 정상 종료용 메서드를 추가한다.
+- [x] `league-of-star-matching` `MatchUserStatusCommandService`에 정상 종료용 메서드를 추가한다.
 - [x] 메서드명은 게임 시작 실패와 구분되도록 `removeFinishedGameStatuses` 또는 `cleanupFinishedGameStatuses` 계열로 둔다.
 - [x] 내부 구현은 기존 `MatchUserStatusStore.getStatus` 후 `IN_GAME`일 때만 `removeStatus`를 호출한다.
 - [x] status가 없으면 no-op 처리한다.
@@ -110,7 +110,7 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 
 ### 3. 종료 후 cleanup application service 추가
 
-- [x] `smite-api`에 정상 종료 후 cleanup 전용 service를 추가한다.
+- [x] `league-of-star-api`에 정상 종료 후 cleanup 전용 service를 추가한다.
 - [x] service는 gameRoomId 기준으로 참가자 2명을 조회한다.
 - [x] service는 record count를 조회해 `2`일 때만 matching cleanup을 호출한다.
 - [x] `FINISHED`가 아닌 gameRoom이면 no-op 또는 warn log로 처리한다.
@@ -125,7 +125,7 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 - [x] 이미 정산 완료로 no-op 된 `record count == 2` 케이스에서도 cleanup 재시도가 가능해야 한다.
 - [x] cleanup 호출은 record/rank 정산 transaction 성공 이후 수행한다.
 - [x] cleanup 실패가 record/rank 정산 transaction을 rollback하지 않도록 경계를 분리한다.
-- [x] SMITE kill, both failed SMITE DRAW, natural death DRAW 모두 같은 cleanup 경로를 타게 한다.
+- [x] LIGHTNING kill, both failed LIGHTNING DRAW, natural death DRAW 모두 같은 cleanup 경로를 타게 한다.
 - [x] 이미 FINISHED인 current result 재응답에서는 즉시 cleanup을 중복 호출하지 않는다.
 
 ### 5. 기존 record/rank recovery 기반 재시도 연결
@@ -155,7 +155,7 @@ Issue 54는 정상 종료 후 Redis 점유 해제를 담당한다. 큐 진입의
 - [x] record count `0`이면 cleanup하지 않는지 검증한다.
 - [x] record count `1`이면 cleanup하지 않고 로그/예외 정책을 따르는지 검증한다.
 - [x] cleanup 실패가 gameRoom `FINISHED`와 record/rank 정산 결과를 rollback하지 않는지 검증한다.
-- [x] SMITE kill, both failed SMITE DRAW, natural death DRAW 경로에서 cleanup service 연결을 검증한다.
+- [x] LIGHTNING kill, both failed LIGHTNING DRAW, natural death DRAW 경로에서 cleanup service 연결을 검증한다.
 - [x] recovery 흐름에서 cleanup이 재시도 가능한지 검증한다.
 - [x] cleanup 단독 실패를 찾기 위한 별도 scheduler가 추가되지 않았고, 기존 recovery 흐름을 재사용하는지 확인한다.
 - [x] API 모듈이 matching Redis repository를 직접 import하지 않는지 확인한다.

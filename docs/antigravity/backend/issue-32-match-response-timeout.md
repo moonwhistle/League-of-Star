@@ -158,8 +158,8 @@ flowchart TD
   - timeout 응답 제한 시간, timeout ZSET key, Lua script path는 matching 모듈 공통 상수로 둡니다.
   - scheduler interval, batch size, processing lease time은 운영 조정 가능성이 있어 설정값 분리도 함께 검토합니다.
 - timeout deadline 계산은 테스트 가능해야 하므로 `Clock` 주입을 사용합니다.
-  - `smite-api`의 `ClockConfig`에 의존하지 않습니다.
-  - `smite-matching` 모듈에 `@ConditionalOnMissingBean(Clock.class)` 기반 Clock 설정을 추가합니다.
+  - `league-of-star-api`의 `ClockConfig`에 의존하지 않습니다.
+  - `league-of-star-matching` 모듈에 `@ConditionalOnMissingBean(Clock.class)` 기반 Clock 설정을 추가합니다.
   - core 모듈에는 Spring config를 두지 않습니다.
   - matching 모듈 timeout 구현에서는 `System.currentTimeMillis()` 직접 호출을 피하고 `clock.millis()` 기준으로 계산합니다.
 - timeout index cleanup 정책은 다음과 같습니다.
@@ -190,10 +190,10 @@ flowchart TD
 #### 구현 결과
 
 - `MatchTimeoutStore` 포트를 추가했습니다.
-  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/repository/MatchTimeoutStore.java`
+  - 위치: `league-of-star-matching/src/main/java/com/sang/leagueofstar/matching/repository/MatchTimeoutStore.java`
   - matching service/scheduler는 timeout index 저장소를 포트로 의존합니다.
 - `RedisMatchTimeoutStore` 구현체를 추가했습니다.
-  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/infrastructure/RedisMatchTimeoutStore.java`
+  - 위치: `league-of-star-matching/src/main/java/com/sang/leagueofstar/matching/infrastructure/RedisMatchTimeoutStore.java`
   - Redis ZSET과 Lua script 실행은 infrastructure에 격리했습니다.
 - timeout ZSET key와 Lua script path를 `MatchingConstants`에 추가했습니다.
   - `match:response:timeout:pending`
@@ -219,7 +219,7 @@ flowchart TD
   - expired processing reclaim
   - lease 만료 전 reclaim 실패
 - 검증 명령:
-  - `:smite-matching:test`
+  - `:league-of-star-matching:test`
 
 ### 3. MatchFoundService timeout 등록
 
@@ -236,9 +236,9 @@ flowchart TD
   - `eventPublisher.publishEvent(...)`
 - timeout deadline은 `clock.millis() + MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L` 기준으로 계산합니다.
   - 테스트 가능성을 위해 `System.currentTimeMillis()` 직접 호출을 사용하지 않습니다.
-- `smite-matching` 모듈에 `MatchingClockConfig`를 추가했습니다.
+- `league-of-star-matching` 모듈에 `MatchingClockConfig`를 추가했습니다.
   - `@ConditionalOnMissingBean(Clock.class)`로 기본 Clock을 제공합니다.
-  - `smite-api`의 Clock 설정에 의존하지 않습니다.
+  - `league-of-star-api`의 Clock 설정에 의존하지 않습니다.
   - core 모듈에는 Spring config를 추가하지 않았습니다.
 - 기존 `match_found` 이벤트 발행 흐름은 유지했습니다.
   - 이벤트 payload의 `acceptTimeoutSeconds`는 `MATCH_RESPONSE_TIMEOUT_SECONDS` 상수를 사용합니다.
@@ -248,7 +248,7 @@ flowchart TD
 - 테스트 전용 `TestMatchingApplication`의 중복 Clock bean은 제거했습니다.
   - matching 모듈 기본 Clock 설정을 테스트에서도 사용합니다.
 - 검증 명령:
-  - `:smite-matching:test`
+  - `:league-of-star-matching:test`
 
 ### 4. MatchResponseResultService timeout 정산 구현
 
@@ -286,8 +286,8 @@ flowchart TD
   - 이미 종료된 세션 timeout no-op
   - 없는 세션 timeout no-op
 - 검증 명령:
-  - `:smite-core:test`
-  - `:smite-matching:test`
+  - `:league-of-star-core:test`
+  - `:league-of-star-matching:test`
 
 ### 5. accept/reject 완료 시 timeout index 정리
 
@@ -318,7 +318,7 @@ flowchart TD
   - accept/reject 조합은 deadline 전 cleanup 미호출
   - cleanup 실패가 accept 성공을 깨지 않는지 검증
 - 검증 명령:
-  - `:smite-matching:test`
+  - `:league-of-star-matching:test`
 
 ### 6. timeout scheduler 구현
 
@@ -337,11 +337,11 @@ flowchart TD
 #### 구현 결과
 
 - `MatchResponseTimeoutScheduler`를 추가했습니다.
-  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/scheduler/MatchResponseTimeoutScheduler.java`
+  - 위치: `league-of-star-matching/src/main/java/com/sang/leagueofstar/matching/scheduler/MatchResponseTimeoutScheduler.java`
 - scheduler는 `TIMEOUT_SCHEDULER_FIXED_DELAY_MS` 주기로 실행되며, timeout 처리 서비스를 호출하는 트리거 역할만 담당합니다.
   - 현재 값: `1000ms`
 - `MatchResponseTimeoutService`를 추가했습니다.
-  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service/MatchResponseTimeoutService.java`
+  - 위치: `league-of-star-matching/src/main/java/com/sang/leagueofstar/matching/service/MatchResponseTimeoutService.java`
   - timeout job orchestration은 service에서 담당합니다.
 - service 처리 흐름은 다음과 같습니다.
   - `Clock` 기준 현재 시각 조회
@@ -367,7 +367,7 @@ flowchart TD
   - expired processing reclaim
   - batch 일부 실패 시 나머지 처리 계속
 - 검증 명령:
-  - `:smite-matching:test`
+  - `:league-of-star-matching:test`
 
 ### 7. 테스트 작성
 
@@ -416,8 +416,8 @@ flowchart TD
 - `MatchResponseTimeoutSchedulerTest`를 추가했습니다.
   - scheduler가 timeout 처리 서비스를 호출하는지 검증
 - 검증 명령:
-  - `:smite-core:test`
-  - `:smite-matching:test`
+  - `:league-of-star-core:test`
+  - `:league-of-star-matching:test`
 
 ### 8. 관측 지표 및 부하 테스트
 
@@ -519,9 +519,9 @@ flowchart TD
   - 매칭 응답 대시보드가 참조하는 `match_response_*` metric은 모두 `MatchResponseMetricNames` 기반 Prometheus 이름과 일치합니다.
   - timer metric은 `publishPercentileHistogram()`을 사용해 `_bucket` 기반 p95 PromQL과 연결됩니다.
 - 검증 명령:
-  - `:smite-core:test`
-  - `:smite-matching:test`
-  - `:smite-api:test`
+  - `:league-of-star-core:test`
+  - `:league-of-star-matching:test`
+  - `:league-of-star-api:test`
 
 ### 9. 문서 갱신
 
@@ -546,16 +546,16 @@ flowchart TD
 
 ### 10. 최종 검증
 
-- [x] `:smite-core:test`
-- [x] `:smite-matching:test`
-- [x] `:smite-api:test`
+- [x] `:league-of-star-core:test`
+- [x] `:league-of-star-matching:test`
+- [x] `:league-of-star-api:test`
 - [x] 기존 accept/reject API 회귀 확인
 - [x] 기존 `match_found` SSE 흐름 회귀 확인
 
 #### 검증 결과
 
 - 전체 모듈 테스트 통과
-  - `./gradlew :smite-core:test :smite-matching:test :smite-api:test`
+  - `./gradlew :league-of-star-core:test :league-of-star-matching:test :league-of-star-api:test`
 - accept/reject API 및 `match_found` SSE 회귀 테스트 재실행 통과
   - `MatchControllerTest`
   - `MatchControllerRestDocsTest`
@@ -956,7 +956,7 @@ API-2 User API:  match-1 accept 요청
 ### Verification
 
 - 전체 테스트 통과
-  - `./gradlew :smite-core:test :smite-matching:test :smite-api:test`
+  - `./gradlew :league-of-star-core:test :league-of-star-matching:test :league-of-star-api:test`
 - 핵심 회귀 테스트 재실행 통과
   - accept/reject API
   - match_found SSE

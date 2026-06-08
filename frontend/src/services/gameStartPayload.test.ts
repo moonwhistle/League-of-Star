@@ -19,7 +19,7 @@ describe('gameStartPayload', () => {
       serverTime: 1716192000000,
       startAt: 1716192004000,
       scenario: {
-        dragonMaxHp: 10000,
+        starCoreMaxHp: 10000,
         durationMs: 15000,
         hpTimeline: [
           { timeMs: 0, hp: 10000 },
@@ -34,7 +34,7 @@ describe('gameStartPayload', () => {
       serverTime: 1716192000000,
       startAt: 1716192004000,
       scenario: {
-        dragonMaxHp: 10000,
+        starCoreMaxHp: 10000,
         durationMs: 15000,
         hpTimeline: [
           { timeMs: 0, hp: 10000 },
@@ -43,25 +43,6 @@ describe('gameStartPayload', () => {
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
     })
-  })
-
-  it('reads legacy smite namespace payloads during the League of Star migration', () => {
-    window.sessionStorage.setItem(
-      'smite.gameStartPayload:100',
-      JSON.stringify({
-        gameRoomId: 100,
-        serverTime: 1716192000000,
-        startAt: 1716192004000,
-        scenario: {
-          dragonMaxHp: 10000,
-          durationMs: 15000,
-          hpTimeline: [{ timeMs: 0, hp: 10000 }],
-        },
-        receivedAt: '2026-06-01T00:00:00.000Z',
-      }),
-    )
-
-    expect(readGameStartPayload(100)?.scenario.dragonMaxHp).toBe(10000)
   })
 
   it('accepts the League of Star starCoreMaxHp scenario field', () => {
@@ -89,7 +70,7 @@ describe('gameStartPayload', () => {
       serverTime: 1716192000000,
       startAt: 1716192004000,
       scenario: {
-        dragonMaxHp: 10000,
+        starCoreMaxHp: 10000,
         durationMs: 15000,
         hpTimeline: [{ timeMs: 0, hp: 10000 }],
       },
@@ -106,7 +87,7 @@ describe('gameStartPayload', () => {
         serverTime: 1716192000000,
         startAt: 1716192004000,
         scenario: {
-          dragonMaxHp: 10000,
+          starCoreMaxHp: 10000,
           durationMs: 15000,
           hpTimeline: [{ timeMs: Number.NaN, hp: 10000 }],
         },
@@ -129,7 +110,7 @@ describe('gameStartPayload', () => {
         serverTime: 1716192000000,
         startAt: 1716192004000,
         scenario: {
-          dragonMaxHp: 10000,
+          starCoreMaxHp: 10000,
           durationMs: 15000,
           hpTimeline: [{ timeMs: 0, hp: 10000 }],
         },
@@ -161,7 +142,7 @@ describe('gameStartPayload', () => {
         serverTime: 1716192000000,
         startAt: 1716192004000,
         scenario: {
-          dragonMaxHp: 10000,
+          starCoreMaxHp: 10000,
           durationMs: 15000,
           hpTimeline: [{ timeMs: 0, hp: '10000' }],
         },

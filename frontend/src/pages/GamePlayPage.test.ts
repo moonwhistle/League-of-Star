@@ -26,7 +26,7 @@ const gameWebSocketMock = vi.hoisted(() => {
       setHandlers: vi.fn(),
       sendClientReady: vi.fn(),
       sendRttPong: vi.fn(),
-      sendSmite: vi.fn(),
+      sendLightning: vi.fn(),
       close: vi.fn(),
     },
   }
@@ -325,7 +325,7 @@ describe('GamePlayPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -347,7 +347,7 @@ describe('GamePlayPage', () => {
       serverTime: 1,
       startAt: 2,
       scenario: {
-        dragonMaxHp: 10000,
+        starCoreMaxHp: 10000,
         durationMs: 15000,
         hpTimeline: [],
       },
@@ -371,7 +371,7 @@ describe('GamePlayPage', () => {
         serverTime: 1,
         startAt: 2,
         scenario: {
-          dragonMaxHp: 10000,
+          starCoreMaxHp: 10000,
           durationMs: 15000,
           hpTimeline: [],
         },
@@ -383,7 +383,7 @@ describe('GamePlayPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -402,7 +402,7 @@ describe('GamePlayPage', () => {
       serverTime: 1,
       startAt: 2,
       scenario: {
-        dragonMaxHp: 10000,
+        starCoreMaxHp: 10000,
         durationMs: 15000,
         hpTimeline: [],
       },
@@ -415,7 +415,7 @@ describe('GamePlayPage', () => {
         opponent: null,
         game: {
           gameRoomId: 101,
-          videoUrl: '/assets/game/dragon-view.mp4',
+          videoUrl: '/assets/game/star-core-view.mp4',
           webSocketUrl: '/ws/game/101',
         },
         receivedAt: '2026-06-01T00:00:00.000Z',
@@ -454,7 +454,7 @@ function saveValidPlayPayloads(options: { startAt?: number } = {}): void {
     serverTime: Date.now() - 5000,
     startAt,
     scenario: {
-      dragonMaxHp: 10000,
+      starCoreMaxHp: 10000,
       durationMs: 15000,
       hpTimeline: [
         {
@@ -479,7 +479,7 @@ function saveValidPlayPayloads(options: { startAt?: number } = {}): void {
     },
     game: {
       gameRoomId: 100,
-      videoUrl: '/assets/game/dragon-view.mp4',
+      videoUrl: '/assets/game/star-core-view.mp4',
       webSocketUrl: '/ws/game/100',
     },
     receivedAt: '2026-06-01T00:00:00.000Z',

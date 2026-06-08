@@ -35,7 +35,7 @@ flowchart TD
 | HP source of truth    | `GAME_START.payload.scenario.hpTimeline`                    |
 | Duration source       | `GAME_START.payload.scenario.durationMs`                    |
 | Game WebSocket source | `match_response_result.game.webSocketUrl`                   |
-| LIGHTNING client wire | 현재 백엔드 호환을 위해 `{ type: 'SMITE', payload: null }` 전송 |
+| LIGHTNING client wire | 현재 백엔드 호환을 위해 `{ type: 'LIGHTNING', payload: null }` 전송 |
 | LIGHTNING timestamp   | 클라이언트가 전송하지 않음                                  |
 | ERROR handling        | 이번 배경 단계에서는 data attribute 상태 유지               |
 | GAME_RESULT handling  | 이번 이슈에서는 route 이동 금지                             |
@@ -52,7 +52,7 @@ interface StoredGameStartPayload {
   startAt: number;
   scenario: {
     starCoreMaxHp?: number;
-    dragonMaxHp?: number; // legacy backend payload
+    starCoreMaxHp?: number; // legacy backend payload
     durationMs: number;
     hpTimeline: {
       timeMs: number;
@@ -133,7 +133,7 @@ interface GameWaitingPayload {
 
 - [x] waiting에서 handoff 받은 Game WebSocket을 우선 사용.
 - [x] handoff가 없으면 저장된 `webSocketUrl`로 재연결.
-- [x] play에서 LIGHTNING wire type `SMITE`, `ERROR`, `GAME_RESULT`를 처리.
+- [x] play에서 LIGHTNING wire type `LIGHTNING`, `ERROR`, `GAME_RESULT`를 처리.
 - [x] play unmount 시 WebSocket 정리.
 - [x] 재연결 실패 시 play 화면 내 오류 표시.
 
@@ -160,7 +160,7 @@ interface GameWaitingPayload {
 
 - [x] 이번 배경 단계에서는 LIGHTNING button을 렌더링하지 않음.
 - [x] `game.webSocketUrl` 연결 source는 유지.
-- [x] LIGHTNING 전송 UI와 중복 전송 방지는 후속 전투 UI 단계로 넘김. 실제 전송 wire type은 백엔드 호환상 `SMITE` 유지.
+- [x] LIGHTNING 전송 UI와 중복 전송 방지는 후속 전투 UI 단계로 넘김. 실제 전송 wire type은 백엔드 호환상 `LIGHTNING` 유지.
 
 ### 5. Locale 구현
 
@@ -188,7 +188,7 @@ interface GameWaitingPayload {
 - [x] `front-plan.md` `## Issue Split Recommendation`에서 10번 진행 범위 확인.
 - [x] `front-plan.md` 11번 `게임 결과 WebSocket 처리 구현`은 후속으로 유지.
 - [x] `front-plan.md` 12번 `게임 결과 Summary 화면 구현`은 후속으로 유지.
-- [x] `docs/project/websocket client.md`의 LIGHTNING wire type `SMITE`/ERROR/GAME_RESULT 정책과 정합성 확인.
+- [x] `docs/project/websocket client.md`의 LIGHTNING wire type `LIGHTNING`/ERROR/GAME_RESULT 정책과 정합성 확인.
 - [x] `docs/project/policy.md`의 GAME_START 이후 disconnect/LIGHTNING/natural death 정책과 정합성 확인.
 - [x] 이번 이슈 PR 메시지 섹션 보강.
 
@@ -202,7 +202,7 @@ interface GameWaitingPayload {
 - [x] `npm run build` 검증.
 - [x] desktop `1440x900` overflow 확인.
 - [x] mobile `390x844` overflow 확인.
-- [x] LIGHTNING wire type `SMITE` `{ payload: null }` 전송 브라우저 확인.
+- [x] LIGHTNING wire type `LIGHTNING` `{ payload: null }` 전송 브라우저 확인.
 
 ## Implementation Policy
 

@@ -79,10 +79,10 @@ Lifecycle 보정:
 
 확인한 백엔드 source of truth:
 
-- `backend/smite-api/build/generated-snippets/notification-match-stream/resource.json`
-- `backend/smite-api/build/generated-snippets/notification-match-stream/http-request.adoc`
-- `backend/smite-api/src/main/java/com/sang/smite/notification/match/controller/MatchNotificationController.java`
-- `backend/smite-api/src/main/java/com/sang/smite/common/path/notification/NotificationPath.java`
+- `backend/league-of-star-api/build/generated-snippets/notification-match-stream/resource.json`
+- `backend/league-of-star-api/build/generated-snippets/notification-match-stream/http-request.adoc`
+- `backend/league-of-star-api/src/main/java/com/sang/leagueofstar/notification/match/controller/MatchNotificationController.java`
+- `backend/league-of-star-api/src/main/java/com/sang/leagueofstar/common/path/notification/NotificationPath.java`
 
 확인 결과:
 

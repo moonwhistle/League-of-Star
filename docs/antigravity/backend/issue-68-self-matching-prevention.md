@@ -54,13 +54,13 @@ flowchart TD
 
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
-| queue 진입 중복 방지 | `smite-matching` `command` | `setStatusIfAbsent`로 동일 userId 정상 중복 진입 차단 |
-| 매칭 후보 탐색 | `smite-matching` `domain/service` | FIFO 정렬, 후보 선택, matchable 판정 |
-| Redis queue 저장소 | `smite-matching` `repository`, `infrastructure/redis` | `MatchTicket` add/remove/findAll/atomicPairRemove |
-| match found 후처리 | `smite-matching` `domain/service` | session 저장, timeout 등록, user status 전환, event 발행 |
-| MatchTicket | `smite-core` `domain/match/domain` | userId, tierScore, entryTime value object |
+| queue 진입 중복 방지 | `league-of-star-matching` `command` | `setStatusIfAbsent`로 동일 userId 정상 중복 진입 차단 |
+| 매칭 후보 탐색 | `league-of-star-matching` `domain/service` | FIFO 정렬, 후보 선택, matchable 판정 |
+| Redis queue 저장소 | `league-of-star-matching` `repository`, `infrastructure/redis` | `MatchTicket` add/remove/findAll/atomicPairRemove |
+| match found 후처리 | `league-of-star-matching` `domain/service` | session 저장, timeout 등록, user status 전환, event 발행 |
+| MatchTicket | `league-of-star-core` `domain/match/domain` | userId, tierScore, entryTime value object |
 
-- 이번 이슈의 주 구현 위치는 `smite-matching`의 `MatchPairingService`임.
+- 이번 이슈의 주 구현 위치는 `league-of-star-matching`의 `MatchPairingService`임.
 - `MatchQueueCommandService`의 queue 진입 정책은 변경하지 않음.
 - `MatchTicket` schema와 Redis queue key 구조는 변경하지 않음.
 - Lua `atomic_pair_remove` 구조는 변경하지 않음.
@@ -263,7 +263,7 @@ flowchart TD
 
 검증 결과는 다음과 같음.
 
-- `./gradlew :smite-matching:cleanTest :smite-matching:test --tests '*MatchPairingServiceTest'` 통과.
+- `./gradlew :league-of-star-matching:cleanTest :league-of-star-matching:test --tests '*MatchPairingServiceTest'` 통과.
 - `testFifoOrdering`으로 FIFO 정렬 후 오래 기다린 유저 우선 탐색 정책을 확인함.
 - `testSlidingWindow_*`, `matchPlacementUserWith*`, `matchApexSameTierScoreImmediately`로 tier range, placement, Apex 매칭 정책을 확인함.
 - `testAtomicRemoveFailContinues`로 `atomicPairRemove` 실패 시 후처리 없이 다음 후보 탐색이 유지되는지 확인함.
@@ -289,21 +289,21 @@ flowchart TD
 
 ### 9. 검증
 
-- [x] `./gradlew :smite-matching:test --tests '*MatchPairingServiceTest'` 실행
-- [x] `./gradlew :smite-matching:test` 실행
+- [x] `./gradlew :league-of-star-matching:test --tests '*MatchPairingServiceTest'` 실행
+- [x] `./gradlew :league-of-star-matching:test` 실행
 - [x] 필요 시 전체 `./gradlew test` 실행
 - [x] 신규 self matching 방지 테스트가 통과하는지 확인
 - [x] 기존 pairing, match found 후처리 회귀 테스트가 통과하는지 확인
 
 완료 기준은 다음과 같음.
 
-- 신규 테스트와 기존 smite-matching 테스트가 통과함.
+- 신규 테스트와 기존 league-of-star-matching 테스트가 통과함.
 - 문서 변경은 `git diff --check`를 통과함.
 
 검증 결과는 다음과 같음.
 
-- `./gradlew :smite-matching:cleanTest :smite-matching:test --tests '*MatchPairingServiceTest'` 통과.
-- `./gradlew :smite-matching:test` 통과.
+- `./gradlew :league-of-star-matching:cleanTest :league-of-star-matching:test --tests '*MatchPairingServiceTest'` 통과.
+- `./gradlew :league-of-star-matching:test` 통과.
 - `./gradlew test` 통과.
 - `./gradlew build` 통과.
 - `git diff --check` 통과.
@@ -319,7 +319,7 @@ flowchart TD
 - 동일 IP 기반 어뷰징 방지, client IP 수집, proxy/load balancer header 신뢰 정책, metric/Grafana 추가는 이번 이슈에서 제외함.
 - queue 단계 dedup/cleanup은 stale ticket 삭제 기준, status 복구 정책, 운영 관측 지표가 필요하므로 이번 이슈에서 제외함.
 - 현재 metric만으로는 동일 userId skip으로 인한 `recordPairsPerScan(0)`과 일반적인 후보 부족을 구분하지 않으며, self-match skip metric은 후속 범위로 분리함.
-- 검증 결과 신규 `MatchPairingServiceTest.sameUserIdCandidateSkippedAndNextCandidateMatched`, `sameUserIdOnlyCandidatesDoNotMatch`, 기존 `MatchPairingServiceTest`, `:smite-matching:test`, 전체 `./gradlew test`, `./gradlew build`가 통과함.
+- 검증 결과 신규 `MatchPairingServiceTest.sameUserIdCandidateSkippedAndNextCandidateMatched`, `sameUserIdOnlyCandidatesDoNotMatch`, 기존 `MatchPairingServiceTest`, `:league-of-star-matching:test`, 전체 `./gradlew test`, `./gradlew build`가 통과함.
 
 ## 변경 이력
 
@@ -517,8 +517,8 @@ metric 해석 한계.
 
 검증.
 
-- `./gradlew :smite-matching:cleanTest :smite-matching:test --tests '*MatchPairingServiceTest'`
-- `./gradlew :smite-matching:test`
+- `./gradlew :league-of-star-matching:cleanTest :league-of-star-matching:test --tests '*MatchPairingServiceTest'`
+- `./gradlew :league-of-star-matching:test`
 - `./gradlew test`
 - `./gradlew build`
 - `git diff --check`

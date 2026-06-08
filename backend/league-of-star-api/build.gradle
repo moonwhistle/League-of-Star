@@ -67,8 +67,8 @@ dependencies {
 
 openapi3 {
 	setServer('http://localhost:8080')
-	title = 'League of Smite API'
-	description = 'League of Smite API 명세서'
+	title = 'League of Star API'
+	description = 'League of Star API 명세서'
 	version = '1.0.0'
 	format = 'yaml'
 }

@@ -28,7 +28,7 @@ flowchart TD
 - `READY` gameRoom은 게임 대기 화면 또는 WebSocket 준비 단계이므로 새 큐 진입을 차단함.
 - `IN_PROGRESS` gameRoom은 이미 게임이 시작된 상태이므로 새 큐 진입을 차단함.
 - `FINISHED`, `ABORTED` gameRoom은 종료되었거나 실패 정산된 상태이므로 큐 진입을 차단하지 않음.
-- Redis `match:status:{userId}` 검증은 기존처럼 `smite-matching`의 `SETNX` 기반 중복 큐 진입 방지로 유지함.
+- Redis `match:status:{userId}` 검증은 기존처럼 `league-of-star-matching`의 `SETNX` 기반 중복 큐 진입 방지로 유지함.
 - DB active gameRoom 검증은 Redis 검증보다 먼저 수행해 이미 게임에 묶인 유저가 Redis 상태 유실로 큐에 들어가는 것을 막음.
 - 이번 이슈는 큐 진입 전 검증만 다루며, gameRoom cleanup, record/rank 정산, Apex 매칭 정책은 변경하지 않음.
 
@@ -36,11 +36,11 @@ flowchart TD
 
 최종 구현 상태는 다음과 같음.
 
-- `MatchController`는 인증 유저의 queue join 요청을 `smite-api`의 `MatchQueueService.joinQueue(userId)`로 위임함.
+- `MatchController`는 인증 유저의 queue join 요청을 `league-of-star-api`의 `MatchQueueService.joinQueue(userId)`로 위임함.
 - `MatchQueueService`는 `GameRoomReadService.existsActiveGameRoomByUserId(userId)`를 먼저 호출해 DB active gameRoom 여부를 확인함.
 - active gameRoom이 있으면 `MatchingException(ACTIVE_GAME_ROOM_EXISTS)`를 던지고, rank 조회와 Redis queue command 호출을 수행하지 않음.
 - active gameRoom이 없으면 `RankReadService`로 유저의 현재 rank를 조회하고, `tierScore`를 계산한 뒤 `MatchQueueCommandService.joinQueue(userId, tierScore)`로 위임함.
-- `MatchQueueService` 주석에는 JPA 기반 `smite-core`와 Redis 도메인 로직 `smite-matching`의 경계를 이 클래스가 맡는다고 명시되어 있음.
+- `MatchQueueService` 주석에는 JPA 기반 `league-of-star-core`와 Redis 도메인 로직 `league-of-star-matching`의 경계를 이 클래스가 맡는다고 명시되어 있음.
 - `MatchQueueCommandService.joinQueue`는 Redis `match:status:{userId}`에 `MATCHING` 상태를 `SETNX` 방식으로 저장하고, 성공 시 `matching:queue:{tierScore}`에 `MatchTicket`을 추가함.
 - Redis 상태 설정에 실패하면 기존 `ALREADY_IN_QUEUE`로 큐 중복 진입을 차단함.
 - 큐 추가 중 예외가 발생하면 Redis user status를 제거해 롤백함.
@@ -54,18 +54,18 @@ flowchart TD
 
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
-| HTTP endpoint | `smite-api` `match/controller` | 인증 유저 주입, queue join/leave HTTP 요청 처리 |
-| queue orchestration | `smite-api` `match/service` | core 조회와 matching command 조합, 큐 진입 전 정책 검증 |
-| gameRoom 조회 | `smite-core` `domain/game/service` | DB 기준 active gameRoom 존재 여부 제공 |
-| gameRoom repository | `smite-core` `domain/game/repository` | participant userId + status 조건 exists query 수행 |
-| rank 조회 | `smite-core` `domain/rank/service` | 큐 key 계산에 필요한 현재 rank/tierScore 제공 |
-| Redis queue command | `smite-matching` `matching/command` | Redis user status SETNX, queue add/remove, Redis rollback |
-| Redis store | `smite-matching`, `smite-infra-redis` | match status, matching queue 저장소 처리 |
+| HTTP endpoint | `league-of-star-api` `match/controller` | 인증 유저 주입, queue join/leave HTTP 요청 처리 |
+| queue orchestration | `league-of-star-api` `match/service` | core 조회와 matching command 조합, 큐 진입 전 정책 검증 |
+| gameRoom 조회 | `league-of-star-core` `domain/game/service` | DB 기준 active gameRoom 존재 여부 제공 |
+| gameRoom repository | `league-of-star-core` `domain/game/repository` | participant userId + status 조건 exists query 수행 |
+| rank 조회 | `league-of-star-core` `domain/rank/service` | 큐 key 계산에 필요한 현재 rank/tierScore 제공 |
+| Redis queue command | `league-of-star-matching` `matching/command` | Redis user status SETNX, queue add/remove, Redis rollback |
+| Redis store | `league-of-star-matching`, `league-of-star-infra-redis` | match status, matching queue 저장소 처리 |
 
-- `smite-matching`은 DB repository나 core gameRoom service를 직접 의존하지 않음.
-- DB active gameRoom 검증은 `smite-api`의 application service에서 `GameRoomReadService`를 조합해 수행함.
-- `smite-core`는 HTTP 응답 DTO나 matching queue command를 알지 않음.
-- `smite-api`는 repository를 직접 import하지 않고 core read service만 사용함.
+- `league-of-star-matching`은 DB repository나 core gameRoom service를 직접 의존하지 않음.
+- DB active gameRoom 검증은 `league-of-star-api`의 application service에서 `GameRoomReadService`를 조합해 수행함.
+- `league-of-star-core`는 HTTP 응답 DTO나 matching queue command를 알지 않음.
+- `league-of-star-api`는 repository를 직접 import하지 않고 core read service만 사용함.
 - Redis `ALREADY_IN_QUEUE`와 DB active gameRoom 차단은 의미가 다르므로 별도 에러 코드로 구분함.
 
 ### Queue Join Policy
@@ -135,7 +135,7 @@ flowchart TD
 - 현재 `MatchQueueService.joinQueue`는 rank 조회 후 `MatchQueueCommandService.joinQueue`로 바로 위임하므로, DB active gameRoom 검증을 이 메서드의 첫 단계에 추가함.
 - DB 검증이 실패하면 rank 조회와 Redis `SETNX`, queue add를 모두 수행하지 않음.
 - DB 검증이 통과한 뒤에는 기존 Redis `SETNX` 기반 `ALREADY_IN_QUEUE` 정책을 그대로 사용함.
-- `smite-matching`은 Redis queue command 책임만 유지하고, DB gameRoom 조회 의존성을 추가하지 않음.
+- `league-of-star-matching`은 Redis queue command 책임만 유지하고, DB gameRoom 조회 의존성을 추가하지 않음.
 - queue leave는 매칭 큐 이탈 명령이므로 active gameRoom DB 검증을 추가하지 않음.
 - 이번 범위는 queue join 사전 검증이며, gameRoom cleanup, record/rank 정산, Apex/배치 매칭 정책은 변경하지 않음.
 
@@ -158,7 +158,7 @@ flowchart TD
 
 ### 3. `MatchQueueService` queue join 분기 추가
 
-- [x] `smite-api`의 `MatchQueueService`에 `GameRoomReadService` 의존성을 추가함.
+- [x] `league-of-star-api`의 `MatchQueueService`에 `GameRoomReadService` 의존성을 추가함.
 - [x] `joinQueue(Long userId)` 시작 지점에서 active gameRoom 존재 여부를 먼저 확인함.
 - [x] active gameRoom이 있으면 rank 조회와 Redis queue command 호출을 수행하지 않음.
 - [x] active gameRoom이 없으면 기존처럼 `RankReadService`로 `tierScore`를 조회하고 `MatchQueueCommandService.joinQueue`로 위임함.
@@ -274,11 +274,11 @@ Redis `match:status`가 TTL 만료, cleanup 실패, 서버 재시작 등으로 �
 - active gameRoom이 있으면 `ACTIVE_GAME_ROOM_EXISTS`로 즉시 차단하고, rank 조회와 Redis queue command를 호출하지 않음.
 - 트레이드오프: queue join마다 DB read가 1회 추가됨. 대신 Redis 상태 유실이나 cleanup 지연이 있어도 실제 게임 생명주기의 source of truth인 DB 기준으로 중복 게임 진입을 막을 수 있음.
 
-### 2. `smite-matching`에는 DB 의존성을 추가하지 않음
+### 2. `league-of-star-matching`에는 DB 의존성을 추가하지 않음
 
-- `smite-api`가 core read service와 matching command를 조합하는 기존 application service 경계를 유지함.
-- `smite-core`는 active gameRoom 존재 여부를 boolean으로 제공하고, HTTP 응답이나 Redis queue 정책을 알지 않음.
-- `smite-matching`은 기존처럼 Redis `match:status` `SETNX`, queue add/remove, rollback 책임만 유지함.
+- `league-of-star-api`가 core read service와 matching command를 조합하는 기존 application service 경계를 유지함.
+- `league-of-star-core`는 active gameRoom 존재 여부를 boolean으로 제공하고, HTTP 응답이나 Redis queue 정책을 알지 않음.
+- `league-of-star-matching`은 기존처럼 Redis `match:status` `SETNX`, queue add/remove, rollback 책임만 유지함.
 - 트레이드오프: 검증 로직이 matching command 내부에 완전히 캡슐화되지는 않음. 대신 JPA 의존성이 Redis matching 모듈로 번지지 않아 모듈 관심사가 더 선명하게 유지됨.
 
 ### 3. active gameRoom 기준을 `READY` / `IN_PROGRESS`로 고정함
@@ -304,9 +304,9 @@ Redis `match:status`가 TTL 만료, cleanup 실패, 서버 재시작 등으로 �
 ## ✅ Tests
 
 ```bash
-./gradlew :smite-core:test --tests com.sang.smite.domain.game.service.GameRoomReadServiceTest --tests com.sang.smite.domain.game.service.GameRoomReadServiceJpaTest
-./gradlew :smite-api:test --tests com.sang.smite.match.service.MatchQueueServiceTest
-./gradlew :smite-api:test --tests com.sang.smite.match.service.MatchQueueServiceTest :smite-matching:test --tests com.sang.smite.matching.command.MatchServiceTest
+./gradlew :league-of-star-core:test --tests com.sang.leagueofstar.domain.game.service.GameRoomReadServiceTest --tests com.sang.leagueofstar.domain.game.service.GameRoomReadServiceJpaTest
+./gradlew :league-of-star-api:test --tests com.sang.leagueofstar.match.service.MatchQueueServiceTest
+./gradlew :league-of-star-api:test --tests com.sang.leagueofstar.match.service.MatchQueueServiceTest :league-of-star-matching:test --tests com.sang.leagueofstar.matching.command.MatchServiceTest
 ```
 
 결과는 모두 `BUILD SUCCESSFUL`임.

@@ -29,7 +29,7 @@ const gameWebSocketMock = vi.hoisted(() => {
       setHandlers: vi.fn(),
       sendClientReady: vi.fn(),
       sendRttPong: vi.fn(),
-      sendSmite: vi.fn(),
+      sendLightning: vi.fn(),
       close: vi.fn(),
     },
   }
@@ -119,7 +119,7 @@ describe('GameWaitingPage', () => {
     gameWebSocketMock.state.connection.setHandlers.mockClear()
     gameWebSocketMock.state.connection.sendClientReady.mockClear()
     gameWebSocketMock.state.connection.sendRttPong.mockClear()
-    gameWebSocketMock.state.connection.sendSmite.mockClear()
+    gameWebSocketMock.state.connection.sendLightning.mockClear()
     gameWebSocketMock.state.connection.close.mockClear()
     gameWebSocketHandoffMock.handoffGameWebSocket.mockClear()
     gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReset()
@@ -162,7 +162,7 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -203,7 +203,7 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -282,7 +282,7 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -297,7 +297,7 @@ describe('GameWaitingPage', () => {
 
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('preloading')
     expect(createdVideoElements).toHaveLength(1)
-    expect(createdVideoElements[0]?.getAttribute('src')).toBe('/assets/game/dragon-view.mp4')
+    expect(createdVideoElements[0]?.getAttribute('src')).toBe('/assets/game/star-core-view.mp4')
     expect(createdVideoElements[0]?.load).toHaveBeenCalledTimes(1)
 
     emitLatestVideoPreloadEvent('loadeddata')
@@ -351,7 +351,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -377,7 +377,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -407,7 +407,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -432,7 +432,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -494,7 +494,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -532,7 +532,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -573,7 +573,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -605,7 +605,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [
               {
@@ -626,7 +626,7 @@ describe('GameWaitingPage', () => {
     expect(storedPayload?.gameRoomId).toBe(100)
     expect(storedPayload?.serverTime).toBe(Date.now())
     expect(storedPayload?.startAt).toBe(startAt)
-    expect(storedPayload?.scenario.dragonMaxHp).toBe(10000)
+    expect(storedPayload?.scenario.starCoreMaxHp).toBe(10000)
     expect(storedPayload?.receivedAt).toBe('2026-06-01T00:00:00.000Z')
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('starting')
     expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('GAME_START')
@@ -655,7 +655,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -673,7 +673,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -695,7 +695,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -713,7 +713,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -739,7 +739,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -757,7 +757,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -784,7 +784,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -816,7 +816,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 4000,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -843,7 +843,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -861,7 +861,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -900,7 +900,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -918,7 +918,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -951,7 +951,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -984,7 +984,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1019,7 +1019,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1053,7 +1053,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1099,7 +1099,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1122,7 +1122,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1157,7 +1157,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1192,7 +1192,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1233,7 +1233,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1288,7 +1288,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1309,7 +1309,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1349,7 +1349,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1392,7 +1392,7 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 101,
-        videoUrl: '/assets/game/dragon-view.mp4',
+        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/101',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',

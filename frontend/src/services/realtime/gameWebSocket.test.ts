@@ -138,12 +138,12 @@ describe('connectGameWebSocket', () => {
 
     connection.sendClientReady()
     connection.sendRttPong(7)
-    connection.sendSmite()
+    connection.sendLightning()
 
     expect(socket?.sentMessages).toEqual([
       '{"type":"CLIENT_READY","payload":{}}',
       '{"type":"RTT_PONG","payload":{"seq":7}}',
-      '{"type":"SMITE","payload":null}',
+      '{"type":"LIGHTNING","payload":null}',
     ])
   })
 

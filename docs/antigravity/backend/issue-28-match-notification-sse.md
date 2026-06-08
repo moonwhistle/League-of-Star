@@ -128,7 +128,7 @@ V2: 동시 연결 부하 테스트에서 리소스 한계가 확인되면 WebFlu
 
 현재 코드 기준으로 V1은 MVC `SseEmitter` 기반으로 구현합니다.
 
-확인 결과 `smite-api`는 `spring-boot-starter-web` 기반 MVC 애플리케이션입니다. WebFlux 의존성은 없고, Security도 Servlet 기반 `SecurityFilterChain`, `OncePerRequestFilter` 구조로 구성되어 있습니다. 따라서 WebFlux/Netty를 이번 이슈에 바로 도입하면 기존 MVC API, Security, RestDocs/MockMvc 테스트 구조와 섞이면서 변경 범위가 커집니다.
+확인 결과 `league-of-star-api`는 `spring-boot-starter-web` 기반 MVC 애플리케이션입니다. WebFlux 의존성은 없고, Security도 Servlet 기반 `SecurityFilterChain`, `OncePerRequestFilter` 구조로 구성되어 있습니다. 따라서 WebFlux/Netty를 이번 이슈에 바로 도입하면 기존 MVC API, Security, RestDocs/MockMvc 테스트 구조와 섞이면서 변경 범위가 커집니다.
 
 반면 MVC `SseEmitter`는 현재 구조와 바로 맞습니다. 기존 JWT 필터가 `Authorization: Bearer` 토큰을 검증하고, `@AuthUser` argument resolver가 `SecurityContextHolder`에서 인증 정보를 읽어 유저 ID를 추출하므로 SSE 연결 API에서도 같은 인증 흐름을 재사용할 수 있습니다.
 
@@ -190,7 +190,7 @@ sequenceDiagram
     autonumber
     participant ClientA as Client A
     participant ClientB as Client B
-    participant API as smite-api
+    participant API as league-of-star-api
     participant Registry as SseConnectionRegistry
     participant Engine as MatchEngine
     participant Found as MatchFoundService
@@ -265,14 +265,14 @@ MatchFoundEvent = 이벤트가 발생한 JVM 내부에서만 전달
 따라서 API 인스턴스가 2대 이상이면 아래 문제가 생깁니다.
 
 ```text
-userA SSE 연결 -> smite-api-1
-userB SSE 연결 -> smite-api-2
+userA SSE 연결 -> league-of-star-api-1
+userB SSE 연결 -> league-of-star-api-2
 
-매칭 엔진 실행 -> smite-api-1
-MatchFoundEvent 발행 -> smite-api-1 JVM 내부
+매칭 엔진 실행 -> league-of-star-api-1
+MatchFoundEvent 발행 -> league-of-star-api-1 JVM 내부
 
-smite-api-1은 userA 연결만 찾을 수 있음
-smite-api-2에 붙은 userB 연결은 찾을 수 없음
+league-of-star-api-1은 userA 연결만 찾을 수 있음
+league-of-star-api-2에 붙은 userB 연결은 찾을 수 없음
 ```
 
 부하 테스트에서도 10,000명 연결은 안정적으로 유지됐지만, `match_found`는 이벤트가 발생한 인스턴스에 연결된 유저에게만 전달되는 한계가 확인되었습니다.
@@ -298,7 +298,7 @@ MatchFoundEvent 발생
 
 ### 1. SSE V1 구현 방식 결정
 - [x] **현재 API 서버 구조 확인**
-  - `smite-api`가 현재 `spring-boot-starter-web` 기반으로 동작하는지 확인
+  - `league-of-star-api`가 현재 `spring-boot-starter-web` 기반으로 동작하는지 확인
   - 기존 MVC 컨트롤러, Spring Security, RestDocs/OpenAPI 구성과 함께 `SseEmitter`를 사용할 수 있는지 확인
   - SSE 연결 timeout, async request timeout, Tomcat connection 설정 확인
 
@@ -714,7 +714,7 @@ MatchFoundService
 - `SseConnectionRegistry`
   - `ConcurrentHashMap<Long, SseConnection>`으로 유저별 SSE 연결을 저장합니다.
   - 이 map은 Redis가 아니라 각 API 인스턴스의 JVM 메모리에만 존재합니다.
-  - 따라서 `smite-api-1`에 연결된 유저는 `smite-api-1`만 전송할 수 있고, `smite-api-2`에서는 해당 연결을 알 수 없습니다.
+  - 따라서 `league-of-star-api-1`에 연결된 유저는 `league-of-star-api-1`만 전송할 수 있고, `league-of-star-api-2`에서는 해당 연결을 알 수 없습니다.
 
 - `MatchFoundService`
   - 매칭 세션 저장 후 `ApplicationEventPublisher.publishEvent(new MatchFoundEvent(...))`를 호출합니다.
@@ -729,8 +729,8 @@ MatchFoundService
 
 ```text
 SSE 연결 10,000명
--> smite-api-1 약 5,000명
--> smite-api-2 약 5,000명
+-> league-of-star-api-1 약 5,000명
+-> league-of-star-api-2 약 5,000명
 
 매칭 엔진 실행 인스턴스에서 MatchFoundEvent 발생
 -> 해당 인스턴스 registry에 있는 유저에게만 match_found 전송
@@ -833,7 +833,7 @@ Netty/WebFlux로 전환해도 `SSE 연결 저장소 = 인스턴스 메모리`, `
 - `MatchFoundPubSubPublishListener`는 `MatchFoundEvent`를 Redis Pub/Sub 메시지로 변환해 publish만 담당합니다.
 - 실제 SSE 전송은 각 API 인스턴스의 `MatchFoundPubSubSubscriber -> MatchFoundSseSender` 경로에서만 수행합니다.
 - 모든 API 인스턴스가 같은 Pub/Sub 메시지를 받지만, 각 인스턴스는 자기 JVM 메모리의 `SseConnectionRegistry`에 존재하는 연결에만 전송합니다.
-- 따라서 `smite-api-1`에 붙은 유저는 `smite-api-1`에서만, `smite-api-2`에 붙은 유저는 `smite-api-2`에서만 알림을 받습니다.
+- 따라서 `league-of-star-api-1`에 붙은 유저는 `league-of-star-api-1`에서만, `league-of-star-api-2`에 붙은 유저는 `league-of-star-api-2`에서만 알림을 받습니다.
 - 로컬 직접 전송 리스너를 제거했기 때문에 같은 인스턴스에서 Pub/Sub 전송과 로컬 전송이 동시에 실행되어 중복 알림이 발생하지 않습니다.
 
 - [x] **관측 지표 보강**

@@ -133,7 +133,7 @@ type GameWaitingServerMessage =
         serverTime: number;
         startAt: number;
         scenario: {
-          dragonMaxHp: number;
+          starCoreMaxHp: number;
           durationMs: number;
           hpTimeline: {
             timeMs: number;
@@ -183,7 +183,7 @@ type GameWaitingServerMessage =
 - `GAME_START` scenario 저장 구현.
 - `GAME_START` 수신 후 `/game/:gameRoomId/play` 이동 구현.
 - `/game/:gameRoomId/play` 실제 게임 플레이 UI 구현.
-- LIGHTNING 버튼 및 `{ type: 'SMITE', payload: null }` 전송 구현.
+- LIGHTNING 버튼 및 `{ type: 'LIGHTNING', payload: null }` 전송 구현.
 - `GAME_RESULT` 수신 후 결과 화면 이동 구현.
 - Game summary API 호출 구현.
 - WebSocket 재접속/복구 구현.
@@ -435,7 +435,7 @@ flowchart TD
 ## 📝 Note
 
 - WebSocket 재접속/복구는 이번 범위가 아님.
-- `COUNTDOWN`, `GAME_START`, game play, SMITE, result summary는 후속 이슈에서 구현함.
+- `COUNTDOWN`, `GAME_START`, game play, LIGHTNING, result summary는 후속 이슈에서 구현함.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`는 `/match` 복귀 기준으로 처리함.
 - invalid JSON은 백엔드 정상 응답이 아니므로 안전한 실패 복귀 대상으로 처리함.
 - client 30초 watchdog은 백엔드 timeout 판정 기준이 아니라 UX fallback임.

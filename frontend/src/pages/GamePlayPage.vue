@@ -77,7 +77,6 @@ let threeSceneController = createNoopThreeGalaxyBackgroundSceneController()
 let hasThreeSceneController = false
 
 const LIGHTNING_SENT_STORAGE_PREFIX = 'league-of-star.gamePlayLightningSent'
-const LEGACY_SMITE_SENT_STORAGE_PREFIX = 'smite.gamePlaySmiteSent'
 
 const playState = computed(() => {
   if (gameStartPayload.value === null || gameWaitingPayload.value === null) {
@@ -288,16 +287,9 @@ function buildLightningSentStorageKey(gameRoomId = '') {
   return `${LIGHTNING_SENT_STORAGE_PREFIX}:${gameRoomId}`
 }
 
-function buildLegacySmiteSentStorageKey(gameRoomId = '') {
-  return `${LEGACY_SMITE_SENT_STORAGE_PREFIX}:${gameRoomId}`
-}
-
 function readLightningSent(gameRoomId = '') {
   try {
-    return (
-      window.sessionStorage.getItem(buildLightningSentStorageKey(gameRoomId)) === 'true' ||
-      window.sessionStorage.getItem(buildLegacySmiteSentStorageKey(gameRoomId)) === 'true'
-    )
+    return window.sessionStorage.getItem(buildLightningSentStorageKey(gameRoomId)) === 'true'
   } catch {
     return false
   }

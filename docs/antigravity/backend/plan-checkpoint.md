@@ -21,9 +21,9 @@ flowchart TD
     N --> O["WebSocket RTT 5회 측정<br/>median으로 시작 가능 여부 판단"]
     O --> P["HP scenario 준비<br/>startAt 결정"]
     P --> Q["COUNTDOWN / GAME_START<br/>scenario 전달"]
-    Q --> R["SMITE command 수신<br/>serverReceiveTime 기준 판정"]
+    Q --> R["LIGHTNING command 수신<br/>serverReceiveTime 기준 판정"]
     R --> S["game_actions 저장"]
-    S --> SR{"SMITE 처치?"}
+    S --> SR{"LIGHTNING 처치?"}
     SR -->|"Yes"| SG["gameRoom FINISHED<br/>GAME_RESULT broadcast"]
     SR -->|"Both failed"| SD["gameRoom FINISHED DRAW<br/>GAME_RESULT broadcast"]
     SR -->|"One failed / no input"| SE["game:end:pending<br/>effective naturalDeathAt"]
@@ -59,7 +59,7 @@ flowchart TD
 - 양쪽 수락 시 `match_response_result` 발행 구현 완료
 - `match_response_result.game` payload는 `gameRoomId`, `videoUrl`, `webSocketUrl`을 포함한다.
 - `game_rooms`, `game_participants`, `game_actions`, `game_records` 도메인과 DDL은 준비됨
-- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, LIGHTNING 입력 저장/판정, SMITE 즉시 종료, 서버 scheduler 자연사 종료 보장, `NATURAL_DEATH_DRAW` 결과 전송까지 구현됨
+- 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, LIGHTNING 입력 저장/판정, LIGHTNING 즉시 종료, 서버 scheduler 자연사 종료 보장, `NATURAL_DEATH_DRAW` 결과 전송까지 구현됨
 
 ## 2. 핵심 결정
 
@@ -71,7 +71,7 @@ flowchart TD
 - 최종 판정은 RTT 보정 없이 서버 수신 시각과 서버 시나리오 기준으로 한다.
 - 매칭 SSE는 매칭 결과와 게임 대기 화면 진입 정보까지만 담당한다.
 - `GO_TO_GAME_WAITING`은 gameRoom/scenario 생성과 Redis `ACCEPTED`/`IN_GAME` 상태 전환이 모두 끝난 뒤 발행한다.
-- `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/SMITE/종료 처리는 WebSocket으로 담당한다.
+- `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/LIGHTNING/종료 처리는 WebSocket으로 담당한다.
 - 별도의 SSE `game_ready` 이벤트는 만들지 않는다.
 - `match_response_result`는 해당 matchId의 매칭 응답 최종 이벤트다.
 - 클라이언트는 `match_response_result.action`별로 매칭 SSE close/유지 정책을 분기한다.
@@ -100,7 +100,7 @@ flowchart TD
 17. 서버가 HP scenario 준비, `startAt` 결정, gameRoom 시작 처리를 수행
 18. WebSocket으로 `COUNTDOWN`/`GAME_START`와 scenario를 전달
 19. 클라이언트가 `startAt` 기준으로 MP4 재생 + HP overlay 렌더링
-20. 유저가 D/F 입력 시 WebSocket으로 `SMITE` 전송
+20. 유저가 D/F 입력 시 WebSocket으로 `LIGHTNING` 전송
 21. 서버가 수신 시각 기준으로 HP 역산
 22. 승패 판정
 23. `game_actions` 저장
@@ -178,13 +178,13 @@ flowchart TD
 
 ### Step 7. LIGHTNING 입력과 서버 판정
 
-- [x] 클라이언트는 WebSocket으로 `SMITE` 명령만 전송
+- [x] 클라이언트는 WebSocket으로 `LIGHTNING` 명령만 전송
 - [x] 서버는 `serverReceiveTime` 기록
-- [x] `smiteTimeMs = serverReceiveTime - gameStartTime`
+- [x] `lightningTimeMs = serverReceiveTime - gameStartTime`
 - [x] scenario에서 HP 역산
 - [x] `game_actions` 저장
-- [x] 중복 SMITE 차단
-- [x] 같은 WebSocket 경로에서 RTT 측정과 SMITE 수신을 처리하되, LIGHTNING 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리
+- [x] 중복 LIGHTNING 차단
+- [x] 같은 WebSocket 경로에서 RTT 측정과 LIGHTNING 수신을 처리하되, LIGHTNING 판정은 RTT 보정 없이 서버 수신 시각 기준으로 처리
 - [x] LIGHTNING으로 HP가 `0` 이하가 되면 gameRoom을 즉시 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast
 - [x] 두 유저가 모두 실패 LIGHTNING을 사용하면 gameRoom을 즉시 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast
 - [x] 이미 `FINISHED`인 gameRoom에 늦게 도착한 LIGHTNING은 새 action 없이 현재 `GAME_RESULT`를 재응답
@@ -193,7 +193,7 @@ flowchart TD
 
 - [x] WebSocket 연결 유무와 무관하게 gameRoom 종료 scheduler 실행
 - [x] `GAME_START` 시 최초 `naturalDeathAt = startAt + scenario.durationMs` 기준 종료 후보 등록
-- [x] 실패 SMITE 누적 데미지 기준 effective naturalDeathAt을 계산해 pending score를 앞당김
+- [x] 실패 LIGHTNING 누적 데미지 기준 effective naturalDeathAt을 계산해 pending score를 앞당김
 - [x] scheduler 지연 시에도 `game:end:pending` due 조회 후 DB row lock 안에서 최종 상태를 재판정
 - [x] 이미 FINISHED/ABORTED 된 gameRoom은 종료 job이 no-op 처리
 - [x] GAME_START 이후 양쪽 WebSocket이 끊겨도 서버가 자연사 DRAW를 확정
@@ -324,7 +324,7 @@ MVP에서 반드시 포함할 것:
 - 게임 대기 WebSocket
 - RTT 측정
 - `GAME_START` scenario 전달
-- SMITE 서버 판정
+- LIGHTNING 서버 판정
 - `game_actions` 저장
 - `game_records` 저장
 
@@ -538,7 +538,7 @@ GAME_START 이후 WebSocket disconnect
 
 - 매칭 SSE는 `match_found`와 `match_response_result`까지만 담당한다는 정책과 일치한다.
 - `GO_TO_GAME_WAITING`을 gameRoom 생성 이후 발행하므로 클라이언트가 빈 game payload로 대기 화면에 진입하지 않는다.
-- WebSocket은 게임 준비/RTT/카운트다운/SMITE/종료를 담당하므로 SSE 단방향 한계와 충돌하지 않는다.
+- WebSocket은 게임 준비/RTT/카운트다운/LIGHTNING/종료를 담당하므로 SSE 단방향 한계와 충돌하지 않는다.
 - 기존 timeout/reject 정책은 유지된다. reject 단독 발생 시 즉시 실패 이벤트를 보내지 않는 정책도 유지된다.
 - Redis match session은 매칭 응답 정산 기록으로만 쓰고, 게임 상태를 Redis match session에 계속 확장하지 않으므로 DB DDL의 `game_rooms` 생명주기와 충돌하지 않는다.
 - gameRoom 생성 실패 이벤트는 Issue 36의 필수 범위로 포함한다. 기존 issue-34 reason/action mapping에는 `GAME_SETUP_FAILED`가 없으므로 Step 1 구현에서 enum, factory mapping, 문서를 함께 확장해야 한다.
@@ -712,7 +712,7 @@ gameRoom 생성 실패 mapping:
 - 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고 `startAt` 기준으로 MP4 재생과 HP overlay 계산 가능
 - 카운트다운 종료 후 추가 서버 메시지 대기 없이 게임을 시작할 수 있음
 
-### Issue 48. SMITE 서버 판정과 action 저장
+### Issue 48. LIGHTNING 서버 판정과 action 저장
 
 목표:
 
@@ -720,11 +720,11 @@ gameRoom 생성 실패 mapping:
 
 범위:
 
-- WebSocket `SMITE` command 수신
+- WebSocket `LIGHTNING` command 수신
 - `serverReceiveTime` 기록
-- `smiteTimeMs = serverReceiveTime - gameStartTime`
+- `lightningTimeMs = serverReceiveTime - gameStartTime`
 - scenario 기준 HP 역산
-- 중복 SMITE 차단
+- 중복 LIGHTNING 차단
 - `game_actions` 저장
 
 완료 기준:

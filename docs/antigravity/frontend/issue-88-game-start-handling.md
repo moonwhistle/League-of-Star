@@ -57,7 +57,7 @@ interface GameStartPayload {
   serverTime: number;
   startAt: number;
   scenario: {
-    dragonMaxHp: number;
+    starCoreMaxHp: number;
     durationMs: number;
     hpTimeline: {
       timeMs: number;
@@ -75,7 +75,7 @@ interface StoredGameStartPayload {
   serverTime: number;
   startAt: number;
   scenario: {
-    dragonMaxHp: number;
+    starCoreMaxHp: number;
     durationMs: number;
     hpTimeline: {
       timeMs: number;
@@ -108,7 +108,7 @@ interface StoredGameStartPayload {
 - `COUNTDOWN` payload의 `gameRoomId`, `serverTime`, `startAt`, `countdownDisplaySeconds` 반영.
 - `GAME_START` 수신 시 `serverTime`, `startAt`, `scenario` 저장 구현.
 - game start payload `sessionStorage` 저장/조회 helper 구현.
-- 저장 key는 현재 구현 기준 `league-of-star.gameStartPayload:{gameRoomId}`를 우선 사용하고, 기존 진행 세션 복구를 위해 `smite.gameStartPayload:{gameRoomId}`는 읽기 fallback으로 유지.
+- 저장 key는 `league-of-star.gameStartPayload:{gameRoomId}`만 사용한다. League of Star 계약 전환 이후 기존 namespace fallback은 유지하지 않는다.
 - route param `gameRoomId`와 `GAME_START.payload.gameRoomId` 불일치 시 play 이동 금지 구현.
 - `COUNTDOWN.startAt`과 `GAME_START.startAt` 불일치 시 play 이동 금지 구현.
 - `GAME_START` 수신 후 `/game/:gameRoomId/play` 이동 구현.
@@ -125,7 +125,7 @@ interface StoredGameStartPayload {
 - `/game/:gameRoomId/play` 실제 MP4 video 표시 구현.
 - HP bar, countdown, smite button HUD 구현.
 - `requestAnimationFrame` 기반 HP 표시 구현.
-- LIGHTNING 클릭 시 `{ type: 'SMITE', payload: null }` 전송 구현.
+- LIGHTNING 클릭 시 `{ type: 'LIGHTNING', payload: null }` 전송 구현.
 - `ERROR` 수신 시 play 화면 내 message 표시 구현.
 - `GAME_RESULT` 수신 후 result route 이동 구현.
 - Game summary API 호출 구현.
@@ -153,7 +153,7 @@ interface StoredGameStartPayload {
 
 - [x] `sessionStorage` 저장 helper 구현.
 - [x] `sessionStorage` 조회 helper 구현.
-- [x] 저장 key를 `league-of-star.gameStartPayload:{gameRoomId}` 기준으로 구현하고, `smite.gameStartPayload:{gameRoomId}` 읽기 fallback 유지.
+- [x] 저장 key를 `league-of-star.gameStartPayload:{gameRoomId}` 기준으로 구현하고, 기존 namespace 읽기 fallback은 제거.
 - [x] 저장 payload에 `gameRoomId`, `serverTime`, `startAt`, `scenario`, `receivedAt` 포함.
 - [x] route param `gameRoomId`와 저장 payload 불일치 시 `null` 반환 구현.
 - [x] malformed JSON, payload shape 불일치, 빈 scenario 필수 값 누락 시 `null` 반환 구현.
@@ -187,9 +187,9 @@ interface StoredGameStartPayload {
 
 - [x] `/game/:gameRoomId/play`에서 저장된 game start payload 조회.
 - [x] payload 없음, parse 실패, route param 불일치 시 `/match` 복귀.
-- [x] 유효 payload가 있으면 `gameRoomId`, `startAt`, `dragonMaxHp`, `durationMs`를 내부 상태로 보관.
+- [x] 유효 payload가 있으면 `gameRoomId`, `startAt`, `starCoreMaxHp`, `durationMs`를 내부 상태로 보관.
 - [x] 화면에는 이번 이슈 범위가 시작 데이터 수신/대기임을 나타내는 최소 상태만 표시.
-- [x] 실제 MP4, HP bar, SMITE HUD는 구현하지 않음.
+- [x] 실제 MP4, HP bar, LIGHTNING HUD는 구현하지 않음.
 - [x] `startAt` 기준 runtime 계산은 후속 play UI가 사용할 수 있도록 `getHpAtElapsedMs` helper와 연결 가능한 구조로 유지.
 
 ### 6. Locale 구현
@@ -272,7 +272,7 @@ interface StoredGameStartPayload {
 - `COUNTDOWN.startAt`과 `GAME_START.startAt` 불일치 시 play route 이동이 발생하지 않음.
 - `GAME_START` 이후 늦은 WebSocket close/error callback이 waiting 상태를 실패로 되돌리지 않음.
 - Game Waiting loading bar 의미가 payload 수신율로 유지됨.
-- 실제 MP4/HP/SMITE/GAME_RESULT는 이번 이슈에서 구현하지 않음.
+- 실제 MP4/HP/LIGHTNING/GAME_RESULT는 이번 이슈에서 구현하지 않음.
 - lint / format / typecheck / test / build 통과.
 - desktop/mobile viewport에서 horizontal overflow와 text overflow 후보가 없음.
 
@@ -312,17 +312,17 @@ flowchart TD
 - `GAME_START` 이후 늦은 WebSocket close/error callback은 실패 복귀로 덮어쓰지 않음.
 - server/client clock 보정은 이번 PR에서 하지 않음.
 - Game Waiting loading bar는 payload 수신율 의미로 유지함.
-- 실제 MP4 재생, HP bar, SMITE, `GAME_RESULT`는 후속 이슈 범위임.
+- 실제 MP4 재생, HP bar, LIGHTNING, `GAME_RESULT`는 후속 이슈 범위임.
 
 백엔드와의 구현 계약:
 
 - `COUNTDOWN` payload는 `gameRoomId`, `serverTime`, `startAt`, `countdownDisplaySeconds`를 사용함.
 - `GAME_START` payload는 `gameRoomId`, `serverTime`, `startAt`, `scenario`를 사용함.
-- `scenario`는 League of Star 기준 `starCoreMaxHp`, `durationMs`, `hpTimeline`으로 구성될 수 있고, 백엔드 레거시 payload 호환을 위해 `dragonMaxHp`도 허용함.
+- `scenario`는 League of Star 기준 `starCoreMaxHp`, `durationMs`, `hpTimeline`으로 구성될 수 있고, 백엔드 레거시 payload 호환을 위해 `starCoreMaxHp`도 허용함.
 - 프론트는 백엔드가 내려준 `serverTime`, `startAt`을 그대로 저장함.
 - route param `gameRoomId`와 payload `gameRoomId`가 다르면 잘못된 메시지로 보고 시작하지 않음.
 - `COUNTDOWN.startAt`과 `GAME_START.startAt`이 다르면 백엔드 동기화 계약 위반으로 보고 시작하지 않음.
-- `/game/:gameRoomId/play`는 `league-of-star.gameStartPayload:{gameRoomId}`를 우선 읽고, 없으면 `smite.gameStartPayload:{gameRoomId}`를 fallback으로 읽음. payload가 없거나 route와 맞지 않으면 `/match`로 복귀함.
+- `/game/:gameRoomId/play`는 `league-of-star.gameStartPayload:{gameRoomId}`만 읽음. payload가 없거나 route와 맞지 않으면 `/match`로 복귀함.
 - `GAME_START` 이전 실패는 유효한 판이 아니므로 record/LP/큐 자동 복귀 흐름을 만들지 않음.
 
 ## 📚 Changes
@@ -337,7 +337,7 @@ flowchart TD
   `GAME_START` 메시지는 백엔드 이벤트지만 프론트는 런타임 payload shape를 그대로 신뢰하지 않음. `gameRoomId`, `serverTime`, `startAt`, `scenario`, `hpTimeline` 구조를 검증한 뒤 저장해 malformed payload가 play route까지 전파되지 않게 함.
 
 - waiting과 play의 책임을 분리함.
-  waiting은 `COUNTDOWN`, `GAME_START`를 받고 안전하게 play로 넘기는 역할만 담당함. play 화면은 저장된 시작 데이터를 확인하고 후속 HUD가 사용할 `startAt` 기반 elapsed/HP 계산값만 연결함. 실제 MP4/HUD/SMITE 구현은 다음 이슈에서 처리함.
+  waiting은 `COUNTDOWN`, `GAME_START`를 받고 안전하게 play로 넘기는 역할만 담당함. play 화면은 저장된 시작 데이터를 확인하고 후속 HUD가 사용할 `startAt` 기반 elapsed/HP 계산값만 연결함. 실제 MP4/HUD/LIGHTNING 구현은 다음 이슈에서 처리함.
 
 - `startAt` 검증을 엄격하게 유지함.
   `COUNTDOWN`과 `GAME_START`가 서로 다른 `startAt`을 가지면 두 클라이언트의 시작 기준이 어긋날 수 있으므로 시작하지 않음. 이는 백엔드가 두 메시지에 같은 `startAt`을 사용한다는 계약을 프론트에서도 방어하는 처리임.
@@ -357,7 +357,7 @@ flowchart TD
 ## 📝 Note
 
 - 실제 MP4 video 표시, HP bar, countdown HUD, LIGHTNING 버튼은 이번 범위가 아님.
-- `SMITE` 전송과 `GAME_RESULT` 수신 후 result route 이동은 후속 이슈에서 구현함.
+- `LIGHTNING` 전송과 `GAME_RESULT` 수신 후 result route 이동은 후속 이슈에서 구현함.
 - Game summary API 호출은 후속 결과 화면 이슈에서 구현함.
 - clock skew 보정과 WebSocket 재접속/복구는 이번 범위가 아님.
 - 실패 복귀 시 match join/leave API를 호출하지 않고 큐 자동 복귀도 하지 않음.
