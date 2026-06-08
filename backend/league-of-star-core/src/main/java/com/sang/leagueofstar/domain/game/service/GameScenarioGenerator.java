@@ -71,7 +71,7 @@ public class GameScenarioGenerator {
                 .sum();
 
         List<HpStep> steps = new ArrayList<>(weights.size() + 1);
-        steps.add(new HpStep(0, GameRoom.DEFAULT_DRAGON_MAX_HP));
+        steps.add(new HpStep(0, GameRoom.DEFAULT_STAR_CORE_MAX_HP));
 
         int cumulativeWeight = 0;
         for (int index = 0; index < weights.size(); index++) {
@@ -89,8 +89,8 @@ public class GameScenarioGenerator {
             return 0;
         }
         int damage = (int) Math.round(
-                (double) GameRoom.DEFAULT_DRAGON_MAX_HP * cumulativeWeight / totalWeight
+                (double) GameRoom.DEFAULT_STAR_CORE_MAX_HP * cumulativeWeight / totalWeight
         );
-        return Math.max(0, GameRoom.DEFAULT_DRAGON_MAX_HP - damage);
+        return Math.max(0, GameRoom.DEFAULT_STAR_CORE_MAX_HP - damage);
     }
 }

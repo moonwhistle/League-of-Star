@@ -6,7 +6,7 @@ import com.sang.leagueofstar.domain.game.domain.vo.HpStep;
 import java.util.List;
 
 public record GameStartScenarioPayload(
-        int dragonMaxHp,
+        int starCoreMaxHp,
         long durationMs,
         List<HpTimelineStep> hpTimeline
 ) {
@@ -16,13 +16,13 @@ public record GameStartScenarioPayload(
                 .map(HpTimelineStep::from)
                 .toList();
         return new GameStartScenarioPayload(
-                resolveDragonMaxHp(hpTimeline),
+                resolveStarCoreMaxHp(hpTimeline),
                 resolveDurationMs(hpTimeline),
                 hpTimeline
         );
     }
 
-    private static int resolveDragonMaxHp(List<HpTimelineStep> hpTimeline) {
+    private static int resolveStarCoreMaxHp(List<HpTimelineStep> hpTimeline) {
         if (hpTimeline.isEmpty()) {
             return 0;
         }

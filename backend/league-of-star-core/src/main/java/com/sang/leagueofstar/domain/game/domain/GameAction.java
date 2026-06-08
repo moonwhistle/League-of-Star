@@ -44,7 +44,7 @@ public class GameAction extends BaseEntity {
     private int lightningTimeMs;
 
     @Column(nullable = false)
-    private int dragonHpAtLightning;
+    private int starCoreHpAtLightning;
 
     @Column(nullable = false)
     private boolean isKill;
@@ -53,14 +53,14 @@ public class GameAction extends BaseEntity {
                                    Long userId,
                                    long serverReceiveTimeMs,
                                    int lightningTimeMs,
-                                   int dragonHpAtLightning) {
+                                   int starCoreHpAtLightning) {
         return GameAction.builder()
                 .gameRoomId(gameRoomId)
                 .userId(userId)
                 .serverReceiveTimeMs(serverReceiveTimeMs)
                 .lightningTimeMs(lightningTimeMs)
-                .dragonHpAtLightning(dragonHpAtLightning)
-                .isKill(dragonHpAtLightning <= GameRules.LIGHTNING_DAMAGE)
+                .starCoreHpAtLightning(starCoreHpAtLightning)
+                .isKill(starCoreHpAtLightning <= GameRules.LIGHTNING_DAMAGE)
                 .build();
     }
 }

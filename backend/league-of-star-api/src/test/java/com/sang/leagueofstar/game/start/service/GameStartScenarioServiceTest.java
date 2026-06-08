@@ -34,7 +34,7 @@ class GameStartScenarioServiceTest {
         GameStartScenarioPayload result = service.getScenarioPayload(GAME_ROOM_ID);
 
         // then
-        assertThat(result.dragonMaxHp()).isEqualTo(10000);
+        assertThat(result.starCoreMaxHp()).isEqualTo(10000);
         assertThat(result.durationMs()).isEqualTo(1000L);
         assertThat(result.hpTimeline()).containsExactly(
                 new GameStartScenarioPayload.HpTimelineStep(0L, 10000),

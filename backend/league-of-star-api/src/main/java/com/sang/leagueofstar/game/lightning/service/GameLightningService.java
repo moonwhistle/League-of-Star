@@ -63,7 +63,7 @@ public class GameLightningService {
     private Optional<GameLightningHandleResponse> toResponse(Long gameRoomId,
                                                          GameRoom gameRoom,
                                                          GameActionSaveResult saveResult) {
-        if (saveResult.action().getDragonHpAtLightning() > GameRules.LIGHTNING_DAMAGE) {
+        if (saveResult.action().getStarCoreHpAtLightning() > GameRules.LIGHTNING_DAMAGE) {
             return nonKillResponse(gameRoomId, gameRoom);
         }
 

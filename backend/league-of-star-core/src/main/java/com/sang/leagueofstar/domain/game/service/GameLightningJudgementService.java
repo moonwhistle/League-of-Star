@@ -27,8 +27,8 @@ public class GameLightningJudgementService {
 
         int baseHp = calculateBaseHp(gameRoom.getScenarioData().steps(), lightningTimeMillis);
         int previousLightningDamage = countEarlierActions(existingActions, serverReceiveTimeMs) * GameRules.LIGHTNING_DAMAGE;
-        int dragonHpAtLightning = Math.max(0, baseHp - previousLightningDamage);
-        if (dragonHpAtLightning <= 0) {
+        int starCoreHpAtLightning = Math.max(0, baseHp - previousLightningDamage);
+        if (starCoreHpAtLightning <= 0) {
             return Optional.empty();
         }
 
@@ -37,7 +37,7 @@ public class GameLightningJudgementService {
                 userId,
                 serverReceiveTimeMs,
                 Math.toIntExact(lightningTimeMillis),
-                dragonHpAtLightning
+                starCoreHpAtLightning
         ));
     }
 

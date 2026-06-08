@@ -40,7 +40,7 @@ import java.util.Objects;
 public class GameRoom extends BaseEntity {
 
     public static final int MAX_PARTICIPANTS = 2;
-    public static final int DEFAULT_DRAGON_MAX_HP = GameRules.DRAGON_INITIAL_HP;
+    public static final int DEFAULT_STAR_CORE_MAX_HP = GameRules.STAR_CORE_INITIAL_HP;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -65,7 +65,7 @@ public class GameRoom extends BaseEntity {
 
     @Column(nullable = false)
     @Builder.Default
-    private int dragonMaxHp = DEFAULT_DRAGON_MAX_HP;
+    private int starCoreMaxHp = DEFAULT_STAR_CORE_MAX_HP;
 
     @Column(nullable = false)
     private int durationSeconds;

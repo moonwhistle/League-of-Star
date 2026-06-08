@@ -115,7 +115,7 @@ class GameWebSocketServerMessageTest {
         assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
         assertThat(json.get("payload").get("serverTime").asLong()).isEqualTo(1000L);
         assertThat(json.get("payload").get("startAt").asLong()).isEqualTo(5000L);
-        assertThat(json.get("payload").get("scenario").get("dragonMaxHp").asInt()).isEqualTo(10000);
+        assertThat(json.get("payload").get("scenario").get("starCoreMaxHp").asInt()).isEqualTo(10000);
         assertThat(json.get("payload").get("scenario").get("hpTimeline").get(0).get("hp").asInt()).isEqualTo(10000);
     }
 

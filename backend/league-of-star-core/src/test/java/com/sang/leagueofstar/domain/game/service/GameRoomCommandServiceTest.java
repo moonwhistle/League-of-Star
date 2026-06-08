@@ -38,7 +38,7 @@ class GameRoomCommandServiceTest {
     private static final int MIN_GAME_DURATION_SECONDS = 8;
     private static final int MAX_GAME_DURATION_SECONDS = 17;
     private static final GameScenario SCENARIO = GameScenario.of(List.of(
-            new HpStep(0, GameRoom.DEFAULT_DRAGON_MAX_HP),
+            new HpStep(0, GameRoom.DEFAULT_STAR_CORE_MAX_HP),
             new HpStep(200, 9_600),
             new HpStep(400, 0)
     ));

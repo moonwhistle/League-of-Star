@@ -114,9 +114,9 @@ public class GameResultPayloadFactory {
                 action.getUserId(),
                 action.getServerReceiveTimeMs(),
                 action.getLightningTimeMs(),
-                action.getDragonHpAtLightning(),
+                action.getStarCoreHpAtLightning(),
                 GameRules.LIGHTNING_DAMAGE,
-                Math.max(0, action.getDragonHpAtLightning() - GameRules.LIGHTNING_DAMAGE),
+                Math.max(0, action.getStarCoreHpAtLightning() - GameRules.LIGHTNING_DAMAGE),
                 action.isKill()
         );
     }

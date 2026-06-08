@@ -25,7 +25,7 @@ class GameStartScenarioPayloadTest {
         GameStartScenarioPayload result = GameStartScenarioPayload.from(scenarioData);
 
         // then
-        assertThat(result.dragonMaxHp()).isEqualTo(10000);
+        assertThat(result.starCoreMaxHp()).isEqualTo(10000);
         assertThat(result.durationMs()).isEqualTo(2000L);
         assertThat(result.hpTimeline()).containsExactly(
                 new GameStartScenarioPayload.HpTimelineStep(0L, 10000),

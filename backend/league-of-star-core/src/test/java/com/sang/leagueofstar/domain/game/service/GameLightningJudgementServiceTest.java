@@ -44,7 +44,7 @@ class GameLightningJudgementServiceTest {
         assertThat(action.getUserId()).isEqualTo(FIRST_USER_ID);
         assertThat(action.getServerReceiveTimeMs()).isEqualTo(START_AT_MILLIS + 500L);
         assertThat(action.getLightningTimeMs()).isEqualTo(500);
-        assertThat(action.getDragonHpAtLightning()).isEqualTo(7_500);
+        assertThat(action.getStarCoreHpAtLightning()).isEqualTo(7_500);
         assertThat(action.isKill()).isFalse();
     }
 
@@ -69,7 +69,7 @@ class GameLightningJudgementServiceTest {
         // then
         assertThat(result).isPresent();
         assertThat(result.get().getLightningTimeMs()).isEqualTo(1_000);
-        assertThat(result.get().getDragonHpAtLightning()).isEqualTo(800);
+        assertThat(result.get().getStarCoreHpAtLightning()).isEqualTo(800);
         assertThat(result.get().isKill()).isTrue();
     }
 
@@ -93,7 +93,7 @@ class GameLightningJudgementServiceTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().getDragonHpAtLightning()).isEqualTo(2_000);
+        assertThat(result.get().getStarCoreHpAtLightning()).isEqualTo(2_000);
         assertThat(result.get().isKill()).isFalse();
     }
 
@@ -117,7 +117,7 @@ class GameLightningJudgementServiceTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().getDragonHpAtLightning()).isEqualTo(800);
+        assertThat(result.get().getStarCoreHpAtLightning()).isEqualTo(800);
         assertThat(result.get().isKill()).isTrue();
     }
 
@@ -212,7 +212,7 @@ class GameLightningJudgementServiceTest {
                 SECOND_USER_ID,
                 serverReceiveTimeMs,
                 Math.toIntExact(serverReceiveTimeMs - START_AT_MILLIS),
-                GameRules.DRAGON_INITIAL_HP
+                GameRules.STAR_CORE_INITIAL_HP
         );
     }
 }

@@ -17,7 +17,7 @@ public record GameResultPayload(
             Long userId,
             long serverReceiveTime,
             int lightningTimeMs,
-            int dragonHpAtLightning,
+            int starCoreHpAtLightning,
             int damage,
             int afterHp,
             boolean isKill

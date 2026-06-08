@@ -228,13 +228,13 @@ class GameEffectiveNaturalDeathServiceTest {
         return gameRoom;
     }
 
-    private GameAction failedLightning(Long userId, long offsetMillis, int dragonHpAtLightning) {
+    private GameAction failedLightning(Long userId, long offsetMillis, int starCoreHpAtLightning) {
         return GameAction.lightning(
                 GAME_ROOM_ID,
                 userId,
                 START_AT_MILLIS + offsetMillis,
                 Math.toIntExact(offsetMillis),
-                dragonHpAtLightning
+                starCoreHpAtLightning
         );
     }
 

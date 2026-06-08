@@ -29,7 +29,7 @@ class GameScenarioGeneratorTest {
         List<HpStep> steps = scenario.steps();
         assertThat(steps).hasSize(EXPECTED_STEP_COUNT);
         assertThat(steps.get(0).timeMs()).isZero();
-        assertThat(steps.get(0).hp()).isEqualTo(GameRoom.DEFAULT_DRAGON_MAX_HP);
+        assertThat(steps.get(0).hp()).isEqualTo(GameRoom.DEFAULT_STAR_CORE_MAX_HP);
         assertThat(steps.get(steps.size() - 1).timeMs()).isEqualTo(DURATION_MILLIS);
         assertThat(steps.get(steps.size() - 1).hp()).isZero();
     }
@@ -46,7 +46,7 @@ class GameScenarioGeneratorTest {
             HpStep previous = steps.get(index - 1);
             HpStep current = steps.get(index);
             assertThat(current.timeMs()).isGreaterThan(previous.timeMs());
-            assertThat(current.hp()).isBetween(0, GameRoom.DEFAULT_DRAGON_MAX_HP);
+            assertThat(current.hp()).isBetween(0, GameRoom.DEFAULT_STAR_CORE_MAX_HP);
             assertThat(current.hp()).isLessThanOrEqualTo(previous.hp());
         }
     }

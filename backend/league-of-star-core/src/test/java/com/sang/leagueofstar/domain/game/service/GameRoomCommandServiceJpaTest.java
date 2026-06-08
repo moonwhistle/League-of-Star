@@ -68,7 +68,7 @@ class GameRoomCommandServiceJpaTest {
         assertThat(foundGameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.READY);
-        assertThat(foundGameRoom.getScenarioData().steps().get(0).hp()).isEqualTo(GameRoom.DEFAULT_DRAGON_MAX_HP);
+        assertThat(foundGameRoom.getScenarioData().steps().get(0).hp()).isEqualTo(GameRoom.DEFAULT_STAR_CORE_MAX_HP);
         assertThat(foundGameRoom.getScenarioData().steps().get(0).timeMs()).isZero();
         int lastStepIndex = foundGameRoom.getScenarioData().steps().size() - 1;
         assertThat(foundGameRoom.getScenarioData().steps().get(lastStepIndex).timeMs())
