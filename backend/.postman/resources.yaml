@@ -4,5 +4,5 @@ workspace:
 
 localResources:
   specs:
-    - ../smite-api/bin/main/static/docs/openapi3.yaml
-    - ../smite-api/src/main/resources/static/docs/openapi3.yaml
+    - ../league-of-star-api/bin/main/static/docs/openapi3.yaml
+    - ../league-of-star-api/src/main/resources/static/docs/openapi3.yaml

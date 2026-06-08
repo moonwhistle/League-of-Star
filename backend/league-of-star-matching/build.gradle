@@ -1,0 +1,15 @@
+dependencies {
+    implementation project(':league-of-star-core')
+    implementation project(':league-of-star-infra-redis')
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.redisson:redisson-spring-boot-starter:3.24.3'
+
+    // 모니터링: Micrometer API는 런타임 구현체를 league-of-star-api가 제공함
+    // compileOnly 사용 이유: 런타임 구현체는 league-of-star-api가 제공함
+    compileOnly 'io.micrometer:micrometer-core'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'com.redis:testcontainers-redis'
+    testImplementation testFixtures(project(':league-of-star-infra-redis'))
+}
