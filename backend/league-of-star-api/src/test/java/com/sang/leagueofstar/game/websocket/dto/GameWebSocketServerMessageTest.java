@@ -126,7 +126,7 @@ class GameWebSocketServerMessageTest {
                 100L,
                 GameResult.PLAYER1_WIN,
                 USER_ID,
-                "SMITE_KILL",
+                "LIGHTNING_KILL",
                 20_000L,
                 List.of(new GameResultPayload.ActionSummary(
                         USER_ID,
@@ -146,7 +146,7 @@ class GameWebSocketServerMessageTest {
         assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(100L);
         assertThat(json.get("payload").get("result").asText()).isEqualTo(GameResult.PLAYER1_WIN.name());
         assertThat(json.get("payload").get("winnerUserId").asLong()).isEqualTo(USER_ID);
-        assertThat(json.get("payload").get("reason").asText()).isEqualTo("SMITE_KILL");
+        assertThat(json.get("payload").get("reason").asText()).isEqualTo("LIGHTNING_KILL");
         assertThat(json.get("payload").get("finishedAt").asLong()).isEqualTo(20_000L);
         assertThat(json.get("payload").get("actions").get(0).get("afterHp").asInt()).isZero();
         assertThat(json.get("payload").get("actions").get(0).get("isKill").asBoolean()).isTrue();

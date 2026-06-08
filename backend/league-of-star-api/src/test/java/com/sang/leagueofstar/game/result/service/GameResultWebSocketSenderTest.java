@@ -45,7 +45,7 @@ class GameResultWebSocketSenderTest {
                 GAME_ROOM_ID,
                 GameResult.PLAYER1_WIN,
                 USER_ID,
-                "SMITE_KILL",
+                "LIGHTNING_KILL",
                 20_000L,
                 List.of()
         );
@@ -70,7 +70,7 @@ class GameResultWebSocketSenderTest {
                 GAME_ROOM_ID,
                 GameResult.PLAYER1_WIN,
                 USER_ID,
-                "SMITE_KILL",
+                "LIGHTNING_KILL",
                 20_000L,
                 List.of()
         );
@@ -82,7 +82,7 @@ class GameResultWebSocketSenderTest {
         JsonNode message = sentMessage(session);
         assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.GAME_RESULT.name());
         assertThat(message.get("payload").get("result").asText()).isEqualTo(GameResult.PLAYER1_WIN.name());
-        assertThat(message.get("payload").get("reason").asText()).isEqualTo("SMITE_KILL");
+        assertThat(message.get("payload").get("reason").asText()).isEqualTo("LIGHTNING_KILL");
     }
 
     @Test
@@ -95,7 +95,7 @@ class GameResultWebSocketSenderTest {
                 GAME_ROOM_ID,
                 GameResult.PLAYER1_WIN,
                 USER_ID,
-                "SMITE_KILL",
+                "LIGHTNING_KILL",
                 20_000L,
                 List.of()
         );

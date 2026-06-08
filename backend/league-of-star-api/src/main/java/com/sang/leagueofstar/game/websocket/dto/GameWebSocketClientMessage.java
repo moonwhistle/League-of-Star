@@ -21,7 +21,7 @@ public record GameWebSocketClientMessage(
     }
 
     public boolean isLightning() {
-        return type == GameWebSocketMessageType.SMITE;
+        return type == GameWebSocketMessageType.LIGHTNING;
     }
 
     public boolean hasInvalidLightningPayload() {

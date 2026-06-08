@@ -8,14 +8,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GameWebSocketMessageTypeTest {
 
     @Test
-    @DisplayName("CLIENT_READY, RTT_PONG, SMITE는 client message type이다")
+    @DisplayName("CLIENT_READY, RTT_PONG, LIGHTNING는 client message type이다")
     void clientMessages_AreClientMessage() {
         assertThat(GameWebSocketMessageType.CLIENT_READY.isClientMessage()).isTrue();
         assertThat(GameWebSocketMessageType.CLIENT_READY.isServerMessage()).isFalse();
         assertThat(GameWebSocketMessageType.RTT_PONG.isClientMessage()).isTrue();
         assertThat(GameWebSocketMessageType.RTT_PONG.isServerMessage()).isFalse();
-        assertThat(GameWebSocketMessageType.SMITE.isClientMessage()).isTrue();
-        assertThat(GameWebSocketMessageType.SMITE.isServerMessage()).isFalse();
+        assertThat(GameWebSocketMessageType.LIGHTNING.isClientMessage()).isTrue();
+        assertThat(GameWebSocketMessageType.LIGHTNING.isServerMessage()).isFalse();
     }
 
     @Test

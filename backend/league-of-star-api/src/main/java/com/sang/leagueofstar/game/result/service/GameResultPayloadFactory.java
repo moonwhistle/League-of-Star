@@ -22,7 +22,7 @@ public class GameResultPayloadFactory {
                 gameRoomId,
                 result,
                 winnerUserId,
-                GameResultReason.SMITE_KILL,
+                GameResultReason.LIGHTNING_KILL,
                 finishedAt,
                 actions
         );
@@ -37,7 +37,7 @@ public class GameResultPayloadFactory {
                 gameRoomId,
                 result,
                 winnerUserId,
-                GameResultReason.BOTH_SMITES_USED_DRAW,
+                GameResultReason.BOTH_LIGHTNINGS_USED_DRAW,
                 finishedAt,
                 actions
         );
@@ -93,10 +93,10 @@ public class GameResultPayloadFactory {
 
     private GameResultReason resolveCurrentResultReason(Long winnerUserId, List<GameAction> actions) {
         if (winnerUserId != null) {
-            return GameResultReason.SMITE_KILL;
+            return GameResultReason.LIGHTNING_KILL;
         }
         if (bothUsersUsedLightningWithoutKill(actions)) {
-            return GameResultReason.BOTH_SMITES_USED_DRAW;
+            return GameResultReason.BOTH_LIGHTNINGS_USED_DRAW;
         }
         return GameResultReason.NATURAL_DEATH_DRAW;
     }

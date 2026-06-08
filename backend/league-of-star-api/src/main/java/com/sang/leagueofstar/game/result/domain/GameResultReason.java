@@ -7,8 +7,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum GameResultReason {
 
-    SMITE_KILL("SMITE_KILL"),
-    BOTH_SMITES_USED_DRAW("BOTH_SMITES_USED_DRAW"),
+    LIGHTNING_KILL("LIGHTNING_KILL"),
+    BOTH_LIGHTNINGS_USED_DRAW("BOTH_LIGHTNINGS_USED_DRAW"),
     NATURAL_DEATH_DRAW("NATURAL_DEATH_DRAW");
 
     private final String code;

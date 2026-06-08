@@ -119,12 +119,12 @@ public class GameWaitingWebSocketService {
         } catch (CoreException e) {
             sendLightningError(currentSession, mapLightningFailureReason(e), e.getErrorCode().message());
         } catch (DataAccessException e) {
-            log.warn("Failed to persist SMITE. gameRoomId={}, userId={}",
+            log.warn("Failed to persist LIGHTNING. gameRoomId={}, userId={}",
                     currentSession.getGameRoomId(), currentSession.getUserId(), e);
             sendLightningError(
                     currentSession,
-                    GameLightningFailureReason.SMITE_PROCESSING_FAILED,
-                    "Failed to process SMITE."
+                    GameLightningFailureReason.LIGHTNING_PROCESSING_FAILED,
+                    "Failed to process LIGHTNING."
             );
         }
     }
@@ -159,7 +159,7 @@ public class GameWaitingWebSocketService {
                     GameWebSocketServerMessage.error(reason.getCode(), message)
             );
         } catch (IOException e) {
-            log.warn("Failed to send SMITE ERROR. gameRoomId={}, userId={}",
+            log.warn("Failed to send LIGHTNING ERROR. gameRoomId={}, userId={}",
                     currentSession.getGameRoomId(), currentSession.getUserId(), e);
         }
     }
@@ -168,7 +168,7 @@ public class GameWaitingWebSocketService {
         if (exception.getErrorCode().equals(CoreErrorCode.INVALID_GAME_PARTICIPANTS)) {
             return GameLightningFailureReason.NOT_GAME_PARTICIPANT;
         }
-        return GameLightningFailureReason.INVALID_SMITE_STATE;
+        return GameLightningFailureReason.INVALID_LIGHTNING_STATE;
     }
 
     public void cleanupSession(WebSocketSession session) {

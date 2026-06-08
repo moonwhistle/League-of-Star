@@ -83,7 +83,7 @@ class GameLightningServiceTest {
     }
 
     @Test
-    @DisplayName("handleLightning - 신규 SMITE가 처치하지 못하고 게임이 진행 중이면 중간 응답을 반환하지 않는다")
+    @DisplayName("handleLightning - 신규 LIGHTNING가 처치하지 못하고 게임이 진행 중이면 중간 응답을 반환하지 않는다")
     void handleLightning_NewNonKillAction_SaveAndReturnEmpty() {
         // given
         GameRoom gameRoom = mock(GameRoom.class);
@@ -123,7 +123,7 @@ class GameLightningServiceTest {
     }
 
     @Test
-    @DisplayName("handleLightning - SMITE로 처치하면 gameRoom을 FINISHED로 전환하고 GAME_RESULT payload를 반환한다")
+    @DisplayName("handleLightning - LIGHTNING로 처치하면 gameRoom을 FINISHED로 전환하고 GAME_RESULT payload를 반환한다")
     void handleLightning_Kill_FinishGameAndReturnGameResult() {
         // given
         GameRoom lockedRoom = mock(GameRoom.class);
@@ -156,7 +156,7 @@ class GameLightningServiceTest {
         assertThat(result.get().gameResult().gameRoomId()).isEqualTo(GAME_ROOM_ID);
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.PLAYER1_WIN);
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
-        assertThat(result.get().gameResult().reason()).isEqualTo("SMITE_KILL");
+        assertThat(result.get().gameResult().reason()).isEqualTo("LIGHTNING_KILL");
         assertThat(result.get().gameResult().finishedAt()).isEqualTo(FINISHED_AT.toEpochMilli());
         assertThat(result.get().gameResult().actions()).hasSize(1);
         verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(finishedRoom);
@@ -164,7 +164,7 @@ class GameLightningServiceTest {
     }
 
     @Test
-    @DisplayName("handleLightning - 두 유저가 모두 실패 SMITE를 사용하면 DRAW GAME_RESULT payload를 반환한다")
+    @DisplayName("handleLightning - 두 유저가 모두 실패 LIGHTNING를 사용하면 DRAW GAME_RESULT payload를 반환한다")
     void handleLightning_BothUsersFailedLightning_FinishDrawAndReturnGameResult() {
         // given
         GameRoom lockedRoom = mock(GameRoom.class);
@@ -201,7 +201,7 @@ class GameLightningServiceTest {
         assertThat(result.get().broadcast()).isTrue();
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.DRAW);
         assertThat(result.get().gameResult().winnerUserId()).isNull();
-        assertThat(result.get().gameResult().reason()).isEqualTo("BOTH_SMITES_USED_DRAW");
+        assertThat(result.get().gameResult().reason()).isEqualTo("BOTH_LIGHTNINGS_USED_DRAW");
         assertThat(result.get().gameResult().finishedAt()).isEqualTo(FINISHED_AT.toEpochMilli());
         assertThat(result.get().gameResult().actions()).hasSize(2);
         verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(finishedRoom);
@@ -232,7 +232,7 @@ class GameLightningServiceTest {
         assertThat(result.get().broadcast()).isFalse();
         assertThat(result.get().gameResult().result()).isEqualTo(GameResult.PLAYER1_WIN);
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
-        assertThat(result.get().gameResult().reason()).isEqualTo("SMITE_KILL");
+        assertThat(result.get().gameResult().reason()).isEqualTo("LIGHTNING_KILL");
         verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
     }
 

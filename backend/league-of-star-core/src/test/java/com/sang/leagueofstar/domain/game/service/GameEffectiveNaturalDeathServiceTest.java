@@ -24,7 +24,7 @@ class GameEffectiveNaturalDeathServiceTest {
     private final GameEffectiveNaturalDeathService service = new GameEffectiveNaturalDeathService();
 
     @Test
-    @DisplayName("calculateNaturalDeathAtMillis - SMITE가 없으면 scenario 마지막 시각을 반환한다")
+    @DisplayName("calculateNaturalDeathAtMillis - LIGHTNING가 없으면 scenario 마지막 시각을 반환한다")
     void calculateNaturalDeathAtMillis_NoLightning() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
@@ -41,7 +41,7 @@ class GameEffectiveNaturalDeathServiceTest {
     }
 
     @Test
-    @DisplayName("calculateNaturalDeathAtMillis - 실패 SMITE 데미지를 반영해 자연사 시각을 앞당긴다")
+    @DisplayName("calculateNaturalDeathAtMillis - 실패 LIGHTNING 데미지를 반영해 자연사 시각을 앞당긴다")
     void calculateNaturalDeathAtMillis_FailedLightningDamage() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
@@ -65,7 +65,7 @@ class GameEffectiveNaturalDeathServiceTest {
     }
 
     @Test
-    @DisplayName("calculateNaturalDeathAtMillis - 여러 실패 SMITE의 누적 데미지를 반영한다")
+    @DisplayName("calculateNaturalDeathAtMillis - 여러 실패 LIGHTNING의 누적 데미지를 반영한다")
     void calculateNaturalDeathAtMillis_MultipleFailedLightningDamage() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
@@ -117,7 +117,7 @@ class GameEffectiveNaturalDeathServiceTest {
     }
 
     @Test
-    @DisplayName("calculateNaturalDeathAtMillis - scenario HP가 누적 SMITE 데미지와 같아지는 시각을 반환한다")
+    @DisplayName("calculateNaturalDeathAtMillis - scenario HP가 누적 LIGHTNING 데미지와 같아지는 시각을 반환한다")
     void calculateNaturalDeathAtMillis_ExactDamageThreshold() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
@@ -137,7 +137,7 @@ class GameEffectiveNaturalDeathServiceTest {
     }
 
     @Test
-    @DisplayName("calculateNaturalDeathAtMillis - 방어적으로 누적 SMITE 데미지가 시작 HP 이상이면 시작 시각을 반환한다")
+    @DisplayName("calculateNaturalDeathAtMillis - 방어적으로 누적 LIGHTNING 데미지가 시작 HP 이상이면 시작 시각을 반환한다")
     void calculateNaturalDeathAtMillis_DefensiveLightningDamageGreaterThanInitialHp() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
@@ -166,7 +166,7 @@ class GameEffectiveNaturalDeathServiceTest {
     }
 
     @Test
-    @DisplayName("calculateNaturalDeathAtMillis - 같은 구간의 여러 SMITE는 action 순서와 무관하게 계산된다")
+    @DisplayName("calculateNaturalDeathAtMillis - 같은 구간의 여러 LIGHTNING는 action 순서와 무관하게 계산된다")
     void calculateNaturalDeathAtMillis_MultipleFailedLightningDamage_OrderIndependent() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
@@ -193,7 +193,7 @@ class GameEffectiveNaturalDeathServiceTest {
     }
 
     @Test
-    @DisplayName("calculateEffectiveHpAt - 특정 시점 scenario HP에서 누적 SMITE 데미지를 뺀다")
+    @DisplayName("calculateEffectiveHpAt - 특정 시점 scenario HP에서 누적 LIGHTNING 데미지를 뺀다")
     void calculateEffectiveHpAt() {
         // given
         GameRoom gameRoom = startedRoom(scenario(

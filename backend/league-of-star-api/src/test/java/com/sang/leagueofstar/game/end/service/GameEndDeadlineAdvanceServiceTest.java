@@ -54,7 +54,7 @@ class GameEndDeadlineAdvanceServiceTest {
     }
 
     @Test
-    @DisplayName("advanceAfterFailedLightning - deadline 갱신 실패가 SMITE 처리 흐름으로 전파되지 않는다")
+    @DisplayName("advanceAfterFailedLightning - deadline 갱신 실패가 LIGHTNING 처리 흐름으로 전파되지 않는다")
     void advanceAfterFailedLightning_Exception() {
         // given
         GameRoom gameRoom = startedRoom();

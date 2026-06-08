@@ -12,7 +12,7 @@ public enum GameWebSocketMessageType {
 
     CLIENT_READY(Direction.CLIENT),
     RTT_PONG(Direction.CLIENT),
-    SMITE(Direction.CLIENT),
+    LIGHTNING(Direction.CLIENT),
     PLAYER_JOINED(Direction.SERVER),
     PLAYER_READY(Direction.SERVER),
     PLAYER_LEFT(Direction.SERVER),

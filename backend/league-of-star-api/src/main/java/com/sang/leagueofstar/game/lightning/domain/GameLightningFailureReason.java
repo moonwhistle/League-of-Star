@@ -8,10 +8,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum GameLightningFailureReason {
 
-    INVALID_SMITE_STATE(GameLightningConstants.ERROR_INVALID_SMITE_STATE),
+    INVALID_LIGHTNING_STATE(GameLightningConstants.ERROR_INVALID_LIGHTNING_STATE),
     NOT_GAME_PARTICIPANT(GameLightningConstants.ERROR_NOT_GAME_PARTICIPANT),
-    INVALID_SMITE_PAYLOAD(GameLightningConstants.ERROR_INVALID_SMITE_PAYLOAD),
-    SMITE_PROCESSING_FAILED(GameLightningConstants.ERROR_SMITE_PROCESSING_FAILED);
+    INVALID_LIGHTNING_PAYLOAD(GameLightningConstants.ERROR_INVALID_LIGHTNING_PAYLOAD),
+    LIGHTNING_PROCESSING_FAILED(GameLightningConstants.ERROR_LIGHTNING_PROCESSING_FAILED);
 
     private final String code;
 }

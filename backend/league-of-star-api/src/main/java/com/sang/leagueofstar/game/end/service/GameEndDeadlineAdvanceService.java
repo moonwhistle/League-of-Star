@@ -28,7 +28,7 @@ public class GameEndDeadlineAdvanceService {
             gameEndScheduleService.advanceEndDeadlineIfEarlier(gameRoom.getId(), naturalDeathAtMillis);
         } catch (RuntimeException e) {
             log.warn(
-                    "Failed to advance game end deadline after failed smite: gameRoomId={}, actionCount={}, naturalDeathAtMillis={}",
+                    "Failed to advance game end deadline after failed lightning: gameRoomId={}, actionCount={}, naturalDeathAtMillis={}",
                     gameRoom.getId(),
                     actionCount,
                     naturalDeathAtMillis,

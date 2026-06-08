@@ -217,7 +217,7 @@ class GameWaitingWebSocketHandlerTest {
     }
 
     @Test
-    @DisplayName("handleTextMessage - SMITE 수신 시 서버 수신 시각을 기록하고 SMITE service로 위임한다")
+    @DisplayName("handleTextMessage - LIGHTNING 수신 시 서버 수신 시각을 기록하고 LIGHTNING service로 위임한다")
     void handleTextMessage_Lightning_DelegateWithServerReceiveTime() throws Exception {
         // given
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
@@ -226,7 +226,7 @@ class GameWaitingWebSocketHandlerTest {
         when(gameLightningService.handleLightning(any())).thenReturn(Optional.empty());
 
         // when
-        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"LIGHTNING\",\"payload\":{}}"));
 
         // then
         verify(gameLightningService).handleLightning(argThat(command ->
@@ -238,7 +238,7 @@ class GameWaitingWebSocketHandlerTest {
     }
 
     @Test
-    @DisplayName("handleTextMessage - SMITE payload에 필드가 있으면 ERROR로 응답한다")
+    @DisplayName("handleTextMessage - LIGHTNING payload에 필드가 있으면 ERROR로 응답한다")
     void handleTextMessage_LightningInvalidPayload_ReturnError() throws Exception {
         // given
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
@@ -246,19 +246,19 @@ class GameWaitingWebSocketHandlerTest {
         clearInvocations(session);
 
         // when
-        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{\"clientTime\":1}}"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"LIGHTNING\",\"payload\":{\"clientTime\":1}}"));
 
         // then
         JsonNode message = lastSentMessage(session);
         assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.ERROR.name());
         assertThat(message.get("payload").get("code").asText())
-                .isEqualTo(GameLightningFailureReason.INVALID_SMITE_PAYLOAD.getCode());
+                .isEqualTo(GameLightningFailureReason.INVALID_LIGHTNING_PAYLOAD.getCode());
         verify(gameLightningService, never()).handleLightning(any());
         verify(session, never()).close(any());
     }
 
     @Test
-    @DisplayName("handleTextMessage - SMITE 참가자 예외는 ERROR로 응답하고 연결을 유지한다")
+    @DisplayName("handleTextMessage - LIGHTNING 참가자 예외는 ERROR로 응답하고 연결을 유지한다")
     void handleTextMessage_LightningNotParticipant_ReturnErrorAndKeepConnection() throws Exception {
         // given
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
@@ -268,7 +268,7 @@ class GameWaitingWebSocketHandlerTest {
                 .thenThrow(new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
 
         // when
-        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"LIGHTNING\",\"payload\":{}}"));
 
         // then
         JsonNode message = lastSentMessage(session);
@@ -279,7 +279,7 @@ class GameWaitingWebSocketHandlerTest {
     }
 
     @Test
-    @DisplayName("handleTextMessage - SMITE 상태 예외는 ERROR로 응답하고 연결을 유지한다")
+    @DisplayName("handleTextMessage - LIGHTNING 상태 예외는 ERROR로 응답하고 연결을 유지한다")
     void handleTextMessage_LightningInvalidState_ReturnErrorAndKeepConnection() throws Exception {
         // given
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
@@ -289,18 +289,18 @@ class GameWaitingWebSocketHandlerTest {
                 .thenThrow(new CoreException(CoreErrorCode.INVALID_GAME_STATE));
 
         // when
-        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"LIGHTNING\",\"payload\":{}}"));
 
         // then
         JsonNode message = lastSentMessage(session);
         assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.ERROR.name());
         assertThat(message.get("payload").get("code").asText())
-                .isEqualTo(GameLightningFailureReason.INVALID_SMITE_STATE.getCode());
+                .isEqualTo(GameLightningFailureReason.INVALID_LIGHTNING_STATE.getCode());
         verify(session, never()).close(any());
     }
 
     @Test
-    @DisplayName("handleTextMessage - SMITE DB 예외는 ERROR로 응답하고 연결을 유지한다")
+    @DisplayName("handleTextMessage - LIGHTNING DB 예외는 ERROR로 응답하고 연결을 유지한다")
     void handleTextMessage_LightningDataAccessException_ReturnErrorAndKeepConnection() throws Exception {
         // given
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
@@ -310,18 +310,18 @@ class GameWaitingWebSocketHandlerTest {
                 .thenThrow(new DataAccessResourceFailureException("db down"));
 
         // when
-        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"LIGHTNING\",\"payload\":{}}"));
 
         // then
         JsonNode message = lastSentMessage(session);
         assertThat(message.get("type").asText()).isEqualTo(GameWebSocketMessageType.ERROR.name());
         assertThat(message.get("payload").get("code").asText())
-                .isEqualTo(GameLightningFailureReason.SMITE_PROCESSING_FAILED.getCode());
+                .isEqualTo(GameLightningFailureReason.LIGHTNING_PROCESSING_FAILED.getCode());
         verify(session, never()).close(any());
     }
 
     @Test
-    @DisplayName("handleTextMessage - SMITE 처치 응답이면 GAME_RESULT만 broadcast한다")
+    @DisplayName("handleTextMessage - LIGHTNING 처치 응답이면 GAME_RESULT만 broadcast한다")
     void handleTextMessage_LightningKill_BroadcastGameResultOnly() throws Exception {
         // given
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
@@ -329,7 +329,7 @@ class GameWaitingWebSocketHandlerTest {
                 GAME_ROOM_ID,
                 GameResult.PLAYER1_WIN,
                 FIRST_USER_ID,
-                "SMITE_KILL",
+                "LIGHTNING_KILL",
                 SERVER_RECEIVE_TIME.toEpochMilli(),
                 List.of()
         );
@@ -339,7 +339,7 @@ class GameWaitingWebSocketHandlerTest {
                 .thenReturn(Optional.of(GameLightningHandleResponse.broadcast(gameResult)));
 
         // when
-        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"LIGHTNING\",\"payload\":{}}"));
 
         // then
         verify(gameResultWebSocketSender).broadcastGameResult(GAME_ROOM_ID, gameResult);
@@ -347,7 +347,7 @@ class GameWaitingWebSocketHandlerTest {
     }
 
     @Test
-    @DisplayName("handleTextMessage - 이미 FINISHED인 SMITE 응답이면 현재 session에 GAME_RESULT만 전송한다")
+    @DisplayName("handleTextMessage - 이미 FINISHED인 LIGHTNING 응답이면 현재 session에 GAME_RESULT만 전송한다")
     void handleTextMessage_AlreadyFinished_SendGameResultToCurrentSessionOnly() throws Exception {
         // given
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
@@ -355,7 +355,7 @@ class GameWaitingWebSocketHandlerTest {
                 GAME_ROOM_ID,
                 GameResult.PLAYER1_WIN,
                 FIRST_USER_ID,
-                "SMITE_KILL",
+                "LIGHTNING_KILL",
                 SERVER_RECEIVE_TIME.toEpochMilli(),
                 List.of()
         );
@@ -365,7 +365,7 @@ class GameWaitingWebSocketHandlerTest {
                 .thenReturn(Optional.of(GameLightningHandleResponse.currentSessionOnly(gameResult)));
 
         // when
-        handler.handleTextMessage(session, new TextMessage("{\"type\":\"SMITE\",\"payload\":{}}"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"LIGHTNING\",\"payload\":{}}"));
 
         // then
         verify(gameResultWebSocketSender).sendGameResult(session, gameResult);

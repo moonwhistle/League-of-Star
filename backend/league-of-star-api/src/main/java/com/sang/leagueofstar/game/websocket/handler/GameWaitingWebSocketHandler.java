@@ -80,8 +80,8 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
         if (clientMessage.isLightning()) {
             if (clientMessage.hasInvalidLightningPayload()) {
                 send(session, GameWebSocketServerMessage.error(
-                        GameLightningFailureReason.INVALID_SMITE_PAYLOAD.getCode(),
-                        "SMITE payload must be empty."
+                        GameLightningFailureReason.INVALID_LIGHTNING_PAYLOAD.getCode(),
+                        "LIGHTNING payload must be empty."
                 ));
                 return;
             }

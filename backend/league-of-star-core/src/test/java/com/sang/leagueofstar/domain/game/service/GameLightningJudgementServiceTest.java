@@ -49,7 +49,7 @@ class GameLightningJudgementServiceTest {
     }
 
     @Test
-    @DisplayName("judge - 이전 SMITE 데미지를 반영한 현재 HP가 1200 이하이면 킬로 판정한다")
+    @DisplayName("judge - 이전 LIGHTNING 데미지를 반영한 현재 HP가 1200 이하이면 킬로 판정한다")
     void judge_SubtractEarlierLightningDamage() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
@@ -169,7 +169,7 @@ class GameLightningJudgementServiceTest {
     }
 
     @Test
-    @DisplayName("judge - 이전 SMITE 반영 후 현재 HP가 0이면 action을 만들지 않는다")
+    @DisplayName("judge - 이전 LIGHTNING 반영 후 현재 HP가 0이면 action을 만들지 않는다")
     void judge_AlreadyKilled_ReturnEmpty() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
