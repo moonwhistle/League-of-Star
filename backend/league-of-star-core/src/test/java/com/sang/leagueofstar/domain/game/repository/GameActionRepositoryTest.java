@@ -48,14 +48,14 @@ class GameActionRepositoryTest {
         room.addParticipant(p2.getId());
         gameRoomRepository.save(room);
 
-        GameAction action1 = GameAction.smite(
+        GameAction action1 = GameAction.lightning(
                 room.getId(), p1.getId(), 1000L, 980, 1000
         );
         gameActionRepository.save(action1);
         gameActionRepository.flush();
 
         // when & then
-        GameAction action2 = GameAction.smite(
+        GameAction action2 = GameAction.lightning(
                 room.getId(), p1.getId(), 1100L, 1080, 900
         );
 
@@ -72,7 +72,7 @@ class GameActionRepositoryTest {
         User p1 = userRepository.save(User.builder().email("p3@test.com").nickname("p3").build());
         User p2 = userRepository.save(User.builder().email("p4@test.com").nickname("p4").build());
         GameRoom room = createRoom(p1.getId(), p2.getId());
-        GameAction action = gameActionRepository.save(GameAction.smite(
+        GameAction action = gameActionRepository.save(GameAction.lightning(
                 room.getId(),
                 p1.getId(),
                 1000L,
@@ -94,14 +94,14 @@ class GameActionRepositoryTest {
         User p1 = userRepository.save(User.builder().email("p5@test.com").nickname("p5").build());
         User p2 = userRepository.save(User.builder().email("p6@test.com").nickname("p6").build());
         GameRoom room = createRoom(p1.getId(), p2.getId());
-        GameAction later = gameActionRepository.save(GameAction.smite(
+        GameAction later = gameActionRepository.save(GameAction.lightning(
                 room.getId(),
                 p1.getId(),
                 1200L,
                 1100,
                 1000
         ));
-        GameAction earlier = gameActionRepository.save(GameAction.smite(
+        GameAction earlier = gameActionRepository.save(GameAction.lightning(
                 room.getId(),
                 p2.getId(),
                 1000L,
@@ -123,14 +123,14 @@ class GameActionRepositoryTest {
         User p1 = userRepository.save(User.builder().email("p7@test.com").nickname("p7").build());
         User p2 = userRepository.save(User.builder().email("p8@test.com").nickname("p8").build());
         GameRoom room = createRoom(p1.getId(), p2.getId());
-        GameAction firstSaved = gameActionRepository.save(GameAction.smite(
+        GameAction firstSaved = gameActionRepository.save(GameAction.lightning(
                 room.getId(),
                 p1.getId(),
                 1000L,
                 900,
                 1500
         ));
-        GameAction secondSaved = gameActionRepository.save(GameAction.smite(
+        GameAction secondSaved = gameActionRepository.save(GameAction.lightning(
                 room.getId(),
                 p2.getId(),
                 1000L,

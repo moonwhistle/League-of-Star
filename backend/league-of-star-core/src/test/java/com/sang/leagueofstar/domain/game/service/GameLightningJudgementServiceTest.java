@@ -15,18 +15,18 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class GameSmiteJudgementServiceTest {
+class GameLightningJudgementServiceTest {
 
     private static final Long GAME_ROOM_ID = 100L;
     private static final Long FIRST_USER_ID = 1L;
     private static final Long SECOND_USER_ID = 2L;
     private static final long START_AT_MILLIS = 10_000L;
 
-    private final GameSmiteJudgementService service = new GameSmiteJudgementService();
+    private final GameLightningJudgementService service = new GameLightningJudgementService();
 
     @Test
-    @DisplayName("judge - 서버 수신 시각 기준 smiteTimeMs와 scenario HP를 계산한다")
-    void judge_CalculateSmiteTimeAndScenarioHp() {
+    @DisplayName("judge - 서버 수신 시각 기준 lightningTimeMs와 scenario HP를 계산한다")
+    void judge_CalculateLightningTimeAndScenarioHp() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
                 new HpStep(0, 10_000),
@@ -43,14 +43,14 @@ class GameSmiteJudgementServiceTest {
         assertThat(action.getGameRoomId()).isEqualTo(GAME_ROOM_ID);
         assertThat(action.getUserId()).isEqualTo(FIRST_USER_ID);
         assertThat(action.getServerReceiveTimeMs()).isEqualTo(START_AT_MILLIS + 500L);
-        assertThat(action.getSmiteTimeMs()).isEqualTo(500);
-        assertThat(action.getDragonHpAtSmite()).isEqualTo(7_500);
+        assertThat(action.getLightningTimeMs()).isEqualTo(500);
+        assertThat(action.getDragonHpAtLightning()).isEqualTo(7_500);
         assertThat(action.isKill()).isFalse();
     }
 
     @Test
     @DisplayName("judge - 이전 SMITE 데미지를 반영한 현재 HP가 1200 이하이면 킬로 판정한다")
-    void judge_SubtractEarlierSmiteDamage() {
+    void judge_SubtractEarlierLightningDamage() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
                 new HpStep(0, 10_000),
@@ -68,8 +68,8 @@ class GameSmiteJudgementServiceTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().getSmiteTimeMs()).isEqualTo(1_000);
-        assertThat(result.get().getDragonHpAtSmite()).isEqualTo(800);
+        assertThat(result.get().getLightningTimeMs()).isEqualTo(1_000);
+        assertThat(result.get().getDragonHpAtLightning()).isEqualTo(800);
         assertThat(result.get().isKill()).isTrue();
     }
 
@@ -93,7 +93,7 @@ class GameSmiteJudgementServiceTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().getDragonHpAtSmite()).isEqualTo(2_000);
+        assertThat(result.get().getDragonHpAtLightning()).isEqualTo(2_000);
         assertThat(result.get().isKill()).isFalse();
     }
 
@@ -117,7 +117,7 @@ class GameSmiteJudgementServiceTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().getDragonHpAtSmite()).isEqualTo(800);
+        assertThat(result.get().getDragonHpAtLightning()).isEqualTo(800);
         assertThat(result.get().isKill()).isTrue();
     }
 
@@ -141,7 +141,7 @@ class GameSmiteJudgementServiceTest {
 
     @Test
     @DisplayName("judge - 게임 시작 후 100ms 미만 입력은 저장 대상 action을 만들지 않는다")
-    void judge_BeforeMinValidSmiteTime_ReturnEmpty() {
+    void judge_BeforeMinValidLightningTime_ReturnEmpty() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
                 new HpStep(0, 10_000),
@@ -152,20 +152,20 @@ class GameSmiteJudgementServiceTest {
         var justAfterStart = service.judge(
                 gameRoom,
                 FIRST_USER_ID,
-                START_AT_MILLIS + GameRules.MIN_VALID_SMITE_TIME_MS - 1L,
+                START_AT_MILLIS + GameRules.MIN_VALID_LIGHTNING_TIME_MS - 1L,
                 List.of()
         );
         var validBoundary = service.judge(
                 gameRoom,
                 FIRST_USER_ID,
-                START_AT_MILLIS + GameRules.MIN_VALID_SMITE_TIME_MS,
+                START_AT_MILLIS + GameRules.MIN_VALID_LIGHTNING_TIME_MS,
                 List.of()
         );
 
         // then
         assertThat(justAfterStart).isEmpty();
         assertThat(validBoundary).isPresent();
-        assertThat(validBoundary.get().getSmiteTimeMs()).isEqualTo(GameRules.MIN_VALID_SMITE_TIME_MS);
+        assertThat(validBoundary.get().getLightningTimeMs()).isEqualTo(GameRules.MIN_VALID_LIGHTNING_TIME_MS);
     }
 
     @Test
@@ -207,7 +207,7 @@ class GameSmiteJudgementServiceTest {
     }
 
     private GameAction action(long serverReceiveTimeMs) {
-        return GameAction.smite(
+        return GameAction.lightning(
                 GAME_ROOM_ID,
                 SECOND_USER_ID,
                 serverReceiveTimeMs,

@@ -20,12 +20,12 @@ public record GameWebSocketClientMessage(
         return type == GameWebSocketMessageType.RTT_PONG;
     }
 
-    public boolean isSmite() {
+    public boolean isLightning() {
         return type == GameWebSocketMessageType.SMITE;
     }
 
-    public boolean hasInvalidSmitePayload() {
-        return isSmite()
+    public boolean hasInvalidLightningPayload() {
+        return isLightning()
                 && payload != null
                 && !payload.isNull()
                 && (!payload.isObject() || !payload.isEmpty());

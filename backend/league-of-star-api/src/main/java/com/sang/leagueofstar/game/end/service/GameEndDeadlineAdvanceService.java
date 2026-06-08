@@ -17,7 +17,7 @@ public class GameEndDeadlineAdvanceService {
     private final GameEffectiveNaturalDeathService gameEffectiveNaturalDeathService;
     private final GameEndScheduleService gameEndScheduleService;
 
-    public void advanceAfterFailedSmite(GameRoom gameRoom, List<GameAction> currentActions) {
+    public void advanceAfterFailedLightning(GameRoom gameRoom, List<GameAction> currentActions) {
         Long naturalDeathAtMillis = null;
         int actionCount = currentActions.size();
         try {

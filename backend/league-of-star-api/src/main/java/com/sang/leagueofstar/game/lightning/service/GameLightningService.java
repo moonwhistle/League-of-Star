@@ -1,4 +1,4 @@
-package com.sang.leagueofstar.game.smite.service;
+package com.sang.leagueofstar.game.lightning.service;
 
 import com.sang.leagueofstar.domain.game.domain.GameAction;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
@@ -6,14 +6,14 @@ import com.sang.leagueofstar.domain.game.domain.GameRules;
 import com.sang.leagueofstar.domain.game.service.GameActionCommandService;
 import com.sang.leagueofstar.domain.game.service.GameActionReadService;
 import com.sang.leagueofstar.domain.game.service.GameRoomCommandService;
-import com.sang.leagueofstar.domain.game.service.GameSmiteJudgementService;
+import com.sang.leagueofstar.domain.game.service.GameLightningJudgementService;
 import com.sang.leagueofstar.domain.game.service.dto.GameActionSaveResult;
 import com.sang.leagueofstar.game.end.service.GameEndDeadlineAdvanceService;
 import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
 import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
-import com.sang.leagueofstar.game.smite.domain.GameSmiteCommand;
-import com.sang.leagueofstar.game.smite.dto.GameSmiteHandleResponse;
+import com.sang.leagueofstar.game.lightning.domain.GameLightningCommand;
+import com.sang.leagueofstar.game.lightning.dto.GameLightningHandleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,20 +25,20 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-public class GameSmiteService {
+public class GameLightningService {
 
     private final GameRoomCommandService gameRoomCommandService;
     private final GameActionReadService gameActionReadService;
     private final GameActionCommandService gameActionCommandService;
-    private final GameSmiteJudgementService gameSmiteJudgementService;
+    private final GameLightningJudgementService gameLightningJudgementService;
     private final GameEndDeadlineAdvanceService gameEndDeadlineAdvanceService;
     private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger;
     private final GameResultPayloadFactory gameResultPayloadFactory;
     private final Clock clock;
 
     @Transactional
-    public Optional<GameSmiteHandleResponse> handleSmite(GameSmiteCommand command) {
-        GameRoom gameRoom = gameRoomCommandService.lockSmiteResultRoom(command.gameRoomId(), command.userId());
+    public Optional<GameLightningHandleResponse> handleLightning(GameLightningCommand command) {
+        GameRoom gameRoom = gameRoomCommandService.lockLightningResultRoom(command.gameRoomId(), command.userId());
         if (gameRoom.getStatus().isFinished()) {
             return Optional.of(currentGameResult(command.gameRoomId(), gameRoom));
         }
@@ -54,44 +54,44 @@ public class GameSmiteService {
         List<GameAction> existingActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
                 command.gameRoomId()
         );
-        return gameSmiteJudgementService
+        return gameLightningJudgementService
                 .judge(gameRoom, command.userId(), command.serverReceiveTimeMs(), existingActions)
                 .map(gameActionCommandService::saveIfAbsent)
                 .flatMap(saveResult -> toResponse(command.gameRoomId(), gameRoom, saveResult));
     }
 
-    private Optional<GameSmiteHandleResponse> toResponse(Long gameRoomId,
+    private Optional<GameLightningHandleResponse> toResponse(Long gameRoomId,
                                                          GameRoom gameRoom,
                                                          GameActionSaveResult saveResult) {
-        if (saveResult.action().getDragonHpAtSmite() > GameRules.SMITE_DAMAGE) {
+        if (saveResult.action().getDragonHpAtLightning() > GameRules.LIGHTNING_DAMAGE) {
             return nonKillResponse(gameRoomId, gameRoom);
         }
 
-        Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomBySmiteKill(
+        Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByLightningKill(
                 gameRoomId,
                 saveResult.action().getUserId()
         );
         return finishedGameRoom.map(finishedRoom -> {
             gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
-            return GameSmiteHandleResponse.broadcast(smiteKillGameResult(gameRoomId, finishedRoom));
+            return GameLightningHandleResponse.broadcast(lightningKillGameResult(gameRoomId, finishedRoom));
         });
     }
 
-    private Optional<GameSmiteHandleResponse> nonKillResponse(Long gameRoomId, GameRoom gameRoom) {
+    private Optional<GameLightningHandleResponse> nonKillResponse(Long gameRoomId, GameRoom gameRoom) {
         List<GameAction> currentActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
                 gameRoomId
         );
-        if (!bothUsersUsedSmiteWithoutKill(currentActions)) {
-            gameEndDeadlineAdvanceService.advanceAfterFailedSmite(gameRoom, currentActions);
+        if (!bothUsersUsedLightningWithoutKill(currentActions)) {
+            gameEndDeadlineAdvanceService.advanceAfterFailedLightning(gameRoom, currentActions);
             return Optional.empty();
         }
 
-        Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(
+        Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByBothLightningsUsedDraw(
                 gameRoomId
         );
         return finishedGameRoom.map(finishedRoom -> {
             gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
-            return GameSmiteHandleResponse.broadcast(bothSmitesUsedDrawGameResult(
+            return GameLightningHandleResponse.broadcast(bothLightningsUsedDrawGameResult(
                     gameRoomId,
                     finishedRoom,
                     currentActions
@@ -99,7 +99,7 @@ public class GameSmiteService {
         });
     }
 
-    private boolean bothUsersUsedSmiteWithoutKill(List<GameAction> actions) {
+    private boolean bothUsersUsedLightningWithoutKill(List<GameAction> actions) {
         return actions.stream()
                 .map(GameAction::getUserId)
                 .distinct()
@@ -107,8 +107,8 @@ public class GameSmiteService {
                 && actions.stream().noneMatch(GameAction::isKill);
     }
 
-    private GameSmiteHandleResponse currentGameResult(Long gameRoomId, GameRoom gameRoom) {
-        return GameSmiteHandleResponse.currentSessionOnly(gameResultPayloadFactory.currentResult(
+    private GameLightningHandleResponse currentGameResult(Long gameRoomId, GameRoom gameRoom) {
+        return GameLightningHandleResponse.currentSessionOnly(gameResultPayloadFactory.currentResult(
                 gameRoomId,
                 gameRoom.getResult(),
                 gameRoom.getWinnerId(),
@@ -117,8 +117,8 @@ public class GameSmiteService {
         ));
     }
 
-    private GameResultPayload smiteKillGameResult(Long gameRoomId, GameRoom gameRoom) {
-        return gameResultPayloadFactory.smiteKill(
+    private GameResultPayload lightningKillGameResult(Long gameRoomId, GameRoom gameRoom) {
+        return gameResultPayloadFactory.lightningKill(
                 gameRoomId,
                 gameRoom.getResult(),
                 gameRoom.getWinnerId(),
@@ -127,10 +127,10 @@ public class GameSmiteService {
         );
     }
 
-    private GameResultPayload bothSmitesUsedDrawGameResult(Long gameRoomId,
+    private GameResultPayload bothLightningsUsedDrawGameResult(Long gameRoomId,
                                                            GameRoom gameRoom,
                                                            List<GameAction> actions) {
-        return gameResultPayloadFactory.bothSmitesUsedDraw(
+        return gameResultPayloadFactory.bothLightningsUsedDraw(
                 gameRoomId,
                 gameRoom.getResult(),
                 gameRoom.getWinnerId(),

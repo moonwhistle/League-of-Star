@@ -269,8 +269,8 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
-    @DisplayName("lockInProgressRoomForSmite - IN_PROGRESS 게임룸 참가자이면 row lock으로 조회한 게임룸을 반환한다")
-    void lockInProgressRoomForSmite_InProgressParticipant_ReturnGameRoom() {
+    @DisplayName("lockInProgressRoomForLightning - IN_PROGRESS 게임룸 참가자이면 row lock으로 조회한 게임룸을 반환한다")
+    void lockInProgressRoomForLightning_InProgressParticipant_ReturnGameRoom() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .scenarioData(SCENARIO)
@@ -281,7 +281,7 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when
-        GameRoom result = gameRoomCommandService.lockInProgressRoomForSmite(100L, FIRST_USER_ID);
+        GameRoom result = gameRoomCommandService.lockInProgressRoomForLightning(100L, FIRST_USER_ID);
 
         // then
         assertThat(result).isSameAs(gameRoom);
@@ -289,20 +289,20 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
-    @DisplayName("lockInProgressRoomForSmite - 없는 게임룸이면 예외를 던진다")
-    void lockInProgressRoomForSmite_NotFound_ThrowException() {
+    @DisplayName("lockInProgressRoomForLightning - 없는 게임룸이면 예외를 던진다")
+    void lockInProgressRoomForLightning_NotFound_ThrowException() {
         // given
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, FIRST_USER_ID))
+        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForLightning(100L, FIRST_USER_ID))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }
 
     @Test
-    @DisplayName("lockInProgressRoomForSmite - IN_PROGRESS가 아니면 예외를 던진다")
-    void lockInProgressRoomForSmite_NotInProgress_ThrowException() {
+    @DisplayName("lockInProgressRoomForLightning - IN_PROGRESS가 아니면 예외를 던진다")
+    void lockInProgressRoomForLightning_NotInProgress_ThrowException() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .build();
@@ -311,14 +311,14 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when & then
-        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, FIRST_USER_ID))
+        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForLightning(100L, FIRST_USER_ID))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
     }
 
     @Test
-    @DisplayName("lockInProgressRoomForSmite - 참가자가 아니면 예외를 던진다")
-    void lockInProgressRoomForSmite_NotParticipant_ThrowException() {
+    @DisplayName("lockInProgressRoomForLightning - 참가자가 아니면 예외를 던진다")
+    void lockInProgressRoomForLightning_NotParticipant_ThrowException() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .scenarioData(SCENARIO)
@@ -329,14 +329,14 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when & then
-        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, 999L))
+        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForLightning(100L, 999L))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
     }
 
     @Test
-    @DisplayName("lockInProgressRoomForSmite - scenario가 없으면 예외를 던진다")
-    void lockInProgressRoomForSmite_MissingScenario_ThrowException() {
+    @DisplayName("lockInProgressRoomForLightning - scenario가 없으면 예외를 던진다")
+    void lockInProgressRoomForLightning_MissingScenario_ThrowException() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .build();
@@ -346,7 +346,7 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when & then
-        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForSmite(100L, FIRST_USER_ID))
+        assertThatThrownBy(() -> gameRoomCommandService.lockInProgressRoomForLightning(100L, FIRST_USER_ID))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
     }
@@ -395,8 +395,8 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
-    @DisplayName("finishInProgressRoomBySmiteKill - 첫 번째 참가자가 처치하면 PLAYER1_WIN으로 종료한다")
-    void finishInProgressRoomBySmiteKill_FirstParticipant() {
+    @DisplayName("finishInProgressRoomByLightningKill - 첫 번째 참가자가 처치하면 PLAYER1_WIN으로 종료한다")
+    void finishInProgressRoomByLightningKill_FirstParticipant() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .build();
@@ -406,7 +406,7 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when
-        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomBySmiteKill(100L, FIRST_USER_ID);
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByLightningKill(100L, FIRST_USER_ID);
 
         // then
         assertThat(result).contains(gameRoom);
@@ -419,8 +419,8 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
-    @DisplayName("finishInProgressRoomBySmiteKill - 두 번째 참가자가 처치하면 PLAYER2_WIN으로 종료한다")
-    void finishInProgressRoomBySmiteKill_SecondParticipant() {
+    @DisplayName("finishInProgressRoomByLightningKill - 두 번째 참가자가 처치하면 PLAYER2_WIN으로 종료한다")
+    void finishInProgressRoomByLightningKill_SecondParticipant() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .build();
@@ -430,7 +430,7 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when
-        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomBySmiteKill(100L, SECOND_USER_ID);
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByLightningKill(100L, SECOND_USER_ID);
 
         // then
         assertThat(result).contains(gameRoom);
@@ -440,8 +440,8 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
-    @DisplayName("finishInProgressRoomBySmiteKill - IN_PROGRESS가 아니면 종료하지 않고 empty를 반환한다")
-    void finishInProgressRoomBySmiteKill_NotInProgress() {
+    @DisplayName("finishInProgressRoomByLightningKill - IN_PROGRESS가 아니면 종료하지 않고 empty를 반환한다")
+    void finishInProgressRoomByLightningKill_NotInProgress() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .build();
@@ -450,7 +450,7 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when
-        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomBySmiteKill(100L, FIRST_USER_ID);
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByLightningKill(100L, FIRST_USER_ID);
 
         // then
         assertThat(result).isEmpty();
@@ -458,8 +458,8 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
-    @DisplayName("finishInProgressRoomByBothSmitesUsedDraw - IN_PROGRESS 게임룸을 DRAW로 종료한다")
-    void finishInProgressRoomByBothSmitesUsedDraw_InProgress() {
+    @DisplayName("finishInProgressRoomByBothLightningsUsedDraw - IN_PROGRESS 게임룸을 DRAW로 종료한다")
+    void finishInProgressRoomByBothLightningsUsedDraw_InProgress() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .build();
@@ -469,7 +469,7 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when
-        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(100L);
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByBothLightningsUsedDraw(100L);
 
         // then
         assertThat(result).contains(gameRoom);
@@ -482,8 +482,8 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
-    @DisplayName("finishInProgressRoomByBothSmitesUsedDraw - IN_PROGRESS가 아니면 종료하지 않고 empty를 반환한다")
-    void finishInProgressRoomByBothSmitesUsedDraw_NotInProgress() {
+    @DisplayName("finishInProgressRoomByBothLightningsUsedDraw - IN_PROGRESS가 아니면 종료하지 않고 empty를 반환한다")
+    void finishInProgressRoomByBothLightningsUsedDraw_NotInProgress() {
         // given
         GameRoom gameRoom = GameRoom.builder()
                 .build();
@@ -492,7 +492,7 @@ class GameRoomCommandServiceTest {
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when
-        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByBothSmitesUsedDraw(100L);
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByBothLightningsUsedDraw(100L);
 
         // then
         assertThat(result).isEmpty();

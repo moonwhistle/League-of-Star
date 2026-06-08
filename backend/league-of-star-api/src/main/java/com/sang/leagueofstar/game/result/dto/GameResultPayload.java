@@ -16,8 +16,8 @@ public record GameResultPayload(
     public record ActionSummary(
             Long userId,
             long serverReceiveTime,
-            int smiteTimeMs,
-            int dragonHpAtSmite,
+            int lightningTimeMs,
+            int dragonHpAtLightning,
             int damage,
             int afterHp,
             boolean isKill

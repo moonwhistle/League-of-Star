@@ -25,7 +25,7 @@ class GameEffectiveNaturalDeathServiceTest {
 
     @Test
     @DisplayName("calculateNaturalDeathAtMillis - SMITE가 없으면 scenario 마지막 시각을 반환한다")
-    void calculateNaturalDeathAtMillis_NoSmite() {
+    void calculateNaturalDeathAtMillis_NoLightning() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
                 new HpStep(0, 10_000),
@@ -42,14 +42,14 @@ class GameEffectiveNaturalDeathServiceTest {
 
     @Test
     @DisplayName("calculateNaturalDeathAtMillis - 실패 SMITE 데미지를 반영해 자연사 시각을 앞당긴다")
-    void calculateNaturalDeathAtMillis_FailedSmiteDamage() {
+    void calculateNaturalDeathAtMillis_FailedLightningDamage() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
                 new HpStep(0, 10_000),
                 new HpStep(1_000, 2_000),
                 new HpStep(2_000, 0)
         ));
-        GameAction failedSmite = GameAction.smite(
+        GameAction failedLightning = GameAction.lightning(
                 GAME_ROOM_ID,
                 FIRST_USER_ID,
                 START_AT_MILLIS + 800L,
@@ -58,7 +58,7 @@ class GameEffectiveNaturalDeathServiceTest {
         );
 
         // when
-        long result = service.calculateNaturalDeathAtMillis(gameRoom, List.of(failedSmite));
+        long result = service.calculateNaturalDeathAtMillis(gameRoom, List.of(failedLightning));
 
         // then
         assertThat(result).isEqualTo(START_AT_MILLIS + 1_400L);
@@ -66,21 +66,21 @@ class GameEffectiveNaturalDeathServiceTest {
 
     @Test
     @DisplayName("calculateNaturalDeathAtMillis - 여러 실패 SMITE의 누적 데미지를 반영한다")
-    void calculateNaturalDeathAtMillis_MultipleFailedSmiteDamage() {
+    void calculateNaturalDeathAtMillis_MultipleFailedLightningDamage() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
                 new HpStep(0, 10_000),
                 new HpStep(1_000, 3_000),
                 new HpStep(2_000, 0)
         ));
-        GameAction firstFailedSmite = GameAction.smite(
+        GameAction firstFailedLightning = GameAction.lightning(
                 GAME_ROOM_ID,
                 FIRST_USER_ID,
                 START_AT_MILLIS + 700L,
                 700,
                 4_000
         );
-        GameAction secondFailedSmite = GameAction.smite(
+        GameAction secondFailedLightning = GameAction.lightning(
                 GAME_ROOM_ID,
                 SECOND_USER_ID,
                 START_AT_MILLIS + 900L,
@@ -91,7 +91,7 @@ class GameEffectiveNaturalDeathServiceTest {
         // when
         long result = service.calculateNaturalDeathAtMillis(
                 gameRoom,
-                List.of(firstFailedSmite, secondFailedSmite)
+                List.of(firstFailedLightning, secondFailedLightning)
         );
 
         // then
@@ -107,10 +107,10 @@ class GameEffectiveNaturalDeathServiceTest {
                 new HpStep(1_000, 10_000),
                 new HpStep(2_000, 0)
         ));
-        GameAction failedSmite = failedSmite(FIRST_USER_ID, 500L, 10_000);
+        GameAction failedLightning = failedLightning(FIRST_USER_ID, 500L, 10_000);
 
         // when
-        long result = service.calculateNaturalDeathAtMillis(gameRoom, List.of(failedSmite));
+        long result = service.calculateNaturalDeathAtMillis(gameRoom, List.of(failedLightning));
 
         // then
         assertThat(result).isEqualTo(START_AT_MILLIS + 1_880L);
@@ -125,11 +125,11 @@ class GameEffectiveNaturalDeathServiceTest {
                 new HpStep(1_000, 1_200),
                 new HpStep(2_000, 0)
         ));
-        GameAction failedSmite = failedSmite(FIRST_USER_ID, 900L, 1_300);
+        GameAction failedLightning = failedLightning(FIRST_USER_ID, 900L, 1_300);
 
         // when
-        long result = service.calculateNaturalDeathAtMillis(gameRoom, List.of(failedSmite));
-        int effectiveHp = service.calculateEffectiveHpAt(gameRoom, List.of(failedSmite), START_AT_MILLIS + 1_000L);
+        long result = service.calculateNaturalDeathAtMillis(gameRoom, List.of(failedLightning));
+        int effectiveHp = service.calculateEffectiveHpAt(gameRoom, List.of(failedLightning), START_AT_MILLIS + 1_000L);
 
         // then
         assertThat(result).isEqualTo(START_AT_MILLIS + 1_000L);
@@ -138,22 +138,22 @@ class GameEffectiveNaturalDeathServiceTest {
 
     @Test
     @DisplayName("calculateNaturalDeathAtMillis - 방어적으로 누적 SMITE 데미지가 시작 HP 이상이면 시작 시각을 반환한다")
-    void calculateNaturalDeathAtMillis_DefensiveSmiteDamageGreaterThanInitialHp() {
+    void calculateNaturalDeathAtMillis_DefensiveLightningDamageGreaterThanInitialHp() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
                 new HpStep(0, 10_000),
                 new HpStep(1_000, 0)
         ));
         List<GameAction> actions = List.of(
-                failedSmite(FIRST_USER_ID, 100L, 9_000),
-                failedSmite(SECOND_USER_ID, 200L, 8_000),
-                failedSmite(FIRST_USER_ID, 300L, 7_000),
-                failedSmite(SECOND_USER_ID, 400L, 6_000),
-                failedSmite(FIRST_USER_ID, 500L, 5_000),
-                failedSmite(SECOND_USER_ID, 600L, 4_000),
-                failedSmite(FIRST_USER_ID, 700L, 3_000),
-                failedSmite(SECOND_USER_ID, 800L, 2_000),
-                failedSmite(FIRST_USER_ID, 900L, 1_000)
+                failedLightning(FIRST_USER_ID, 100L, 9_000),
+                failedLightning(SECOND_USER_ID, 200L, 8_000),
+                failedLightning(FIRST_USER_ID, 300L, 7_000),
+                failedLightning(SECOND_USER_ID, 400L, 6_000),
+                failedLightning(FIRST_USER_ID, 500L, 5_000),
+                failedLightning(SECOND_USER_ID, 600L, 4_000),
+                failedLightning(FIRST_USER_ID, 700L, 3_000),
+                failedLightning(SECOND_USER_ID, 800L, 2_000),
+                failedLightning(FIRST_USER_ID, 900L, 1_000)
         );
 
         // when
@@ -167,24 +167,24 @@ class GameEffectiveNaturalDeathServiceTest {
 
     @Test
     @DisplayName("calculateNaturalDeathAtMillis - 같은 구간의 여러 SMITE는 action 순서와 무관하게 계산된다")
-    void calculateNaturalDeathAtMillis_MultipleFailedSmiteDamage_OrderIndependent() {
+    void calculateNaturalDeathAtMillis_MultipleFailedLightningDamage_OrderIndependent() {
         // given
         GameRoom gameRoom = startedRoom(scenario(
                 new HpStep(0, 10_000),
                 new HpStep(1_000, 3_000),
                 new HpStep(2_000, 0)
         ));
-        GameAction firstFailedSmite = failedSmite(FIRST_USER_ID, 700L, 4_000);
-        GameAction secondFailedSmite = failedSmite(SECOND_USER_ID, 900L, 3_500);
+        GameAction firstFailedLightning = failedLightning(FIRST_USER_ID, 700L, 4_000);
+        GameAction secondFailedLightning = failedLightning(SECOND_USER_ID, 900L, 3_500);
 
         // when
         long orderedResult = service.calculateNaturalDeathAtMillis(
                 gameRoom,
-                List.of(firstFailedSmite, secondFailedSmite)
+                List.of(firstFailedLightning, secondFailedLightning)
         );
         long reversedResult = service.calculateNaturalDeathAtMillis(
                 gameRoom,
-                List.of(secondFailedSmite, firstFailedSmite)
+                List.of(secondFailedLightning, firstFailedLightning)
         );
 
         // then
@@ -201,7 +201,7 @@ class GameEffectiveNaturalDeathServiceTest {
                 new HpStep(1_000, 2_000),
                 new HpStep(2_000, 0)
         ));
-        GameAction failedSmite = GameAction.smite(
+        GameAction failedLightning = GameAction.lightning(
                 GAME_ROOM_ID,
                 FIRST_USER_ID,
                 START_AT_MILLIS + 800L,
@@ -210,7 +210,7 @@ class GameEffectiveNaturalDeathServiceTest {
         );
 
         // when
-        int result = service.calculateEffectiveHpAt(gameRoom, List.of(failedSmite), START_AT_MILLIS + 1_000L);
+        int result = service.calculateEffectiveHpAt(gameRoom, List.of(failedLightning), START_AT_MILLIS + 1_000L);
 
         // then
         assertThat(result).isEqualTo(800);
@@ -228,13 +228,13 @@ class GameEffectiveNaturalDeathServiceTest {
         return gameRoom;
     }
 
-    private GameAction failedSmite(Long userId, long offsetMillis, int dragonHpAtSmite) {
-        return GameAction.smite(
+    private GameAction failedLightning(Long userId, long offsetMillis, int dragonHpAtLightning) {
+        return GameAction.lightning(
                 GAME_ROOM_ID,
                 userId,
                 START_AT_MILLIS + offsetMillis,
                 Math.toIntExact(offsetMillis),
-                dragonHpAtSmite
+                dragonHpAtLightning
         );
     }
 

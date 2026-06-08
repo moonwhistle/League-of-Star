@@ -85,7 +85,7 @@ class GameNaturalDeathSettlementServiceTest {
                 new HpStep(1_000, 2_000),
                 new HpStep(2_000, 0)
         ));
-        GameAction failedSmite = GameAction.smite(
+        GameAction failedLightning = GameAction.lightning(
                 GAME_ROOM_ID,
                 FIRST_USER_ID,
                 START_AT_MILLIS + 800L,
@@ -94,7 +94,7 @@ class GameNaturalDeathSettlementServiceTest {
         );
         when(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).thenReturn(Optional.of(gameRoom));
         when(gameActionRepository.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))
-                .thenReturn(List.of(failedSmite));
+                .thenReturn(List.of(failedLightning));
 
         // when
         GameNaturalDeathSettlementResult result = service.settle(GAME_ROOM_ID, START_AT_MILLIS + 1_000L);

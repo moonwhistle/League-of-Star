@@ -178,7 +178,7 @@ class GameEndSettlementServiceTest {
                 .id(gameRoomId)
                 .build();
         gameRoom.finish(GameResult.DRAW, null);
-        GameAction action = GameAction.smite(gameRoomId, 1L, NOW.toEpochMilli() - 100L, 900, 1_000);
+        GameAction action = GameAction.lightning(gameRoomId, 1L, NOW.toEpochMilli() - 100L, 900, 1_000);
         return GameNaturalDeathSettlementResult.finished(gameRoom, List.of(action));
     }
 }

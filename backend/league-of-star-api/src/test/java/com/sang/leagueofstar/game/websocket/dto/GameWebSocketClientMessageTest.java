@@ -42,7 +42,7 @@ class GameWebSocketClientMessageTest {
 
     @Test
     @DisplayName("SMITE 메시지는 시간 payload 없이 공통 envelope로 역직렬화한다")
-    void deserialize_Smite() throws Exception {
+    void deserialize_Lightning() throws Exception {
         // when
         GameWebSocketClientMessage result = objectMapper.readValue(
                 "{\"type\":\"SMITE\",\"payload\":{}}",
@@ -52,7 +52,7 @@ class GameWebSocketClientMessageTest {
         // then
         assertThat(result.type()).isEqualTo(GameWebSocketMessageType.SMITE);
         assertThat(result.payload().isObject()).isTrue();
-        assertThat(result.isSmite()).isTrue();
+        assertThat(result.isLightning()).isTrue();
         assertThat(result.payload().has("clientTimestamp")).isFalse();
         assertThat(result.payload().has("serverReceiveTime")).isFalse();
     }

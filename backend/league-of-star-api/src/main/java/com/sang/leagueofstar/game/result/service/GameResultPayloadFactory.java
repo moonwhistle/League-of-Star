@@ -13,7 +13,7 @@ import java.util.List;
 @Component
 public class GameResultPayloadFactory {
 
-    public GameResultPayload smiteKill(Long gameRoomId,
+    public GameResultPayload lightningKill(Long gameRoomId,
                                        GameResult result,
                                        Long winnerUserId,
                                        long finishedAt,
@@ -28,7 +28,7 @@ public class GameResultPayloadFactory {
         );
     }
 
-    public GameResultPayload bothSmitesUsedDraw(Long gameRoomId,
+    public GameResultPayload bothLightningsUsedDraw(Long gameRoomId,
                                                 GameResult result,
                                                 Long winnerUserId,
                                                 long finishedAt,
@@ -95,13 +95,13 @@ public class GameResultPayloadFactory {
         if (winnerUserId != null) {
             return GameResultReason.SMITE_KILL;
         }
-        if (bothUsersUsedSmiteWithoutKill(actions)) {
+        if (bothUsersUsedLightningWithoutKill(actions)) {
             return GameResultReason.BOTH_SMITES_USED_DRAW;
         }
         return GameResultReason.NATURAL_DEATH_DRAW;
     }
 
-    private boolean bothUsersUsedSmiteWithoutKill(List<GameAction> actions) {
+    private boolean bothUsersUsedLightningWithoutKill(List<GameAction> actions) {
         return actions.stream()
                 .map(GameAction::getUserId)
                 .distinct()
@@ -113,10 +113,10 @@ public class GameResultPayloadFactory {
         return new GameResultPayload.ActionSummary(
                 action.getUserId(),
                 action.getServerReceiveTimeMs(),
-                action.getSmiteTimeMs(),
-                action.getDragonHpAtSmite(),
-                GameRules.SMITE_DAMAGE,
-                Math.max(0, action.getDragonHpAtSmite() - GameRules.SMITE_DAMAGE),
+                action.getLightningTimeMs(),
+                action.getDragonHpAtLightning(),
+                GameRules.LIGHTNING_DAMAGE,
+                Math.max(0, action.getDragonHpAtLightning() - GameRules.LIGHTNING_DAMAGE),
                 action.isKill()
         );
     }

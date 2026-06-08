@@ -41,26 +41,26 @@ public class GameAction extends BaseEntity {
     private long serverReceiveTimeMs;
 
     @Column(nullable = false)
-    private int smiteTimeMs;
+    private int lightningTimeMs;
 
     @Column(nullable = false)
-    private int dragonHpAtSmite;
+    private int dragonHpAtLightning;
 
     @Column(nullable = false)
     private boolean isKill;
 
-    public static GameAction smite(Long gameRoomId,
+    public static GameAction lightning(Long gameRoomId,
                                    Long userId,
                                    long serverReceiveTimeMs,
-                                   int smiteTimeMs,
-                                   int dragonHpAtSmite) {
+                                   int lightningTimeMs,
+                                   int dragonHpAtLightning) {
         return GameAction.builder()
                 .gameRoomId(gameRoomId)
                 .userId(userId)
                 .serverReceiveTimeMs(serverReceiveTimeMs)
-                .smiteTimeMs(smiteTimeMs)
-                .dragonHpAtSmite(dragonHpAtSmite)
-                .isKill(dragonHpAtSmite <= GameRules.SMITE_DAMAGE)
+                .lightningTimeMs(lightningTimeMs)
+                .dragonHpAtLightning(dragonHpAtLightning)
+                .isKill(dragonHpAtLightning <= GameRules.LIGHTNING_DAMAGE)
                 .build();
     }
 }

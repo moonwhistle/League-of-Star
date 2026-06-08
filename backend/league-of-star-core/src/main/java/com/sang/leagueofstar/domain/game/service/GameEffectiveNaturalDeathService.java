@@ -14,14 +14,14 @@ public class GameEffectiveNaturalDeathService {
 
     public int calculateEffectiveHpAt(GameRoom gameRoom, List<GameAction> actions, long nowMillis) {
         long elapsedMillis = nowMillis - startAtMillis(gameRoom);
-        int smiteDamageSum = smiteDamageSum(actions);
-        return Math.max(0, baseHpAt(gameRoom.getScenarioData().steps(), elapsedMillis) - smiteDamageSum);
+        int lightningDamageSum = lightningDamageSum(actions);
+        return Math.max(0, baseHpAt(gameRoom.getScenarioData().steps(), elapsedMillis) - lightningDamageSum);
     }
 
     public long calculateNaturalDeathAtMillis(GameRoom gameRoom, List<GameAction> actions) {
         return startAtMillis(gameRoom) + effectiveNaturalDeathTimeMs(
                 gameRoom.getScenarioData().steps(),
-                smiteDamageSum(actions)
+                lightningDamageSum(actions)
         );
     }
 
@@ -31,8 +31,8 @@ public class GameEffectiveNaturalDeathService {
                 .toEpochMilli();
     }
 
-    private int smiteDamageSum(List<GameAction> actions) {
-        return actions.size() * GameRules.SMITE_DAMAGE;
+    private int lightningDamageSum(List<GameAction> actions) {
+        return actions.size() * GameRules.LIGHTNING_DAMAGE;
     }
 
     private int baseHpAt(List<HpStep> steps, long elapsedMillis) {
@@ -67,16 +67,16 @@ public class GameEffectiveNaturalDeathService {
         return Math.max(current.hp(), Math.min(previous.hp(), interpolatedHp));
     }
 
-    private long effectiveNaturalDeathTimeMs(List<HpStep> steps, int smiteDamageSum) {
+    private long effectiveNaturalDeathTimeMs(List<HpStep> steps, int lightningDamageSum) {
         HpStep previous = steps.get(0);
-        if (previous.hp() <= smiteDamageSum) {
+        if (previous.hp() <= lightningDamageSum) {
             return previous.timeMs();
         }
 
         for (int index = 1; index < steps.size(); index++) {
             HpStep current = steps.get(index);
-            if (current.hp() <= smiteDamageSum) {
-                return interpolateDeathTimeMs(previous, current, smiteDamageSum);
+            if (current.hp() <= lightningDamageSum) {
+                return interpolateDeathTimeMs(previous, current, lightningDamageSum);
             }
             previous = current;
         }
@@ -84,13 +84,13 @@ public class GameEffectiveNaturalDeathService {
         return steps.get(steps.size() - 1).timeMs();
     }
 
-    private long interpolateDeathTimeMs(HpStep previous, HpStep current, int smiteDamageSum) {
+    private long interpolateDeathTimeMs(HpStep previous, HpStep current, int lightningDamageSum) {
         int hpDrop = previous.hp() - current.hp();
         if (hpDrop <= 0) {
             return current.timeMs();
         }
 
-        double progress = (double) (previous.hp() - smiteDamageSum) / hpDrop;
+        double progress = (double) (previous.hp() - lightningDamageSum) / hpDrop;
         long intervalMillis = current.timeMs() - previous.timeMs();
         long interpolatedMillis = previous.timeMs() + (long) Math.ceil(intervalMillis * progress);
         return Math.max(previous.timeMs(), Math.min(current.timeMs(), interpolatedMillis));

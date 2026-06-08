@@ -75,17 +75,17 @@ public class GameRoomCommandService {
                 .orElse(false);
     }
 
-    public GameRoom lockInProgressRoomForSmite(Long gameRoomId, Long userId) {
+    public GameRoom lockInProgressRoomForLightning(Long gameRoomId, Long userId) {
         GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
-        validateSmiteJudgementRoom(gameRoom, userId);
+        validateLightningJudgementRoom(gameRoom, userId);
         return gameRoom;
     }
 
-    public GameRoom lockSmiteResultRoom(Long gameRoomId, Long userId) {
+    public GameRoom lockLightningResultRoom(Long gameRoomId, Long userId) {
         GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
-        validateSmiteResultRoom(gameRoom, userId);
+        validateLightningResultRoom(gameRoom, userId);
         return gameRoom;
     }
 
@@ -100,7 +100,7 @@ public class GameRoomCommandService {
                 .orElse(false);
     }
 
-    public Optional<GameRoom> finishInProgressRoomBySmiteKill(Long gameRoomId, Long winnerUserId) {
+    public Optional<GameRoom> finishInProgressRoomByLightningKill(Long gameRoomId, Long winnerUserId) {
         return gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .filter(gameRoom -> gameRoom.getStatus().isInProgress())
                 .map(gameRoom -> {
@@ -109,7 +109,7 @@ public class GameRoomCommandService {
                 });
     }
 
-    public Optional<GameRoom> finishInProgressRoomByBothSmitesUsedDraw(Long gameRoomId) {
+    public Optional<GameRoom> finishInProgressRoomByBothLightningsUsedDraw(Long gameRoomId) {
         return gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .filter(gameRoom -> gameRoom.getStatus().isInProgress())
                 .map(gameRoom -> {
@@ -129,7 +129,7 @@ public class GameRoomCommandService {
                 });
     }
 
-    private void validateSmiteJudgementRoom(GameRoom gameRoom, Long userId) {
+    private void validateLightningJudgementRoom(GameRoom gameRoom, Long userId) {
         if (!gameRoom.getStatus().isInProgress()
                 || gameRoom.getGameStartTime() == null
                 || gameRoom.getScenarioData() == null) {
@@ -140,7 +140,7 @@ public class GameRoomCommandService {
         }
     }
 
-    private void validateSmiteResultRoom(GameRoom gameRoom, Long userId) {
+    private void validateLightningResultRoom(GameRoom gameRoom, Long userId) {
         if ((!gameRoom.getStatus().isInProgress() && !gameRoom.getStatus().isFinished())
                 || gameRoom.getGameStartTime() == null
                 || gameRoom.getScenarioData() == null) {

@@ -94,7 +94,7 @@ class GameActionCommandServiceTest {
     }
 
     private GameAction action(long serverReceiveTimeMs) {
-        return GameAction.smite(
+        return GameAction.lightning(
                 GAME_ROOM_ID,
                 USER_ID,
                 serverReceiveTimeMs,

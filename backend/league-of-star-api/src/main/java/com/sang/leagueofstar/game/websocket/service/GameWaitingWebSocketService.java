@@ -6,11 +6,11 @@ import com.sang.leagueofstar.game.end.service.GameEndScheduleService;
 import com.sang.leagueofstar.game.rtt.common.constant.GameRttConstants;
 import com.sang.leagueofstar.game.rtt.domain.GameRttPongResult;
 import com.sang.leagueofstar.game.rtt.service.GameRttMeasurementService;
-import com.sang.leagueofstar.game.smite.domain.GameSmiteCommand;
-import com.sang.leagueofstar.game.smite.domain.GameSmiteFailureReason;
+import com.sang.leagueofstar.game.lightning.domain.GameLightningCommand;
+import com.sang.leagueofstar.game.lightning.domain.GameLightningFailureReason;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
-import com.sang.leagueofstar.game.smite.dto.GameSmiteHandleResponse;
-import com.sang.leagueofstar.game.smite.service.GameSmiteService;
+import com.sang.leagueofstar.game.lightning.dto.GameLightningHandleResponse;
+import com.sang.leagueofstar.game.lightning.service.GameLightningService;
 import com.sang.leagueofstar.game.result.service.GameResultWebSocketSender;
 import com.sang.leagueofstar.game.start.domain.GameStartFailureReason;
 import com.sang.leagueofstar.game.start.domain.GameStartTransitionResult;
@@ -49,7 +49,7 @@ public class GameWaitingWebSocketService {
     private final GameStartFailureProcessor gameStartFailureProcessor;
     private final GameEndScheduleService gameEndScheduleService;
     private final GameStartWebSocketSender gameStartWebSocketSender;
-    private final GameSmiteService gameSmiteService;
+    private final GameLightningService gameLightningService;
     private final GameResultWebSocketSender gameResultWebSocketSender;
 
     public void registerSession(Long gameRoomId, Long userId, WebSocketSession session) throws IOException {
@@ -108,29 +108,29 @@ public class GameWaitingWebSocketService {
         }
     }
 
-    public void handleSmite(GameRoomWebSocketSession currentSession, long serverReceiveTimeMs) {
+    public void handleLightning(GameRoomWebSocketSession currentSession, long serverReceiveTimeMs) {
         try {
-            gameSmiteService.handleSmite(new GameSmiteCommand(
+            gameLightningService.handleLightning(new GameLightningCommand(
                             currentSession.getGameRoomId(),
                             currentSession.getUserId(),
                             serverReceiveTimeMs
                     ))
-                    .ifPresent(response -> sendSmiteResponse(currentSession, response));
+                    .ifPresent(response -> sendLightningResponse(currentSession, response));
         } catch (CoreException e) {
-            sendSmiteError(currentSession, mapSmiteFailureReason(e), e.getErrorCode().message());
+            sendLightningError(currentSession, mapLightningFailureReason(e), e.getErrorCode().message());
         } catch (DataAccessException e) {
             log.warn("Failed to persist SMITE. gameRoomId={}, userId={}",
                     currentSession.getGameRoomId(), currentSession.getUserId(), e);
-            sendSmiteError(
+            sendLightningError(
                     currentSession,
-                    GameSmiteFailureReason.SMITE_PROCESSING_FAILED,
+                    GameLightningFailureReason.SMITE_PROCESSING_FAILED,
                     "Failed to process SMITE."
             );
         }
     }
 
-    private void sendSmiteResponse(GameRoomWebSocketSession currentSession,
-                                   GameSmiteHandleResponse response) {
+    private void sendLightningResponse(GameRoomWebSocketSession currentSession,
+                                   GameLightningHandleResponse response) {
         response.gameResultOptional()
                 .ifPresent(gameResult -> sendGameResult(currentSession, gameResult, response.broadcast()));
     }
@@ -150,8 +150,8 @@ public class GameWaitingWebSocketService {
         }
     }
 
-    private void sendSmiteError(GameRoomWebSocketSession currentSession,
-                                GameSmiteFailureReason reason,
+    private void sendLightningError(GameRoomWebSocketSession currentSession,
+                                GameLightningFailureReason reason,
                                 String message) {
         try {
             messageSender.send(
@@ -164,11 +164,11 @@ public class GameWaitingWebSocketService {
         }
     }
 
-    private GameSmiteFailureReason mapSmiteFailureReason(CoreException exception) {
+    private GameLightningFailureReason mapLightningFailureReason(CoreException exception) {
         if (exception.getErrorCode().equals(CoreErrorCode.INVALID_GAME_PARTICIPANTS)) {
-            return GameSmiteFailureReason.NOT_GAME_PARTICIPANT;
+            return GameLightningFailureReason.NOT_GAME_PARTICIPANT;
         }
-        return GameSmiteFailureReason.INVALID_SMITE_STATE;
+        return GameLightningFailureReason.INVALID_SMITE_STATE;
     }
 
     public void cleanupSession(WebSocketSession session) {

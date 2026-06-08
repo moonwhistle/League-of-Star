@@ -2,7 +2,7 @@ package com.sang.leagueofstar.game.websocket.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sang.leagueofstar.game.smite.domain.GameSmiteFailureReason;
+import com.sang.leagueofstar.game.lightning.domain.GameLightningFailureReason;
 import com.sang.leagueofstar.game.websocket.dto.GameWebSocketClientMessage;
 import com.sang.leagueofstar.game.websocket.dto.GameWebSocketServerMessage;
 import com.sang.leagueofstar.game.websocket.session.GameRoomWebSocketSession;
@@ -77,15 +77,15 @@ public class GameWaitingWebSocketHandler extends TextWebSocketHandler {
             gameWaitingWebSocketService.handleRttPong(currentSession.get(), clientMessage);
             return;
         }
-        if (clientMessage.isSmite()) {
-            if (clientMessage.hasInvalidSmitePayload()) {
+        if (clientMessage.isLightning()) {
+            if (clientMessage.hasInvalidLightningPayload()) {
                 send(session, GameWebSocketServerMessage.error(
-                        GameSmiteFailureReason.INVALID_SMITE_PAYLOAD.getCode(),
+                        GameLightningFailureReason.INVALID_SMITE_PAYLOAD.getCode(),
                         "SMITE payload must be empty."
                 ));
                 return;
             }
-            gameWaitingWebSocketService.handleSmite(currentSession.get(), receivedAtMillis);
+            gameWaitingWebSocketService.handleLightning(currentSession.get(), receivedAtMillis);
             return;
         }
 

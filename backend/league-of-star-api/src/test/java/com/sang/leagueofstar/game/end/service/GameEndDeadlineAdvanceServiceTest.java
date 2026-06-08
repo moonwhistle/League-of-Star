@@ -34,11 +34,11 @@ class GameEndDeadlineAdvanceServiceTest {
     );
 
     @Test
-    @DisplayName("advanceAfterFailedSmite - effective naturalDeathAt을 계산해 더 빠른 deadline 갱신을 요청한다")
-    void advanceAfterFailedSmite() {
+    @DisplayName("advanceAfterFailedLightning - effective naturalDeathAt을 계산해 더 빠른 deadline 갱신을 요청한다")
+    void advanceAfterFailedLightning() {
         // given
         GameRoom gameRoom = startedRoom();
-        GameAction failedSmite = GameAction.smite(
+        GameAction failedLightning = GameAction.lightning(
                 GAME_ROOM_ID,
                 FIRST_USER_ID,
                 START_AT_MILLIS + 800L,
@@ -47,18 +47,18 @@ class GameEndDeadlineAdvanceServiceTest {
         );
 
         // when
-        service.advanceAfterFailedSmite(gameRoom, List.of(failedSmite));
+        service.advanceAfterFailedLightning(gameRoom, List.of(failedLightning));
 
         // then
         verify(gameEndScheduleService).advanceEndDeadlineIfEarlier(GAME_ROOM_ID, START_AT_MILLIS + 1_400L);
     }
 
     @Test
-    @DisplayName("advanceAfterFailedSmite - deadline 갱신 실패가 SMITE 처리 흐름으로 전파되지 않는다")
-    void advanceAfterFailedSmite_Exception() {
+    @DisplayName("advanceAfterFailedLightning - deadline 갱신 실패가 SMITE 처리 흐름으로 전파되지 않는다")
+    void advanceAfterFailedLightning_Exception() {
         // given
         GameRoom gameRoom = startedRoom();
-        GameAction failedSmite = GameAction.smite(
+        GameAction failedLightning = GameAction.lightning(
                 GAME_ROOM_ID,
                 FIRST_USER_ID,
                 START_AT_MILLIS + 800L,
@@ -70,7 +70,7 @@ class GameEndDeadlineAdvanceServiceTest {
                 .advanceEndDeadlineIfEarlier(GAME_ROOM_ID, START_AT_MILLIS + 1_400L);
 
         // when & then
-        assertThatCode(() -> service.advanceAfterFailedSmite(gameRoom, List.of(failedSmite)))
+        assertThatCode(() -> service.advanceAfterFailedLightning(gameRoom, List.of(failedLightning)))
                 .doesNotThrowAnyException();
     }
 
