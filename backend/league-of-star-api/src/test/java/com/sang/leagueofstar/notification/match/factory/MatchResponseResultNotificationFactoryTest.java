@@ -81,7 +81,7 @@ class MatchResponseResultNotificationFactoryTest {
                 MatchResponseStatus.ACCEPTED,
                 new MatchResponseResultEvent.Game(
                         100L,
-                        "/assets/game/dragon-view.mp4",
+                        "/assets/game/star-core-view.mp4",
                         "/ws/game/100"
                 )
         );
@@ -95,14 +95,14 @@ class MatchResponseResultNotificationFactoryTest {
         assertThat(userAMessage.notification().reason()).isEqualTo(MatchResponseReason.BOTH_ACCEPTED);
         assertThat(userAMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_GAME_WAITING);
         assertThat(userAMessage.notification().game().gameRoomId()).isEqualTo(100L);
-        assertThat(userAMessage.notification().game().videoUrl()).isEqualTo("/assets/game/dragon-view.mp4");
+        assertThat(userAMessage.notification().game().videoUrl()).isEqualTo("/assets/game/star-core-view.mp4");
         assertThat(userAMessage.notification().game().webSocketUrl()).isEqualTo("/ws/game/100");
 
         assertThat(userBMessage.notification().outcome()).isEqualTo(MatchResponseOutcome.MATCHED);
         assertThat(userBMessage.notification().reason()).isEqualTo(MatchResponseReason.BOTH_ACCEPTED);
         assertThat(userBMessage.notification().action()).isEqualTo(MatchResponseAction.GO_TO_GAME_WAITING);
         assertThat(userBMessage.notification().game().gameRoomId()).isEqualTo(100L);
-        assertThat(userBMessage.notification().game().videoUrl()).isEqualTo("/assets/game/dragon-view.mp4");
+        assertThat(userBMessage.notification().game().videoUrl()).isEqualTo("/assets/game/star-core-view.mp4");
         assertThat(userBMessage.notification().game().webSocketUrl()).isEqualTo("/ws/game/100");
     }
 

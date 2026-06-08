@@ -121,7 +121,7 @@ flowchart TD
 ### Step 2. MP4 정적 서빙
 
 - [x] Spring Boot static resource 디렉토리 준비
-- [x] `/assets/game/dragon-view.mp4` 접근을 위한 경로 구조 구성
+- [x] `/assets/game/star-core-view.mp4` 접근을 위한 경로 구조 구성
 - [x] 실제 MP4 배치 경로 명시
 - [x] 실제 MP4 파일은 repo에 포함하지 않고 `.gitkeep`만 유지
 - [x] gameRoom마다 MP4를 따로 만들지 않음
@@ -603,21 +603,21 @@ gameRoom 생성 실패 mapping:
 
 목표:
 
-- 공통 MP4를 `/assets/game/dragon-view.mp4`로 제공한다.
+- 공통 MP4를 `/assets/game/star-core-view.mp4`로 제공한다.
 
 범위:
 
 - Spring Boot static resource 위치 정리
-- `backend/smite-api/src/main/resources/static/assets/game/.gitkeep` 추가
+- `backend/league-of-star-api/src/main/resources/static/assets/game/.gitkeep` 추가
 - 실제 MP4 배치 경로 명시
-- 실제 `dragon-view.mp4` 파일은 Git에 포함하지 않음
+- 실제 `star-core-view.mp4` 파일은 Git에 포함하지 않음
 - API 문서 또는 체크포인트 문서에 고정 `videoUrl` 명시
 - gameRoom별 MP4 생성/복제 없음
 - CDN/S3 static asset 분리는 MVP 이후 검토
 
 완료 기준:
 
-- 로컬/배포 환경에서 `dragon-view.mp4`를 배치하면 `/assets/game/dragon-view.mp4` 접근 가능
+- 로컬/배포 환경에서 `star-core-view.mp4`를 배치하면 `/assets/game/star-core-view.mp4` 접근 가능
 - `match_response_result.game.videoUrl`이 같은 URL을 반환
 - 실제 MP4 파일 없이도 테스트 통과
 

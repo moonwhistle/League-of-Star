@@ -86,7 +86,7 @@ class MatchNotificationControllerRestDocsTest extends RestDocsSupport {
                                         - `opponent`: 상대 `userId`, `nickname`, `tier`, `tierScore`
                                         - `game`: 성공 시 게임 대기 화면 진입 payload, 실패 시 `null`
                                         - `game.gameRoomId`: 생성된 게임방 ID
-                                        - `game.videoUrl`: 공통 MP4 static resource URL. MVP 기본값은 `/assets/game/dragon-view.mp4`
+                                        - `game.videoUrl`: 공통 MP4 static resource URL. MVP 기본값은 `/assets/game/star-core-view.mp4`
                                         - `game.webSocketUrl`: gameRoom WebSocket URL. MVP 기본 형식은 `/ws/game/{gameRoomId}`
                                         
                                         Action mapping:

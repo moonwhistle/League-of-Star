@@ -337,7 +337,7 @@ CREATE TABLE rank_series (
 | `status` | VARCHAR(20) | NOT NULL | READY / IN_PROGRESS / FINISHED / ABORTED |
 | `result` | VARCHAR(20) | NULLABLE | PLAYER1_WIN / PLAYER2_WIN / DRAW |
 | `winner_id` | BIGINT | FK → users, NULLABLE | 승자 (무승부 시 NULL) |
-| `dragon_max_hp` | INT | NOT NULL, DEFAULT 10000 | 스타 코어 초기 HP |
+| `star_core_max_hp` | INT | NOT NULL, DEFAULT 10000 | 스타 코어 초기 HP |
 | `duration_seconds` | INT | NOT NULL | 게임 시간 (8~17) |
 | `scenario_data` | JSON | NOT NULL | HP 감소 시나리오 스냅샷 |
 | `game_start_time` | DATETIME(3) | NULLABLE | 게임 실제 시작 시각 (ms 정밀도) |
@@ -351,7 +351,7 @@ CREATE TABLE game_rooms (
     status             VARCHAR(20) NOT NULL DEFAULT 'READY',
     result             VARCHAR(20) NULL,
     winner_id          BIGINT      NULL,
-    dragon_max_hp      INT         NOT NULL DEFAULT 10000,
+    star_core_max_hp   INT         NOT NULL DEFAULT 10000,
     duration_seconds   INT         NOT NULL,
     scenario_data      JSON        NOT NULL,
     game_start_time    DATETIME(3) NULL,
@@ -398,16 +398,14 @@ CREATE TABLE game_participants (
 
 ### 3.7 game_actions — 라이트닝 액션 기록
 
-> League of Star 명칭 전환 후 사용자-facing 개념은 LIGHTNING / 스타 코어지만, 현재 DB 컬럼은 기존 backend schema 호환을 위해 `smite_*`, `dragon_*` 레거시 이름을 유지한다. 컬럼명 변경은 별도 migration 이슈에서 처리한다.
-
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
 | `id` | BIGINT | PK, AUTO_INCREMENT | 고유 ID |
 | `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 게임 방 |
 | `user_id` | BIGINT | FK → users, NOT NULL | 라이트닝 사용 유저 |
 | `server_receive_time_ms` | BIGINT | NOT NULL | 서버 수신 시각 (epoch ms) |
-| `smite_time_ms` | INT | NOT NULL | 서버 수신 시각 기준 LIGHTNING 시점 (게임 시작 기준 ms). 레거시 컬럼명 |
-| `dragon_hp_at_smite` | INT | NOT NULL | 이전 LIGHTNING 데미지 반영 후, 이번 LIGHTNING 적용 전 현재 스타 코어 HP. 레거시 컬럼명 |
+| `lightning_time_ms` | INT | NOT NULL | 서버 수신 시각 기준 LIGHTNING 시점 (게임 시작 기준 ms) |
+| `star_core_hp_at_lightning` | INT | NOT NULL | 이전 LIGHTNING 데미지 반영 후, 이번 LIGHTNING 적용 전 현재 스타 코어 HP |
 | `is_kill` | BOOLEAN | NOT NULL | 킬 성공 여부 (HP 1200 이하) |
 | `created_at` | DATETIME | NOT NULL | 기록일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
@@ -418,8 +416,8 @@ CREATE TABLE game_actions (
     game_room_id            BIGINT   NOT NULL,
     user_id                 BIGINT   NOT NULL,
     server_receive_time_ms  BIGINT   NOT NULL,
-    smite_time_ms           INT      NOT NULL,
-    dragon_hp_at_smite      INT      NOT NULL,
+    lightning_time_ms       INT      NOT NULL,
+    star_core_hp_at_lightning INT    NOT NULL,
     is_kill                 BOOLEAN  NOT NULL,
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -430,10 +428,10 @@ CREATE TABLE game_actions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- `dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 같은 gameRoom에서 더 이른 LIGHTNING 데미지를 모두 반영한 현재 스타 코어 HP입니다.
-- `smite_time_ms < 100` 또는 scenario 범위 밖 LIGHTNING은 action으로 저장하지 않습니다.
+- `star_core_hp_at_lightning`은 scenario 원본 HP가 아니라, 같은 gameRoom에서 더 이른 LIGHTNING 데미지를 모두 반영한 현재 스타 코어 HP입니다.
+- `lightning_time_ms < 100` 또는 scenario 범위 밖 LIGHTNING은 action으로 저장하지 않습니다.
 - LIGHTNING 데미지는 정책상 `1200` 고정이므로 별도 컬럼으로 저장하지 않습니다.
-- `afterHp = max(0, dragon_hp_at_smite - 1200)`은 WebSocket 응답에서 계산하는 값이며 DB에는 저장하지 않습니다.
+- `afterHp = max(0, star_core_hp_at_lightning - 1200)`은 WebSocket 응답에서 계산하는 값이며 DB에는 저장하지 않습니다.
 - `game_actions`는 유저당 1회 LIGHTNING 입력과 판정 스냅샷만 저장합니다. 승패 기록, LP 변동, 배치/승급전 반영은 `game_records`에서 처리합니다.
 
 > **uk_game_room_user**: 한 게임에서 유저당 라이트닝 1회만 → 유니크 제약으로 DB 레벨 보장

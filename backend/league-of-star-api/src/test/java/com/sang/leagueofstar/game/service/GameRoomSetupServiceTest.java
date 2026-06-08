@@ -29,7 +29,7 @@ class GameRoomSetupServiceTest {
     private static final Long FIRST_USER_ID = 1L;
     private static final Long SECOND_USER_ID = 2L;
     private static final Long GAME_ROOM_ID = 100L;
-    private static final String GAME_VIDEO_URL = "/assets/game/dragon-view.mp4";
+    private static final String GAME_VIDEO_URL = "/assets/game/star-core-view.mp4";
     private static final String GAME_WEB_SOCKET_URL = "/ws/game/100";
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 5, 18, 10, 0);
 

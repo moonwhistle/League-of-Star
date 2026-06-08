@@ -1,6 +1,6 @@
 spring:
   application:
-    name: smite
+    name: league-of-star
   profiles:
     active: local
   config:

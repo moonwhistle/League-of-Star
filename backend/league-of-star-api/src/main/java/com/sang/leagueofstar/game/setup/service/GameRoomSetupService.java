@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class GameRoomSetupService {
 
-    private static final String GAME_VIDEO_URL = "/assets/game/dragon-view.mp4";
+    private static final String GAME_VIDEO_URL = "/assets/game/star-core-view.mp4";
     private static final String GAME_WEB_SOCKET_URL_FORMAT = "/ws/game/%d";
 
     private final GameRoomCommandService gameRoomCommandService;
