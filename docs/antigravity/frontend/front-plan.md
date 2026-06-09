@@ -234,6 +234,8 @@ interface GameStartPayload {
 - `/game/:gameRoomId/play` 페이지에서 Three.js 기반 galaxy background 구현.
 - galaxy background는 카메라 주변 star sphere와 전방 star mist로 구성해 진입 직후 확대된 별무리가 화면을 채우게 구현.
 - 배경 animation은 별 평면 이동이 아니라 viewer/camera 기준의 느린 시점 회전으로 구현.
+- 게임 진입마다 카메라 yaw/pitch/roll, 배경 회전 phase, 스타 코어 이동 phase를 프론트 랜덤 시각 연출로 다르게 시작하게 구현.
+- 이 랜덤값은 화면 재미를 위한 visual-only 값이며 `LIGHTNING` 판정 payload나 백엔드 source of truth에는 포함하지 않음.
 - HP bar, countdown, LIGHTNING button HUD는 후속 전투 UI 단계로 보류.
 - `requestAnimationFrame` 기반 배경 animation 구현.
 - LIGHTNING 클릭 UI와 `{ type: 'LIGHTNING', payload: null }` 전송은 후속 전투 UI 단계로 보류.
@@ -242,7 +244,20 @@ interface GameStartPayload {
 - PixiJS, Web Worker는 MVP에서 도입하지 않음.
 - Three.js 구현을 위해 `three`, `@types/three` 추가.
 
-### 11. [ ] 게임 결과 WebSocket 처리 구현
+### 11. [ ] LIGHTNING 전투 입력 UI 구현
+
+- `/game/:gameRoomId/play`에서 사용자가 LIGHTNING을 1회 입력할 수 있는 UI 구현.
+- 입력 방식은 Three.js 스타 코어를 기준으로 한 타겟/클릭 UI 또는 명확한 LIGHTNING 버튼으로 구현하되, 최종 판정은 프론트가 하지 않음.
+- WebSocket 전송 payload는 백엔드 계약대로 `{ type: 'LIGHTNING', payload: null }`만 사용.
+- 클라이언트 timestamp, HP, elapsed time, target 좌표는 payload에 포함하지 않음.
+- 서버 판정 source of truth는 WebSocket 수신 시각과 백엔드 `GAME_START` scenario임.
+- 한 gameRoom에서 LIGHTNING은 한 번만 전송하도록 session storage 기반 중복 방지 구현.
+- 이미 전송한 gameRoom으로 재진입/새로고침해도 중복 전송하지 않음.
+- 전송 직후 승패를 프론트에서 확정하지 않고 `GAME_RESULT` 수신을 기다림.
+- 전송 실패나 WebSocket close/error는 화면 상태로 표시하고, 서버 결과를 임의 생성하지 않음.
+- `GAME_RESULT` route 이동과 summary API 호출은 다음 이슈로 유지.
+
+### 12. [ ] 게임 결과 WebSocket 처리 구현
 
 - `GAME_RESULT` payload shape 반영.
 
@@ -269,7 +284,7 @@ interface GameResultPayload {
 - WebSocket result payload는 즉시 전환/임시 표시용으로만 사용.
 - 최종 결과 source of truth는 summary API로 처리.
 
-### 12. [ ] 게임 결과 Summary 화면 구현
+### 13. [ ] 게임 결과 Summary 화면 구현
 
 - `/game/:gameRoomId/result` 페이지에서 `GET /api/v1/games/{gameId}/summary` 호출 구현.
 - 현재 백엔드 기준 `gameId = gameRoomId`로 호출.
@@ -328,7 +343,10 @@ type GameSummaryResponse =
 - `RTT_PING` 수신 시 `RTT_PONG` 전송 검증.
 - `COUNTDOWN` 수신 시 countdown 상태 표시 검증.
 - `GAME_START` 수신 시 play 이동 및 scenario 저장 검증.
-- LIGHTNING 클릭 시 전송되는 레거시 `LIGHTNING` payload가 `null`인지 검증.
+- LIGHTNING 클릭 시 `{ type: 'LIGHTNING', payload: null }`이 한 번만 전송되는지 검증.
+- LIGHTNING 전송 payload에 timestamp, HP, elapsed time, target 좌표가 포함되지 않는지 검증.
+- LIGHTNING 전송 후 프론트가 승패를 즉시 확정하지 않고 `GAME_RESULT`를 기다리는지 검증.
+- 새로고침/재진입 후 같은 gameRoom에서 LIGHTNING 중복 전송이 막히는지 검증.
 - `GAME_RESULT` 수신 후 result 이동 검증.
 - summary `PENDING` polling 검증.
 - summary `DONE` 결과 표시 검증.
@@ -368,6 +386,7 @@ Accept: text/event-stream
 - [ ] 게임 대기방 WebSocket 구현.
 - [x] 게임 시작 처리 구현.
 - [x] 게임 플레이 화면 구현.
+- [ ] LIGHTNING 전투 입력 UI 구현.
 - [ ] 게임 결과 WebSocket 처리 구현.
 - [ ] 게임 결과 Summary 화면 구현.
 - [ ] 공통 UI, 테스트, 문서 정합성 정리.

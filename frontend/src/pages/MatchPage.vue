@@ -227,7 +227,7 @@ import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/ser
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
-import logoImageUrl from '../../img/logo.png'
+import logoImageUrl from '../../img/lightning-spell.png'
 
 const streamStatus = ref('idle')
 const { nextLocaleLabel, t, toggleLocale } = useLocale()

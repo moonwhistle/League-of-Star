@@ -9,6 +9,15 @@ interface ThreeGalaxyBackgroundSceneCallbacks {
   onReadyChange: (isReady: boolean) => void
 }
 
+interface ThreeGalaxyVisualStart {
+  cameraPitch: number
+  cameraRoll: number
+  cameraYaw: number
+  galaxyRoll: number
+  timeOffsetSeconds: number
+  targetTimeOffsetMs: number
+}
+
 interface SwooshTarget {
   from: THREE.Vector3
   group: THREE.Group
@@ -50,6 +59,7 @@ export function createThreeGalaxyBackgroundScene(
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x07040f)
+  const visualStart = createRandomVisualStart()
 
   const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 180)
   camera.position.set(0, 0, 0)
@@ -216,7 +226,7 @@ export function createThreeGalaxyBackgroundScene(
   })
 
   galaxyRoot.add(...nebulaFields, milkyWay, ...sparkleFields, ...starFields)
-  galaxyRoot.rotation.z = -0.26
+  galaxyRoot.rotation.z = visualStart.galaxyRoll
   scene.add(galaxyRoot)
   camera.add(swooshTarget.group)
 
@@ -232,13 +242,13 @@ export function createThreeGalaxyBackgroundScene(
   }
 
   function update(elapsedMs: number, hpPercent = 100, currentHp = 0): void {
-    const time = elapsedMs / 1000
-    camera.rotation.x = Math.sin(time * 0.04) * 0.14
-    camera.rotation.y = time * 0.038
-    camera.rotation.z = Math.sin(time * 0.032) * 0.055
+    const time = elapsedMs / 1000 + visualStart.timeOffsetSeconds
+    camera.rotation.x = visualStart.cameraPitch + Math.sin(time * 0.04) * 0.14
+    camera.rotation.y = visualStart.cameraYaw + time * 0.038
+    camera.rotation.z = visualStart.cameraRoll + Math.sin(time * 0.032) * 0.055
     galaxyRoot.rotation.x = Math.sin(time * 0.025) * 0.1
     galaxyRoot.rotation.y = time * 0.018
-    galaxyRoot.rotation.z = -0.26 + time * 0.012
+    galaxyRoot.rotation.z = visualStart.galaxyRoll + time * 0.012
     milkyWay.rotation.z = Math.sin(time * 0.035) * 0.018
     nebulaFields.forEach((field, index) => {
       field.rotation.x = Math.sin(time * 0.011 + index) * 0.045
@@ -255,7 +265,12 @@ export function createThreeGalaxyBackgroundScene(
       field.rotation.y = time * (0.0025 + index * 0.00085)
       field.rotation.z = time * (0.004 + index * 0.0009)
     })
-    updateSwooshTarget(swooshTarget, elapsedMs, hpPercent, currentHp)
+    updateSwooshTarget(
+      swooshTarget,
+      elapsedMs + visualStart.targetTimeOffsetMs,
+      hpPercent,
+      currentHp,
+    )
     renderer.render(scene, camera)
   }
 
@@ -301,6 +316,17 @@ export function createNoopThreeGalaxyBackgroundSceneController(): ThreeGalaxyBac
   return {
     dispose: () => {},
     update: () => {},
+  }
+}
+
+function createRandomVisualStart(): ThreeGalaxyVisualStart {
+  return {
+    cameraPitch: randomBetween(-0.18, 0.18),
+    cameraRoll: randomBetween(-0.12, 0.12),
+    cameraYaw: randomBetween(-Math.PI, Math.PI),
+    galaxyRoll: randomBetween(-Math.PI, Math.PI),
+    targetTimeOffsetMs: randomBetween(0, 4200),
+    timeOffsetSeconds: randomBetween(0, 140),
   }
 }
 
@@ -1026,4 +1052,8 @@ function drawStarPath(
 
 function randomNormal(): number {
   return (Math.random() + Math.random() + Math.random() + Math.random() - 2) / 2
+}
+
+function randomBetween(min: number, max: number): number {
+  return min + Math.random() * (max - min)
 }
