@@ -508,6 +508,7 @@ describe('GamePlayPage', () => {
     expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
     expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('true')
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+    expect(window.sessionStorage.getItem('league-of-star.gamePlayLightningSent:100')).toBe('true')
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
     await wrapper.vm.$nextTick()
@@ -591,6 +592,26 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('SEND_FAILED')
+    expect(window.sessionStorage.getItem('league-of-star.gamePlayLightningSent:100')).toBeNull()
+  })
+
+  it('blocks LIGHTNING after re-entering a gameRoom that was already sent in session storage', async () => {
+    window.sessionStorage.setItem('league-of-star.gamePlayLightningSent:100', 'true')
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+    expect(gameWebSocketMock.state.connection.sendLightning).not.toHaveBeenCalled()
   })
 })
 

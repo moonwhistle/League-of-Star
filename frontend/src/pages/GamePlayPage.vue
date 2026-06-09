@@ -204,6 +204,7 @@ function handleLightningKeyDown() {
   try {
     playGameWebSocketConnection.value?.sendLightning()
     lightningSent.value = true
+    storeLightningSent(readRouteGameRoomId())
     gameSocketErrorMessage.value = ''
   } catch (error) {
     lightningSent.value = false
@@ -333,6 +334,14 @@ function readLightningSent(gameRoomId = '') {
     return window.sessionStorage.getItem(buildLightningSentStorageKey(gameRoomId)) === 'true'
   } catch {
     return false
+  }
+}
+
+function storeLightningSent(gameRoomId = '') {
+  try {
+    window.sessionStorage.setItem(buildLightningSentStorageKey(gameRoomId), 'true')
+  } catch {
+    // Session storage is a client-side duplicate guard. Backend uniqueness remains authoritative.
   }
 }
 

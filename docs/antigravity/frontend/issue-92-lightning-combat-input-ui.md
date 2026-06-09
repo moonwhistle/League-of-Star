@@ -188,11 +188,19 @@ interface GameResultPayload {
 
 ### 4. LIGHTNING Storage / State 구현
 
-- [ ] sessionStorage key를 `league-of-star.gamePlayLightningSent:{gameRoomId}`로 유지.
-- [ ] 전송 성공 직후 sessionStorage 저장.
-- [ ] 새로고침/재진입 후 같은 gameRoom이면 전송 불가 상태로 복구.
-- [ ] 전송 실패 시 sessionStorage 저장하지 않고 error 상태만 표시.
-- [ ] 프론트는 전송 성공 직후 승패를 확정하지 않음.
+- [x] sessionStorage key를 `league-of-star.gamePlayLightningSent:{gameRoomId}`로 유지.
+- [x] 전송 성공 직후 sessionStorage 저장.
+- [x] 새로고침/재진입 후 같은 gameRoom이면 전송 불가 상태로 복구.
+- [x] 전송 실패 시 sessionStorage 저장하지 않고 error 상태만 표시.
+- [x] 프론트는 전송 성공 직후 승패를 확정하지 않음.
+
+구현 결과:
+
+- `GamePlayPage`는 진입 시 `league-of-star.gamePlayLightningSent:{gameRoomId}`를 읽어 `lightningSent` 상태를 복구한다.
+- LIGHTNING 전송이 예외 없이 끝난 뒤에만 같은 key에 `true`를 저장한다.
+- storage 저장 실패는 클라이언트 중복 방지 실패로만 보고 서버 unique 제약을 최종 방어선으로 둔다.
+- WebSocket `sendLightning()` 예외가 발생하면 storage를 저장하지 않고 `lightningSent=false`를 유지한다.
+- 전송 성공 직후에도 `GAME_RESULT`를 받기 전까지 승패/result route 이동을 확정하지 않는다.
 
 ### 5. HP Display Model 구현
 
