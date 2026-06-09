@@ -170,12 +170,21 @@ interface GameResultPayload {
 
 ### 3. LIGHTNING Keyboard Input 구현
 
-- [ ] `GamePlayPage`에서 `D`/`F` keydown listener 등록.
-- [ ] hover true일 때만 LIGHTNING 입력 허용.
-- [ ] `D`/`F` 외 키는 무시.
-- [ ] 이미 전송한 gameRoom이면 중복 전송 차단.
-- [ ] WebSocket 연결 불가, error, close, result 수신 이후에는 전송 차단.
-- [ ] key repeat으로 중복 전송되지 않게 방어.
+- [x] `GamePlayPage`에서 `D`/`F` keydown listener 등록.
+- [x] hover true일 때만 LIGHTNING 입력 허용.
+- [x] `D`/`F` 외 키는 무시.
+- [x] 이미 전송한 gameRoom이면 중복 전송 차단.
+- [x] WebSocket 연결 불가, error, close, result 수신 이후에는 전송 차단.
+- [x] key repeat으로 중복 전송되지 않게 방어.
+
+구현 결과:
+
+- `GamePlayPage`는 mount 시 `window.keydown` listener를 등록하고 unmount 시 제거한다.
+- LIGHTNING 입력 가능 조건은 `target hover`, `D/F key`, `WebSocket connected 또는 handoff`, `미전송`, `GAME_RESULT 미수신`, `key repeat 아님`으로 제한한다.
+- 조건이 맞으면 기존 `GameWebSocketConnection.sendLightning()`을 호출하므로 wire payload는 `{ type: 'LIGHTNING', payload: null }` 계약을 그대로 따른다.
+- 전송 성공 직후 페이지 상태의 `lightningSent`를 true로 바꿔 같은 화면 생명주기에서 중복 입력을 막는다.
+- 전송 실패 시 `lightningSent`를 false로 유지하고 socket error 상태만 표시한다.
+- sessionStorage 영구 저장과 새로고침 후 중복 방지는 4번 `LIGHTNING Storage / State 구현`에서 처리한다.
 
 ### 4. LIGHTNING Storage / State 구현
 

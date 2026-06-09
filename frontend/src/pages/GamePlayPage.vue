@@ -21,7 +21,7 @@
     :data-game-result-received="gameResultReceived"
     :data-game-socket-lightning-ready="canSendGameSocketLightning"
     :data-game-star-targeted="isStarTargeted"
-    :data-game-lightning-ready="false"
+    :data-game-lightning-ready="canSendLightningCommand"
     :data-game-lightning-sent="lightningSent"
     :data-game-three-ready="isThreeSceneReady"
   >
@@ -118,6 +118,17 @@ const hpPercent = computed(() => {
 })
 
 const canSendGameSocketLightning = computed(() => playGameWebSocketConnection.value !== undefined)
+const isGameSocketReadyForLightning = computed(
+  () => gameSocketStatus.value === 'connected' || gameSocketStatus.value === 'handoff',
+)
+const canSendLightningCommand = computed(
+  () =>
+    canSendGameSocketLightning.value &&
+    isGameSocketReadyForLightning.value &&
+    isStarTargeted.value &&
+    !lightningSent.value &&
+    !gameResultReceived.value,
+)
 const isNaturalDeathWaiting = computed(
   () =>
     playState.value !== null &&
@@ -126,6 +137,7 @@ const isNaturalDeathWaiting = computed(
 )
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('keydown', handleLightningKeyDown)
   const gameRoomId = readRouteGameRoomId()
 
   if (gameRoomId === '') {
@@ -153,6 +165,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener('keydown', handleLightningKeyDown)
   closePlayWebSocket()
   playGameWebSocketConnection.value = undefined
   closePlayWebSocket = () => {}
@@ -177,6 +190,33 @@ function handleBeforeUnload() {
   const event = arguments[0]
   event.preventDefault()
   event.returnValue = ''
+}
+
+function handleLightningKeyDown() {
+  const event = arguments[0]
+
+  if (event.repeat || !isLightningKey(event.key) || !canSendLightningCommand.value) {
+    return
+  }
+
+  event.preventDefault()
+
+  try {
+    playGameWebSocketConnection.value?.sendLightning()
+    lightningSent.value = true
+    gameSocketErrorMessage.value = ''
+  } catch (error) {
+    lightningSent.value = false
+    gameSocketStatus.value = 'error'
+    gameSocketErrorMessage.value =
+      error instanceof Error ? error.message : t('gamePlay.socketErrorDetail')
+  }
+}
+
+function isLightningKey(key = '') {
+  const normalizedKey = key.trim().toLowerCase()
+
+  return normalizedKey === 'd' || normalizedKey === 'f'
 }
 
 function shouldWarnBeforeLeaving() {

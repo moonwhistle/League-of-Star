@@ -18,6 +18,21 @@ const routeLeaveGuardsMock = vi.hoisted((): unknown[] => [])
 const gameWebSocketHandoffMock = vi.hoisted(() => ({
   takeGameWebSocketHandoff: vi.fn(),
 }))
+const threeSceneMock = vi.hoisted(() => ({
+  state: {
+    callbacks: undefined,
+  },
+  controller: {
+    dispose: vi.fn(),
+    update: vi.fn(),
+  },
+  createThreeGalaxyBackgroundScene: vi.fn((canvas = {}, callbacks = {}) => {
+    void canvas
+    threeSceneMock.state.callbacks = callbacks
+
+    return threeSceneMock.controller
+  }),
+}))
 const gameWebSocketMock = vi.hoisted(() => {
   const state = {
     handlers: undefined,
@@ -61,6 +76,14 @@ vi.mock('@/services/realtime/gameWebSocketHandoff', () => ({
   takeGameWebSocketHandoff: gameWebSocketHandoffMock.takeGameWebSocketHandoff,
 }))
 
+vi.mock('@/game/threeGalaxyBackgroundScene', () => ({
+  createNoopThreeGalaxyBackgroundSceneController: () => ({
+    dispose: vi.fn(),
+    update: vi.fn(),
+  }),
+  createThreeGalaxyBackgroundScene: threeSceneMock.createThreeGalaxyBackgroundScene,
+}))
+
 const { setLocale } = useLocale()
 
 interface GameWebSocketTestHandlers {
@@ -88,6 +111,20 @@ function getGameWebSocketHandlers() {
   return gameWebSocketMock.state.handlers as GameWebSocketTestHandlers
 }
 
+function setStarTargeted(isTargeted: boolean) {
+  const callbacks = threeSceneMock.state.callbacks as
+    | {
+        onTargetHoverChange?: (isTargetHovered: boolean) => void
+      }
+    | undefined
+
+  if (callbacks?.onTargetHoverChange === undefined) {
+    throw new Error('Three scene hover callback was not registered.')
+  }
+
+  callbacks.onTargetHoverChange(isTargeted)
+}
+
 describe('GamePlayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -101,6 +138,10 @@ describe('GamePlayPage', () => {
     gameWebSocketMock.state.connection.setHandlers.mockClear()
     gameWebSocketMock.state.connection.close.mockClear()
     gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReset()
+    threeSceneMock.state.callbacks = undefined
+    threeSceneMock.controller.dispose.mockClear()
+    threeSceneMock.controller.update.mockClear()
+    threeSceneMock.createThreeGalaxyBackgroundScene.mockClear()
     setLocale('ko')
   })
 
@@ -440,6 +481,116 @@ describe('GamePlayPage', () => {
     expect(wrapper.find('.target-reticle').exists()).toBe(false)
     expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="three-scene"]').exists()).toBe(true)
+  })
+
+  it('sends LIGHTNING once when D is pressed while the target is hovered', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-star-targeted')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('true')
+
+    const firstEvent = new KeyboardEvent('keydown', {
+      cancelable: true,
+      key: 'd',
+    })
+    window.dispatchEvent(firstEvent)
+    await wrapper.vm.$nextTick()
+
+    expect(firstEvent.defaultPrevented).toBe(true)
+    expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends LIGHTNING when F is pressed while the target is hovered', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F' }))
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('true')
+  })
+
+  it('does not send LIGHTNING when hover, key, repeat, socket, or result conditions are invalid', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendLightning).not.toHaveBeenCalled()
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', repeat: true }))
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendLightning).not.toHaveBeenCalled()
+
+    const handlers = getGameWebSocketHandlers()
+    handlers.onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: {
+          gameRoomId: 100,
+          result: 'DRAW',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendLightning).not.toHaveBeenCalled()
+  })
+
+  it('keeps LIGHTNING retryable when websocket send fails', async () => {
+    gameWebSocketMock.state.connection.sendLightning.mockImplementationOnce(() => {
+      throw new Error('SEND_FAILED')
+    })
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('SEND_FAILED')
   })
 })
 
