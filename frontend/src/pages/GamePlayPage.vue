@@ -20,7 +20,7 @@
     :data-game-socket-error-message="gameSocketErrorMessage"
     :data-game-result-received="gameResultReceived"
     :data-game-socket-lightning-ready="canSendGameSocketLightning"
-    :data-game-star-targeted="false"
+    :data-game-star-targeted="isStarTargeted"
     :data-game-lightning-ready="false"
     :data-game-lightning-sent="lightningSent"
     :data-game-three-ready="isThreeSceneReady"
@@ -71,6 +71,7 @@ const gameResultReceived = shallowRef(false)
 const playGameWebSocketConnection = shallowRef()
 const lightningSent = shallowRef(false)
 const isThreeSceneReady = shallowRef(false)
+const isStarTargeted = shallowRef(false)
 let animationFrameId = 0
 let closePlayWebSocket = () => {}
 let threeSceneController = createNoopThreeGalaxyBackgroundSceneController()
@@ -309,6 +310,9 @@ function initializeThreeScene() {
     onReadyChange: (nextIsReady) => {
       isThreeSceneReady.value = nextIsReady
     },
+    onTargetHoverChange: (nextIsStarTargeted) => {
+      isStarTargeted.value = nextIsStarTargeted
+    },
   })
   threeSceneController =
     nextThreeSceneController ?? createNoopThreeGalaxyBackgroundSceneController()
@@ -325,6 +329,8 @@ function updateThreeScene() {
 }
 
 function disposeThreeScene() {
+  isStarTargeted.value = false
+
   if (!hasThreeSceneController) {
     isThreeSceneReady.value = false
     return

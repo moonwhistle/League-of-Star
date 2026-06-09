@@ -10,6 +10,7 @@ export interface ThreeGalaxyBackgroundSceneController {
 
 interface ThreeGalaxyBackgroundSceneCallbacks {
   onReadyChange: (isReady: boolean) => void
+  onTargetHoverChange?: (isTargetHovered: boolean) => void
 }
 
 interface ThreeGalaxyVisualStart {
@@ -34,6 +35,7 @@ interface SwooshTarget {
   hpTextLastValue: string
   hpTextSprite: THREE.Sprite
   hpTextTexture: THREE.CanvasTexture
+  isHovered: boolean
   lastElapsedMs: number | null
   position: THREE.Vector3
   segmentDurationMs: number
@@ -50,6 +52,7 @@ export function createThreeGalaxyBackgroundScene(
 ): ThreeGalaxyBackgroundSceneController | null {
   if (typeof window.WebGLRenderingContext === 'undefined') {
     callbacks.onReadyChange(false)
+    callbacks.onTargetHoverChange?.(false)
     return null
   }
 
@@ -239,6 +242,9 @@ export function createThreeGalaxyBackgroundScene(
   camera.add(swooshTarget.group)
 
   let resizeObserver: ResizeObserver | null = null
+  const targetRaycaster = new THREE.Raycaster()
+  const pointerNdc = new THREE.Vector2()
+  let hasPointerPosition = false
 
   function resizeScene(): void {
     const rect = canvas.getBoundingClientRect()
@@ -279,12 +285,17 @@ export function createThreeGalaxyBackgroundScene(
       hpPercent,
       currentHp,
     )
+    updateTargetHoverState()
+    applySwooshTargetHoverVisual(swooshTarget, elapsedMs + visualStart.targetTimeOffsetMs)
     renderer.render(scene, camera)
   }
 
   function dispose(): void {
+    canvas.removeEventListener('pointermove', handlePointerMove)
+    canvas.removeEventListener('pointerleave', handlePointerLeave)
     resizeObserver?.disconnect()
     resizeObserver = null
+    setTargetHovered(false)
     scene.traverse((object) => {
       const maybeMesh = object as THREE.Mesh
       maybeMesh.geometry?.dispose()
@@ -304,6 +315,51 @@ export function createThreeGalaxyBackgroundScene(
     swooshTarget.hpTextTexture.dispose()
     renderer.dispose()
     callbacks.onReadyChange(false)
+    callbacks.onTargetHoverChange?.(false)
+  }
+
+  function handlePointerMove(event: PointerEvent): void {
+    const rect = canvas.getBoundingClientRect()
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      hasPointerPosition = false
+      setTargetHovered(false)
+      return
+    }
+
+    pointerNdc.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -(((event.clientY - rect.top) / rect.height) * 2 - 1),
+    )
+    hasPointerPosition = true
+    updateTargetHoverState()
+  }
+
+  function handlePointerLeave(): void {
+    hasPointerPosition = false
+    setTargetHovered(false)
+  }
+
+  function updateTargetHoverState(): void {
+    if (!hasPointerPosition) {
+      setTargetHovered(false)
+      return
+    }
+
+    camera.updateMatrixWorld()
+    swooshTarget.starCore.updateMatrixWorld()
+    targetRaycaster.setFromCamera(pointerNdc, camera)
+    setTargetHovered(targetRaycaster.intersectObject(swooshTarget.starCore, false).length > 0)
+  }
+
+  function setTargetHovered(isHovered: boolean): void {
+    if (swooshTarget.isHovered === isHovered) {
+      return
+    }
+
+    swooshTarget.isHovered = isHovered
+    canvas.style.cursor = isHovered ? 'crosshair' : 'default'
+    callbacks.onTargetHoverChange?.(isHovered)
   }
 
   resizeScene()
@@ -312,7 +368,10 @@ export function createThreeGalaxyBackgroundScene(
     resizeObserver.observe(canvas)
   }
 
+  canvas.addEventListener('pointermove', handlePointerMove)
+  canvas.addEventListener('pointerleave', handlePointerLeave)
   callbacks.onReadyChange(true)
+  callbacks.onTargetHoverChange?.(false)
   update(0)
 
   return {
@@ -867,6 +926,7 @@ function createSwooshTarget(options: {
     hpTextLastValue: '',
     hpTextSprite,
     hpTextTexture,
+    isHovered: false,
     lastElapsedMs: null,
     position: from.clone(),
     segmentDurationMs: 1200,
@@ -922,6 +982,16 @@ function updateSwooshTarget(
     trail.renderOrder = 6
     trail.material.opacity = Math.max(0.03, 0.44 - index * 0.046)
   })
+}
+
+function applySwooshTargetHoverVisual(target: SwooshTarget, elapsedMs: number): void {
+  const pulse = 1 + Math.sin(elapsedMs * 0.027) * 0.16
+  const hoverScale = target.isHovered ? 1.08 : 1
+
+  target.halo.scale.setScalar((target.isHovered ? 2.72 : 2.2) * pulse)
+  target.halo.material.opacity = target.isHovered ? 0.92 : 0.68
+  target.starCore.scale.setScalar(CHARACTER_TARGET_SCALE * pulse * hoverScale)
+  target.starCore.material.color.set(target.isHovered ? 0xffffff : 0xfff2bf)
 }
 
 function updateSwooshTargetSteering(target: SwooshTarget, dtSeconds: number): void {
