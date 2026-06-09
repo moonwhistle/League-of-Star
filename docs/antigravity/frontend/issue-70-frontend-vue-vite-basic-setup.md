@@ -34,7 +34,6 @@ flowchart TD
 | Match notification | `GET /api/v1/notifications/match/stream` | native `EventSource` wrapper 확장 자리 준비 |
 | Game WebSocket | `/ws/game/{gameRoomId}` | native `WebSocket` wrapper 확장 자리 준비 |
 | Game summary | `GET /api/v1/games/{gameId}/summary` | summary API 타입/서비스 확장 자리 준비 |
-| Static game asset | `/assets/game/star-core-view.mp4` | asset URL 상수와 game rendering 확장 자리 준비 |
 
 이번 이슈에서는 위 API를 실제로 호출하는 사용자 플로우를 완성하지 않는다. 다만 이후 이슈에서 바로 기능을 얹을 수 있도록 환경변수, 서비스 레이어, 타입 디렉토리, 라우트 shell을 만든다.
 
@@ -70,7 +69,6 @@ flowchart TD
 
 - 매칭 알림은 native `EventSource` 사용
 - 게임 통신은 native `WebSocket` 사용
-- MP4 배경은 HTML `<video>` 사용
 - HP bar, countdown, result HUD는 CSS overlay로 렌더링
 - `requestAnimationFrame` 기반 HP overlay 갱신 방향 유지
 - STOMP.js, SockJS, PixiJS, Web Worker, OffscreenCanvas는 MVP에서 미도입
@@ -163,7 +161,6 @@ types/constants -> no app dependency
 ```env
 VITE_API_BASE_URL=http://localhost:8080
 VITE_WS_BASE_URL=ws://localhost:8080
-VITE_GAME_VIDEO_URL=/assets/game/star-core-view.mp4
 ```
 
 로컬 개발 기준:
@@ -259,7 +256,6 @@ VITE_GAME_VIDEO_URL=/assets/game/star-core-view.mp4
 - [x] `gameMessages.ts`에 WebSocket client/server message type 초안 작성
 - [x] `hpScenario.ts`에 HP scenario 계산 함수 자리 생성
 - [x] `requestAnimationFrame` 기반 overlay 갱신은 후속 게임 화면 이슈로 분리
-- [x] MP4 URL 상수 위치 확정
 
 ### 8. Styling 기본값
 
@@ -333,7 +329,6 @@ npm run dev
 - `npm install`로 `package-lock.json`을 생성했다.
 - Vite 예제 컴포넌트와 로고 자산을 제거했다.
 - `package.json` 이름을 `league-of-star-frontend`로 정리하고 `typecheck` script를 추가했다.
-- `.env.example`에 백엔드 API, WebSocket, 게임 MP4 URL 기본값을 추가했다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
 
 ### 2026-06-01 - Task 3 TypeScript/Vite Settings
@@ -385,7 +380,6 @@ npm run dev
 - `src/game/gameMessages.ts`에 WebSocket client/server message 타입 re-export와 client message 생성 함수를 추가했다.
 - `src/game/hpScenario.ts`에 scenario timeline 기준 HP 계산 함수 자리를 추가했다.
 - `requestAnimationFrame` 기반 overlay 갱신은 후속 게임 화면 이슈에서 구현한다.
-- MP4 URL 상수는 기존 `src/constants/env.ts`의 `GAME_VIDEO_URL`을 사용한다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
 
 ### 2026-06-01 - Task 8 Styling Defaults

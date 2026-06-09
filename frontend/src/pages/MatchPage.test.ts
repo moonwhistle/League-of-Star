@@ -234,7 +234,6 @@ describe('MatchPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
     })
@@ -266,7 +265,6 @@ describe('MatchPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: expect.any(String),

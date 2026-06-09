@@ -50,7 +50,6 @@ flowchart LR
         REDIS_ACCEPTED["MatchSessionStore<br/>session = ACCEPTED<br/>A response = ACCEPTED<br/>B response = ACCEPTED"]
         US_IN_GAME["UserStatusStore<br/>A = IN_GAME<br/>B = IN_GAME"]
         CLEANUP_SUCCESS["MatchTimeoutStore cleanup"]
-        SSE_GO_WAITING["SSE match_response_result<br/>outcome = MATCHED<br/>action = GO_TO_GAME_WAITING<br/>gameRoomId/videoUrl/webSocketUrl"]
     end
 
     subgraph SETUP_FAIL["Game Setup Failed Scenarios"]

@@ -4,7 +4,6 @@
 
 이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `10. 게임 플레이 화면 구현` 범위를 구현한다. Issue 86~88에서 `GAME_START` 저장, Game WebSocket handoff, `/game/:gameRoomId/play` 최소 연결까지 끝났으므로, 이번 이슈에서는 play route를 실제 확인 가능한 게임 화면으로 확장한다.
 
-초기 검토에서는 백엔드가 내려준 MP4 위에 HP bar를 tracking overlay로 덮는 방식과 3D 스타 코어 전투 화면을 시도했다. 하지만 현재 디자인 확인 단계에서는 전투 UI보다 배경 품질을 먼저 확정하는 것이 우선이므로, 이번 이슈는 MP4 렌더링과 고정 Star Core/LIGHTNING/HUD 표시를 제거하고 `background-new-sharp.png` 기반의 선명한 우주 배경과 Three.js full-screen 은하 배경을 구현한다. 배경은 멀리 있는 평면 이미지를 보여주는 방식이 아니라, 카메라가 별무리 안에 들어간 것처럼 처음부터 확대된 별들이 화면을 채우고 시점 기준으로 천천히 회전하는 구조로 구현한다.
 
 ```mermaid
 flowchart TD
@@ -40,7 +39,6 @@ flowchart TD
 | ERROR handling        | 이번 배경 단계에서는 data attribute 상태 유지               |
 | GAME_RESULT handling  | 이번 이슈에서는 route 이동 금지                             |
 | Refresh policy        | 차단이 아니라 경고 + 저장 payload 기반 복구                 |
-| MP4 policy            | play 화면에서는 렌더링하지 않음                             |
 | 3D render policy      | Three.js WebGL canvas를 full-bleed galaxy background로 사용 |
 
 `StoredGameStartPayload`:
@@ -80,7 +78,6 @@ interface GameWaitingPayload {
 - 실제 시작 기준은 백엔드가 발행한 `GAME_START.payload.startAt`임.
 - 이번 배경 단계에서는 고정 HUD/LIGHTNING/GAME_RESULT를 화면에 표시하지 않음.
 - 저장된 payload와 WebSocket source는 유지해 route 복구/연결 정책이 깨지지 않게 함.
-- Game Waiting 단계의 MP4 preload/`CLIENT_READY` 계약은 유지하지만, Play 화면에서는 MP4를 렌더링하지 않음.
 
 ## Scope Boundary
 
@@ -105,8 +102,6 @@ interface GameWaitingPayload {
 
 이번 이슈에서 제외:
 
-- Play 화면 MP4 렌더링.
-- MP4 위 HP bar 좌표 tracking.
 - 3D 스타 코어 모델/타겟팅.
 - 고정 전투 HUD HP bar / countdown / LIGHTNING button 표시.
 - LIGHTNING 클릭 전송 UI.
@@ -125,7 +120,6 @@ interface GameWaitingPayload {
 
 - [x] `gameStartPayload`를 play 시작 데이터 source로 유지.
 - [x] `gameWaitingPayload`에서 `webSocketUrl` 조회.
-- [x] `videoUrl`은 play 화면 렌더링 source에서 제거.
 - [x] route param `gameRoomId`와 저장 payload 불일치 시 `/match` 복귀 유지.
 - [x] `startAt`, `durationMs`, `hpTimeline`을 play state로 연결.
 
@@ -139,7 +133,6 @@ interface GameWaitingPayload {
 
 ### 3. Three.js Galaxy Background 구현
 
-- [x] MP4 렌더링 제거.
 - [x] Three.js WebGL canvas 기반 우주 배경 렌더링.
 - [x] `gamebackground.png` 레퍼런스 기반 warm pink/gold + dark violet/blue 색감 반영.
 - [x] 고밀도 immersive star belt 구현.
@@ -173,7 +166,6 @@ interface GameWaitingPayload {
 
 - [x] 유효 payload에서 play UI 표시 테스트.
 - [x] payload missing 또는 mismatch 시 `/match` 복귀 테스트.
-- [x] MP4/video 없이 Three.js galaxy canvas가 렌더링되는지 테스트.
 - [x] 전투 overlay 없이 배경만 렌더링되는지 테스트.
 - [x] `startAt`/HP 계산 data attribute 유지 테스트.
 - [x] `ERROR` 수신 시 화면 message 없이 data attribute 상태 유지 테스트.
@@ -183,7 +175,6 @@ interface GameWaitingPayload {
 
 ### 7. 문서 정합성 구현
 
-- [x] issue-90을 MP4/스타 코어 overlay 정책에서 Three.js galaxy background 정책으로 갱신.
 - [x] `front-plan.md` 10번 `게임 플레이 화면 구현` 범위와 issue-90 범위 정합성 확인.
 - [x] `front-plan.md` `## Issue Split Recommendation`에서 10번 진행 범위 확인.
 - [x] `front-plan.md` 11번 `게임 결과 WebSocket 처리 구현`은 후속으로 유지.
@@ -211,20 +202,16 @@ interface GameWaitingPayload {
 - 프론트는 전투 판정 source of truth가 아님.
 - `GAME_RESULT` 수신 전까지 result route로 이동하지 않음.
 - 새로고침은 완전 차단이 불가능하므로 경고와 저장 payload 기반 복구/재연결로 처리함.
-- Play 화면은 MP4 렌더링과 MP4 좌표 tracking을 사용하지 않음.
 - Three.js WebGL canvas는 arena 전체를 채우는 full-bleed galaxy background로 렌더링함.
 - Three.js galaxy background는 카메라 주변 particle field를 source로 삼고, 시점 회전을 통해 “별무리 안에서 보는” 느낌을 우선함.
-- Game Waiting의 MP4 preload/`CLIENT_READY` 정책은 이번 변경으로 바꾸지 않음.
 - PixiJS, Web Worker는 MVP에서 도입하지 않음.
 - Three.js 구현을 위해 `three`, `@types/three`를 추가함.
 
 ## Acceptance Criteria
 
-- `/game/:gameRoomId/play`에서 MP4 video element가 렌더링되지 않음.
 - `/game/:gameRoomId/play`에서 Three.js galaxy canvas와 스타 코어 HP indicator/숫자만 표시됨.
 - play 진입 직후 빈 우주가 아니라 확대된 별무리가 화면을 채움.
 - galaxy background가 정지 이미지처럼 보이지 않고 시점 기준으로 천천히 회전함.
-- MP4 video, 3D Star Core model, 고정 HUD HP bar, countdown, reticle, LIGHTNING button이 표시되지 않음.
 - `startAt` 기준 elapsed/HP 계산 data attribute는 유지됨.
 - `ERROR` 수신 상태는 data attribute로 유지됨.
 - `GAME_RESULT`를 받아도 이번 이슈에서는 result route 이동이 발생하지 않음.
@@ -237,7 +224,6 @@ interface GameWaitingPayload {
 
 ## 📌 Summary
 
-`/game/:gameRoomId/play` 화면을 MP4 overlay/스타 코어 전투 방식에서 Three.js 기반 full-screen galaxy background로 전환함.
 
 이번 PR의 핵심은 전투 UI를 잠시 걷어내고 **우주 배경 품질과 움직이는 스타 코어를 먼저 확정할 수 있는 full-screen WebGL 배경**을 만드는 것임. 저장된 `GAME_START`/waiting payload와 WebSocket source는 유지하지만, 화면에는 고정 HUD/LIGHTNING/countdown/target overlay를 표시하지 않음.
 
@@ -257,7 +243,6 @@ flowchart TD
 
 - `GAME_START.payload.startAt`이 실제 시작 기준임.
 - `scenario.hpTimeline`은 스타 코어 HP indicator의 source로 사용함.
-- Play 화면은 MP4 렌더링과 MP4 좌표 tracking을 사용하지 않음.
 - Three.js WebGL canvas를 full-bleed galaxy background로 사용함.
 - 고정 HP HUD/LIGHTNING/countdown/target overlay는 이번 배경 단계에서 숨김.
 - 새로고침은 경고와 저장 payload 기반 복구/재연결로 처리함.
@@ -273,7 +258,6 @@ flowchart TD
 
 ## 📚 Changes
 
-- MP4 overlay와 3D 스타 코어 전투 UI를 제거하고 Three.js galaxy background로 전환함.
   원본 영상 위 HP bar tracking은 스타 코어 움직임, viewport crop, object-fit 차이에 따라 좌표가 쉽게 깨지는 구조였음. 이번 단계의 목표는 배경 품질 확인이므로 `gamebackground.png`의 warm pink/gold star field와 dark violet galaxy 느낌을 절차형 Three.js particles/nebula로 구현함.
 
 - 별 배경을 평면 레이어가 아니라 immersive particle field로 구성함.
@@ -299,7 +283,6 @@ flowchart TD
 - clock skew 보정과 WebSocket 재접속 고도화는 이번 범위가 아님.
 - PixiJS, Web Worker는 도입하지 않음.
 - Three.js 구현을 위해 `three`, `@types/three`를 추가함.
-- Game Waiting의 MP4 preload/`CLIENT_READY` 정책은 이번 PR에서 바꾸지 않음.
 - 검증 완료: `format`, `lint`, `typecheck`, 전체 test, production build, desktop/mobile overflow, WebGL canvas nonblank/frame change 확인.
 
 ## 📌 Related Issue

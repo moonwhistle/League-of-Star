@@ -26,7 +26,6 @@ flowchart TD
     K --> L["Handshake success<br/>101 Switching Protocols"]
     L --> M["afterConnectionEstablished"]
     M --> N["Server stores connection<br/>roomId + userId"]
-    N --> O["Client MP4 preload"]
     O --> P["CLIENT_READY"]
     P --> Q{"both READY?"}
     Q -->|"no"| R["WAITING"]
@@ -409,7 +408,6 @@ flowchart TD
     F -->|"yes"| G["Store session attributes<br/>gameRoomId, userId"]
     G --> H["Register local session<br/>gameRoomId + userId"]
     H --> I["Broadcast PLAYER_JOINED"]
-    I --> J["Client MP4 preload"]
     J --> K["CLIENT_READY"]
     K --> L["Broadcast PLAYER_READY"]
     L --> M["Wait for RTT/GAME_START<br/>later issue"]

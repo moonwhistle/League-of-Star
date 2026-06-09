@@ -21,7 +21,6 @@ public class GameSetupPortAdapter implements GameSetupPort {
         GameRoomSetupResult result = gameRoomSetupService.createReadyGameRoom(firstUserId, secondUserId);
         return new GameSetupResult(
                 result.gameRoomId(),
-                result.videoUrl(),
                 result.webSocketUrl()
         );
     }

@@ -4,7 +4,6 @@
 
 범위:
 
-- 포함: `match_response_result`, 매칭 SSE 종료, 게임 대기 화면 이동, MP4 preload, WebSocket handshake, `PLAYER_JOINED`, `CLIENT_READY`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, RTT 측정 메시지, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, LIGHTNING 입력 wire type `LIGHTNING`, `GAME_RESULT`, 클라이언트 복구 정책, `ERROR`
 - 제외: LIGHTNING 서버 판정 상세, game record/LP 반영
 
 ## 0. League of Star 명칭 및 WebSocket 호환 정책
@@ -70,8 +69,6 @@ sequenceDiagram
 
     W-->>A: PLAYER_JOINED
     W-->>B: PLAYER_JOINED
-    A->>A: MP4 preload
-    B->>B: MP4 preload
     A->>W: CLIENT_READY
     B->>W: CLIENT_READY
     W-->>A: PLAYER_READY
@@ -93,7 +90,6 @@ sequenceDiagram
 
     S-->>C: match_response_result
     Note over C: outcome = MATCHED<br/>reason = BOTH_ACCEPTED<br/>action = GO_TO_GAME_WAITING
-    Note over C: game.gameRoomId<br/>game.videoUrl<br/>game.webSocketUrl
     C->>C: EventSource.close()
     C->>C: /game/{gameRoomId}/waiting 이동
 ```
@@ -114,7 +110,6 @@ sequenceDiagram
   },
   "game": {
     "gameRoomId": 100,
-    "videoUrl": "/assets/game/star-core-view.mp4",
     "webSocketUrl": "/ws/game/100"
   }
 }
@@ -123,7 +118,6 @@ sequenceDiagram
 클라이언트 처리:
 
 - `action=GO_TO_GAME_WAITING`이면 `game` payload가 있어야 합니다.
-- `videoUrl`은 MP4 preload에 사용합니다.
 - `webSocketUrl`은 WebSocket 연결 주소로 사용합니다.
 - 브라우저 native WebSocket에서는 custom `Authorization` header를 붙이기 어렵기 때문에 MVP에서는 query parameter로 token을 전달합니다.
 
@@ -230,9 +224,7 @@ sequenceDiagram
 - 이 메시지는 게임 시작 신호가 아닙니다.
 - `GAME_START`는 RTT 통과 이후 Step 6에서 별도 메시지로 처리합니다.
 
-## 7. MP4 preload와 CLIENT_READY
 
-클라이언트는 게임 대기 화면에서 MP4를 preload한 뒤 `CLIENT_READY`를 한 번 전송합니다.
 
 ```mermaid
 sequenceDiagram
@@ -240,7 +232,6 @@ sequenceDiagram
     participant H as GameWaitingWebSocketHandler
     participant R as GameRoomWebSocketSessionRegistry
 
-    C->>C: videoUrl MP4 preload
     C->>H: CLIENT_READY
     H->>R: markReady(gameRoomId, userId)
     H->>R: areBothReady(gameRoomId)
@@ -404,7 +395,6 @@ GO_TO_GAME_WAITING 수신
 -> waiting 화면 진입
 -> 30초 자체 timer 시작
 -> WebSocket handshake 시도
--> MP4 preload 완료 후 CLIENT_READY 전송
 
 다음 중 하나 발생 시 start 버튼 화면 복귀:
   - GAME_WAITING_TIMEOUT 수신
@@ -540,7 +530,6 @@ sequenceDiagram
 
 | type | 설명 |
 |------|------|
-| `CLIENT_READY` | MP4 preload 등 대기 준비 완료 |
 | `RTT_PONG` | 서버 `RTT_PING`에 대한 RTT 측정 응답. payload의 `seq`를 그대로 반환 |
 | `LIGHTNING` | GAME_START 이후 LIGHTNING 입력을 나타내는 레거시 wire type. payload는 `null`이어야 하며 클라이언트 timestamp를 넣지 않음 |
 
@@ -641,8 +630,6 @@ stateDiagram-v2
     WaitingPage --> WebSocketConnecting: open webSocketUrl
     WebSocketConnecting --> WaitingConnected: handshake success
     WebSocketConnecting --> MatchStart: handshake fail
-    WaitingConnected --> PreloadingVideo: videoUrl preload
-    PreloadingVideo --> ReadySent: CLIENT_READY
     ReadySent --> WaitingOtherPlayer: PLAYER_READY bothReady=false
     ReadySent --> BothReady: PLAYER_READY bothReady=true
     WaitingOtherPlayer --> BothReady: PLAYER_READY bothReady=true
@@ -671,7 +658,6 @@ stateDiagram-v2
 - `RETURN_TO_MATCHING`에서는 매칭 SSE를 유지하고 `join/leave`를 호출하지 않습니다.
 - `game.webSocketUrl`에 access token query parameter를 붙여 WebSocket에 연결합니다.
 - WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `GAME_RESULT`, `ERROR`를 처리합니다.
-- MP4 preload 완료 후 `CLIENT_READY`를 한 번 전송합니다.
 - `GAME_WAITING_TIMEOUT`, handshake 실패, close/error, 자체 30초 timer 만료 시 start 버튼 화면으로 복귀합니다.
 - RTT 단계의 `GAME_START_FAILED` 수신 시 start 버튼 화면으로 복귀합니다.
 - 복귀 시 기존 waiting 화면 상태, WebSocket 객체, 자체 timer를 정리합니다.

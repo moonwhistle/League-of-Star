@@ -164,7 +164,6 @@ ACCEPTED + ACCEPTED
    outcome=MATCHED
    reason=BOTH_ACCEPTED
    action=GO_TO_GAME_WAITING
-   game={gameRoomId, videoUrl, webSocketUrl}
 ```
 
 정상 종료 후에는 gameRoom 결과와 record/rank 정산이 DB 기준으로 완료된 뒤 `match:status:{userA/userB}=IN_GAME`만 best-effort로 제거합니다. `matching:queue:*`, `match:session:*`, `match:response:timeout:*`는 정상 종료 cleanup 대상이 아닙니다.

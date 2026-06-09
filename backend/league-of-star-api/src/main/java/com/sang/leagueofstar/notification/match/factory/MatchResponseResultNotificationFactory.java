@@ -123,7 +123,6 @@ public class MatchResponseResultNotificationFactory {
         }
         return new MatchResponseResultNotification.Game(
                 game.gameRoomId(),
-                game.videoUrl(),
                 game.webSocketUrl()
         );
     }

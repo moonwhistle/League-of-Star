@@ -534,14 +534,9 @@ function isValidGamePayload(game = {}) {
   }
 
   const gameRoomId = Reflect.get(game, 'gameRoomId')
-  const videoUrl = Reflect.get(game, 'videoUrl')
   const webSocketUrl = Reflect.get(game, 'webSocketUrl')
 
-  return (
-    Number.isFinite(gameRoomId) &&
-    String(videoUrl).trim() !== '' &&
-    String(webSocketUrl).trim() !== ''
-  )
+  return Number.isFinite(gameRoomId) && String(webSocketUrl).trim() !== ''
 }
 
 function returnToMatchStart() {

@@ -1,13 +1,8 @@
 import type { GameWaitingPayload } from './gameWaitingPayload'
 
-export const GAME_WAITING_PROGRESS_STEP_PERCENT = 20
+export const GAME_WAITING_PROGRESS_STEP_PERCENT = 25
 
-export type GameWaitingProgressStepKey =
-  | 'matchId'
-  | 'opponent'
-  | 'gameRoomId'
-  | 'videoUrl'
-  | 'webSocketUrl'
+export type GameWaitingProgressStepKey = 'matchId' | 'opponent' | 'gameRoomId' | 'webSocketUrl'
 
 export interface GameWaitingProgressStep {
   key: GameWaitingProgressStepKey
@@ -35,10 +30,6 @@ export function calculateGameWaitingProgress(
     {
       key: 'gameRoomId',
       ready: Number.isFinite(payload?.game.gameRoomId),
-    },
-    {
-      key: 'videoUrl',
-      ready: String(payload?.game.videoUrl ?? '').trim() !== '',
     },
     {
       key: 'webSocketUrl',

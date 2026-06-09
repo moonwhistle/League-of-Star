@@ -40,8 +40,3 @@ security.yml
 .env
 
 backend/league-of-star-infra-redis/src/main/resources/application-redis.yml
-
-### Game static assets ###
-backend/league-of-star-api/src/main/resources/static/assets/game/*.mp4
-!backend/league-of-star-api/src/main/resources/static/assets/game/.gitkeep
-frontend/public/assets/game/*.mp4

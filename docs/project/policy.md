@@ -72,7 +72,6 @@
   - `GO_TO_MATCH_START`이면 매칭 SSE를 닫고 start 버튼 화면으로 복귀한다.
   - `RETURN_TO_MATCHING`이면 백엔드가 이미 기존 `entryTime/tierScore`로 큐 복귀를 완료한 상태이므로 매칭 SSE를 유지하고 `join/leave`를 호출하지 않는다.
 - 양쪽 수락이 완료되어도 게임방/시나리오 생성과 Redis 상태 전환이 모두 성공하기 전에는 게임 대기 화면으로 이동시키지 않는다.
-  - 게임방/시나리오 생성 성공 후 Redis `match session=ACCEPTED`, 두 유저 `match:status=IN_GAME` 전환까지 완료되면 `match_response_result`는 `GO_TO_GAME_WAITING`과 함께 `gameRoomId`, `videoUrl`, `webSocketUrl`을 전달한다.
   - 게임방/시나리오 생성 실패 또는 Redis 상태 전환 실패 시 `match_response_result`는 `FAILED / GAME_SETUP_FAILED / GO_TO_MATCH_START`를 전달한다.
   - Redis 상태 전환 실패가 게임방 생성 이후 발생하면 생성된 `game_rooms`와 `game_participants`는 `ABORTED`로 보상 처리한다.
   - 클라이언트는 `GAME_SETUP_FAILED` reason에 대응하는 안내 문구를 표시한 뒤 start 버튼 화면으로 복귀한다.
@@ -176,7 +175,6 @@
 - 서버 timer/scheduler는 `naturalDeathAt = startAt + scenario.durationMs`를 최초 자연사 deadline으로 등록한다.
 - LIGHTNING 실패 action이 저장되면 원본 scenario HP에서 누적 LIGHTNING 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있다.
 - `naturalDeathAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각이다. scheduler는 이 시각 이후 gameRoom을 다시 조회하고, 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
-- 클라이언트 MP4 재생 지연, 브라우저 pause, 렌더링 지연은 서버의 종료 기준을 바꾸지 않는다. 서버 종료 기준은 `startAt + scenario.durationMs`다.
 - `GAME_START` 확정 후 `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom과 participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않는다. 이 경우 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫으며, record와 LP/티어 변동은 반영하지 않는다.
 - `GAME_START` 메시지 전송에 실패하면 이미 등록된 `game:end:pending` deadline을 제거하고 gameRoom과 participants를 `ABORTED` 처리한다. 이 경우 match user status, RTT 상태, waiting 상태를 정리하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫는다.
 - game end scheduler는 `naturalDeathAt`에 도달한 gameRoom만 정산 대상으로 삼고, 정산 시 gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
@@ -243,7 +241,6 @@
 | **메시지 전송 시점** | 서버는 `COUNTDOWN`과 `GAME_START`를 countdown 종료 후가 아니라 `startAt` 전에 미리 전송 |
 | **GAME_START 처리** | 클라이언트는 `GAME_START`를 받아도 즉시 시작하지 않고, payload의 `startAt`까지 대기 |
 | **동일 기준** | `COUNTDOWN`과 `GAME_START`는 반드시 같은 `startAt`을 사용 |
-| **MP4 preload** | MP4 preload 완료 여부는 `CLIENT_READY` 전제로 보고 `GAME_START` 단계에서 다시 검증하지 않음 |
 
 `startAt`을 서버 기준으로 고정하는 이유는 클라이언트마다 WebSocket 메시지를 받는 시점이 다를 수 있기 때문이다. 메시지를 받은 뒤 각자 3초를 세면 실제 시작 시각이 달라질 수 있으므로, 서버가 하나의 절대 시작 시각을 정하고 클라이언트는 그 시각까지 남은 시간만 렌더링한다.
 

@@ -24,7 +24,6 @@ describe('gameWaitingPayload', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -40,7 +39,6 @@ describe('gameWaitingPayload', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -59,7 +57,6 @@ describe('gameWaitingPayload', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
     })
@@ -96,7 +93,6 @@ describe('gameWaitingPayload', () => {
         opponent: null,
         game: {
           gameRoomId: 101,
-          videoUrl: '/assets/game/star-core-view.mp4',
           webSocketUrl: '/ws/game/101',
         },
         receivedAt: '2026-06-01T00:00:00.000Z',

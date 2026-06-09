@@ -58,7 +58,6 @@ interface MatchResponseResultNotification {
   } | null;
   game: {
     gameRoomId: number;
-    videoUrl: string;
     webSocketUrl: string;
   } | null;
 }
@@ -66,7 +65,6 @@ interface MatchResponseResultNotification {
 
 프론트 처리 기준:
 
-- `GO_TO_GAME_WAITING`은 `game.gameRoomId`, `game.videoUrl`, `game.webSocketUrl`이 있어야 게임 대기 화면으로 이동한다.
 - `GO_TO_GAME_WAITING` 이동 전 `matchId`, `opponent`, `game`, `receivedAt`을 `sessionStorage`에 저장한다.
 - `GO_TO_GAME_WAITING`은 매칭 SSE를 닫고 게임 대기 화면으로 이동한다.
 - `GO_TO_MATCH_START`는 매칭 SSE를 닫고 ready 상태로 복귀한다.
@@ -165,7 +163,6 @@ interface MatchResponseResultNotification {
   - `matchId`
   - `opponent`
   - `game.gameRoomId`
-  - `game.videoUrl`
   - `game.webSocketUrl`
 - [x] 각 항목을 20%로 계산.
 - [x] 1개 확보 시 20%, 2개 확보 시 40%, 3개 확보 시 60%, 4개 확보 시 80%, 5개 확보 시 100% 표시.
@@ -314,7 +311,6 @@ flowchart TD
 
 - Loading bar 기준을 “필수 payload 확보율”로 정함.
   아직 Game WebSocket 연결은 이번 이슈 범위가 아니므로, 로딩 바를 실제 소켓 준비율처럼 보이면 오해가 생김.
-  그래서 `matchId`, `opponent`, `gameRoomId`, `videoUrl`, `webSocketUrl` 5개 항목을 각각 20%로 계산함.
   100% 상태 문구도 `Ready`가 아니라 `Received` 계열로 표현해 게임 시작 가능 상태와 구분함.
 
 - 최종 전환 이후 늦은 SSE callback을 무시함.

@@ -55,7 +55,6 @@ class MatchResponseResultNotificationTest {
                 new MatchResponseResultNotification.Opponent(2L, "opponent", "GOLD_IV", 13),
                 new MatchResponseResultNotification.Game(
                         100L,
-                        "/assets/game/star-core-view.mp4",
                         "/ws/game/100"
                 )
         );
@@ -65,7 +64,6 @@ class MatchResponseResultNotificationTest {
 
         // then
         assertThat(payload).contains("\"gameRoomId\":100");
-        assertThat(payload).contains("\"videoUrl\":\"/assets/game/star-core-view.mp4\"");
         assertThat(payload).contains("\"webSocketUrl\":\"/ws/game/100\"");
     }
 }

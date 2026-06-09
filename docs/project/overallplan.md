@@ -38,7 +38,6 @@
   - 한 명이라도 거절/타임아웃 → 10초 안에 수락한 유저는 큐 최우선 복귀, 거절/타임아웃/미응답 유저는 큐 이탈 (거절 패널티 없음)
   - 한 명이 먼저 거절해도 상대방 팝업은 10초 동안 유지되며, 제한 시간 안에 수락하면 큐 복귀 대상이 됨
 - **매칭 알림 채널**: SSE는 `match_found`와 최종 `match_response_result`까지만 담당
-  - 게임방 생성 성공 시 `match_response_result.game`에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
   - 게임방 생성 실패 시 `GAME_SETUP_FAILED` 결과를 전달하고 양쪽 모두 start 버튼 화면으로 복귀
   - 게임방 생성 후 Redis 상태 전환 실패 시 생성된 게임방/참여자는 `ABORTED`로 보상 처리하고 동일하게 `GAME_SETUP_FAILED` 결과를 전달
   - 게임방 생성 실패 또는 Redis 상태 전환 실패 시 매칭 큐에 자동 복귀하지 않음
@@ -49,7 +48,6 @@
 ### 2.3 라이트닝 싸움 게임
 - 두 플레이어가 **동일한 스타 코어의 HP 바**를 실시간으로 공유
 - 스타 코어 HP가 **불규칙하게 감소** (서버에서 사전 생성한 시나리오 기반)
-- MP4 배경은 gameRoom별로 만들지 않고 공통 static resource를 사용
 - `GAME_START` 이전 WebSocket 미접속/READY timeout은 **gameRoom `createdAt` 기준 30초**로 판단하며, 30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 완료되지 않으면 gameRoom `ABORTED`로 처리하고 전적/LP를 반영하지 않음
 - `GAME_START` 이후 disconnect는 게임을 중단하지 않고 서버 timer/scheduler, 시나리오, 수신 액션 기준으로 끝까지 판정
 - WebSocket 연결이 모두 끊겨도 서버 timer/scheduler가 gameRoom 종료 작업을 완료
@@ -104,7 +102,6 @@ HP: ████░██████░░█░░████░░█░░�
 - 매판 서버가 새로운 랜덤 시나리오를 생성 → 킬존 진입 시점이 매번 다름
 - HP 바를 읽는 **판독력** + 순간적인 클릭 **반응속도** 둘 다 필요
 - 양쪽 클라이언트에는 게임 시작 직전 동일한 시나리오를 전달 (WebSocket)
-- 클라이언트는 서버가 내려준 `startAt` 기준으로 MP4 재생과 HP overlay를 동기화
 - 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링
 - `COUNTDOWN`과 `GAME_START`는 countdown 종료 후가 아니라 `startAt` 전에 미리 전송하며, 클라이언트는 `GAME_START`를 받아도 `startAt`까지 대기
 
@@ -260,7 +257,6 @@ gap = 상대_티어점수 - 내_티어점수
 | **TanStack Query Vue** | 후속 이슈에서 서버 상태 캐싱/무효화 요구가 명확해질 때 도입 검토 |
 | **Native EventSource** | 매칭 SSE 수신 |
 | **Native WebSocket** | 게임 준비, RTT, 카운트다운, LIGHTNING 입력 |
-| **HTML video + Vue/CSS overlay** | MP4 배경 재생, HP bar/HUD 렌더링 |
 | **Vitest + Vue Test Utils** | 프론트엔드 테스트 |
 
 ### 5.3 Infra *(확장 시)*
@@ -363,7 +359,6 @@ MVP에서는 구현 단순성과 판정 정합성을 우선합니다.
 
 ### 9.1 MVP 렌더링 방식
 
-- MP4 배경은 HTML `<video>`로 재생합니다.
 - HP bar, countdown, result HUD는 Vue 컴포넌트와 CSS overlay로 렌더링합니다.
 - HP overlay는 서버가 내려준 `startAt`과 scenario를 기준으로 `requestAnimationFrame`에서 계산합니다.
 - PixiJS, Web Worker, OffscreenCanvas는 MVP 이후 성능 문제가 확인될 때 검토합니다.

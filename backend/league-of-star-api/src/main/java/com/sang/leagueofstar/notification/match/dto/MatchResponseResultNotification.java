@@ -27,7 +27,6 @@ public record MatchResponseResultNotification(
      */
     public record Game(
             Long gameRoomId,
-            String videoUrl,
             String webSocketUrl
     ) {
     }

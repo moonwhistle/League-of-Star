@@ -7,13 +7,11 @@ import java.util.Objects;
  */
 public record GameSetupResult(
         Long gameRoomId,
-        String videoUrl,
         String webSocketUrl
 ) {
 
     public GameSetupResult {
         Objects.requireNonNull(gameRoomId, "gameRoomId must not be null");
-        Objects.requireNonNull(videoUrl, "videoUrl must not be null");
         Objects.requireNonNull(webSocketUrl, "webSocketUrl must not be null");
     }
 }

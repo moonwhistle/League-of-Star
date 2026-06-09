@@ -4,7 +4,6 @@
 
 Vue 프론트엔드의 `/game/:gameRoomId/waiting` 페이지에서 Game WebSocket `COUNTDOWN`, `GAME_START` 이벤트를 실제 게임 시작 흐름으로 연결한다.
 
-이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `9. [x] 게임 시작 처리 구현`을 구현 기준으로 삼는다. Issue 86에서 Game Waiting WebSocket 연결, MP4 preload, `CLIENT_READY`, READY 대기, RTT 응답, 실패 복귀까지 완료했고, `COUNTDOWN`, `GAME_START`는 수신 가능하게만 두었다. 이번 이슈에서는 그 후속으로 countdown 표시, `GAME_START` payload 저장, `/game/:gameRoomId/play` 이동을 구현한다.
 
 핵심은 `GAME_START`를 실제 게임 시작 데이터의 source of truth로 삼되, 클라이언트가 즉시 게임이 시작됐다고 판단하지 않는 것이다. 서버는 `COUNTDOWN`과 `GAME_START`를 `startAt` 전에 미리 전송하고, 프론트는 `GAME_START` 수신 후 play route로 이동하되 실제 게임 시작 기준은 payload의 `startAt`으로 유지한다.
 
@@ -19,12 +18,10 @@ flowchart TD
     G -->|no| H["WebSocket 정리"]
     H --> I["/match 복귀"]
     G -->|yes| J["serverTime/startAt/scenario 저장"]
-    J --> K["WebSocket/timer/preload 정리"]
     K --> L["/game/{gameRoomId}/play 이동"]
     L --> M["Play 화면은 startAt 기준으로 대기"]
 ```
 
-이번 이슈에 포함되는 play route 작업은 저장된 game start payload를 읽고 다음 이슈가 사용할 시작 기준 데이터를 확인하는 최소 연결까지다. MP4 재생, HP bar/HUD, LIGHTNING 버튼, `GAME_RESULT` 처리는 `front-plan.md` 10번 이후 이슈로 넘긴다.
 
 ## Backend Contract
 
@@ -122,7 +119,6 @@ interface StoredGameStartPayload {
 
 이번 이슈에서 제외한다.
 
-- `/game/:gameRoomId/play` 실제 MP4 video 표시 구현.
 - HP bar, countdown, lightning button HUD 구현.
 - `requestAnimationFrame` 기반 HP 표시 구현.
 - LIGHTNING 클릭 시 `{ type: 'LIGHTNING', payload: null }` 전송 구현.
@@ -178,7 +174,6 @@ interface StoredGameStartPayload {
 - [x] `COUNTDOWN`을 먼저 받은 경우 `COUNTDOWN.startAt`과 `GAME_START.startAt` 일치 검증.
 - [x] `COUNTDOWN` 없이 `GAME_START`가 먼저 오면 `GAME_START` payload를 source of truth로 저장.
 - [x] `GAME_START` payload를 `sessionStorage`에 저장.
-- [x] 저장 성공 후 WebSocket, watchdog, countdown timer, preload listener 정리.
 - [x] `GAME_START`를 final transition으로 표시해 늦은 close/error callback 무시.
 - [x] `/game/:gameRoomId/play` 이동 구현.
 - [x] play route 이동 실패 시 waiting 화면에 실패 상태를 유지하고 error message 표시.
@@ -189,7 +184,6 @@ interface StoredGameStartPayload {
 - [x] payload 없음, parse 실패, route param 불일치 시 `/match` 복귀.
 - [x] 유효 payload가 있으면 `gameRoomId`, `startAt`, `starCoreMaxHp`, `durationMs`를 내부 상태로 보관.
 - [x] 화면에는 이번 이슈 범위가 시작 데이터 수신/대기임을 나타내는 최소 상태만 표시.
-- [x] 실제 MP4, HP bar, LIGHTNING HUD는 구현하지 않음.
 - [x] `startAt` 기준 runtime 계산은 후속 play UI가 사용할 수 있도록 `getHpAtElapsedMs` helper와 연결 가능한 구조로 유지.
 
 ### 6. Locale 구현
@@ -254,7 +248,6 @@ interface StoredGameStartPayload {
 - `COUNTDOWN` 없이 `GAME_START`가 먼저 와도 `GAME_START` payload가 유효하면 play로 이동한다.
 - route param `gameRoomId`와 payload `gameRoomId`가 다르면 시작하지 않는다.
 - server/client clock 보정은 이번 이슈에서 구현하지 않는다.
-- MP4 preload 완료 여부는 `CLIENT_READY` 전제로 보고 `GAME_START` 단계에서 다시 검증하지 않는다.
 - `GAME_START` 이전 실패는 유효한 판이 아니므로 큐 자동 복귀, LP, 전적 흐름과 섞지 않는다.
 - 실패 복귀 시 `joinMatchQueue`, `leaveMatchQueue`를 호출하지 않는다.
 - Game Waiting loading bar는 payload 수신율이며 countdown 진행률이나 게임 시작 준비율이 아니다.
@@ -272,7 +265,6 @@ interface StoredGameStartPayload {
 - `COUNTDOWN.startAt`과 `GAME_START.startAt` 불일치 시 play route 이동이 발생하지 않음.
 - `GAME_START` 이후 늦은 WebSocket close/error callback이 waiting 상태를 실패로 되돌리지 않음.
 - Game Waiting loading bar 의미가 payload 수신율로 유지됨.
-- 실제 MP4/HP/LIGHTNING/GAME_RESULT는 이번 이슈에서 구현하지 않음.
 - lint / format / typecheck / test / build 통과.
 - desktop/mobile viewport에서 horizontal overflow와 text overflow 후보가 없음.
 
@@ -294,7 +286,6 @@ flowchart TD
     F --> G["/match 복귀"]
     E -->|yes| H["GAME_START payload sessionStorage 저장"]
     H --> I["전환 완료 guard 설정"]
-    I --> J["WebSocket/watchdog/countdown/preload 정리"]
     J --> K["/game/:gameRoomId/play 이동"]
     K --> L["Play 최소 연결<br/>저장 payload 조회"]
     L --> M{"payload 유효?"}
@@ -312,7 +303,6 @@ flowchart TD
 - `GAME_START` 이후 늦은 WebSocket close/error callback은 실패 복귀로 덮어쓰지 않음.
 - server/client clock 보정은 이번 PR에서 하지 않음.
 - Game Waiting loading bar는 payload 수신율 의미로 유지함.
-- 실제 MP4 재생, HP bar, LIGHTNING, `GAME_RESULT`는 후속 이슈 범위임.
 
 백엔드와의 구현 계약:
 
@@ -337,7 +327,6 @@ flowchart TD
   `GAME_START` 메시지는 백엔드 이벤트지만 프론트는 런타임 payload shape를 그대로 신뢰하지 않음. `gameRoomId`, `serverTime`, `startAt`, `scenario`, `hpTimeline` 구조를 검증한 뒤 저장해 malformed payload가 play route까지 전파되지 않게 함.
 
 - waiting과 play의 책임을 분리함.
-  waiting은 `COUNTDOWN`, `GAME_START`를 받고 안전하게 play로 넘기는 역할만 담당함. play 화면은 저장된 시작 데이터를 확인하고 후속 HUD가 사용할 `startAt` 기반 elapsed/HP 계산값만 연결함. 실제 MP4/HUD/LIGHTNING 구현은 다음 이슈에서 처리함.
 
 - `startAt` 검증을 엄격하게 유지함.
   `COUNTDOWN`과 `GAME_START`가 서로 다른 `startAt`을 가지면 두 클라이언트의 시작 기준이 어긋날 수 있으므로 시작하지 않음. 이는 백엔드가 두 메시지에 같은 `startAt`을 사용한다는 계약을 프론트에서도 방어하는 처리임.
@@ -356,7 +345,6 @@ flowchart TD
 
 ## 📝 Note
 
-- 실제 MP4 video 표시, HP bar, countdown HUD, LIGHTNING 버튼은 이번 범위가 아님.
 - `LIGHTNING` 전송과 `GAME_RESULT` 수신 후 result route 이동은 후속 이슈에서 구현함.
 - Game summary API 호출은 후속 결과 화면 이슈에서 구현함.
 - clock skew 보정과 WebSocket 재접속/복구는 이번 범위가 아님.

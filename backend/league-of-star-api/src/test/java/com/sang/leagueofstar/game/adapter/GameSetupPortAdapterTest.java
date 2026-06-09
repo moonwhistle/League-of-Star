@@ -17,7 +17,6 @@ class GameSetupPortAdapterTest {
     private static final Long FIRST_USER_ID = 1L;
     private static final Long SECOND_USER_ID = 2L;
     private static final Long GAME_ROOM_ID = 100L;
-    private static final String GAME_VIDEO_URL = "/assets/game/star-core-view.mp4";
     private static final String GAME_WEB_SOCKET_URL = "/ws/game/100";
 
     private final GameRoomSetupService gameRoomSetupService = mock(GameRoomSetupService.class);
@@ -28,14 +27,13 @@ class GameSetupPortAdapterTest {
     void setup() {
         // given
         when(gameRoomSetupService.createReadyGameRoom(FIRST_USER_ID, SECOND_USER_ID))
-                .thenReturn(new GameRoomSetupResult(GAME_ROOM_ID, GAME_VIDEO_URL, GAME_WEB_SOCKET_URL));
+                .thenReturn(new GameRoomSetupResult(GAME_ROOM_ID, GAME_WEB_SOCKET_URL));
 
         // when
         GameSetupResult result = adapter.setup(FIRST_USER_ID, SECOND_USER_ID);
 
         // then
         assertThat(result.gameRoomId()).isEqualTo(GAME_ROOM_ID);
-        assertThat(result.videoUrl()).isEqualTo(GAME_VIDEO_URL);
         assertThat(result.webSocketUrl()).isEqualTo(GAME_WEB_SOCKET_URL);
         verify(gameRoomSetupService).createReadyGameRoom(FIRST_USER_ID, SECOND_USER_ID);
     }

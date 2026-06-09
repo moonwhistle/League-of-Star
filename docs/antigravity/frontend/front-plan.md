@@ -163,7 +163,6 @@ interface MatchResponseResultNotification {
   } | null;
   game: {
     gameRoomId: number;
-    videoUrl: string;
     webSocketUrl: string;
   } | null;
 }
@@ -175,14 +174,12 @@ interface MatchResponseResultNotification {
 - `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`는 매칭 SSE를 닫고, `RETURN_TO_MATCHING`은 백엔드 큐 복귀 완료 이벤트로 보고 SSE를 유지.
 - `RETURN_TO_MATCHING`에서는 `joinMatchQueue`, `leaveMatchQueue`를 호출하지 않음.
 - `game`이 null인 실패 이벤트에서는 게임 화면 이동 금지.
-- `game.videoUrl`, `game.webSocketUrl`은 게임 화면에서 사용할 수 있도록 route state 또는 session storage로 최소 보관 구현.
 - 최종 전환 기준은 HTTP accept/reject 응답이 아니라 이 이벤트의 `action`임을 테스트로 검증.
 
 ### 8. [x] 게임 대기방 WebSocket 구현
 
 - `/game/:gameRoomId/waiting` 페이지에서 WebSocket 연결 구현.
 - 연결 URL은 백엔드가 `match_response_result.game.webSocketUrl`로 내려준 값을 source로 사용하고, access token query를 append해 구성.
-- 연결 성공 후 `game.videoUrl` MP4 preload가 완료되면 `CLIENT_READY`를 한 번만 자동 전송.
 - server message 처리 구현.
 
 ```ts
@@ -242,7 +239,6 @@ interface GameStartPayload {
 - LIGHTNING 클릭 UI와 `{ type: 'LIGHTNING', payload: null }` 전송은 후속 전투 UI 단계로 보류.
 - `ERROR` 수신 상태는 data attribute로 유지하고 message 표시는 후속 전투 UI 단계로 보류.
 - `GAME_RESULT` 수신 전까지 결과 화면 이동 금지.
-- Play 화면에서는 MP4 렌더링과 MP4 좌표 tracking을 사용하지 않음.
 - PixiJS, Web Worker는 MVP에서 도입하지 않음.
 - Three.js 구현을 위해 `three`, `@types/three` 추가.
 

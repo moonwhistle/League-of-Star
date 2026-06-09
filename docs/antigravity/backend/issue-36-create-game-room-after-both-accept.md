@@ -19,7 +19,6 @@
    outcome=MATCHED
    reason=BOTH_ACCEPTED
    action=GO_TO_GAME_WAITING
-   game={gameRoomId, videoUrl, webSocketUrl}
 ```
 
 gameRoom 생성 실패 흐름:
@@ -51,7 +50,6 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 - [x] 클라이언트는 `GAME_SETUP_FAILED` reason 기준으로 안내 문구를 매핑하기로 결정
 - [x] `match_response_result.game` 성공 payload 필드 확정
   - [x] `gameRoomId`
-  - [x] `videoUrl`
   - [x] `webSocketUrl`
 
 결정 사항:
@@ -61,7 +59,6 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 - gameRoom 생성 실패 이벤트의 `game`은 `null`이다.
 - gameRoom 생성 실패 이벤트에 별도 `message` 필드는 추가하지 않는다.
 - 클라이언트는 `reason=GAME_SETUP_FAILED`를 보고 "게임 준비 중 문제가 발생했습니다. 다시 매칭을 시도해 주세요." 문구를 표시한다.
-- 성공 이벤트의 `game` payload는 `gameRoomId`, `videoUrl`, `webSocketUrl`을 포함한다.
 - `MatchStatus.GAME_SETUP_FAILED`를 추가해 `DECLINED`, `TIMEOUT`과 구분한다.
 
 ### 2. gameRoom 생성 유스케이스 추가
@@ -74,7 +71,6 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
   - [x] `GameRoom`
 - [x] game 도메인 관심사가 아닌 값 제거
   - [x] `matchId`
-  - [x] `videoUrl`
   - [x] `webSocketUrl`
 - [x] 별도 실패 결과 모델 제거
 
@@ -85,7 +81,6 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 - `GameRoomCommandService`는 `GameRoom` 생성, participant 추가, 기본 scenario 생성, 저장까지만 담당한다.
 - HP scenario 길이는 gameRoom 생성 시 8초 이상 17초 이하로 랜덤 결정한다.
 - HP scenario는 1초 단위 step으로 구성하고, 시작 HP는 10000, 마지막 step HP는 0으로 둔다.
-- `match_response_result.game`의 `videoUrl`, `webSocketUrl`은 이후 매칭/알림 연결 단계에서 조립한다.
 - gameRoom 생성 실패는 별도 result 타입이 아니라 `CoreException` 계열 예외로 전파하고, 호출부에서 `GAME_SETUP_FAILED` 이벤트로 변환한다.
 - 잘못된 참가자 입력은 `CoreErrorCode.INVALID_GAME_PARTICIPANTS`로 표현한다.
 
@@ -97,16 +92,12 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 - [x] `game_participants.status=READY`로 저장
 - [x] HP scenario 생성
 - [x] `scenario_data` 저장
-- [x] 고정 MP4 URL 반환
 - [x] game WebSocket URL 반환
 
 결정 사항:
 
 - `GameRoomCommandService`는 DB 저장만 담당한다.
 - `GameRoomSetupService`는 `league-of-star-api`의 game service에 둔다.
-- `league-of-star-matching`은 gameRoom 생성, MP4 URL, WebSocket URL 조립을 알지 않는다.
-- 고정 MP4 URL은 `/assets/game/star-core-view.mp4`로 반환한다.
-- Spring Boot static resource 경로는 준비되어 있으며, 실제 MP4 파일은 로컬/배포 환경에서 배치한다.
 - game WebSocket URL은 `/ws/game/{gameRoomId}` 형식으로 반환한다.
 
 ### 4. 매칭 성공 흐름과 연결
@@ -131,7 +122,6 @@ gameRoom 생성 이후 Redis 상태 전환이 실패한 경우도 성공 이벤�
 - [x] matching 내부 이벤트에 game payload에 필요한 내부 결과 추가
 - [x] notification factory에서 성공 이벤트의 `game`을 `null`이 아니게 생성
 - [x] `gameRoomId` 매핑
-- [x] `videoUrl` 매핑
 - [x] `webSocketUrl` 매핑
 - [x] 실패 이벤트에서는 `game=null` 유지
 
@@ -218,7 +208,6 @@ gameRoom 생성 성공
 - [x] 양쪽 accept 시 gameRoom이 생성되는지 테스트
 - [x] gameRoom participant가 2명 생성되는지 테스트
 - [x] scenario가 저장되는지 테스트
-- [x] 성공 이벤트에 `gameRoomId`, `videoUrl`, `webSocketUrl`이 포함되는지 테스트
 - [x] 성공 후 두 유저 Redis status가 `IN_GAME`인지 테스트
 - [x] gameRoom 생성 실패 시 두 유저 Redis status가 제거되는지 테스트
 - [x] gameRoom 생성 실패 시 큐에 재삽입하지 않는지 테스트
@@ -280,7 +269,6 @@ flowchart TD
     E --> F["8~17초 HP scenario 저장"]
     F --> G["Redis user status = IN_GAME"]
     G --> H["match_response_result"]
-    H --> I["MATCHED / BOTH_ACCEPTED / GO_TO_GAME_WAITING<br/>game={gameRoomId, videoUrl, webSocketUrl}"]
 
     C -->|"실패"| J["match session = GAME_SETUP_FAILED"]
     J --> K["Redis user status 제거"]
@@ -299,7 +287,6 @@ flowchart TD
 - 매칭 성공 흐름과 gameRoom 생성 연결
   - 양쪽 accept 완료 시 game setup을 먼저 수행
   - gameRoom 생성과 Redis 상태 전환이 모두 성공한 뒤에만 match session을 `ACCEPTED`, 두 유저 Redis status를 `IN_GAME`으로 확정
-  - `match_response_result.game`에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
 
 ```mermaid
 flowchart TD
@@ -322,7 +309,6 @@ flowchart TD
 - 관심사 분리
   - `league-of-star-core`: gameRoom 저장과 도메인 로직
   - `league-of-star-matching`: 매칭 상태 전이, Redis 상태 정리, 결과 이벤트 발행
-  - `league-of-star-api`: gameRoom setup orchestration, static MP4/WebSocket URL 조립
   - matching은 `GameSetupPort`만 의존하고 실제 gameRoom 생성 구현은 api adapter에서 연결
 
 - gameRoom 생성 실패 처리
@@ -346,7 +332,6 @@ flowchart TD
 
 ## 📝 Note
 
-- MP4 static resource 디렉토리는 준비되어 있으며, 실제 `star-core-view.mp4` 파일은 repo에 포함하지 않고 로컬/배포 환경에서 배치합니다.
 - WebSocket endpoint는 아직 구현하지 않았고, payload에는 `/ws/game/{gameRoomId}` 형식의 URL만 포함합니다.
 - `game` payload는 `GO_TO_GAME_WAITING`일 때만 필수이며, 실패 이벤트에서는 `game=null`입니다.
 - gameRoom 생성 실패 시 자동 매칭 복귀는 하지 않는 정책을 따릅니다.

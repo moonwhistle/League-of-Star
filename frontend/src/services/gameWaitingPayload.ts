@@ -117,8 +117,6 @@ function isValidGame(game: unknown): game is MatchResponseGame {
 
   return (
     Number.isFinite(game.gameRoomId) &&
-    typeof game.videoUrl === 'string' &&
-    game.videoUrl.trim() !== '' &&
     typeof game.webSocketUrl === 'string' &&
     game.webSocketUrl.trim() !== ''
   )

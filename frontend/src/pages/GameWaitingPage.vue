@@ -136,9 +136,7 @@ const gameSocketPlayerLeftUserId = ref('')
 const gameCountdownStartAt = ref(0)
 const gameCountdownDisplaySeconds = ref(0)
 const gameCountdownRemainingSeconds = ref(0)
-const videoPreloadElement = shallowRef()
 const gameWebSocketConnection = shallowRef()
-let cleanupVideoPreloadListeners = () => {}
 let gameWaitingWatchdogId = 0
 let gameCountdownTimerId = 0
 let closeGameWebSocket = () => {}
@@ -182,10 +180,6 @@ const gameSocketStatusLabel = computed(() => {
 
   if (gameSocketStatus.value === 'connected') {
     return t('gameWaiting.socketConnected')
-  }
-
-  if (gameSocketStatus.value === 'preloading') {
-    return t('gameWaiting.videoPreloading')
   }
 
   if (gameSocketStatus.value === 'readySent') {
@@ -233,10 +227,6 @@ const gameSocketDetailLabel = computed(() => {
 
   if (gameSocketStatus.value === 'connected') {
     return t('gameWaiting.socketConnectedDetail')
-  }
-
-  if (gameSocketStatus.value === 'preloading') {
-    return t('gameWaiting.videoPreloadingDetail')
   }
 
   if (gameSocketStatus.value === 'readySent') {
@@ -366,7 +356,7 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
           return
         }
 
-        startGameVideoPreload(payload.game.videoUrl)
+        sendClientReadyOnce()
       },
       onMessage: (message) => {
         if (!canHandleGameSocketCallback()) {
@@ -422,45 +412,6 @@ function clearGameWaitingWatchdog() {
 
   window.clearTimeout(gameWaitingWatchdogId)
   gameWaitingWatchdogId = 0
-}
-
-function startGameVideoPreload(videoUrl = '') {
-  cleanupGameVideoPreload()
-  gameSocketStatus.value = 'preloading'
-
-  const video = document.createElement('video')
-  videoPreloadElement.value = video
-  video.preload = 'auto'
-  video.muted = true
-  video.playsInline = true
-
-  const completePreload = () => {
-    if (videoPreloadElement.value !== video || !canHandleGameSocketCallback()) {
-      return
-    }
-
-    cleanupGameVideoPreload()
-    sendClientReadyOnce()
-  }
-  const failPreload = () => {
-    if (videoPreloadElement.value !== video || !canHandleGameSocketCallback()) {
-      return
-    }
-
-    failGameSocketAndReturnToMatch(t('gameWaiting.videoPreloadFailed'))
-  }
-
-  video.addEventListener('loadeddata', completePreload)
-  video.addEventListener('canplaythrough', completePreload)
-  video.addEventListener('error', failPreload)
-  cleanupVideoPreloadListeners = () => {
-    video.removeEventListener('loadeddata', completePreload)
-    video.removeEventListener('canplaythrough', completePreload)
-    video.removeEventListener('error', failPreload)
-  }
-
-  video.src = videoUrl
-  video.load()
 }
 
 function sendClientReadyOnce() {
@@ -656,7 +607,6 @@ function failGameSocket(message = t('gameWaiting.websocketFailed')) {
   hasFinalGameSocketFailure = true
   clearGameWaitingWatchdog()
   resetGameCountdown()
-  cleanupGameVideoPreload()
   gameSocketStatus.value = 'failed'
   gameSocketErrorMessage.value = message
 }
@@ -674,7 +624,6 @@ function canHandleGameSocketCallback() {
 function closeWaitingWebSocket() {
   clearGameWaitingWatchdog()
   resetGameCountdown()
-  cleanupGameVideoPreload()
   closeGameWebSocket()
   gameWebSocketConnection.value = undefined
   closeGameWebSocket = () => {}
@@ -687,7 +636,6 @@ function closeWaitingWebSocket() {
 function handoffWaitingWebSocket(gameRoomId = '') {
   clearGameWaitingWatchdog()
   resetGameCountdown()
-  cleanupGameVideoPreload()
 
   if (gameWebSocketConnection.value !== undefined) {
     gameWebSocketConnection.value.setHandlers()
@@ -714,12 +662,6 @@ function normalizeGameRoomId(gameRoomId = '') {
   return String(gameRoomId).trim()
 }
 
-function cleanupGameVideoPreload() {
-  cleanupVideoPreloadListeners()
-  cleanupVideoPreloadListeners = () => {}
-  videoPreloadElement.value = undefined
-}
-
 function getLoadingStepLabel(key = '') {
   if (key === 'matchId') {
     return t('gameWaiting.matchData')
@@ -731,10 +673,6 @@ function getLoadingStepLabel(key = '') {
 
   if (key === 'gameRoomId') {
     return t('gameWaiting.gameSetup')
-  }
-
-  if (key === 'videoUrl') {
-    return t('gameWaiting.video')
   }
 
   return t('gameWaiting.socket')
@@ -1031,7 +969,6 @@ function getLoadingStepLabel(key = '') {
 .socket-status-indicator.is-rttMeasuring,
 .socket-status-indicator.is-countdown,
 .socket-status-indicator.is-starting,
-.socket-status-indicator.is-preloading,
 .socket-status-indicator.is-connecting {
   background: var(--waiting-violet);
   box-shadow: 0 0 12px rgba(215, 185, 255, 0.44);

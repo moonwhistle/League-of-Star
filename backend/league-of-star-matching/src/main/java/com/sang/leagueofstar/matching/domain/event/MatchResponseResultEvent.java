@@ -69,7 +69,6 @@ public record MatchResponseResultEvent(
                 session.userBStatus(),
                 new Game(
                         gameSetupResult.gameRoomId(),
-                        gameSetupResult.videoUrl(),
                         gameSetupResult.webSocketUrl()
                 )
         );
@@ -77,7 +76,6 @@ public record MatchResponseResultEvent(
 
     public record Game(
             Long gameRoomId,
-            String videoUrl,
             String webSocketUrl
     ) {
     }

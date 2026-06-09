@@ -17,7 +17,6 @@ function createPayload(overrides: Partial<GameWaitingPayload> = {}): GameWaiting
     },
     game: {
       gameRoomId: 100,
-      videoUrl: '/assets/game/star-core-view.mp4',
       webSocketUrl: '/ws/game/100',
     },
     receivedAt: '2026-06-01T00:00:00.000Z',
@@ -26,15 +25,14 @@ function createPayload(overrides: Partial<GameWaitingPayload> = {}): GameWaiting
 }
 
 describe('gameWaitingProgress', () => {
-  it('defines each required payload field as a 20 percent step', () => {
-    expect(GAME_WAITING_PROGRESS_STEP_PERCENT).toBe(20)
+  it('defines each required payload field as a 25 percent step', () => {
+    expect(GAME_WAITING_PROGRESS_STEP_PERCENT).toBe(25)
 
     expect(calculateGameWaitingProgress(undefined)).toEqual({
       steps: [
         { key: 'matchId', ready: false },
         { key: 'opponent', ready: false },
         { key: 'gameRoomId', ready: false },
-        { key: 'videoUrl', ready: false },
         { key: 'webSocketUrl', ready: false },
       ],
       readyCount: 0,
@@ -45,27 +43,22 @@ describe('gameWaitingProgress', () => {
   it.each([
     [
       1,
-      20,
+      25,
       createPayload({
         opponent: null,
-        game: { gameRoomId: Number.NaN, videoUrl: '', webSocketUrl: '' },
+        game: { gameRoomId: Number.NaN, webSocketUrl: '' },
       }),
     ],
-    [
-      2,
-      40,
-      createPayload({ opponent: null, game: { gameRoomId: 100, videoUrl: '', webSocketUrl: '' } }),
-    ],
+    [2, 50, createPayload({ opponent: null, game: { gameRoomId: 100, webSocketUrl: '' } })],
     [
       3,
-      60,
+      75,
       createPayload({
         opponent: null,
-        game: { gameRoomId: 100, videoUrl: '/video.mp4', webSocketUrl: '' },
+        game: { gameRoomId: 100, webSocketUrl: '/ws/game/100' },
       }),
     ],
-    [4, 80, createPayload({ opponent: null })],
-    [5, 100, createPayload()],
+    [4, 100, createPayload()],
   ])('returns %i ready steps as %i percent progress', (readyCount, progress, payload) => {
     expect(calculateGameWaitingProgress(payload).readyCount).toBe(readyCount)
     expect(calculateGameWaitingProgress(payload).progress).toBe(progress)
@@ -78,7 +71,6 @@ describe('gameWaitingProgress', () => {
       'matchId',
       'opponent',
       'gameRoomId',
-      'videoUrl',
       'webSocketUrl',
     ])
     expect(progress.progress).toBe(100)

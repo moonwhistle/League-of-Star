@@ -135,7 +135,6 @@ interface MatchResponseResultNotification {
   } | null
   game: {
     gameRoomId: number
-    videoUrl: string
     webSocketUrl: string
   } | null
 }

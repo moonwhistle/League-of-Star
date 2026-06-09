@@ -14,10 +14,8 @@ flowchart TD
     G --> H{"gameRoom 생성 성공?"}
     H -->|"성공"| I{"Redis ACCEPTED/IN_GAME<br/>상태 전환 성공?"}
     I -->|"성공"| J["timeout index cleanup"]
-    J --> K["SSE match_response_result<br/>GO_TO_GAME_WAITING<br/>game={gameRoomId, videoUrl, webSocketUrl}"]
     K --> L["클라이언트 /game/{gameRoomId}/waiting 이동<br/>EventSource.close()"]
     L --> M["gameRoom WebSocket 연결"]
-    M --> N["MP4 preload 후 CLIENT_READY"]
     N --> O["WebSocket RTT 5회 측정<br/>median으로 시작 가능 여부 판단"]
     O --> P["HP scenario 준비<br/>startAt 결정"]
     P --> Q["COUNTDOWN / GAME_START<br/>scenario 전달"]
@@ -57,15 +55,12 @@ flowchart TD
 - `match_found` SSE 구현 완료
 - accept/reject/timeout 처리 구현 완료
 - 양쪽 수락 시 `match_response_result` 발행 구현 완료
-- `match_response_result.game` payload는 `gameRoomId`, `videoUrl`, `webSocketUrl`을 포함한다.
 - `game_rooms`, `game_participants`, `game_actions`, `game_records` 도메인과 DDL은 준비됨
 - 매칭 성공 이후 게임방 생성, 대기 WebSocket, RTT 측정, GAME_START, LIGHTNING 입력 저장/판정, LIGHTNING 즉시 종료, 서버 scheduler 자연사 종료 보장, `NATURAL_DEATH_DRAW` 결과 전송까지 구현됨
 
 ## 2. 핵심 결정
 
 - 우리 게임은 P2P/유저 호스트 방식이 아니라 중앙 백엔드 서버 권위 방식으로 구현한다.
-- MP4는 gameRoom별로 생성하거나 전송하지 않는다.
-- MP4는 공통 static resource로 제공한다.
 - gameRoom별로 달라지는 것은 참가자, HP 시나리오, 시작 시간, RTT, 액션, 결과다.
 - 클라이언트가 보낸 시간은 신뢰하지 않는다.
 - 최종 판정은 RTT 보정 없이 서버 수신 시각과 서버 시나리오 기준으로 한다.
@@ -89,17 +84,14 @@ flowchart TD
 6. `game_rooms` insert
 7. `game_participants` 2명 insert
 8. HP 감소 scenario 생성 및 저장
-9. `match_response_result.game` payload에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
 10. 클라이언트는 `GO_TO_GAME_WAITING` 기준으로 매칭 SSE `EventSource.close()` 호출
 11. 클라이언트는 `/game/{gameRoomId}/waiting` 이동
 12. 클라이언트가 gameRoom WebSocket 연결
-13. MP4 preload
 14. 클라이언트가 `CLIENT_READY` 전송
 15. 서버가 RTT 5회 측정
 16. 서버가 RTT 정상 여부를 확정
 17. 서버가 HP scenario 준비, `startAt` 결정, gameRoom 시작 처리를 수행
 18. WebSocket으로 `COUNTDOWN`/`GAME_START`와 scenario를 전달
-19. 클라이언트가 `startAt` 기준으로 MP4 재생 + HP overlay 렌더링
 20. 유저가 D/F 입력 시 WebSocket으로 `LIGHTNING` 전송
 21. 서버가 수신 시각 기준으로 HP 역산
 22. 승패 판정
@@ -114,18 +106,11 @@ flowchart TD
 - [x] `game_rooms` 생성
 - [x] `game_participants` 생성
 - [x] scenario 생성/저장
-- [x] `match_response_result.game` payload에 `gameRoomId`, `videoUrl`, `webSocketUrl` 채우기
 - [x] gameRoom 생성 실패 시 `GO_TO_GAME_WAITING`을 발행하지 않고 매칭 성공 정산 실패로 격리할 정책 정의
 - [x] 이 단계에서는 WebSocket 연결/RTT/LIGHTNING 판정은 구현하지 않음
 
-### Step 2. MP4 정적 서빙
 
 - [x] Spring Boot static resource 디렉토리 준비
-- [x] `/assets/game/star-core-view.mp4` 접근을 위한 경로 구조 구성
-- [x] 실제 MP4 배치 경로 명시
-- [x] 실제 MP4 파일은 repo에 포함하지 않고 `.gitkeep`만 유지
-- [x] gameRoom마다 MP4를 따로 만들지 않음
-- [x] gameRoom 생성 시 payload에는 고정 `videoUrl`만 포함
 - [x] CDN/S3 static asset 분리는 MVP 이후로 유지
 
 ### Step 3. 게임 대기 WebSocket 연결
@@ -134,7 +119,6 @@ flowchart TD
 - [x] WebSocket 인증 및 gameRoom 참가자 검증
 - [x] 두 참가자의 입장/이탈 상태 관리
 - [x] 클라이언트 `CLIENT_READY` 수신
-- [x] MP4 preload 완료 여부는 클라이언트가 `CLIENT_READY`로 보고
 - [x] `GO_TO_GAME_WAITING` 이후 WebSocket 미접속 timeout 정책 정의
 - [x] `CLIENT_READY` 미수신 timeout 정책 정의
 - [x] GAME_START 이전 이탈과 GAME_START 이후 disconnect 정책 분리
@@ -172,8 +156,6 @@ flowchart TD
 - [x] gameRoom 상태를 `IN_PROGRESS`로 전환
 - [x] `COUNTDOWN`/`GAME_START` 이벤트를 countdown 종료 후가 아니라 `startAt` 전에 미리 전달
 - [x] 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고 `startAt` 기준으로 HP bar overlay 계산
-- [x] MP4 preload 완료 여부는 `CLIENT_READY` 전제로 보고 Step 6에서 다시 검증하지 않음
-- [x] MP4는 배경으로만 사용
 - [x] `GAME_START` 시 서버 기준 game end timer/scheduler 등록
 
 ### Step 7. LIGHTNING 입력과 서버 판정
@@ -319,8 +301,6 @@ flowchart TD
 MVP에서 반드시 포함할 것:
 
 - 양쪽 수락 후 gameRoom 생성
-- game payload에 `gameRoomId`, `videoUrl`, `webSocketUrl` 포함
-- MP4 static serving
 - 게임 대기 WebSocket
 - RTT 측정
 - `GAME_START` scenario 전달
@@ -383,7 +363,6 @@ B도 accept
    outcome=MATCHED
    reason=BOTH_ACCEPTED
    action=GO_TO_GAME_WAITING
-   game={gameRoomId, videoUrl, webSocketUrl}
 ```
 
 핵심 기준:
@@ -499,7 +478,6 @@ gameRoom.status = READY
 -> waiting deadline = gameRoom.createdAt + 30초
 -> GO_TO_GAME_WAITING
 -> 두 유저 WebSocket connect
--> MP4 preload 후 CLIENT_READY
 -> 양쪽 READY + RTT 정상
 -> HP scenario 준비 + startAt 결정
 -> COUNTDOWN / GAME_START
@@ -560,7 +538,6 @@ GAME_START 이후 WebSocket disconnect
 - `game_rooms` insert
 - `game_participants` 2명 insert
 - scenario 생성/저장
-- `gameRoomId`, `videoUrl`, `webSocketUrl` payload 추가
 - 기존 `GO_TO_GAME_WAITING` 액션 유지
 - gameRoom 생성 성공 후 두 유저 Redis 상태를 `IN_GAME`으로 전환
 - Redis 상태 전환까지 모두 성공한 뒤에만 `GO_TO_GAME_WAITING` 이벤트 발행
@@ -595,31 +572,20 @@ gameRoom 생성 실패 mapping:
 - 양쪽 accept 시 `match_response_result.action=GO_TO_GAME_WAITING`
 - `match_response_result.game != null`
 - 클라이언트가 payload만으로 `/game/{gameRoomId}/waiting` 화면으로 이동 가능
-- MP4는 gameRoom 생성 과정에서 만들지 않고 static URL만 전달
 - gameRoom 생성 성공 후 `match:status:{userA/userB}=IN_GAME`
 - gameRoom 생성 실패 시 두 유저가 `ACCEPTED` 상태에 갇히지 않고 start 버튼 화면으로 복귀 가능
 
-### Issue 38. MP4 static resource 제공
 
 목표:
 
-- 공통 MP4를 `/assets/game/star-core-view.mp4`로 제공한다.
 
 범위:
 
 - Spring Boot static resource 위치 정리
-- `backend/league-of-star-api/src/main/resources/static/assets/game/.gitkeep` 추가
-- 실제 MP4 배치 경로 명시
-- 실제 `star-core-view.mp4` 파일은 Git에 포함하지 않음
-- API 문서 또는 체크포인트 문서에 고정 `videoUrl` 명시
-- gameRoom별 MP4 생성/복제 없음
 - CDN/S3 static asset 분리는 MVP 이후 검토
 
 완료 기준:
 
-- 로컬/배포 환경에서 `star-core-view.mp4`를 배치하면 `/assets/game/star-core-view.mp4` 접근 가능
-- `match_response_result.game.videoUrl`이 같은 URL을 반환
-- 실제 MP4 파일 없이도 테스트 통과
 
 ### Issue 40. 게임 대기 WebSocket 연결
 
@@ -709,7 +675,6 @@ gameRoom 생성 실패 mapping:
 완료 기준:
 
 - 양쪽 정상 RTT일 때 같은 `startAt`을 받음
-- 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고 `startAt` 기준으로 MP4 재생과 HP overlay 계산 가능
 - 카운트다운 종료 후 추가 서버 메시지 대기 없이 게임을 시작할 수 있음
 
 ### Issue 48. LIGHTNING 서버 판정과 action 저장

@@ -68,8 +68,6 @@ vi.mock('@/services/realtime/gameWebSocketHandoff', () => ({
 }))
 
 const connectGameWebSocketMock = vi.mocked(connectGameWebSocket)
-let createdVideoElements: HTMLVideoElement[] = []
-let restoreCreateElement = () => {}
 
 interface GameWebSocketTestHandlers {
   onOpen?: (event: Event) => void
@@ -96,22 +94,10 @@ function getLatestRouteLeaveGuard() {
   return guard as (to?: unknown) => unknown
 }
 
-function emitLatestVideoPreloadEvent(type: string) {
-  const video = createdVideoElements.at(-1)
-
-  if (video === undefined) {
-    throw new Error('Video preload element was not created.')
-  }
-
-  video.dispatchEvent(new Event(type))
-}
-
 describe('GameWaitingPage', () => {
   beforeEach(() => {
-    restoreCreateElement()
     vi.clearAllMocks()
     window.sessionStorage.clear()
-    createdVideoElements = []
     routeMock.params.gameRoomId = '100'
     routerReplaceMock.mockResolvedValue(undefined)
     routerPushMock.mockResolvedValue(undefined)
@@ -124,30 +110,10 @@ describe('GameWaitingPage', () => {
     gameWebSocketHandoffMock.handoffGameWebSocket.mockClear()
     gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReset()
     routeLeaveGuardsMock.length = 0
-    const originalCreateElement = document.createElement.bind(document)
-    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((
-      tagName: string,
-      options?: ElementCreationOptions,
-    ) => {
-      const element = originalCreateElement(tagName, options)
-
-      if (tagName.toLowerCase() === 'video') {
-        createdVideoElements.push(element as HTMLVideoElement)
-        Object.defineProperty(element, 'load', {
-          configurable: true,
-          value: vi.fn(),
-        })
-      }
-
-      return element
-    }) as typeof document.createElement)
-    restoreCreateElement = () => createElementSpy.mockRestore()
     setLocale('ko')
   })
 
   afterEach(() => {
-    restoreCreateElement()
-    restoreCreateElement = () => {}
     vi.useRealTimers()
   })
 
@@ -162,7 +128,6 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -187,7 +152,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).not.toContain('match-1')
     expect(wrapper.text()).not.toContain('게임룸')
     expect(wrapper.text()).not.toContain('매치 ID')
-    expect(wrapper.findAll('.loading-steps .is-ready')).toHaveLength(5)
+    expect(wrapper.findAll('.loading-steps .is-ready')).toHaveLength(4)
     expect(connectGameWebSocketMock).toHaveBeenCalledWith('/ws/game/100', expect.any(Object))
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
@@ -203,7 +168,6 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -216,9 +180,9 @@ describe('GameWaitingPage', () => {
     handlers.onOpen?.(new Event('open'))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('preloading')
-    expect(wrapper.text()).toContain('전장 데이터 확인 중')
-    expect(wrapper.text()).toContain('게임 시작 전에 필요한 MP4 데이터를 미리 불러오는 중입니다.')
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('readySent')
+    expect(wrapper.text()).toContain('준비 신호 전송됨')
+    expect(wrapper.text()).toContain('내 준비 신호를 보냈고 상대 준비를 기다리는 중입니다.')
 
     handlers.onMessage?.(
       {
@@ -271,7 +235,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('양쪽 준비가 끝났고 연결 품질 확인을 기다리는 중입니다.')
   })
 
-  it('preloads the game video after websocket open and sends CLIENT_READY once', async () => {
+  it('sends CLIENT_READY once after websocket open', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: {
@@ -282,7 +246,6 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -293,14 +256,6 @@ describe('GameWaitingPage', () => {
     const handlers = getGameWebSocketHandlers()
 
     handlers.onOpen?.(new Event('open'))
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('preloading')
-    expect(createdVideoElements).toHaveLength(1)
-    expect(createdVideoElements[0]?.getAttribute('src')).toBe('/assets/game/star-core-view.mp4')
-    expect(createdVideoElements[0]?.load).toHaveBeenCalledTimes(1)
-
-    emitLatestVideoPreloadEvent('loadeddata')
     await wrapper.vm.$nextTick()
 
     expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
@@ -308,20 +263,18 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('준비 신호 전송됨')
     expect(wrapper.text()).toContain('내 준비 신호를 보냈고 상대 준비를 기다리는 중입니다.')
 
-    emitLatestVideoPreloadEvent('canplaythrough')
-    emitLatestVideoPreloadEvent('loadeddata')
+    handlers.onOpen?.(new Event('open'))
     await wrapper.vm.$nextTick()
 
     expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
   })
 
-  it('closes the websocket and returns to match when video preload fails', async () => {
+  it('does not send CLIENT_READY when websocket opens after unmount', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/missing.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -331,44 +284,12 @@ describe('GameWaitingPage', () => {
     await flushPromises()
     const handlers = getGameWebSocketHandlers()
 
-    handlers.onOpen?.(new Event('open'))
-    emitLatestVideoPreloadEvent('error')
-    await flushPromises()
-
-    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
-    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
-      '전장 데이터를 불러오지 못했습니다.',
-    )
-    expect(wrapper.text()).toContain('매칭 화면으로 돌아갑니다.')
-    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
-    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
-    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
-  })
-
-  it('does not send CLIENT_READY when preload resolves after unmount', async () => {
-    saveGameWaitingPayload({
-      matchId: 'match-1',
-      opponent: null,
-      game: {
-        gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
-        webSocketUrl: '/ws/game/100',
-      },
-      receivedAt: '2026-06-01T00:00:00.000Z',
-    })
-
-    const wrapper = mount(GameWaitingPage)
-    await flushPromises()
-    const handlers = getGameWebSocketHandlers()
-
-    handlers.onOpen?.(new Event('open'))
-    await wrapper.vm.$nextTick()
     wrapper.unmount()
-    emitLatestVideoPreloadEvent('loadeddata')
+    handlers.onOpen?.(new Event('open'))
     await flushPromises()
 
-    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
   })
 
   it('warns before browser refresh while waiting payload is active', async () => {
@@ -377,7 +298,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -407,7 +327,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -432,7 +351,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -494,7 +412,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -532,7 +449,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -573,7 +489,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -655,7 +570,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -695,7 +609,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -739,7 +652,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -784,7 +696,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -843,7 +754,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -900,7 +810,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -951,7 +860,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -984,7 +892,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1019,7 +926,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1053,7 +959,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1099,7 +1004,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1122,7 +1026,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1157,7 +1060,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1192,7 +1094,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1233,7 +1134,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1288,7 +1188,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1302,14 +1201,13 @@ describe('GameWaitingPage', () => {
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
   })
 
-  it('cleans websocket, watchdog, countdown timer, and preload listeners on unmount', async () => {
+  it('cleans websocket, watchdog, and countdown timer on unmount', async () => {
     vi.useFakeTimers()
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1335,11 +1233,10 @@ describe('GameWaitingPage', () => {
     await wrapper.vm.$nextTick()
     wrapper.unmount()
     vi.advanceTimersByTime(30000)
-    emitLatestVideoPreloadEvent('loadeddata')
     await flushPromises()
 
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
-    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
+    expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
@@ -1349,7 +1246,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1363,7 +1259,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('수신 대기')
     expect(wrapper.text()).toContain('대기방 연결 중')
     expect(wrapper.text()).toContain('게임 대기방에 접속하는 중입니다.')
-    expect(wrapper.get('main').attributes('data-loading-progress')).toBe('80')
+    expect(wrapper.get('main').attributes('data-loading-progress')).toBe('75')
 
     await wrapper.get('.locale-toggle').trigger('click')
 
@@ -1392,7 +1288,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 101,
-        videoUrl: '/assets/game/star-core-view.mp4',
         webSocketUrl: '/ws/game/101',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',

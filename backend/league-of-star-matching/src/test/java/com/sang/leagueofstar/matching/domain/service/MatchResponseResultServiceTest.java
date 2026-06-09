@@ -109,7 +109,6 @@ class MatchResponseResultServiceTest {
         assertThat(event.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
         assertThat(event.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
         assertThat(event.game().gameRoomId()).isEqualTo(100L);
-        assertThat(event.game().videoUrl()).isEqualTo("/assets/game/star-core-view.mp4");
         assertThat(event.game().webSocketUrl()).isEqualTo("/ws/game/100");
     }
 
@@ -611,6 +610,6 @@ class MatchResponseResultServiceTest {
     }
 
     private GameSetupResult gameSetupResult() {
-        return new GameSetupResult(100L, "/assets/game/star-core-view.mp4", "/ws/game/100");
+        return new GameSetupResult(100L, "/ws/game/100");
     }
 }
