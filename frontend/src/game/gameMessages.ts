@@ -18,9 +18,9 @@ export function createRttPongMessage(seq: number): GameWebSocketClientMessage {
   }
 }
 
-export function createSmiteMessage(): GameWebSocketClientMessage {
+export function createLightningMessage(): GameWebSocketClientMessage {
   return {
-    type: 'SMITE',
+    type: 'LIGHTNING',
     payload: null,
   }
 }

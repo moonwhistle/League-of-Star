@@ -13,9 +13,9 @@
 ```mermaid
 sequenceDiagram
     participant User as 유저
-    participant API as API Server (smite-api)
-    participant Redis as Redis (smite-infra-redis)
-    participant Core as Core Domain (smite-core)
+    participant API as API Server (league-of-star-api)
+    participant Redis as Redis (league-of-star-infra-redis)
+    participant Core as Core Domain (league-of-star-core)
     participant DB as MySQL (users table)
 
     Note over User, DB: [Phase 1: 재설정 요청]
@@ -43,19 +43,19 @@ sequenceDiagram
 | **토큰 만료 시간** | 10분 (Redis TTL 설정) |
 | **토큰 형식** | UUID (예측 불가능성 확보) |
 | **이메일 발송** | 실제 발송 엔진 연동 전까지 **서버 로그 출력**으로 대체 |
-| **비밀번호 저장** | **smite-api**에서 Spring Security `PasswordEncoder`로 암호화 후 전달 |
+| **비밀번호 저장** | **league-of-star-api**에서 Spring Security `PasswordEncoder`로 암호화 후 전달 |
 | **토큰 재사용** | 비밀번호 변경 성공 시 토큰 즉시 폐기 (1회용) |
 
 ---
 
 ## 4. 작업 목록 (Tasks)
 
-### 4.1 Infrastructure & Core (smite-core & smite-infra-redis)
+### 4.1 Infrastructure & Core (league-of-star-core & league-of-star-infra-redis)
 - [x] **Redis 전용 Repository 구현**: `PasswordResetTokenRepository`.
 - [x] **도메인 추상화**: `PasswordResetStore` 인터페이스 정의.
 - [x] **User 엔티티 업데이트**: `updatePassword` 도메인 메서드 추가.
 
-### 4.2 Backend Application (smite-api)
+### 4.2 Backend Application (league-of-star-api)
 - [x] **API 경로 상수화**: `AuthPath`에 비밀번호 재설정 경로 추가.
 - [x] **PasswordResetService 구현**: API 모듈에서 암호화 및 Redis/DB 오케스트레이션 수행.
 - [x] **Controller 구현**: `AuthPasswordController` (RestAssuredMockMvc 기반).
@@ -90,7 +90,7 @@ sequenceDiagram
 
 ## 📝 Note
 - **Security**: 이메일 존재 여부에 관계없이 동일한 성공 메시지를 반환하여 이메일 열거 공격(Email Enumeration)을 방지함.
-- **Architecture**: `smite-core`는 어떠한 보안 라이브러리나 외부 기술에도 의존하지 않으며, `smite-api` 계층에서 모든 기술적 구현(Encryption, Mail)을 담당함.
+- **Architecture**: `league-of-star-core`는 어떠한 보안 라이브러리나 외부 기술에도 의존하지 않으며, `league-of-star-api` 계층에서 모든 기술적 구현(Encryption, Mail)을 담당함.
 - **Testing**:
   - `RestAssuredMockMvc`를 활용한 Controller 테스트 및 RestDocs 명세 생성 완료.
   - Testcontainers 기반의 실제 Redis 연동 데이터 무결성 검증 완료.

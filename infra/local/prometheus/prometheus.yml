@@ -2,9 +2,9 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'smite-api'
+  - job_name: 'league-of-star-api'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets:
-          - 'smite-api-1:8080'
-          - 'smite-api-2:8080'
+          - 'league-of-star-api-1:8080'
+          - 'league-of-star-api-2:8080'

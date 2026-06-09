@@ -23,8 +23,8 @@ burst 상황에서는 한 번의 스캔에서 읽는 큐 크기가 매우 커진
 
 ```mermaid
 sequenceDiagram
-    participant API1 as smite-api-1
-    participant API2 as smite-api-2
+    participant API1 as league-of-star-api-1
+    participant API2 as league-of-star-api-2
     participant Lock as Redis Lock
     participant Queue as Redis Matching Queue
     participant Lua as atomic_pair_remove.lua

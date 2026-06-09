@@ -16,14 +16,20 @@ const routeMock = vi.hoisted(() => ({
 }))
 const routerReplaceMock = vi.hoisted(() => vi.fn())
 const routerPushMock = vi.hoisted(() => vi.fn())
+const routeLeaveGuardsMock = vi.hoisted((): unknown[] => [])
+const gameWebSocketHandoffMock = vi.hoisted(() => ({
+  handoffGameWebSocket: vi.fn(),
+  takeGameWebSocketHandoff: vi.fn(),
+}))
 const gameWebSocketMock = vi.hoisted(() => {
   const state = {
     handlers: undefined,
     connection: {
       socket: {},
+      setHandlers: vi.fn(),
       sendClientReady: vi.fn(),
       sendRttPong: vi.fn(),
-      sendSmite: vi.fn(),
+      sendLightning: vi.fn(),
       close: vi.fn(),
     },
   }
@@ -42,6 +48,9 @@ const gameWebSocketMock = vi.hoisted(() => {
 const { setLocale } = useLocale()
 
 vi.mock('vue-router', () => ({
+  onBeforeRouteLeave: (guard: unknown) => {
+    routeLeaveGuardsMock.push(guard)
+  },
   useRoute: () => routeMock,
   useRouter: () => ({
     replace: routerReplaceMock,
@@ -53,9 +62,12 @@ vi.mock('@/services/realtime/gameWebSocket', () => ({
   connectGameWebSocket: gameWebSocketMock.connect,
 }))
 
+vi.mock('@/services/realtime/gameWebSocketHandoff', () => ({
+  handoffGameWebSocket: gameWebSocketHandoffMock.handoffGameWebSocket,
+  takeGameWebSocketHandoff: gameWebSocketHandoffMock.takeGameWebSocketHandoff,
+}))
+
 const connectGameWebSocketMock = vi.mocked(connectGameWebSocket)
-let createdVideoElements: HTMLVideoElement[] = []
-let restoreCreateElement = () => {}
 
 interface GameWebSocketTestHandlers {
   onOpen?: (event: Event) => void
@@ -72,54 +84,36 @@ function getGameWebSocketHandlers() {
   return gameWebSocketMock.state.handlers as GameWebSocketTestHandlers
 }
 
-function emitLatestVideoPreloadEvent(type: string) {
-  const video = createdVideoElements.at(-1)
+function getLatestRouteLeaveGuard() {
+  const guard = routeLeaveGuardsMock.at(-1)
 
-  if (video === undefined) {
-    throw new Error('Video preload element was not created.')
+  if (guard === undefined) {
+    throw new Error('Route leave guard was not registered.')
   }
 
-  video.dispatchEvent(new Event(type))
+  return guard as (to?: unknown) => unknown
 }
 
 describe('GameWaitingPage', () => {
   beforeEach(() => {
-    restoreCreateElement()
     vi.clearAllMocks()
     window.sessionStorage.clear()
-    createdVideoElements = []
     routeMock.params.gameRoomId = '100'
     routerReplaceMock.mockResolvedValue(undefined)
     routerPushMock.mockResolvedValue(undefined)
     gameWebSocketMock.state.handlers = undefined
+    gameWebSocketMock.state.connection.setHandlers.mockClear()
     gameWebSocketMock.state.connection.sendClientReady.mockClear()
     gameWebSocketMock.state.connection.sendRttPong.mockClear()
-    gameWebSocketMock.state.connection.sendSmite.mockClear()
+    gameWebSocketMock.state.connection.sendLightning.mockClear()
     gameWebSocketMock.state.connection.close.mockClear()
-    const originalCreateElement = document.createElement.bind(document)
-    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((
-      tagName: string,
-      options?: ElementCreationOptions,
-    ) => {
-      const element = originalCreateElement(tagName, options)
-
-      if (tagName.toLowerCase() === 'video') {
-        createdVideoElements.push(element as HTMLVideoElement)
-        Object.defineProperty(element, 'load', {
-          configurable: true,
-          value: vi.fn(),
-        })
-      }
-
-      return element
-    }) as typeof document.createElement)
-    restoreCreateElement = () => createElementSpy.mockRestore()
+    gameWebSocketHandoffMock.handoffGameWebSocket.mockClear()
+    gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReset()
+    routeLeaveGuardsMock.length = 0
     setLocale('ko')
   })
 
   afterEach(() => {
-    restoreCreateElement()
-    restoreCreateElement = () => {}
     vi.useRealTimers()
   })
 
@@ -134,7 +128,6 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -146,7 +139,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-waiting-payload-ready')).toBe('true')
     expect(wrapper.get('main').attributes('data-game-room-id')).toBe('100')
     expect(wrapper.get('main').attributes('data-loading-progress')).toBe('100')
-    expect(wrapper.get('h1').text()).toBe('LEAGUE OF SMITE')
+    expect(wrapper.get('h1').text()).toBe('LEAGUE OF STAR')
     expect(wrapper.text()).toContain('게임 준비 중')
     expect(wrapper.text()).toContain('전투 데이터를 동기화하는 중')
     expect(wrapper.text()).toContain('Voidwalker')
@@ -159,7 +152,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).not.toContain('match-1')
     expect(wrapper.text()).not.toContain('게임룸')
     expect(wrapper.text()).not.toContain('매치 ID')
-    expect(wrapper.findAll('.loading-steps .is-ready')).toHaveLength(5)
+    expect(wrapper.findAll('.loading-steps .is-ready')).toHaveLength(4)
     expect(connectGameWebSocketMock).toHaveBeenCalledWith('/ws/game/100', expect.any(Object))
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
@@ -175,7 +168,6 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -188,9 +180,9 @@ describe('GameWaitingPage', () => {
     handlers.onOpen?.(new Event('open'))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('preloading')
-    expect(wrapper.text()).toContain('전장 데이터 확인 중')
-    expect(wrapper.text()).toContain('게임 시작 전에 필요한 MP4 데이터를 미리 불러오는 중입니다.')
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('readySent')
+    expect(wrapper.text()).toContain('준비 신호 전송됨')
+    expect(wrapper.text()).toContain('내 준비 신호를 보냈고 상대 준비를 기다리는 중입니다.')
 
     handlers.onMessage?.(
       {
@@ -243,7 +235,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('양쪽 준비가 끝났고 연결 품질 확인을 기다리는 중입니다.')
   })
 
-  it('preloads the game video after websocket open and sends CLIENT_READY once', async () => {
+  it('sends CLIENT_READY once after websocket open', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: {
@@ -254,7 +246,6 @@ describe('GameWaitingPage', () => {
       },
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -265,14 +256,6 @@ describe('GameWaitingPage', () => {
     const handlers = getGameWebSocketHandlers()
 
     handlers.onOpen?.(new Event('open'))
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('preloading')
-    expect(createdVideoElements).toHaveLength(1)
-    expect(createdVideoElements[0]?.getAttribute('src')).toBe('/assets/game/dragon-view.mp4')
-    expect(createdVideoElements[0]?.load).toHaveBeenCalledTimes(1)
-
-    emitLatestVideoPreloadEvent('loadeddata')
     await wrapper.vm.$nextTick()
 
     expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
@@ -280,20 +263,18 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('준비 신호 전송됨')
     expect(wrapper.text()).toContain('내 준비 신호를 보냈고 상대 준비를 기다리는 중입니다.')
 
-    emitLatestVideoPreloadEvent('canplaythrough')
-    emitLatestVideoPreloadEvent('loadeddata')
+    handlers.onOpen?.(new Event('open'))
     await wrapper.vm.$nextTick()
 
     expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
   })
 
-  it('closes the websocket and returns to match when video preload fails', async () => {
+  it('does not send CLIENT_READY when websocket opens after unmount', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/missing.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -303,27 +284,20 @@ describe('GameWaitingPage', () => {
     await flushPromises()
     const handlers = getGameWebSocketHandlers()
 
+    wrapper.unmount()
     handlers.onOpen?.(new Event('open'))
-    emitLatestVideoPreloadEvent('error')
     await flushPromises()
 
-    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('failed')
-    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
-      '전장 데이터를 불러오지 못했습니다.',
-    )
-    expect(wrapper.text()).toContain('매칭 화면으로 돌아갑니다.')
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
-    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
     expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
   })
 
-  it('does not send CLIENT_READY when preload resolves after unmount', async () => {
+  it('warns before browser refresh while waiting payload is active', async () => {
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -331,16 +305,42 @@ describe('GameWaitingPage', () => {
 
     const wrapper = mount(GameWaitingPage)
     await flushPromises()
-    const handlers = getGameWebSocketHandlers()
+    const event = new Event('beforeunload', { cancelable: true })
 
-    handlers.onOpen?.(new Event('open'))
-    await wrapper.vm.$nextTick()
+    window.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
     wrapper.unmount()
-    emitLatestVideoPreloadEvent('loadeddata')
-    await flushPromises()
 
-    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
-    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function))
+  })
+
+  it('confirms route leave while waiting and follows the user choice', async () => {
+    const confirmSpy = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    mount(GameWaitingPage)
+    await flushPromises()
+    const guard = getLatestRouteLeaveGuard()
+
+    expect(guard({ name: ROUTE_NAMES.match })).toBe(false)
+    expect(guard({ name: ROUTE_NAMES.match })).toBe(true)
+    expect(confirmSpy).toHaveBeenCalledWith(
+      '게임 대기 중에 이동하면 현재 연결이 끊길 수 있습니다. 그래도 이동하시겠습니까?',
+    )
   })
 
   it('responds to RTT_PING and renders COUNTDOWN before game start', async () => {
@@ -351,7 +351,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -413,7 +412,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -451,7 +449,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -492,7 +489,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -524,7 +520,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [
               {
@@ -545,14 +541,19 @@ describe('GameWaitingPage', () => {
     expect(storedPayload?.gameRoomId).toBe(100)
     expect(storedPayload?.serverTime).toBe(Date.now())
     expect(storedPayload?.startAt).toBe(startAt)
-    expect(storedPayload?.scenario.dragonMaxHp).toBe(10000)
+    expect(storedPayload?.scenario.starCoreMaxHp).toBe(10000)
     expect(storedPayload?.receivedAt).toBe('2026-06-01T00:00:00.000Z')
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('starting')
     expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('GAME_START')
     expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('0')
     expect(wrapper.text()).toContain('게임 시작 정보 저장됨')
     expect(wrapper.text()).toContain('서버가 확정한 시작 데이터로 전장 화면으로 이동하는 중입니다.')
-    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
+    expect(gameWebSocketMock.state.connection.setHandlers).toHaveBeenCalledWith()
+    expect(gameWebSocketHandoffMock.handoffGameWebSocket).toHaveBeenCalledWith(
+      '100',
+      gameWebSocketMock.state.connection,
+    )
+    expect(gameWebSocketMock.state.connection.close).not.toHaveBeenCalled()
     expect(routerPushMock).toHaveBeenCalledWith({
       name: ROUTE_NAMES.gamePlay,
       params: {
@@ -562,15 +563,13 @@ describe('GameWaitingPage', () => {
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
-  it('uses GAME_START as the source of truth when COUNTDOWN was not received', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))
+  it('allows the normal transition to play without route leave confirmation', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -588,7 +587,46 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
+            durationMs: 15000,
+            hpTimeline: [],
+          },
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(getLatestRouteLeaveGuard()({ name: ROUTE_NAMES.gamePlay })).toBe(true)
+    expect(confirmSpy).not.toHaveBeenCalled()
+  })
+
+  it('uses GAME_START as the source of truth when COUNTDOWN was not received', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))
+    saveGameWaitingPayload({
+      matchId: 'match-1',
+      opponent: null,
+      game: {
+        gameRoomId: 100,
+        webSocketUrl: '/ws/game/100',
+      },
+      receivedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    mount(GameWaitingPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'GAME_START',
+        payload: {
+          gameRoomId: 100,
+          serverTime: Date.now(),
+          startAt: Date.now() + 2500,
+          scenario: {
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -614,7 +652,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -632,7 +669,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -659,7 +696,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -691,7 +727,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 4000,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -718,7 +754,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -736,7 +771,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -766,13 +801,15 @@ describe('GameWaitingPage', () => {
   })
 
   it('keeps a failed state when moving to play route fails', async () => {
+    gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReturnValueOnce(
+      gameWebSocketMock.state.connection,
+    )
     routerPushMock.mockRejectedValueOnce(new Error('NAVIGATION_BLOCKED'))
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -790,7 +827,7 @@ describe('GameWaitingPage', () => {
           serverTime: Date.now(),
           startAt: Date.now() + 2500,
           scenario: {
-            dragonMaxHp: 10000,
+            starCoreMaxHp: 10000,
             durationMs: 15000,
             hpTimeline: [],
           },
@@ -807,6 +844,12 @@ describe('GameWaitingPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toContain(
       'NAVIGATION_BLOCKED',
     )
+    expect(gameWebSocketHandoffMock.handoffGameWebSocket).toHaveBeenCalledWith(
+      '100',
+      gameWebSocketMock.state.connection,
+    )
+    expect(gameWebSocketHandoffMock.takeGameWebSocketHandoff).toHaveBeenCalledWith('100')
+    expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
@@ -817,7 +860,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -850,7 +892,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -885,7 +926,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -919,7 +959,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -965,7 +1004,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -988,7 +1026,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1023,7 +1060,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1058,7 +1094,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1099,7 +1134,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1154,7 +1188,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1168,14 +1201,13 @@ describe('GameWaitingPage', () => {
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
   })
 
-  it('cleans websocket, watchdog, countdown timer, and preload listeners on unmount', async () => {
+  it('cleans websocket, watchdog, and countdown timer on unmount', async () => {
     vi.useFakeTimers()
     saveGameWaitingPayload({
       matchId: 'match-1',
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1201,11 +1233,10 @@ describe('GameWaitingPage', () => {
     await wrapper.vm.$nextTick()
     wrapper.unmount()
     vi.advanceTimersByTime(30000)
-    emitLatestVideoPreloadEvent('loadeddata')
     await flushPromises()
 
     expect(gameWebSocketMock.state.connection.close).toHaveBeenCalledTimes(1)
-    expect(gameWebSocketMock.state.connection.sendClientReady).not.toHaveBeenCalled()
+    expect(gameWebSocketMock.state.connection.sendClientReady).toHaveBeenCalledTimes(1)
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
@@ -1215,7 +1246,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 100,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/100',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',
@@ -1229,7 +1259,7 @@ describe('GameWaitingPage', () => {
     expect(wrapper.text()).toContain('수신 대기')
     expect(wrapper.text()).toContain('대기방 연결 중')
     expect(wrapper.text()).toContain('게임 대기방에 접속하는 중입니다.')
-    expect(wrapper.get('main').attributes('data-loading-progress')).toBe('80')
+    expect(wrapper.get('main').attributes('data-loading-progress')).toBe('75')
 
     await wrapper.get('.locale-toggle').trigger('click')
 
@@ -1258,7 +1288,6 @@ describe('GameWaitingPage', () => {
       opponent: null,
       game: {
         gameRoomId: 101,
-        videoUrl: '/assets/game/dragon-view.mp4',
         webSocketUrl: '/ws/game/101',
       },
       receivedAt: '2026-06-01T00:00:00.000Z',

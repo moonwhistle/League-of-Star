@@ -34,7 +34,6 @@ flowchart TD
 | Match notification | `GET /api/v1/notifications/match/stream` | native `EventSource` wrapper 확장 자리 준비 |
 | Game WebSocket | `/ws/game/{gameRoomId}` | native `WebSocket` wrapper 확장 자리 준비 |
 | Game summary | `GET /api/v1/games/{gameId}/summary` | summary API 타입/서비스 확장 자리 준비 |
-| Static game asset | `/assets/game/dragon-view.mp4` | asset URL 상수와 game rendering 확장 자리 준비 |
 
 이번 이슈에서는 위 API를 실제로 호출하는 사용자 플로우를 완성하지 않는다. 다만 이후 이슈에서 바로 기능을 얹을 수 있도록 환경변수, 서비스 레이어, 타입 디렉토리, 라우트 shell을 만든다.
 
@@ -70,7 +69,6 @@ flowchart TD
 
 - 매칭 알림은 native `EventSource` 사용
 - 게임 통신은 native `WebSocket` 사용
-- MP4 배경은 HTML `<video>` 사용
 - HP bar, countdown, result HUD는 CSS overlay로 렌더링
 - `requestAnimationFrame` 기반 HP overlay 갱신 방향 유지
 - STOMP.js, SockJS, PixiJS, Web Worker, OffscreenCanvas는 MVP에서 미도입
@@ -163,7 +161,6 @@ types/constants -> no app dependency
 ```env
 VITE_API_BASE_URL=http://localhost:8080
 VITE_WS_BASE_URL=ws://localhost:8080
-VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 ```
 
 로컬 개발 기준:
@@ -196,7 +193,7 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 - 회원가입/비밀번호 찾기 화면 구현
 - 매칭 start/accept/reject UI 구현
 - SSE 연결 플로우 완성
-- WebSocket 게임 준비/RTT/SMITE 플로우 완성
+- WebSocket 게임 준비/RTT/LIGHTNING 플로우 완성
 - HP bar, countdown, video overlay 구현
 - 결과 화면 summary polling 구현
 - Pinia 도입
@@ -259,7 +256,6 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 - [x] `gameMessages.ts`에 WebSocket client/server message type 초안 작성
 - [x] `hpScenario.ts`에 HP scenario 계산 함수 자리 생성
 - [x] `requestAnimationFrame` 기반 overlay 갱신은 후속 게임 화면 이슈로 분리
-- [x] MP4 URL 상수 위치 확정
 
 ### 8. Styling 기본값
 
@@ -291,7 +287,7 @@ VITE_GAME_VIDEO_URL=/assets/game/dragon-view.mp4
 
 1. 문서와 convention부터 Vue 기준으로 정리한다.
 2. `npm create vite@latest frontend -- --template vue-ts` 계열로 scaffold를 만든다.
-3. 예제 코드를 제거하고 League of Smite 앱 shell만 남긴다.
+3. 예제 코드를 제거하고 League of Star 앱 shell만 남긴다.
 4. Router, services, realtime, game, types, constants 디렉토리를 먼저 만든다.
 5. 실제 화면 기능은 넣지 않고 placeholder page와 확장 가능한 service signature만 둔다.
 6. `npm install` 후 `npm run build`, `npm run test`, `npm run lint`가 통과하도록 조정한다.
@@ -332,8 +328,7 @@ npm run dev
 - `frontend/`를 Vue 3 + TypeScript + Vite scaffold로 생성했다.
 - `npm install`로 `package-lock.json`을 생성했다.
 - Vite 예제 컴포넌트와 로고 자산을 제거했다.
-- `package.json` 이름을 `smite-frontend`로 정리하고 `typecheck` script를 추가했다.
-- `.env.example`에 백엔드 API, WebSocket, 게임 MP4 URL 기본값을 추가했다.
+- `package.json` 이름을 `league-of-star-frontend`로 정리하고 `typecheck` script를 추가했다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
 
 ### 2026-06-01 - Task 3 TypeScript/Vite Settings
@@ -374,7 +369,7 @@ npm run dev
 - match SSE payload 타입은 `src/types/match.ts`에 위치시켰다.
 - `src/services/realtime/gameWebSocket.ts`에 native `WebSocket` 기반 game room wrapper를 추가했다.
 - game WebSocket URL은 백엔드 handshake 계약에 맞춰 `?token={accessToken}`을 붙인다.
-- game WebSocket client command는 `CLIENT_READY`, `RTT_PONG`, `SMITE` 전송 함수로 노출했다.
+- game WebSocket client command는 `CLIENT_READY`, `RTT_PONG`, `LIGHTNING` 전송 함수로 노출했다.
 - game WebSocket server/client envelope 타입은 `src/types/game.ts`에 위치시켰다.
 - reconnect, heartbeat 처리, RTT 측정 orchestration은 후속 기능 이슈에서 구현한다.
 - 현재 백엔드 SSE 인증은 `Authorization: Bearer` 헤더 기반이고 native `EventSource`는 custom header를 지원하지 않는다. 후속 SSE 연결 플로우 구현 전 백엔드 인증 방식을 cookie 또는 query token 등 native EventSource와 호환되는 방식으로 정리해야 한다.
@@ -385,7 +380,6 @@ npm run dev
 - `src/game/gameMessages.ts`에 WebSocket client/server message 타입 re-export와 client message 생성 함수를 추가했다.
 - `src/game/hpScenario.ts`에 scenario timeline 기준 HP 계산 함수 자리를 추가했다.
 - `requestAnimationFrame` 기반 overlay 갱신은 후속 게임 화면 이슈에서 구현한다.
-- MP4 URL 상수는 기존 `src/constants/env.ts`의 `GAME_VIDEO_URL`을 사용한다.
 - `npm run typecheck`, `npm run build` 통과를 확인했다.
 
 ### 2026-06-01 - Task 8 Styling Defaults
@@ -461,7 +455,7 @@ flowchart TD
 
 - Realtime wrapper는 native API를 유지하되 orchestration 제외.
   - 매칭 알림은 백엔드 정책대로 `match_found`, `match_response_result`까지 SSE가 담당하므로 `EventSource` wrapper만 구성.
-  - 게임 대기/RTT/카운트다운/SMITE/종료는 백엔드 WebSocket 경로가 담당하므로 `WebSocket` wrapper와 client command 함수만 구성.
+  - 게임 대기/RTT/카운트다운/LIGHTNING/종료는 백엔드 WebSocket 경로가 담당하므로 `WebSocket` wrapper와 client command 함수만 구성.
   - WebSocket handshake는 백엔드가 `/ws/game/{gameRoomId}?token={accessToken}`을 요구하므로 token query를 붙이는 구조로 정렬.
   - reconnect, heartbeat 처리, RTT 측정 orchestration은 후속 기능 이슈에서 실제 화면 상태와 함께 구현 예정.
 

@@ -1,4 +1,4 @@
-# League of Smite — Database Design (DDL)
+# League of Star — Database Design (DDL)
 
 ---
 
@@ -149,7 +149,7 @@ stateDiagram-v2
 | 게임 시작 | UPDATE | status=IN_PROGRESS, participants(PLAYING), game_start_time 기록 |
 | GAME_START 이전 timeout | UPDATE | gameRoom `createdAt` 기준 30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 완료되지 않으면 status=ABORTED, participants(ABORTED), game_records/LP 미반영 |
 | GAME_START 이후 disconnect | UPDATE 없음 또는 participant 상태만 DISCONNECTED. gameRoom은 IN_PROGRESS 유지 |
-| 게임 종료 | UPDATE | SMITE 즉시 종료 또는 서버 scheduler 자연사 정산이 scenario와 game_actions 기준으로 status=FINISHED, result/winner_id, participants(FINISHED), finished_at 확정 |
+| 게임 종료 | UPDATE | LIGHTNING 즉시 종료 또는 서버 scheduler 자연사 정산이 scenario와 game_actions 기준으로 status=FINISHED, result/winner_id, participants(FINISHED), finished_at 확정 |
 
 > Issue 50의 서버 종료 보장 흐름은 기존 `game_rooms`, `game_participants`, `game_actions` 구조를 사용하며 새 DB 컬럼/테이블을 추가하지 않습니다. 자연사 종료 후보 목록은 Redis `game:end:pending` ZSET으로 관리합니다.
 
@@ -157,10 +157,10 @@ stateDiagram-v2
 
 | 시점 | 동작 | 비고 |
 |------|------|------|
-| 강타 입력 | INSERT | 서버 수신 시각 기준 입력 시점, HP 역산 결과 저장 |
+| 라이트닝 입력 | INSERT | 서버 수신 시각 기준 입력 시점, HP 역산 결과 저장 |
 
 - **불변(Immutable)**: 한번 기록되면 수정 없음
-- **조건부 생성**: 강타 사용 시에만 생성 (미사용 시 행 없음)
+- **조건부 생성**: 라이트닝 사용 시에만 생성 (미사용 시 행 없음)
 - **게임당 최대 2행**: UK 제약으로 중복 방지
 
 ### 2.7 game_records — Immutable
@@ -337,7 +337,7 @@ CREATE TABLE rank_series (
 | `status` | VARCHAR(20) | NOT NULL | READY / IN_PROGRESS / FINISHED / ABORTED |
 | `result` | VARCHAR(20) | NULLABLE | PLAYER1_WIN / PLAYER2_WIN / DRAW |
 | `winner_id` | BIGINT | FK → users, NULLABLE | 승자 (무승부 시 NULL) |
-| `dragon_max_hp` | INT | NOT NULL, DEFAULT 10000 | 드래곤 초기 HP |
+| `star_core_max_hp` | INT | NOT NULL, DEFAULT 10000 | 스타 코어 초기 HP |
 | `duration_seconds` | INT | NOT NULL | 게임 시간 (8~17) |
 | `scenario_data` | JSON | NOT NULL | HP 감소 시나리오 스냅샷 |
 | `game_start_time` | DATETIME(3) | NULLABLE | 게임 실제 시작 시각 (ms 정밀도) |
@@ -351,7 +351,7 @@ CREATE TABLE game_rooms (
     status             VARCHAR(20) NOT NULL DEFAULT 'READY',
     result             VARCHAR(20) NULL,
     winner_id          BIGINT      NULL,
-    dragon_max_hp      INT         NOT NULL DEFAULT 10000,
+    star_core_max_hp   INT         NOT NULL DEFAULT 10000,
     duration_seconds   INT         NOT NULL,
     scenario_data      JSON        NOT NULL,
     game_start_time    DATETIME(3) NULL,
@@ -396,16 +396,16 @@ CREATE TABLE game_participants (
 
 ---
 
-### 3.7 game_actions — 강타 액션 기록
+### 3.7 game_actions — 라이트닝 액션 기록
 
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
 | `id` | BIGINT | PK, AUTO_INCREMENT | 고유 ID |
 | `game_room_id` | BIGINT | FK → game_rooms, NOT NULL | 게임 방 |
-| `user_id` | BIGINT | FK → users, NOT NULL | 강타 사용 유저 |
+| `user_id` | BIGINT | FK → users, NOT NULL | 라이트닝 사용 유저 |
 | `server_receive_time_ms` | BIGINT | NOT NULL | 서버 수신 시각 (epoch ms) |
-| `smite_time_ms` | INT | NOT NULL | 서버 수신 시각 기준 강타 시점 (게임 시작 기준 ms) |
-| `dragon_hp_at_smite` | INT | NOT NULL | 이전 SMITE 데미지 반영 후, 이번 SMITE 적용 전 현재 HP |
+| `lightning_time_ms` | INT | NOT NULL | 서버 수신 시각 기준 LIGHTNING 시점 (게임 시작 기준 ms) |
+| `star_core_hp_at_lightning` | INT | NOT NULL | 이전 LIGHTNING 데미지 반영 후, 이번 LIGHTNING 적용 전 현재 스타 코어 HP |
 | `is_kill` | BOOLEAN | NOT NULL | 킬 성공 여부 (HP 1200 이하) |
 | `created_at` | DATETIME | NOT NULL | 기록일시 |
 | `updated_at` | DATETIME | NOT NULL | 수정일시 |
@@ -416,8 +416,8 @@ CREATE TABLE game_actions (
     game_room_id            BIGINT   NOT NULL,
     user_id                 BIGINT   NOT NULL,
     server_receive_time_ms  BIGINT   NOT NULL,
-    smite_time_ms           INT      NOT NULL,
-    dragon_hp_at_smite      INT      NOT NULL,
+    lightning_time_ms       INT      NOT NULL,
+    star_core_hp_at_lightning INT    NOT NULL,
     is_kill                 BOOLEAN  NOT NULL,
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -428,13 +428,13 @@ CREATE TABLE game_actions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- `dragon_hp_at_smite`는 scenario 원본 HP가 아니라, 같은 gameRoom에서 더 이른 SMITE 데미지를 모두 반영한 현재 HP입니다.
-- `smite_time_ms < 100` 또는 scenario 범위 밖 SMITE는 action으로 저장하지 않습니다.
-- SMITE 데미지는 정책상 `1200` 고정이므로 별도 컬럼으로 저장하지 않습니다.
-- `afterHp = max(0, dragon_hp_at_smite - 1200)`은 WebSocket 응답에서 계산하는 값이며 DB에는 저장하지 않습니다.
-- `game_actions`는 유저당 1회 SMITE 입력과 판정 스냅샷만 저장합니다. 승패 기록, LP 변동, 배치/승급전 반영은 `game_records`에서 처리합니다.
+- `star_core_hp_at_lightning`은 scenario 원본 HP가 아니라, 같은 gameRoom에서 더 이른 LIGHTNING 데미지를 모두 반영한 현재 스타 코어 HP입니다.
+- `lightning_time_ms < 100` 또는 scenario 범위 밖 LIGHTNING은 action으로 저장하지 않습니다.
+- LIGHTNING 데미지는 정책상 `1200` 고정이므로 별도 컬럼으로 저장하지 않습니다.
+- `afterHp = max(0, star_core_hp_at_lightning - 1200)`은 WebSocket 응답에서 계산하는 값이며 DB에는 저장하지 않습니다.
+- `game_actions`는 유저당 1회 LIGHTNING 입력과 판정 스냅샷만 저장합니다. 승패 기록, LP 변동, 배치/승급전 반영은 `game_records`에서 처리합니다.
 
-> **uk_game_room_user**: 한 게임에서 유저당 강타 1회만 → 유니크 제약으로 DB 레벨 보장
+> **uk_game_room_user**: 한 게임에서 유저당 라이트닝 1회만 → 유니크 제약으로 DB 레벨 보장
 
 ---
 
@@ -529,7 +529,7 @@ game:rtt:{gameRoomId}
 
 - status는 `PENDING`, `PASSED`, `FAILED`만 사용합니다.
 - `RTT_FAILED`, `RTT_TOO_HIGH` reason은 이벤트/로그 용도이며 Redis RTT HASH에는 별도 reason field를 두지 않습니다.
-- median RTT는 `PASSED`/`FAILED` 판단에만 사용하며 SMITE 판정 보정에는 사용하지 않습니다.
+- median RTT는 `PASSED`/`FAILED` 판단에만 사용하며 LIGHTNING 판정 보정에는 사용하지 않습니다.
 - RTT 실패/초과 또는 게임 정상 종료 시 `game:rtt:{gameRoomId}`를 cleanup합니다.
 - TTL 300초는 cleanup 누락 방지용 안전장치이며, 게임 진행/판정 시간을 충분히 감싸기 위한 값입니다.
 
@@ -540,8 +540,8 @@ naturalDeathAtMillis = startAtMillis + scenario.durationMs
 ZADD game:end:pending naturalDeathAtMillis gameRoomId
 ```
 
-- `naturalDeathAtMillis`는 HP scenario 기준 드래곤이 0이 되는 최초 자연사 후보 시각입니다.
-- 한 명만 SMITE를 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 SMITE 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAtMillis`를 계산해 score를 앞당길 수 있습니다.
+- `naturalDeathAtMillis`는 HP scenario 기준 스타 코어가 0이 되는 최초 자연사 후보 시각입니다.
+- 한 명만 LIGHTNING을 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 LIGHTNING 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAtMillis`를 계산해 score를 앞당길 수 있습니다.
 - `naturalDeathAtMillis`는 정산 완료 시각이 아니라 서버가 최종 판정 대상으로 조회하기 시작할 수 있는 시각입니다.
 - scheduler는 `ZRANGEBYSCORE game:end:pending -inf nowMillis` 기준으로 due gameRoomId를 batch 조회합니다.
 - due 조회된 gameRoom이 아직 effective HP가 남아 있으면 현재 score가 due 상태일 때만 더 늦은 effective naturalDeathAt으로 score를 갱신합니다.
@@ -549,7 +549,7 @@ ZADD game:end:pending naturalDeathAtMillis gameRoomId
 - `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending` cleanup을 시도하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 이미 등록된 `game:end:pending` member를 제거하고 gameRoom/participants를 `ABORTED` 처리합니다.
 - 후속 game end scheduler는 `naturalDeathAtMillis`가 지난 gameRoom을 조회하고, gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
-- SMITE로 먼저 `FINISHED`된 gameRoom의 member가 `game:end:pending`에 남아 있어도 정상입니다. DB 상태가 최종 기준이며 scheduler no-op으로 정리합니다.
+- LIGHTNING으로 먼저 `FINISHED`된 gameRoom의 member가 `game:end:pending`에 남아 있어도 정상입니다. DB 상태가 최종 기준이며 scheduler no-op으로 정리합니다.
 
 후속 게임 흐름에서 사용할 예정인 Redis 구조:
 
@@ -569,7 +569,7 @@ ZADD game:end:pending naturalDeathAtMillis gameRoomId
 | 4 | `rank_series` | 배치/승급전마다 1행 | 진행 중 Mutable → 완료 후 Immutable | 배치/승급전 통합 시리즈 |
 | 5 | `game_rooms` | 게임당 1행 | 진행 중 Mutable → 종료 후 Immutable | 게임 메타데이터 + 시나리오 |
 | 6 | `game_participants` | 게임당 2행 | 진행 중 Mutable → 종료 후 Immutable | 게임 참여자 상태 |
-| 7 | `game_actions` | 게임당 0~2행 | **Immutable** | 강타 판정 상세 기록 |
+| 7 | `game_actions` | 게임당 0~2행 | **Immutable** | 라이트닝 판정 상세 기록 |
 | 8 | `game_records` | 게임당 2행 | **Immutable** | 전적 기록 (LP 변동 포함) |
 
 ---

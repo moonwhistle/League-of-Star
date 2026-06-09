@@ -39,7 +39,7 @@ globs: ["*.vue", "*.ts", "*.js"]
 
 - **UPPER_SNAKE_CASE** 사용.
 - 의미 단위로 묶어 정의.
-- 예시: `MAX_RETRY_COUNT`, `SMITE_DAMAGE`, `DRAGON_MAX_HP`
+- 예시: `MAX_RETRY_COUNT`, `LIGHTNING_DAMAGE`, `STAR_CORE_MAX_HP`
 
 ---
 
@@ -145,7 +145,7 @@ interface GameHpBarProps {
 defineProps<GameHpBarProps>();
 
 const emit = defineEmits<{
-  smite: [];
+  lightning: [];
 }>();
 </script>
 ```
@@ -194,7 +194,7 @@ const emit = defineEmits<{
 
 - Vitest + Vue Test Utils 사용 권장.
 - 테스트는 구현이 아닌 행동을 검증.
-- 예시: "강타 버튼 클릭 시 서버에 SMITE 액션이 전송된다"
+- 예시: "강타 버튼 클릭 시 서버에 LIGHTNING 액션이 전송된다"
 
 ---
 

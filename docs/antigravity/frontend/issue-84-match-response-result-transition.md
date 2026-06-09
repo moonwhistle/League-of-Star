@@ -26,47 +26,45 @@ flowchart TD
 
 ## Backend Contract
 
-| 항목 | 기준 |
-| ---- | ---- |
-| Final event | SSE `match_response_result` |
-| Transition source | `match_response_result.action` |
-| Game waiting action | `GO_TO_GAME_WAITING` |
-| Start screen action | `GO_TO_MATCH_START` |
-| Queue return action | `RETURN_TO_MATCHING` |
-| Game waiting route | `/game/:gameRoomId/waiting` |
+| 항목                | 기준                           |
+| ------------------- | ------------------------------ |
+| Final event         | SSE `match_response_result`    |
+| Transition source   | `match_response_result.action` |
+| Game waiting action | `GO_TO_GAME_WAITING`           |
+| Start screen action | `GO_TO_MATCH_START`            |
+| Queue return action | `RETURN_TO_MATCHING`           |
+| Game waiting route  | `/game/:gameRoomId/waiting`    |
 
 `match_response_result` payload:
 
 ```ts
 interface MatchResponseResultNotification {
-  matchId: string
-  outcome: 'MATCHED' | 'FAILED'
+  matchId: string;
+  outcome: "MATCHED" | "FAILED";
   reason:
-    | 'BOTH_ACCEPTED'
-    | 'MY_REJECTED'
-    | 'OPPONENT_REJECTED'
-    | 'MY_TIMEOUT'
-    | 'OPPONENT_TIMEOUT'
-    | 'BOTH_TIMEOUT'
-    | 'GAME_SETUP_FAILED'
-  action: 'GO_TO_GAME_WAITING' | 'GO_TO_MATCH_START' | 'RETURN_TO_MATCHING'
+    | "BOTH_ACCEPTED"
+    | "MY_REJECTED"
+    | "OPPONENT_REJECTED"
+    | "MY_TIMEOUT"
+    | "OPPONENT_TIMEOUT"
+    | "BOTH_TIMEOUT"
+    | "GAME_SETUP_FAILED";
+  action: "GO_TO_GAME_WAITING" | "GO_TO_MATCH_START" | "RETURN_TO_MATCHING";
   opponent: {
-    userId: number
-    nickname: string
-    tier: string
-    tierScore: number
-  } | null
+    userId: number;
+    nickname: string;
+    tier: string;
+    tierScore: number;
+  } | null;
   game: {
-    gameRoomId: number
-    videoUrl: string
-    webSocketUrl: string
-  } | null
+    gameRoomId: number;
+    webSocketUrl: string;
+  } | null;
 }
 ```
 
 프론트 처리 기준:
 
-- `GO_TO_GAME_WAITING`은 `game.gameRoomId`, `game.videoUrl`, `game.webSocketUrl`이 있어야 게임 대기 화면으로 이동한다.
 - `GO_TO_GAME_WAITING` 이동 전 `matchId`, `opponent`, `game`, `receivedAt`을 `sessionStorage`에 저장한다.
 - `GO_TO_GAME_WAITING`은 매칭 SSE를 닫고 게임 대기 화면으로 이동한다.
 - `GO_TO_MATCH_START`는 매칭 SSE를 닫고 ready 상태로 복귀한다.
@@ -86,7 +84,7 @@ interface MatchResponseResultNotification {
 - action별 매칭 SSE close / 유지 정책 구현.
 - game waiting payload `sessionStorage` 저장/조회 구현.
 - `GameWaitingPage.vue` loading UI 구현.
-- `background.png` 기반 game waiting background 구현.
+- `background-new-sharp.png` 기반 game waiting background 구현.
 - `gameloading.png` 참고 디자인 기반 CSS 재현.
 - game waiting loading bar payload 확보율 구현.
 - game waiting loading bar 문구는 게임 시작 준비 완료가 아니라 payload 수신 상태로 표시.
@@ -140,7 +138,7 @@ interface MatchResponseResultNotification {
 
 - [x] `sessionStorage` 저장 helper 구현.
 - [x] `sessionStorage` 조회 helper 구현.
-- [x] 저장 key를 `smite.gameWaitingPayload:{gameRoomId}` 기준으로 구현.
+- [x] 저장 key를 `league-of-star.gameWaitingPayload:{gameRoomId}` 기준으로 구현하고, League of Star 계약 전환 이후 기존 namespace 읽기 fallback은 제거.
 - [x] 저장 payload에 `matchId`, `opponent`, `game`, `receivedAt` 포함.
 - [x] route param `gameRoomId`와 저장 payload 불일치 시 안전 복귀 구현.
 - [x] payload 없음 또는 parse 실패 시 안전 복귀 구현.
@@ -148,10 +146,10 @@ interface MatchResponseResultNotification {
 ### 4. Game waiting UI 구현
 
 - [x] `GameWaitingPage.vue` placeholder 제거.
-- [x] `background.png` 기반 full-screen background 구현.
+- [x] `background-new-sharp.png` 기반 full-screen background 구현.
 - [x] `gameloading.png` 참고 디자인을 CSS로 재현.
 - [x] `gameloading.png` runtime import 금지 유지.
-- [x] `LEAGUE OF SMITE` title 구현.
+- [x] `LEAGUE OF STAR` title 구현.
 - [x] 게임 준비 중 title 구현.
 - [x] 상대 nickname / tier 표시 구현.
 - [x] `gameRoomId`, `matchId`는 화면 표시 없이 내부 저장/검증 상태로 유지.
@@ -165,7 +163,6 @@ interface MatchResponseResultNotification {
   - `matchId`
   - `opponent`
   - `game.gameRoomId`
-  - `game.videoUrl`
   - `game.webSocketUrl`
 - [x] 각 항목을 20%로 계산.
 - [x] 1개 확보 시 20%, 2개 확보 시 40%, 3개 확보 시 60%, 4개 확보 시 80%, 5개 확보 시 100% 표시.
@@ -314,7 +311,6 @@ flowchart TD
 
 - Loading bar 기준을 “필수 payload 확보율”로 정함.
   아직 Game WebSocket 연결은 이번 이슈 범위가 아니므로, 로딩 바를 실제 소켓 준비율처럼 보이면 오해가 생김.
-  그래서 `matchId`, `opponent`, `gameRoomId`, `videoUrl`, `webSocketUrl` 5개 항목을 각각 20%로 계산함.
   100% 상태 문구도 `Ready`가 아니라 `Received` 계열로 표현해 게임 시작 가능 상태와 구분함.
 
 - 최종 전환 이후 늦은 SSE callback을 무시함.
@@ -323,7 +319,7 @@ flowchart TD
 
 - Game waiting UI는 참고 이미지를 그대로 삽입하지 않고 CSS로 재구성함.
   `gameloading.png`는 디자인 참고용이고 runtime asset이 아님.
-  실제 화면은 기존 `background.png`를 쓰고, desktop/mobile에서 loading 영역과 segment가 겹치지 않도록 반응형 레이아웃을 조정함.
+  실제 화면은 기존 `background-new-sharp.png`를 쓰고, desktop/mobile에서 loading 영역과 segment가 겹치지 않도록 반응형 레이아웃을 조정함.
 
 ## 📝 Note
 

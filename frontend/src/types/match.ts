@@ -55,7 +55,6 @@ export interface MatchResponseOpponent {
  */
 export interface MatchResponseGame {
   gameRoomId: number
-  videoUrl: string
   webSocketUrl: string
 }
 

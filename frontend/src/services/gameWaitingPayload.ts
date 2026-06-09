@@ -4,7 +4,7 @@ import type {
   MatchResponseResultNotification,
 } from '@/types/match'
 
-const GAME_WAITING_PAYLOAD_KEY_PREFIX = 'smite.gameWaitingPayload:'
+const GAME_WAITING_PAYLOAD_KEY_PREFIX = 'league-of-star.gameWaitingPayload:'
 
 export interface GameWaitingPayload {
   matchId: string
@@ -117,8 +117,6 @@ function isValidGame(game: unknown): game is MatchResponseGame {
 
   return (
     Number.isFinite(game.gameRoomId) &&
-    typeof game.videoUrl === 'string' &&
-    game.videoUrl.trim() !== '' &&
     typeof game.webSocketUrl === 'string' &&
     game.webSocketUrl.trim() !== ''
   )

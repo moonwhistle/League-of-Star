@@ -16,9 +16,10 @@ export interface GameWebSocketHandlers {
 
 export interface GameWebSocketConnection {
   socket: WebSocket
+  setHandlers: (handlers?: GameWebSocketHandlers) => void
   sendClientReady: () => void
   sendRttPong: (seq: number) => void
-  sendSmite: () => void
+  sendLightning: () => void
   close: (code?: number, reason?: string) => void
 }
 
@@ -27,27 +28,31 @@ export function connectGameWebSocket(
   handlers: GameWebSocketHandlers = {},
 ): GameWebSocketConnection {
   const socket = new WebSocket(buildGameWebSocketUrl(webSocketUrlOrGameRoomId))
+  let currentHandlers = handlers
   let isClosed = false
 
-  socket.addEventListener('open', (event) => handlers.onOpen?.(event))
+  socket.addEventListener('open', (event) => currentHandlers.onOpen?.(event))
   socket.addEventListener('message', (event: MessageEvent<string>) => {
     try {
-      handlers.onMessage?.(JSON.parse(event.data) as GameWebSocketServerMessage, event)
+      currentHandlers.onMessage?.(JSON.parse(event.data) as GameWebSocketServerMessage, event)
     } catch (error) {
-      handlers.onError?.(error)
+      currentHandlers.onError?.(error)
     }
   })
-  socket.addEventListener('error', (event) => handlers.onError?.(event))
+  socket.addEventListener('error', (event) => currentHandlers.onError?.(event))
   socket.addEventListener('close', (event) => {
     isClosed = true
-    handlers.onClose?.(event)
+    currentHandlers.onClose?.(event)
   })
 
   return {
     socket,
+    setHandlers: (nextHandlers = {}) => {
+      currentHandlers = nextHandlers
+    },
     sendClientReady: () => sendMessage(socket, { type: 'CLIENT_READY', payload: {} }),
     sendRttPong: (seq) => sendMessage(socket, { type: 'RTT_PONG', payload: { seq } }),
-    sendSmite: () => sendMessage(socket, { type: 'SMITE', payload: null }),
+    sendLightning: () => sendMessage(socket, { type: 'LIGHTNING', payload: null }),
     close: (code, reason) => {
       if (isClosed) {
         return

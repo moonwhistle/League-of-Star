@@ -13,6 +13,7 @@
 - 게임 WebSocket은 백엔드가 내려준 `game.webSocketUrl`을 source로 사용하고, access token은 query parameter로 붙여 연결.
 - 게임 결과 화면의 summary 조회는 현재 백엔드 기준 `gameId = gameRoomId`로 처리.
 - SSE는 백엔드의 `Authorization: Bearer` 계약을 유지하고, native `EventSource` 대신 `@microsoft/fetch-event-source`로 header 기반 연결을 구현.
+- 사용자-facing 명칭은 League of Star / LIGHTNING / Star Core로 통일하되, 현재 백엔드 WebSocket wire type `LIGHTNING`와 `lightningTimeMs`, `starCoreHpAtLightning`, `starCoreMaxHp` 레거시 payload 필드는 호환 계약으로 유지.
 
 ```mermaid
 flowchart TD
@@ -34,7 +35,7 @@ flowchart TD
     N --> O[COUNTDOWN]
     O --> P[GAME_START]
     P --> Q[게임 플레이 화면]
-    Q --> R[SMITE]
+    Q --> R[LIGHTNING<br/>wire type LIGHTNING]
     R --> S[GAME_RESULT]
     S --> T[게임 결과 Summary 조회]
 ```
@@ -162,7 +163,6 @@ interface MatchResponseResultNotification {
   } | null;
   game: {
     gameRoomId: number;
-    videoUrl: string;
     webSocketUrl: string;
   } | null;
 }
@@ -174,14 +174,12 @@ interface MatchResponseResultNotification {
 - `GO_TO_GAME_WAITING`, `GO_TO_MATCH_START`는 매칭 SSE를 닫고, `RETURN_TO_MATCHING`은 백엔드 큐 복귀 완료 이벤트로 보고 SSE를 유지.
 - `RETURN_TO_MATCHING`에서는 `joinMatchQueue`, `leaveMatchQueue`를 호출하지 않음.
 - `game`이 null인 실패 이벤트에서는 게임 화면 이동 금지.
-- `game.videoUrl`, `game.webSocketUrl`은 게임 화면에서 사용할 수 있도록 route state 또는 session storage로 최소 보관 구현.
 - 최종 전환 기준은 HTTP accept/reject 응답이 아니라 이 이벤트의 `action`임을 테스트로 검증.
 
 ### 8. [x] 게임 대기방 WebSocket 구현
 
 - `/game/:gameRoomId/waiting` 페이지에서 WebSocket 연결 구현.
 - 연결 URL은 백엔드가 `match_response_result.game.webSocketUrl`로 내려준 값을 source로 사용하고, access token query를 append해 구성.
-- 연결 성공 후 `game.videoUrl` MP4 preload가 완료되면 `CLIENT_READY`를 한 번만 자동 전송.
 - server message 처리 구현.
 
 ```ts
@@ -216,7 +214,8 @@ interface GameStartPayload {
   serverTime: number;
   startAt: number;
   scenario: {
-    dragonMaxHp: number;
+    starCoreMaxHp?: number;
+    starCoreMaxHp?: number; // legacy backend payload
     durationMs: number;
     hpTimeline: {
       timeMs: number;
@@ -230,18 +229,41 @@ interface GameStartPayload {
 - HP 계산은 `startAt`과 `scenario.hpTimeline` 기준으로 구현.
 - server/client clock 보정은 후속 고도화로 보류하고, 현재 단계에서는 백엔드가 내려준 `serverTime`, `startAt`을 그대로 사용.
 
-### 10. [ ] 게임 플레이 화면 구현
+### 10. [x] 게임 플레이 화면 구현
 
-- `/game/:gameRoomId/play` 페이지에서 MP4 video 표시 구현.
-- HP bar, countdown, smite button HUD 구현.
-- `requestAnimationFrame` 기반 HP 표시 구현.
-- SMITE 클릭 시 `{ type: 'SMITE', payload: null }` 전송 구현.
-- SMITE payload에 임의 데이터 추가 금지.
-- `ERROR` 수신 시 message 표시 구현.
+- `/game/:gameRoomId/play` 페이지에서 Three.js 기반 galaxy background 구현.
+- galaxy background는 카메라 주변 star sphere와 전방 star mist로 구성해 진입 직후 확대된 별무리가 화면을 채우게 구현.
+- 배경 animation은 별 평면 이동이 아니라 viewer/camera 기준의 느린 시점 회전으로 구현.
+- 게임 진입마다 카메라 yaw/pitch/roll, 배경 회전 phase, 스타 코어 이동 phase를 프론트 랜덤 시각 연출로 다르게 시작하게 구현.
+- 이 랜덤값은 화면 재미를 위한 visual-only 값이며 `LIGHTNING` 판정 payload나 백엔드 source of truth에는 포함하지 않음.
+- 움직이는 타겟의 본체 이미지는 `frontend/img/character-cutout.png`를 사용하고, 기존 glow/빛 잔상 motion은 유지함.
+- 체크무늬 배경이 제거된 `character-cutout.png` alpha PNG만 런타임 asset으로 유지함.
+- HP indicator는 캐릭터 얼굴을 가리지 않도록 타겟 위쪽으로 분리하고, 잔상은 캐릭터 뒤쪽 레이어로 유지함.
+- 타겟 이동은 목적지마다 감속하는 segment easing 대신 velocity steering으로 처리해 중간 멈칫임을 줄임.
+- 캐릭터 texture는 alpha edge, texture filter, halo opacity를 조정해 배경 glow 속에서도 더 선명하게 보이도록 처리함.
+- 백엔드 payload 필드명 `starCoreMaxHp`/`hpTimeline`은 HP source 계약으로 유지하며 visual asset 이름과 섞지 않음.
+- HP bar, countdown, LIGHTNING button HUD는 후속 전투 UI 단계로 보류.
+- `requestAnimationFrame` 기반 배경 animation 구현.
+- LIGHTNING 클릭 UI와 `{ type: 'LIGHTNING', payload: null }` 전송은 후속 전투 UI 단계로 보류.
+- `ERROR` 수신 상태는 data attribute로 유지하고 message 표시는 후속 전투 UI 단계로 보류.
 - `GAME_RESULT` 수신 전까지 결과 화면 이동 금지.
-- PixiJS, canvas, Web Worker는 MVP에서 도입하지 않음.
+- PixiJS, Web Worker는 MVP에서 도입하지 않음.
+- Three.js 구현을 위해 `three`, `@types/three` 추가.
 
-### 11. [ ] 게임 결과 WebSocket 처리 구현
+### 11. [ ] LIGHTNING 전투 입력 UI 구현
+
+- `/game/:gameRoomId/play`에서 사용자가 LIGHTNING을 1회 입력할 수 있는 UI 구현.
+- 입력 방식은 Three.js 스타 코어를 기준으로 한 타겟/클릭 UI 또는 명확한 LIGHTNING 버튼으로 구현하되, 최종 판정은 프론트가 하지 않음.
+- WebSocket 전송 payload는 백엔드 계약대로 `{ type: 'LIGHTNING', payload: null }`만 사용.
+- 클라이언트 timestamp, HP, elapsed time, target 좌표는 payload에 포함하지 않음.
+- 서버 판정 source of truth는 WebSocket 수신 시각과 백엔드 `GAME_START` scenario임.
+- 한 gameRoom에서 LIGHTNING은 한 번만 전송하도록 session storage 기반 중복 방지 구현.
+- 이미 전송한 gameRoom으로 재진입/새로고침해도 중복 전송하지 않음.
+- 전송 직후 승패를 프론트에서 확정하지 않고 `GAME_RESULT` 수신을 기다림.
+- 전송 실패나 WebSocket close/error는 화면 상태로 표시하고, 서버 결과를 임의 생성하지 않음.
+- `GAME_RESULT` route 이동과 summary API 호출은 다음 이슈로 유지.
+
+### 12. [ ] 게임 결과 WebSocket 처리 구현
 
 - `GAME_RESULT` payload shape 반영.
 
@@ -255,8 +277,8 @@ interface GameResultPayload {
   actions: {
     userId: number;
     serverReceiveTime: number;
-    smiteTimeMs: number;
-    dragonHpAtSmite: number;
+    lightningTimeMs: number;
+    starCoreHpAtLightning: number;
     damage: number;
     afterHp: number;
     isKill: boolean;
@@ -268,7 +290,7 @@ interface GameResultPayload {
 - WebSocket result payload는 즉시 전환/임시 표시용으로만 사용.
 - 최종 결과 source of truth는 summary API로 처리.
 
-### 12. [ ] 게임 결과 Summary 화면 구현
+### 13. [ ] 게임 결과 Summary 화면 구현
 
 - `/game/:gameRoomId/result` 페이지에서 `GET /api/v1/games/{gameId}/summary` 호출 구현.
 - 현재 백엔드 기준 `gameId = gameRoomId`로 호출.
@@ -327,7 +349,10 @@ type GameSummaryResponse =
 - `RTT_PING` 수신 시 `RTT_PONG` 전송 검증.
 - `COUNTDOWN` 수신 시 countdown 상태 표시 검증.
 - `GAME_START` 수신 시 play 이동 및 scenario 저장 검증.
-- SMITE 전송 payload가 null인지 검증.
+- LIGHTNING 클릭 시 `{ type: 'LIGHTNING', payload: null }`이 한 번만 전송되는지 검증.
+- LIGHTNING 전송 payload에 timestamp, HP, elapsed time, target 좌표가 포함되지 않는지 검증.
+- LIGHTNING 전송 후 프론트가 승패를 즉시 확정하지 않고 `GAME_RESULT`를 기다리는지 검증.
+- 새로고침/재진입 후 같은 gameRoom에서 LIGHTNING 중복 전송이 막히는지 검증.
 - `GAME_RESULT` 수신 후 result 이동 검증.
 - summary `PENDING` polling 검증.
 - summary `DONE` 결과 표시 검증.
@@ -366,7 +391,8 @@ Accept: text/event-stream
 - [ ] 매칭 응답 결과 화면 전환 구현.
 - [ ] 게임 대기방 WebSocket 구현.
 - [x] 게임 시작 처리 구현.
-- [ ] 게임 플레이 화면 구현.
+- [x] 게임 플레이 화면 구현.
+- [ ] LIGHTNING 전투 입력 UI 구현.
 - [ ] 게임 결과 WebSocket 처리 구현.
 - [ ] 게임 결과 Summary 화면 구현.
 - [ ] 공통 UI, 테스트, 문서 정합성 정리.

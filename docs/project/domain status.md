@@ -1,6 +1,6 @@
-# League of Smite - Domain Status
+# League of Star - Domain Status
 
-이 문서는 League of Smite 프로젝트의 핵심 도메인별 상태 전환 흐름을 정의합니다.
+이 문서는 League of Star 프로젝트의 핵심 도메인별 상태 전환 흐름을 정의합니다.
 
 ## 1. User (유저 상태)
 유저의 서비스 이용 상태 흐름입니다.
@@ -237,6 +237,8 @@ sequenceDiagram
 ## 3. Game (게임 세션 상태)
 실제 게임이 진행되는 과정의 상태 흐름입니다.
 
+사용자-facing 입력명은 LIGHTNING이지만, 현재 WebSocket message type과 일부 reason/schema 이름은 레거시 `LIGHTNING` 식별자를 유지합니다.
+
 ```mermaid
 stateDiagram-v2
     [*] --> READY: 게임 세션 생성 완료
@@ -245,15 +247,15 @@ stateDiagram-v2
     READY --> IN_PROGRESS: RTT PASSED 이후<br/>startAt 확정 + GAME_START
     
     state IN_PROGRESS {
-        [*] --> WAITING_ACTION: 강타 대기
-        WAITING_ACTION --> WAITING_ACTION: SMITE 저장<br/>미처치 + 상대 SMITE 남음
-        WAITING_ACTION --> SMITE_KILL: SMITE 저장<br/>HP 0 이하
-        WAITING_ACTION --> BOTH_SMITE_USED: 양쪽 SMITE 저장<br/>미처치
+        [*] --> WAITING_ACTION: 라이트닝 대기
+        WAITING_ACTION --> WAITING_ACTION: LIGHTNING 저장<br/>미처치 + 상대 입력 남음
+        WAITING_ACTION --> LIGHTNING_KILL: LIGHTNING 저장<br/>HP 0 이하
+        WAITING_ACTION --> BOTH_LIGHTNING_USED: 양쪽 LIGHTNING 저장<br/>미처치
         WAITING_ACTION --> WAITING_ACTION: GAME_START 이후 disconnect<br/>서버 timer/scheduler가 clock 유지
     }
     
-    SMITE_KILL --> FINISHED: 판정 완료 (Winner Decided)
-    BOTH_SMITE_USED --> FINISHED: 즉시 DRAW
+    LIGHTNING_KILL --> FINISHED: 판정 완료 (Winner Decided)
+    BOTH_LIGHTNING_USED --> FINISHED: 즉시 DRAW
     IN_PROGRESS --> FINISHED: effective naturalDeathAt 도달 후<br/>scheduler 자연사 DRAW 정산
     FINISHED --> RECORDED: Step 9 record/rank 정산 완료
     RECORDED --> MATCH_STATUS_CLEANED: Step 10 match:status IN_GAME 제거
@@ -267,30 +269,30 @@ stateDiagram-v2
 - RTT 측정은 양쪽 `CLIENT_READY` 이후 `GAME_START` 이전 단계입니다.
 - RTT 측정 실패, median RTT 2000ms 초과, RTT 측정 중 WebSocket close/error는 모두 `GAME_START` 이전 실패로 보고 `ABORTED` 처리하며 record/LP를 반영하지 않습니다.
 - RTT 실패 reason은 단순하게 `RTT_FAILED`, `RTT_TOO_HIGH`만 사용합니다.
-- `GAME_START`는 양쪽 RTT `PASSED`가 확인된 경우에만 진행합니다. median RTT는 시작 전 품질 검사에만 사용하고 SMITE 판정에는 사용하지 않습니다.
+- `GAME_START`는 양쪽 RTT `PASSED`가 확인된 경우에만 진행합니다. median RTT는 시작 전 품질 검사에만 사용하고 LIGHTNING 판정에는 사용하지 않습니다.
 - 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링합니다.
 - `COUNTDOWN`과 `GAME_START`는 countdown 종료 후가 아니라 `startAt` 전에 미리 전송하며, 반드시 같은 `startAt`을 사용합니다.
 - `GAME_START` 이후 disconnect는 gameRoom을 `ABORTED`로 만들지 않습니다.
 - disconnect 유저는 이후 추가 입력을 할 수 없지만, 이미 서버가 수신한 액션은 유지합니다.
 - WebSocket 연결이 모두 끊겨도 gameRoom 종료 작업은 서버 timer/scheduler 기준으로 완료합니다.
 - 종료 정산 deadline은 최초 `naturalDeathAt = startAt + scenario.durationMs`로 계산합니다.
-- 한 명만 SMITE를 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 SMITE 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있습니다.
+- 한 명만 LIGHTNING을 사용했고 처치하지 못한 경우 원본 scenario HP에서 누적 LIGHTNING 데미지를 뺀 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 `game:end:pending` score를 앞당길 수 있습니다.
 - deadline 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom/participants를 `ABORTED` 처리하고 상태 저장소 cleanup을 수행하며 record/LP를 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 등록된 deadline을 제거하고 gameRoom/participants를 `ABORTED` 처리하며 record/LP를 반영하지 않습니다.
-- `IN_PROGRESS` 중 클라이언트는 gameRoom WebSocket으로 `SMITE`를 보낼 수 있고, 서버는 클라이언트 timestamp 없이 서버 수신 시각만 저장합니다.
-- SMITE 판정 시각은 `serverReceiveTimeMs - startAt`으로 계산하며, median RTT 또는 `RTT_PONG` 측정값으로 보정하지 않습니다.
-- `smiteTimeMs < 100` 또는 scenario 범위 밖 SMITE는 action으로 저장하지 않습니다.
-- 서버는 저장된 HP scenario와 기존 `game_actions`를 기준으로 해당 시점 HP를 계산하고, 이전 SMITE가 킬 실패였더라도 `1200` 데미지를 차감합니다.
-- 유저당 gameRoom당 SMITE는 한 번만 저장하며, 중복 SMITE는 새 action을 만들지 않습니다.
-- 결과가 확정되지 않은 SMITE는 중간 응답을 전송하지 않습니다.
-- SMITE 적용 후 HP가 `0` 이하이면 같은 처리 흐름에서 gameRoom을 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast합니다.
-- 양쪽 유저가 모두 SMITE를 사용했는데 처치하지 못한 경우 같은 처리 흐름에서 gameRoom을 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast합니다.
-- 한 명만 SMITE를 사용했고 처치하지 못한 경우 gameRoom은 `IN_PROGRESS`를 유지하며, 이후 상대 SMITE 또는 자연사/제한 시간 종료 정산을 기다립니다.
-- 이미 `FINISHED`된 gameRoom에 늦게 도착한 SMITE는 새 action을 저장하지 않고 현재 session에 확정된 `GAME_RESULT`만 재응답합니다.
+- `IN_PROGRESS` 중 클라이언트는 gameRoom WebSocket으로 LIGHTNING 의도를 보낼 수 있습니다. 현재 wire type은 레거시 `LIGHTNING`이며, 서버는 클라이언트 timestamp 없이 서버 수신 시각만 저장합니다.
+- LIGHTNING 판정 시각은 `serverReceiveTimeMs - startAt`으로 계산하며, median RTT 또는 `RTT_PONG` 측정값으로 보정하지 않습니다.
+- `lightningTimeMs < 100` 또는 scenario 범위 밖 LIGHTNING은 action으로 저장하지 않습니다.
+- 서버는 저장된 HP scenario와 기존 `game_actions`를 기준으로 해당 시점 HP를 계산하고, 이전 LIGHTNING이 킬 실패였더라도 `1200` 데미지를 차감합니다.
+- 유저당 gameRoom당 LIGHTNING은 한 번만 저장하며, 중복 LIGHTNING은 새 action을 만들지 않습니다.
+- 결과가 확정되지 않은 LIGHTNING은 중간 응답을 전송하지 않습니다.
+- LIGHTNING 적용 후 HP가 `0` 이하이면 같은 처리 흐름에서 gameRoom을 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast합니다.
+- 양쪽 유저가 모두 LIGHTNING을 사용했는데 처치하지 못한 경우 같은 처리 흐름에서 gameRoom을 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast합니다.
+- 한 명만 LIGHTNING을 사용했고 처치하지 못한 경우 gameRoom은 `IN_PROGRESS`를 유지하며, 이후 상대 LIGHTNING 또는 자연사/제한 시간 종료 정산을 기다립니다.
+- 이미 `FINISHED`된 gameRoom에 늦게 도착한 LIGHTNING은 새 action을 저장하지 않고 현재 session에 확정된 `GAME_RESULT`만 재응답합니다.
 - scheduler는 `naturalDeathAt`에 도달한 gameRoom을 정산 대상으로 삼고, 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
 - scheduler는 due gameRoom을 row lock으로 다시 조회하고, 저장된 action 목록과 원본 scenario를 합성해 effective HP를 재계산합니다.
 - due로 조회됐더라도 effective HP가 아직 `0`보다 크면 종료하지 않고 더 늦은 effective naturalDeathAt으로 `game:end:pending` score를 갱신합니다.
-- 실패 SMITE 직후의 deadline 앞당김과 scheduler due 재조정은 Redis Lua script를 분리합니다. 앞당김은 member가 없으면 등록할 수 있고 기존 deadline보다 빠른 경우만 반영하며, due 재조정은 이미 due인 기존 member만 뒤로 이동합니다.
+- 실패 LIGHTNING 직후의 deadline 앞당김과 scheduler due 재조정은 Redis Lua script를 분리합니다. 앞당김은 member가 없으면 등록할 수 있고 기존 deadline보다 빠른 경우만 반영하며, due 재조정은 이미 due인 기존 member만 뒤로 이동합니다.
 - effective HP가 `0` 이하이고 gameRoom이 아직 `IN_PROGRESS`이면 자연사 `DRAW`로 `FINISHED` 전환하고 participants를 `FINISHED`로 전환합니다.
 - 자연사 `DRAW`로 새로 종료된 경우 연결된 local WebSocket session에만 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 broadcast합니다. 연결이 없거나 전송에 실패해도 DB 결과는 유지하며 pending cleanup은 계속 시도합니다.
 - 이미 `FINISHED` 또는 `ABORTED`인 gameRoom은 기존 결과/상태를 유지하고 no-op 처리합니다.
@@ -348,7 +350,7 @@ stateDiagram-v2
 | `CONNECTED` | API local memory registry | handshake 성공 후 gameRoom/user 단위 WebSocket session 등록 완료 |
 | `READY` | API local memory registry | 클라이언트가 `CLIENT_READY`를 보내 대기 준비 완료 |
 | `RTT_MEASURING` | Redis `game:rtt:{gameRoomId}` + API local memory | 양쪽 `CLIENT_READY` 완료 후 RTT 측정 중. 각 `RTT_PING`은 2500ms 안에 응답해야 하고 5회 측정 구조상 전체 측정은 최대 15초 안에 끝나야 함 |
-| `RTT_PASSED` | Redis `game:rtt:{gameRoomId}` | 양쪽 median RTT가 2000ms 이하. RTT 측정값은 GAME_START 전 품질 검사에만 사용하며 SMITE 판정 보정에는 사용하지 않음 |
+| `RTT_PASSED` | Redis `game:rtt:{gameRoomId}` | 양쪽 median RTT가 2000ms 이하. RTT 측정값은 GAME_START 전 품질 검사에만 사용하며 LIGHTNING 판정 보정에는 사용하지 않음 |
 | `GAME_STARTING` | WebSocket message | 서버가 `startAt = serverNow + 4000ms`를 확정하고 `COUNTDOWN`/`GAME_START`를 전송한 상태. 클라이언트는 남은 시간이 3000ms 이하일 때 countdown을 렌더링하고 `startAt`까지 대기 |
 | `RTT_FAILED` | DB `game_rooms`, `game_participants`; 연결된 session은 close | `RTT_PONG` 응답 누락, WebSocket close/error, 측정 중 예외, median RTT 2000ms 초과로 gameRoom/participants가 `ABORTED` 된 상태 |
 | `DISCONNECTED` | registry에서 제거 | WebSocket 연결 종료로 session 제거 |

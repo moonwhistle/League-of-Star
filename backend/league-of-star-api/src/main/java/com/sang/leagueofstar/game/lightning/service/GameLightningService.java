@@ -1,0 +1,141 @@
+package com.sang.leagueofstar.game.lightning.service;
+
+import com.sang.leagueofstar.domain.game.domain.GameAction;
+import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.GameRules;
+import com.sang.leagueofstar.domain.game.service.GameActionCommandService;
+import com.sang.leagueofstar.domain.game.service.GameActionReadService;
+import com.sang.leagueofstar.domain.game.service.GameRoomCommandService;
+import com.sang.leagueofstar.domain.game.service.GameLightningJudgementService;
+import com.sang.leagueofstar.domain.game.service.dto.GameActionSaveResult;
+import com.sang.leagueofstar.game.end.service.GameEndDeadlineAdvanceService;
+import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger;
+import com.sang.leagueofstar.game.result.dto.GameResultPayload;
+import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
+import com.sang.leagueofstar.game.lightning.domain.GameLightningCommand;
+import com.sang.leagueofstar.game.lightning.dto.GameLightningHandleResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class GameLightningService {
+
+    private final GameRoomCommandService gameRoomCommandService;
+    private final GameActionReadService gameActionReadService;
+    private final GameActionCommandService gameActionCommandService;
+    private final GameLightningJudgementService gameLightningJudgementService;
+    private final GameEndDeadlineAdvanceService gameEndDeadlineAdvanceService;
+    private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger;
+    private final GameResultPayloadFactory gameResultPayloadFactory;
+    private final Clock clock;
+
+    @Transactional
+    public Optional<GameLightningHandleResponse> handleLightning(GameLightningCommand command) {
+        GameRoom gameRoom = gameRoomCommandService.lockLightningResultRoom(command.gameRoomId(), command.userId());
+        if (gameRoom.getStatus().isFinished()) {
+            return Optional.of(currentGameResult(command.gameRoomId(), gameRoom));
+        }
+
+        Optional<GameAction> existingAction = gameActionReadService.findByGameRoomIdAndUserId(
+                command.gameRoomId(),
+                command.userId()
+        );
+        if (existingAction.isPresent()) {
+            return Optional.empty();
+        }
+
+        List<GameAction> existingActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
+                command.gameRoomId()
+        );
+        return gameLightningJudgementService
+                .judge(gameRoom, command.userId(), command.serverReceiveTimeMs(), existingActions)
+                .map(gameActionCommandService::saveIfAbsent)
+                .flatMap(saveResult -> toResponse(command.gameRoomId(), gameRoom, saveResult));
+    }
+
+    private Optional<GameLightningHandleResponse> toResponse(Long gameRoomId,
+                                                         GameRoom gameRoom,
+                                                         GameActionSaveResult saveResult) {
+        if (saveResult.action().getStarCoreHpAtLightning() > GameRules.LIGHTNING_DAMAGE) {
+            return nonKillResponse(gameRoomId, gameRoom);
+        }
+
+        Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByLightningKill(
+                gameRoomId,
+                saveResult.action().getUserId()
+        );
+        return finishedGameRoom.map(finishedRoom -> {
+            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
+            return GameLightningHandleResponse.broadcast(lightningKillGameResult(gameRoomId, finishedRoom));
+        });
+    }
+
+    private Optional<GameLightningHandleResponse> nonKillResponse(Long gameRoomId, GameRoom gameRoom) {
+        List<GameAction> currentActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
+                gameRoomId
+        );
+        if (!bothUsersUsedLightningWithoutKill(currentActions)) {
+            gameEndDeadlineAdvanceService.advanceAfterFailedLightning(gameRoom, currentActions);
+            return Optional.empty();
+        }
+
+        Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByBothLightningsUsedDraw(
+                gameRoomId
+        );
+        return finishedGameRoom.map(finishedRoom -> {
+            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
+            return GameLightningHandleResponse.broadcast(bothLightningsUsedDrawGameResult(
+                    gameRoomId,
+                    finishedRoom,
+                    currentActions
+            ));
+        });
+    }
+
+    private boolean bothUsersUsedLightningWithoutKill(List<GameAction> actions) {
+        return actions.stream()
+                .map(GameAction::getUserId)
+                .distinct()
+                .count() == GameRoom.MAX_PARTICIPANTS
+                && actions.stream().noneMatch(GameAction::isKill);
+    }
+
+    private GameLightningHandleResponse currentGameResult(Long gameRoomId, GameRoom gameRoom) {
+        return GameLightningHandleResponse.currentSessionOnly(gameResultPayloadFactory.currentResult(
+                gameRoomId,
+                gameRoom.getResult(),
+                gameRoom.getWinnerId(),
+                Instant.now(clock).toEpochMilli(),
+                gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(gameRoomId)
+        ));
+    }
+
+    private GameResultPayload lightningKillGameResult(Long gameRoomId, GameRoom gameRoom) {
+        return gameResultPayloadFactory.lightningKill(
+                gameRoomId,
+                gameRoom.getResult(),
+                gameRoom.getWinnerId(),
+                Instant.now(clock).toEpochMilli(),
+                gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(gameRoomId)
+        );
+    }
+
+    private GameResultPayload bothLightningsUsedDrawGameResult(Long gameRoomId,
+                                                           GameRoom gameRoom,
+                                                           List<GameAction> actions) {
+        return gameResultPayloadFactory.bothLightningsUsedDraw(
+                gameRoomId,
+                gameRoom.getResult(),
+                gameRoom.getWinnerId(),
+                Instant.now(clock).toEpochMilli(),
+                actions
+        );
+    }
+}

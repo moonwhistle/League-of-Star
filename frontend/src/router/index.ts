@@ -1,11 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/constants/routes'
-import GamePlayPage from '@/pages/GamePlayPage.vue'
-import GameResultPage from '@/pages/GameResultPage.vue'
-import GameWaitingPage from '@/pages/GameWaitingPage.vue'
-import LoginPage from '@/pages/LoginPage.vue'
-import MatchPage from '@/pages/MatchPage.vue'
 
 import { authGuard } from './authGuard'
 
@@ -22,7 +17,7 @@ export const router = createRouter({
     {
       path: ROUTE_PATHS.login,
       name: ROUTE_NAMES.login,
-      component: LoginPage,
+      component: () => import('@/pages/LoginPage.vue'),
       meta: {
         guestOnly: true,
       },
@@ -30,14 +25,14 @@ export const router = createRouter({
     {
       path: ROUTE_PATHS.match,
       name: ROUTE_NAMES.match,
-      component: MatchPage,
+      component: () => import('@/pages/MatchPage.vue'),
       // TODO(issue-78): Temporary preview access while the match page UI is being implemented.
       // Restore requiresAuth before merging the completed authenticated match flow.
     },
     {
       path: ROUTE_PATHS.gameWaiting,
       name: ROUTE_NAMES.gameWaiting,
-      component: GameWaitingPage,
+      component: () => import('@/pages/GameWaitingPage.vue'),
       meta: {
         requiresAuth: true,
       },
@@ -45,7 +40,7 @@ export const router = createRouter({
     {
       path: ROUTE_PATHS.gamePlay,
       name: ROUTE_NAMES.gamePlay,
-      component: GamePlayPage,
+      component: () => import('@/pages/GamePlayPage.vue'),
       meta: {
         requiresAuth: true,
       },
@@ -53,7 +48,7 @@ export const router = createRouter({
     {
       path: ROUTE_PATHS.gameResult,
       name: ROUTE_NAMES.gameResult,
-      component: GameResultPage,
+      component: () => import('@/pages/GameResultPage.vue'),
       meta: {
         requiresAuth: true,
       },

@@ -1,11 +1,11 @@
-# League of Smite - Flow Status
+# League of Star - Flow Status
 
 이 문서는 매칭 시작부터 게임 대기 WebSocket 연결까지의 status 흐름을 시나리오별로 한 그림에서 확인하기 위한 문서입니다.
 
 범위:
 
 - 포함: 매칭 큐 진입, match found, accept/reject/timeout, gameRoom 생성, Redis 상태 전환, `GO_TO_GAME_WAITING`, WebSocket handshake, `CLIENT_READY`, game waiting timeout, `GAME_WAITING_TIMEOUT`, RTT 측정 정책, `COUNTDOWN`, `GAME_START` 진입 정책
-- 제외: SMITE, game record/LP 반영
+- 제외: LIGHTNING, game record/LP 반영
 - 게임 대기 WebSocket timeout 기준: gameRoom `createdAt`부터 **30초 안에 두 참가자의 WebSocket 연결과 `CLIENT_READY`가 모두 완료되어야 함**
 
 ## 1. Overall Flow
@@ -50,7 +50,6 @@ flowchart LR
         REDIS_ACCEPTED["MatchSessionStore<br/>session = ACCEPTED<br/>A response = ACCEPTED<br/>B response = ACCEPTED"]
         US_IN_GAME["UserStatusStore<br/>A = IN_GAME<br/>B = IN_GAME"]
         CLEANUP_SUCCESS["MatchTimeoutStore cleanup"]
-        SSE_GO_WAITING["SSE match_response_result<br/>outcome = MATCHED<br/>action = GO_TO_GAME_WAITING<br/>gameRoomId/videoUrl/webSocketUrl"]
     end
 
     subgraph SETUP_FAIL["Game Setup Failed Scenarios"]
@@ -189,7 +188,7 @@ flowchart LR
 | `CLIENT_READY` 수신 | `READY` | Redis `game:waiting:{gameRoomId}` + API local memory `GameRoomWebSocketSessionRegistry` |
 | 30초 안에 양쪽 `READY` 미완료 | `ABORTED` | DB `game_rooms`, `game_participants`; Redis `game_waiting_timeout` Pub/Sub |
 | 양쪽 `READY` 완료 후 RTT 측정 중 | `PENDING` | Redis `game:rtt:{gameRoomId}` |
-| RTT median 2000ms 이하 | `PASSED` | Redis `game:rtt:{gameRoomId}`. GAME_START 전 품질 검사 통과 상태이며 SMITE 판정 보정에는 사용하지 않음 |
+| RTT median 2000ms 이하 | `PASSED` | Redis `game:rtt:{gameRoomId}`. GAME_START 전 품질 검사 통과 상태이며 LIGHTNING 판정 보정에는 사용하지 않음 |
 | GAME_START 진입 | `IN_PROGRESS` | DB `game_rooms`; Redis `game:end:pending`; WebSocket `COUNTDOWN`, `GAME_START` | 양쪽 RTT `PASSED` 이후 `startAt = serverNow + 4000ms` 확정. 최초 `naturalDeathAt = startAt + scenario.durationMs` 등록. 클라이언트는 남은 시간이 3000ms 이하일 때 countdown 렌더링 |
 | RTT 응답 누락/close/error/예외 또는 median 2000ms 초과 | `FAILED` | DB `game_rooms`, `game_participants`; WebSocket `GAME_START_FAILED` |
 
@@ -204,7 +203,7 @@ flowchart LR
 - RTT 실패/초과는 `GAME_START` 이전 실패이므로 gameRoom/participants를 `ABORTED`로 정리하고 record/LP를 반영하지 않습니다.
 - GAME_START 진입 시 서버는 `startAt = serverNow + 4000ms`로 시작 시각을 확정하고, `COUNTDOWN`과 `GAME_START`를 `startAt` 전에 미리 전송합니다.
 - GAME_START 진입 시 서버는 `game:end:pending`에 최초 `naturalDeathAt = startAt + scenario.durationMs`를 등록합니다.
-- `naturalDeathAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각입니다. 한 명만 SMITE를 사용했고 처치하지 못한 경우 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 score를 앞당길 수 있습니다.
+- `naturalDeathAt`은 정산 완료 시각이 아니라 scheduler가 정산 대상으로 조회할 수 있는 시작 시각입니다. 한 명만 LIGHTNING을 사용했고 처치하지 못한 경우 effective HP 기준으로 더 빠른 `naturalDeathAt`을 계산해 score를 앞당길 수 있습니다.
 - `game:end:pending` 등록에 실패하면 gameRoom/participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않으며 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도합니다. 연결된 클라이언트에는 `GAME_START_FAILED`를 전송하고 record/LP는 반영하지 않습니다.
 - `COUNTDOWN`/`GAME_START` 전송에 실패하면 gameRoom/participants를 `ABORTED` 처리하고 `game:end:pending`, match user status, RTT 상태, waiting 상태를 정리합니다.
 - 클라이언트는 남은 시간이 3000ms 이하일 때 `3, 2, 1` countdown을 렌더링하고, `GAME_START`를 받아도 즉시 시작하지 않고 `startAt`까지 대기합니다.

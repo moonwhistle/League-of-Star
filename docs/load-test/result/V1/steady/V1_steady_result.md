@@ -225,10 +225,10 @@ GC 패널에서 특정 인스턴스가 안 보이는 것처럼 보일 수 있다
 정확히 확인하려면 Prometheus에서 인스턴스별로 아래 지표를 따로 보면 된다.
 
 ```promql
-jvm_gc_pause_seconds_count{instance="smite-api-1:8080"}
-jvm_gc_pause_seconds_count{instance="smite-api-2:8080"}
-jvm_gc_pause_seconds_max{instance="smite-api-1:8080"}
-jvm_gc_pause_seconds_max{instance="smite-api-2:8080"}
+jvm_gc_pause_seconds_count{instance="league-of-star-api-1:8080"}
+jvm_gc_pause_seconds_count{instance="league-of-star-api-2:8080"}
+jvm_gc_pause_seconds_max{instance="league-of-star-api-1:8080"}
+jvm_gc_pause_seconds_max{instance="league-of-star-api-2:8080"}
 ```
 
 ### 50 TPS 결론

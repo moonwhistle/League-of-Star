@@ -1,6 +1,6 @@
 import type { GameRoomId, GameStartPayload, GameStartScenario, HpTimelineStep } from '@/types/game'
 
-const GAME_START_PAYLOAD_KEY_PREFIX = 'smite.gameStartPayload:'
+const GAME_START_PAYLOAD_KEY_PREFIX = 'league-of-star.gameStartPayload:'
 
 export interface StoredGameStartPayload {
   gameRoomId: GameRoomId
@@ -109,7 +109,7 @@ function isGameStartScenario(scenario: unknown): scenario is GameStartScenario {
   }
 
   return (
-    Number.isFinite(scenario.dragonMaxHp) &&
+    Number.isFinite(scenario.starCoreMaxHp) &&
     Number.isFinite(scenario.durationMs) &&
     Array.isArray(scenario.hpTimeline) &&
     scenario.hpTimeline.every(isHpTimelineStep)

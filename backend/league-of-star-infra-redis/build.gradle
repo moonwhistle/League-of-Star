@@ -1,0 +1,20 @@
+plugins {
+    id 'java-library'
+}
+
+apply plugin: 'java-test-fixtures'
+
+dependencies {
+	implementation project(':league-of-star-core')
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+	implementation 'org.redisson:redisson-spring-boot-starter:3.24.3'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'com.redis:testcontainers-redis'
+
+	testFixturesImplementation 'org.testcontainers:junit-jupiter'
+	testFixturesImplementation 'com.redis:testcontainers-redis'
+	testFixturesImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

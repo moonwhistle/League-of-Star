@@ -6,7 +6,7 @@ Vue 프론트엔드의 `/match` 페이지에서 SSE `match_found` 이벤트 수�
 
 이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `5. [ ] 매칭 성사 모달 구현`을 구현 기준으로 삼는다. `match_found` payload를 받아 모달을 표시하고, `acceptTimeoutSeconds` 기준 countdown을 보여준다. 단, 수락/거절 API 호출과 `match_response_result.action` 기반 화면 전환은 후속 이슈에서 구현한다.
 
-`frontend/img/matchfound.jpeg`는 디자인 레퍼런스로만 사용하고 실제 화면에 import하지 않는다. 실제 모달은 Vue template과 scoped CSS로 구현하며, 모달 중앙 원형 영역에는 `frontend/img/logo.png`를 사용한다.
+`frontend/img/matchfound.jpeg`는 디자인 레퍼런스로만 사용하고 실제 화면에 import하지 않는다. 실제 모달은 Vue template과 scoped CSS로 구현하며, 모달 중앙 원형 영역에는 `frontend/img/lightning-spell.png`를 사용한다.
 
 ```mermaid
 flowchart TD
@@ -69,7 +69,7 @@ interface MatchFoundNotification {
 | Asset | 용도 | 기준 |
 |-------|------|------|
 | `frontend/img/matchfound.jpeg` | 매칭 성사 모달 디자인 레퍼런스 | 실제 구현 산출물에 import하지 않음 |
-| `frontend/img/logo.png` | 모달 중앙 원형 영역 logo | `MatchPage.vue`에서 import asset으로 사용 |
+| `frontend/img/lightning-spell.png` | 모달 중앙 원형 영역 lightning spell | `MatchPage.vue`에서 import asset으로 사용 |
 
 구현 기준:
 
@@ -133,7 +133,7 @@ interface MatchFoundNotification {
 ### 3. Match found modal UI 구현
 
 - [x] `matchfound.jpeg` 레퍼런스 기준 중앙 modal panel 구현.
-- [x] `logo.png` import 및 원형 logo frame 구현.
+- [x] `lightning-spell.png` import 및 원형 spell frame 구현.
 - [x] cyan countdown ring 스타일 구현.
 - [x] match found title 구현.
 - [x] countdown text 구현.
@@ -177,7 +177,7 @@ interface MatchFoundNotification {
 - [x] issue-76의 SSE event dispatch 정책과 issue-80의 modal 표시 범위 연결 확인 구현.
 - [x] issue-78의 on-demand stream lifecycle과 issue-80의 `match_found` 처리 시점 정합성 확인 구현.
 - [x] backend issue-34의 `match_response_result` 최종 전환 정책과 countdown 0초 처리 정합성 확인 구현.
-- [x] `matchfound.jpeg`는 레퍼런스 전용이고 `logo.png`만 실제 asset으로 사용한다는 문서 기준 확인 구현.
+- [x] `matchfound.jpeg`는 레퍼런스 전용이고 `lightning-spell.png`만 실제 asset으로 사용한다는 문서 기준 확인 구현.
 - [x] accept/reject command와 result routing을 후속 이슈로 제외한다는 정책 확인 구현.
 - [x] 이번 이슈 PR 메시지 섹션 작성.
 
@@ -195,7 +195,7 @@ interface MatchFoundNotification {
 
 - 이번 이슈는 `match_found` 모달 표시 범위만 담당한다.
 - `matchfound.jpeg`는 레퍼런스 전용으로만 사용하고 실제 화면 asset으로 import하지 않는다.
-- 실제 모달 내부 이미지는 `logo.png`만 사용한다.
+- 실제 모달 내부 이미지는 `lightning-spell.png`만 사용한다.
 - 새 패키지를 추가하지 않는다.
 - 상태는 `MatchPage.vue` page local state로 유지한다.
 - `match_found` 수신 시 queue 상태를 `ready`로 바꾸지 않는다.
@@ -219,7 +219,7 @@ interface MatchFoundNotification {
 - SSE `match_found` 수신 시 매칭 성사 모달이 표시됨.
 - `match_found.matchId`가 후속 command에 사용할 수 있는 상태로 보관됨.
 - `match_found` 수신 시 기존 매칭 대기 숫자 timer가 멈춤.
-- 모달 중앙 원형 영역에 `logo.png`가 표시됨.
+- 모달 중앙 원형 영역에 `lightning-spell.png`가 표시됨.
 - `matchfound.jpeg`는 구현 asset으로 import되지 않음.
 - countdown이 `eventCreatedAt + acceptTimeoutSeconds` 기준으로 감소함.
 - `acceptTimeoutSeconds`가 유효하지 않으면 countdown이 0초 loading 상태로 방어 처리됨.
@@ -299,7 +299,7 @@ flowchart TD
 - 장시간 `match_response_result`가 오지 않는 상황의 watchdog, session recovery, 재조회 API는 후속 이슈에서 다룸.
 - 새 패키지는 추가하지 않음.
 - `matchfound.jpeg`는 디자인 레퍼런스로만 사용하고 실제 화면 asset으로 import하지 않음.
-- 실제 모달 중앙 이미지는 `logo.png`를 사용함.
+- 실제 모달 중앙 이미지는 `lightning-spell.png`를 사용함.
 
 ## 📌 Related Issue
 

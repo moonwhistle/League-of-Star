@@ -375,9 +375,9 @@ Content-Length: 0
 
 | 모듈 | 책임 | 금지 |
 | :--- | :--- | :--- |
-| `smite-matching` | session/queue/userStatus 정산, matchId lock, timeout claim, 내부 정산 결과 생성 | `MatchResponseResultNotification` 같은 클라이언트 DTO 의존 |
-| `smite-api` match service | accept/reject HTTP command 위임, 성공 시 `200 OK` empty body 유지 | 성공 응답 body 조립 |
-| `smite-api` notification adapter/factory | matching 내부 정산 결과를 유저별 SSE payload로 변환, 상대 nickname/tier/tierScore 조립, Pub/Sub publish | 세션/큐 정산 직접 수행 |
+| `league-of-star-matching` | session/queue/userStatus 정산, matchId lock, timeout claim, 내부 정산 결과 생성 | `MatchResponseResultNotification` 같은 클라이언트 DTO 의존 |
+| `league-of-star-api` match service | accept/reject HTTP command 위임, 성공 시 `200 OK` empty body 유지 | 성공 응답 body 조립 |
+| `league-of-star-api` notification adapter/factory | matching 내부 정산 결과를 유저별 SSE payload로 변환, 상대 nickname/tier/tierScore 조립, Pub/Sub publish | 세션/큐 정산 직접 수행 |
 | notification pub/sub | `match_response_result` 메시지 fan-out, 로컬 SSE connection이 있는 유저에게만 전송 | 매칭 정책 판단 |
 
 #### 권장 구현 흐름
@@ -413,7 +413,7 @@ timeout scheduler
 #### 이벤트 발행 포트 방향
 
 - timeout scheduler도 matching 모듈 내부에서 실행되므로, api service 반환값만으로는 timeout SSE 발행을 처리할 수 없습니다.
-- matching 모듈에 클라이언트 DTO를 모르는 이벤트 발행 port를 두고, `smite-api` notification adapter가 이를 구현하는 방향을 우선합니다.
+- matching 모듈에 클라이언트 DTO를 모르는 이벤트 발행 port를 두고, `league-of-star-api` notification adapter가 이를 구현하는 방향을 우선합니다.
 - port 구현체는 내부 정산 결과를 받아 상대 정보 조회 후 `match_response_result` Pub/Sub message를 발행합니다.
 
 ### 10. match_response_result 발행 구현
@@ -422,7 +422,7 @@ timeout scheduler
 - [x] matching event publisher port 정의
 - [x] accept/reject 최종 정산 시 event publisher 호출
 - [x] timeout 최종 정산 시 event publisher 호출
-- [x] smite-api notification adapter/factory 구현
+- [x] league-of-star-api notification adapter/factory 구현
 - [x] 상대 nickname/tier/tierScore 조회 후 유저별 SSE payload 조립
 - [x] match_response_result Pub/Sub message 정의
 - [x] match_response_result Pub/Sub codec 구현
@@ -528,7 +528,7 @@ Content-Length: 0
   - Pub/Sub 메시지 수신, decode 실패, dispatch 실패 격리와 수신/실패 메트릭을 검증했습니다.
 - `MatchResponseResultSseSenderTest`
   - 로컬 SSE 연결 hit/miss에 따라 `match_response_result` 전송 여부와 dispatch hit/miss 메트릭을 검증했습니다.
-- 기존 `match_found` Pub/Sub/SSE 테스트는 `:smite-api:test`에 함께 포함되어 회귀 검증했습니다.
+- 기존 `match_found` Pub/Sub/SSE 테스트는 `:league-of-star-api:test`에 함께 포함되어 회귀 검증했습니다.
 
 #### 메트릭 검증 결과
 
@@ -550,7 +550,7 @@ Content-Length: 0
 #### 검증 명령
 
 ```bash
-./gradlew :smite-api:test :smite-matching:test
+./gradlew :league-of-star-api:test :league-of-star-matching:test
 ```
 
 결과: `BUILD SUCCESSFUL`
@@ -679,8 +679,8 @@ flowchart TD
   - 게임 세션 생성과 `gameId` 채우기는 후속 게임 이슈에서 처리합니다.
 
 - matching 모듈과 API notification 모듈의 책임을 분리했습니다.
-  - `smite-matching`: session/queue/userStatus 정산, matchId lock, timeout claim, 내부 결과 이벤트 발행
-  - `smite-api`: 내부 결과 이벤트를 유저별 SSE payload로 변환, 상대 프로필 조회, Redis Pub/Sub publish
+  - `league-of-star-matching`: session/queue/userStatus 정산, matchId lock, timeout claim, 내부 결과 이벤트 발행
+  - `league-of-star-api`: 내부 결과 이벤트를 유저별 SSE payload로 변환, 상대 프로필 조회, Redis Pub/Sub publish
   - notification Pub/Sub: 멀티 인스턴스 fan-out 후 로컬 SSE connection이 있는 유저에게만 전송
 
 - RestDocs와 테스트를 갱신했습니다.
@@ -714,7 +714,7 @@ flowchart TD
 - 검증 명령:
 
 ```bash
-./gradlew :smite-api:test :smite-matching:test
+./gradlew :league-of-star-api:test :league-of-star-matching:test
 ```
 
 결과: `BUILD SUCCESSFUL`

@@ -7,8 +7,8 @@
 
     <section class="login-card" aria-labelledby="login-title">
       <div class="login-heading">
-        <h1 id="login-title">LEAGUE OF SMITE</h1>
-        <p>PROVE YOUR SMITE TIMING</p>
+        <h1 id="login-title">LEAGUE OF STAR</h1>
+        <p>MASTER YOUR LIGHTNING TIMING</p>
       </div>
 
       <form class="login-form" aria-label="Login form" @submit.prevent="handleSubmit">
@@ -97,7 +97,7 @@ import { ApiClientError } from '@/services/apiClient'
 import { login } from '@/services/authService'
 import { setAuthTokens } from '@/services/authToken'
 
-import backgroundImageUrl from '../../img/background.png'
+import backgroundImageUrl from '../../img/background-new-sharp.png'
 
 const router = useRouter()
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
@@ -148,8 +148,8 @@ async function handleSubmit() {
   overflow: hidden;
   background-color: #0d1723;
   background:
-    linear-gradient(90deg, rgb(4 8 22 / 0.82), rgb(4 8 22 / 0.28) 58%),
-    linear-gradient(0deg, rgb(4 8 22 / 0.84), rgb(4 8 22 / 0.16) 50%), var(--login-background-image);
+    linear-gradient(90deg, rgb(4 8 22 / 0.56), rgb(4 8 22 / 0.12) 58%),
+    linear-gradient(0deg, rgb(4 8 22 / 0.48), rgb(4 8 22 / 0.08) 50%), var(--login-background-image);
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;

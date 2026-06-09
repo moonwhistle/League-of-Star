@@ -35,6 +35,10 @@ export function getHpAtElapsedMs(scenario: GameStartScenario, elapsedMs: number)
   return lastStep.hp
 }
 
+export function getScenarioMaxHp(scenario: GameStartScenario): number {
+  return scenario.starCoreMaxHp
+}
+
 function interpolateHp(
   previousStep: HpTimelineStep,
   nextStep: HpTimelineStep,

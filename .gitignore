@@ -39,8 +39,4 @@ security.yml
 .vscode/
 .env
 
-backend/smite-infra-redis/src/main/resources/application-redis.yml
-
-### Game static assets ###
-backend/smite-api/src/main/resources/static/assets/game/*.mp4
-!backend/smite-api/src/main/resources/static/assets/game/.gitkeep
+backend/league-of-star-infra-redis/src/main/resources/application-redis.yml

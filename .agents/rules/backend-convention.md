@@ -58,14 +58,14 @@ Controller → Service → Repository → DB
 ### 2.4 멀티모듈 의존성
 
 ```
-smite-api        → smite-core, smite-infra-redis
-smite-infra-redis → smite-core
-smite-core       → (독립)
+league-of-star-api        → league-of-star-core, league-of-star-infra-redis
+league-of-star-infra-redis → league-of-star-core
+league-of-star-core       → (독립)
 ```
 
-- **smite-core**: Entity, Repository 인터페이스, Service 인터페이스, 게임 로직. 인프라 기술(Spring Web, Redis)에 의존하지 않는다.
-- **smite-api**: Controller, DTO, Service 구현체, Config.
-- **smite-infra-redis**: Redis 구현체 (매칭 큐, 세션 관리).
+- **league-of-star-core**: Entity, Repository 인터페이스, Service 인터페이스, 게임 로직. 인프라 기술(Spring Web, Redis)에 의존하지 않는다.
+- **league-of-star-api**: Controller, DTO, Service 구현체, Config.
+- **league-of-star-infra-redis**: Redis 구현체 (매칭 큐, 세션 관리).
 ---
 
 ## 3. Service 분리 (CQRS-lite)

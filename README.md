@@ -1,3 +1,3 @@
-# League of Smite
+# League of Star
 
-prove your smite timming
+prove your lightning timing

@@ -53,7 +53,7 @@ export type GameWebSocketClientMessage =
       }
     }
   | {
-      type: 'SMITE'
+      type: 'LIGHTNING'
       payload: null
     }
 
@@ -133,7 +133,7 @@ export interface GameStartPayload {
 }
 
 export interface GameStartScenario {
-  dragonMaxHp: number
+  starCoreMaxHp: number
   durationMs: number
   hpTimeline: HpTimelineStep[]
 }
@@ -155,8 +155,8 @@ export interface GameResultPayload {
 export interface GameActionSummary {
   userId: number
   serverReceiveTime: number
-  smiteTimeMs: number
-  dragonHpAtSmite: number
+  lightningTimeMs: number
+  starCoreHpAtLightning: number
   damage: number
   afterHp: number
   isKill: boolean

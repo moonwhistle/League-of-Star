@@ -115,8 +115,8 @@ gameRoom READY 생성
 
 | 영역 | 책임 |
 |------|------|
-| `smite-core` | gameRoom `READY -> ABORTED` 상태 전이, participants `ABORTED` 처리 |
-| `smite-api` WebSocket | handshake/session 관리, `CLIENT_READY` 수신, 연결된 session에 timeout 이벤트 전송 |
+| `league-of-star-core` | gameRoom `READY -> ABORTED` 상태 전이, participants `ABORTED` 처리 |
+| `league-of-star-api` WebSocket | handshake/session 관리, `CLIENT_READY` 수신, 연결된 session에 timeout 이벤트 전송 |
 | Redis waiting store | gameRoom별 ready 상태와 timeout deadline 저장 |
 | timeout scheduler/service | due gameRoom 조회, Redis ready 상태 확인, DB READY 최종 확인, abort orchestration |
 | Redis match status store | timeout 후 `match:status:{userId}` 제거 |
@@ -191,15 +191,15 @@ LOCK game:waiting:timeout:lock:{gameRoomId}
 
 | 모듈/패키지 | 배치 대상 | 이유 |
 |------|------|------|
-| `smite-core` `domain.game` | gameRoom `READY -> ABORTED` 도메인 전이, participant 상태 변경 | core는 JPA/domain만 알고 Redis/WebSocket을 몰라야 함 |
-| `smite-api` `game.websocket` | WebSocket handler, DTO, session registry | 기존 Issue 40 구조와 동일하게 API transport 계층 책임 |
-| `smite-api` `game.waiting` | waiting timeout service/scheduler, Redis waiting store, timeout Pub/Sub sender/subscriber | gameRoom waiting은 matching 큐가 아니라 game 대기방 orchestration 책임 |
-| `smite-matching` `command` | 필요 시 match status 제거용 command facade | `match:status:{userId}`의 소유권은 matching 모듈에 있으므로 직접 store 접근보다 command 경유가 적절 |
-| `smite-infra-redis` | 공통 Redisson config/lock만 유지 | 특정 game waiting key 구현을 공통 infra에 섞지 않음 |
+| `league-of-star-core` `domain.game` | gameRoom `READY -> ABORTED` 도메인 전이, participant 상태 변경 | core는 JPA/domain만 알고 Redis/WebSocket을 몰라야 함 |
+| `league-of-star-api` `game.websocket` | WebSocket handler, DTO, session registry | 기존 Issue 40 구조와 동일하게 API transport 계층 책임 |
+| `league-of-star-api` `game.waiting` | waiting timeout service/scheduler, Redis waiting store, timeout Pub/Sub sender/subscriber | gameRoom waiting은 matching 큐가 아니라 game 대기방 orchestration 책임 |
+| `league-of-star-matching` `command` | 필요 시 match status 제거용 command facade | `match:status:{userId}`의 소유권은 matching 모듈에 있으므로 직접 store 접근보다 command 경유가 적절 |
+| `league-of-star-infra-redis` | 공통 Redisson config/lock만 유지 | 특정 game waiting key 구현을 공통 infra에 섞지 않음 |
 
 컨벤션 확인:
 
-- `smite-core`에는 Spring WebSocket/Redis 의존을 추가하지 않는다.
+- `league-of-star-core`에는 Spring WebSocket/Redis 의존을 추가하지 않는다.
 - API WebSocket handler는 DB repository를 직접 호출하지 않고 service를 통해 처리한다.
 - Redis waiting 구현체는 구체 기술이 드러나는 `RedisGameWaitingStore` 같은 이름을 사용한다.
 - 저장소 port는 `GameWaitingStore`처럼 `I` 접두사 없이 둔다.
@@ -268,11 +268,11 @@ cleanup 정책:
 
 | 파일 | 역할 |
 |------|------|
-| `smite-api/game/waiting/common/constant/GameWaitingConstants` | waiting timeout 정책값, Redis key/field 상수 |
-| `smite-api/game/waiting/domain/GameWaitingTimeoutRegistration` | timeout 등록 요청 모델 |
-| `smite-api/game/waiting/repository/GameWaitingStore` | waiting 상태 저장 port |
-| `smite-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | Redis HASH/ZSET 등록 구현 |
-| `smite-api/game/service/GameRoomSetupService` | gameRoom 생성 직후 waiting timeout 등록 및 실패 시 abort 보상 |
+| `league-of-star-api/game/waiting/common/constant/GameWaitingConstants` | waiting timeout 정책값, Redis key/field 상수 |
+| `league-of-star-api/game/waiting/domain/GameWaitingTimeoutRegistration` | timeout 등록 요청 모델 |
+| `league-of-star-api/game/waiting/repository/GameWaitingStore` | waiting 상태 저장 port |
+| `league-of-star-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | Redis HASH/ZSET 등록 구현 |
+| `league-of-star-api/game/service/GameRoomSetupService` | gameRoom 생성 직후 waiting timeout 등록 및 실패 시 abort 보상 |
 
 ### 4. WebSocket handshake/READY와 Redis waiting 상태 연동
 
@@ -324,11 +324,11 @@ CLIENT_READY 수신
 
 | 파일 | 역할 |
 |------|------|
-| `smite-api/game/waiting/domain/GameWaitingReadyResult` | Redis ready 반영 결과 |
-| `smite-api/game/waiting/service/GameWaitingReadyService` | `CLIENT_READY` Redis 반영 및 gameRoom 단위 lock 적용 |
-| `smite-api/game/waiting/repository/GameWaitingStore` | `markReady`, `cleanup` port 추가 |
-| `smite-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | ready field 갱신, both ready 시 HASH/ZSET cleanup |
-| `smite-api/game/websocket/handler/GameWaitingWebSocketHandler` | `CLIENT_READY` 수신 시 Redis waiting 상태 연동 |
+| `league-of-star-api/game/waiting/domain/GameWaitingReadyResult` | Redis ready 반영 결과 |
+| `league-of-star-api/game/waiting/service/GameWaitingReadyService` | `CLIENT_READY` Redis 반영 및 gameRoom 단위 lock 적용 |
+| `league-of-star-api/game/waiting/repository/GameWaitingStore` | `markReady`, `cleanup` port 추가 |
+| `league-of-star-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | ready field 갱신, both ready 시 HASH/ZSET cleanup |
+| `league-of-star-api/game/websocket/handler/GameWaitingWebSocketHandler` | `CLIENT_READY` 수신 시 Redis waiting 상태 연동 |
 
 ### 5. timeout scheduler 구현
 
@@ -387,13 +387,13 @@ DB 최종 확인 이유:
 
 | 파일 | 역할 |
 |------|------|
-| `smite-api/game/waiting/scheduler/GameWaitingTimeoutScheduler` | 1초 주기 timeout batch trigger |
-| `smite-api/game/waiting/service/GameWaitingTimeoutService` | due gameRoomId 조회 및 batch 순회, lock 실패/예외 격리 |
-| `smite-api/game/waiting/service/GameWaitingTimeoutProcessor` | 단일 gameRoom timeout 정산, gameRoom 단위 lock 적용 |
-| `smite-api/game/waiting/domain/GameWaitingState` | Redis waiting HASH 상태 모델 |
-| `smite-api/game/waiting/repository/GameWaitingStore` | due 조회, waiting state 조회 port 추가 |
-| `smite-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | ZSET due 조회, HASH state 조회 구현 |
-| `smite-core/domain/game/service/GameRoomReadService` | gameRoom status 조회 메서드 추가 |
+| `league-of-star-api/game/waiting/scheduler/GameWaitingTimeoutScheduler` | 1초 주기 timeout batch trigger |
+| `league-of-star-api/game/waiting/service/GameWaitingTimeoutService` | due gameRoomId 조회 및 batch 순회, lock 실패/예외 격리 |
+| `league-of-star-api/game/waiting/service/GameWaitingTimeoutProcessor` | 단일 gameRoom timeout 정산, gameRoom 단위 lock 적용 |
+| `league-of-star-api/game/waiting/domain/GameWaitingState` | Redis waiting HASH 상태 모델 |
+| `league-of-star-api/game/waiting/repository/GameWaitingStore` | due 조회, waiting state 조회 port 추가 |
+| `league-of-star-api/game/waiting/infrastructure/redis/RedisGameWaitingStore` | ZSET due 조회, HASH state 조회 구현 |
+| `league-of-star-core/domain/game/service/GameRoomReadService` | gameRoom status 조회 메서드 추가 |
 
 ### 6. gameRoom abort 처리 유스케이스 구현
 
@@ -437,9 +437,9 @@ DB 최종 확인 이유:
 
 | 파일 | 역할 |
 |------|------|
-| `smite-core/domain/game/domain/GameRoom` | `abortBeforeStartIfReady()` safe transition 추가 |
-| `smite-core/domain/game/service/GameRoomCommandService` | `abortReadyRoomIfReady()` timeout-safe abort 유스케이스 추가 |
-| `smite-api/game/waiting/service/GameWaitingTimeoutProcessor` | timeout 정산에서 safe abort 유스케이스 사용 |
+| `league-of-star-core/domain/game/domain/GameRoom` | `abortBeforeStartIfReady()` safe transition 추가 |
+| `league-of-star-core/domain/game/service/GameRoomCommandService` | `abortReadyRoomIfReady()` timeout-safe abort 유스케이스 추가 |
+| `league-of-star-api/game/waiting/service/GameWaitingTimeoutProcessor` | timeout 정산에서 safe abort 유스케이스 사용 |
 
 ### 7. Redis match status 정리
 
@@ -458,8 +458,8 @@ DB 최종 확인 이유:
 
 구현 결과:
 
-- `match:status:{userId}` 소유권은 matching 모듈에 있으므로 `smite-api`가 Redis store를 직접 호출하지 않는다.
-- `smite-matching`에 `MatchUserStatusCommandService.removeGameWaitingTimeoutStatuses(userAId, userBId)`를 추가했다.
+- `match:status:{userId}` 소유권은 matching 모듈에 있으므로 `league-of-star-api`가 Redis store를 직접 호출하지 않는다.
+- `league-of-star-matching`에 `MatchUserStatusCommandService.removeGameWaitingTimeoutStatuses(userAId, userBId)`를 추가했다.
 - timeout processor는 Redis waiting HASH의 `userAId`, `userBId`를 사용해 두 유저의 match status를 제거한다.
 - match status 제거는 현재 값이 `IN_GAME`인 경우에만 수행한다. 재시도 중 유저가 이미 새 매칭을 시작해 `MATCHING` 상태가 된 경우에는 제거하지 않는다.
 - DB gameRoom이 `READY`이면 `abortReadyRoomIfReady(gameRoomId)` 성공 후 match status 제거와 timeout 이벤트 publish를 완료하고 Redis waiting 상태를 cleanup한다.
@@ -472,8 +472,8 @@ DB 최종 확인 이유:
 
 | 파일 | 역할 |
 |------|------|
-| `smite-matching/matching/command/MatchUserStatusCommandService` | matching 모듈 command facade로 두 유저의 match status 제거 |
-| `smite-api/game/waiting/service/GameWaitingTimeoutProcessor` | timeout abort 이후 match status 제거와 waiting cleanup 순서 조정 |
+| `league-of-star-matching/matching/command/MatchUserStatusCommandService` | matching 모듈 command facade로 두 유저의 match status 제거 |
+| `league-of-star-api/game/waiting/service/GameWaitingTimeoutProcessor` | timeout abort 이후 match status 제거와 waiting cleanup 순서 조정 |
 
 ### 8. timeout 이벤트 Pub/Sub 및 WebSocket 전송
 
@@ -529,14 +529,14 @@ server message 예시:
 
 | 파일 | 역할 |
 |------|------|
-| `smite-api/game/waiting/pubsub/GameWaitingTimeoutPubSubPublisher` | timeout 확정 이벤트 Redis Pub/Sub publish |
-| `smite-api/game/waiting/pubsub/GameWaitingTimeoutPubSubSubscriber` | Pub/Sub 메시지 수신 후 WebSocket sender 위임 |
-| `smite-api/game/waiting/pubsub/GameWaitingTimeoutPubSubConfig` | `game_waiting_timeout` channel listener 등록 |
-| `smite-api/game/waiting/pubsub/dto/GameWaitingTimeoutPubSubMessage` | timeout Pub/Sub payload |
-| `smite-api/game/waiting/pubsub/util/GameWaitingTimeoutPubSubMessageCodec` | Pub/Sub payload JSON encode/decode |
-| `smite-api/game/websocket/service/GameWaitingTimeoutWebSocketSender` | local session에 timeout 메시지 전송 후 close/registry cleanup |
-| `smite-api/game/websocket/dto/GameWebSocketMessageType` | `GAME_WAITING_TIMEOUT` server message type 추가 |
-| `smite-api/game/websocket/dto/GameWebSocketServerMessage` | `GAME_WAITING_TIMEOUT` payload factory 추가 |
+| `league-of-star-api/game/waiting/pubsub/GameWaitingTimeoutPubSubPublisher` | timeout 확정 이벤트 Redis Pub/Sub publish |
+| `league-of-star-api/game/waiting/pubsub/GameWaitingTimeoutPubSubSubscriber` | Pub/Sub 메시지 수신 후 WebSocket sender 위임 |
+| `league-of-star-api/game/waiting/pubsub/GameWaitingTimeoutPubSubConfig` | `game_waiting_timeout` channel listener 등록 |
+| `league-of-star-api/game/waiting/pubsub/dto/GameWaitingTimeoutPubSubMessage` | timeout Pub/Sub payload |
+| `league-of-star-api/game/waiting/pubsub/util/GameWaitingTimeoutPubSubMessageCodec` | Pub/Sub payload JSON encode/decode |
+| `league-of-star-api/game/websocket/service/GameWaitingTimeoutWebSocketSender` | local session에 timeout 메시지 전송 후 close/registry cleanup |
+| `league-of-star-api/game/websocket/dto/GameWebSocketMessageType` | `GAME_WAITING_TIMEOUT` server message type 추가 |
+| `league-of-star-api/game/websocket/dto/GameWebSocketServerMessage` | `GAME_WAITING_TIMEOUT` payload factory 추가 |
 
 ### 9. 멀티 인스턴스 정합성
 

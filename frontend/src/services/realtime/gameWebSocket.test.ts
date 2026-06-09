@@ -105,18 +105,45 @@ describe('connectGameWebSocket', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(SyntaxError))
   })
 
+  it('can replace handlers on an existing connection for route handoff', () => {
+    const waitingOnMessage = vi.fn()
+    const playOnMessage = vi.fn()
+    const connection = connectGameWebSocket('/ws/game/100', {
+      onMessage: waitingOnMessage,
+    })
+    const socket = MockWebSocket.instances[0]
+
+    socket?.emitMessage('{"type":"PLAYER_READY","payload":{"userId":2,"bothReady":true}}')
+    connection.setHandlers({
+      onMessage: playOnMessage,
+    })
+    socket?.emitMessage('{"type":"GAME_RESULT","payload":{"gameRoomId":100}}')
+
+    expect(waitingOnMessage).toHaveBeenCalledTimes(1)
+    expect(playOnMessage).toHaveBeenCalledTimes(1)
+    expect(playOnMessage).toHaveBeenCalledWith(
+      {
+        type: 'GAME_RESULT',
+        payload: {
+          gameRoomId: 100,
+        },
+      },
+      expect.any(MessageEvent),
+    )
+  })
+
   it('sends game websocket client messages using the backend envelope', () => {
     const connection = connectGameWebSocket('/ws/game/100')
     const socket = MockWebSocket.instances[0]
 
     connection.sendClientReady()
     connection.sendRttPong(7)
-    connection.sendSmite()
+    connection.sendLightning()
 
     expect(socket?.sentMessages).toEqual([
       '{"type":"CLIENT_READY","payload":{}}',
       '{"type":"RTT_PONG","payload":{"seq":7}}',
-      '{"type":"SMITE","payload":null}',
+      '{"type":"LIGHTNING","payload":null}',
     ])
   })
 

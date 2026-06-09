@@ -62,15 +62,15 @@ flowchart TD
 
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
-| 배치 진행 여부 조회 | `smite-core` `domain/rank` | active `RankSeries` 중 `PLACEMENT` 여부 조회 |
-| queue join/leave orchestration | `smite-api` `match/service` | active gameRoom 검증, rank/placement 조회, 매칭용 tierScore 결정 |
-| 상대 프로필 표시 | `smite-api` `notification/match` | 배치 진행 중 유저를 `Unranked`로 표시 |
-| 매칭 큐 저장 | `smite-matching` `command`, `infrastructure/redis` | 전달받은 tierScore로 기존 Redis queue 저장/제거 |
-| 매칭 후보 판정 | `smite-matching` `domain/service` | 기존 대기 시간별 tierScore diff 정책 유지 |
-| MatchTicket value object | `smite-core` `domain/match/domain` | 기존 userId, tierScore, entryTime 구조 유지 |
+| 배치 진행 여부 조회 | `league-of-star-core` `domain/rank` | active `RankSeries` 중 `PLACEMENT` 여부 조회 |
+| queue join/leave orchestration | `league-of-star-api` `match/service` | active gameRoom 검증, rank/placement 조회, 매칭용 tierScore 결정 |
+| 상대 프로필 표시 | `league-of-star-api` `notification/match` | 배치 진행 중 유저를 `Unranked`로 표시 |
+| 매칭 큐 저장 | `league-of-star-matching` `command`, `infrastructure/redis` | 전달받은 tierScore로 기존 Redis queue 저장/제거 |
+| 매칭 후보 판정 | `league-of-star-matching` `domain/service` | 기존 대기 시간별 tierScore diff 정책 유지 |
+| MatchTicket value object | `league-of-star-core` `domain/match/domain` | 기존 userId, tierScore, entryTime 구조 유지 |
 
-- DB 조회 책임은 `smite-core`와 이를 조율하는 `smite-api`에 둠.
-- `smite-matching`은 배치 여부를 직접 조회하지 않고, 전달받은 tierScore만 처리함.
+- DB 조회 책임은 `league-of-star-core`와 이를 조율하는 `league-of-star-api`에 둠.
+- `league-of-star-matching`은 배치 여부를 직접 조회하지 않고, 전달받은 tierScore만 처리함.
 - Redis key 구조는 기존 `matching:queue:{tierScore}`를 유지함.
 - `MatchTicket` schema와 `MatchSession` schema는 변경하지 않음.
 - accept/reject/timeout, gameRoom 생성, record/rank 정산 흐름은 변경하지 않음.
@@ -354,10 +354,10 @@ match 응답 상대 프로필에서는 배치 완료 전 티어 미표시 정책
 
 검증:
 
-- `./gradlew :smite-core:test --tests com.sang.smite.domain.rank.repository.RankSeriesRepositoryTest --rerun-tasks`
-- `./gradlew :smite-api:test --tests com.sang.smite.match.service.MatchQueueServiceTest --tests com.sang.smite.notification.match.factory.MatchResponseResultNotificationFactoryTest`
-- `./gradlew :smite-matching:test --tests com.sang.smite.matching.domain.service.MatchPairingServiceTest --tests com.sang.smite.matching.infrastructure.redis.RedisMatchQueueStoreTest --tests com.sang.smite.matching.command.MatchServiceTest --tests com.sang.smite.matching.domain.service.MatchResponseResultServiceTest`
-- `./gradlew :smite-core:test :smite-api:test :smite-matching:test`
+- `./gradlew :league-of-star-core:test --tests com.sang.leagueofstar.domain.rank.repository.RankSeriesRepositoryTest --rerun-tasks`
+- `./gradlew :league-of-star-api:test --tests com.sang.leagueofstar.match.service.MatchQueueServiceTest --tests com.sang.leagueofstar.notification.match.factory.MatchResponseResultNotificationFactoryTest`
+- `./gradlew :league-of-star-matching:test --tests com.sang.leagueofstar.matching.domain.service.MatchPairingServiceTest --tests com.sang.leagueofstar.matching.infrastructure.redis.RedisMatchQueueStoreTest --tests com.sang.leagueofstar.matching.command.MatchServiceTest --tests com.sang.leagueofstar.matching.domain.service.MatchResponseResultServiceTest`
+- `./gradlew :league-of-star-core:test :league-of-star-api:test :league-of-star-matching:test`
 - `git diff --check`
 
 ## 📌 Related Issue

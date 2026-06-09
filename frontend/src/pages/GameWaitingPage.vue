@@ -14,7 +14,7 @@
     :data-game-countdown-start-at="gameCountdownStartAt"
   >
     <header class="game-waiting-header" aria-label="Game waiting header">
-      <h1>LEAGUE OF SMITE</h1>
+      <h1>LEAGUE OF STAR</h1>
       <button class="locale-toggle" type="button" @click="toggleLocale">
         {{ nextLocaleLabel }}
       </button>
@@ -107,7 +107,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
@@ -115,8 +115,12 @@ import { saveGameStartPayloadFromMessage } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { calculateGameWaitingProgress } from '@/services/gameWaitingProgress'
 import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
+import {
+  handoffGameWebSocket,
+  takeGameWebSocketHandoff,
+} from '@/services/realtime/gameWebSocketHandoff'
 
-import backgroundImageUrl from '../../img/background.png'
+import backgroundImageUrl from '../../img/background-new-sharp.png'
 
 const GAME_WAITING_CLIENT_WATCHDOG_MS = 30000
 const route = useRoute()
@@ -132,8 +136,7 @@ const gameSocketPlayerLeftUserId = ref('')
 const gameCountdownStartAt = ref(0)
 const gameCountdownDisplaySeconds = ref(0)
 const gameCountdownRemainingSeconds = ref(0)
-const videoPreloadElement = shallowRef()
-let cleanupVideoPreloadListeners = () => {}
+const gameWebSocketConnection = shallowRef()
 let gameWaitingWatchdogId = 0
 let gameCountdownTimerId = 0
 let closeGameWebSocket = () => {}
@@ -177,10 +180,6 @@ const gameSocketStatusLabel = computed(() => {
 
   if (gameSocketStatus.value === 'connected') {
     return t('gameWaiting.socketConnected')
-  }
-
-  if (gameSocketStatus.value === 'preloading') {
-    return t('gameWaiting.videoPreloading')
   }
 
   if (gameSocketStatus.value === 'readySent') {
@@ -230,10 +229,6 @@ const gameSocketDetailLabel = computed(() => {
     return t('gameWaiting.socketConnectedDetail')
   }
 
-  if (gameSocketStatus.value === 'preloading') {
-    return t('gameWaiting.videoPreloadingDetail')
-  }
-
   if (gameSocketStatus.value === 'readySent') {
     return t('gameWaiting.readySentDetail')
   }
@@ -263,6 +258,7 @@ const gameSocketDetailLabel = computed(() => {
 
 onMounted(() => {
   isActive = true
+  window.addEventListener('beforeunload', handleBeforeUnload)
   const gameRoomId = readRouteGameRoomId()
 
   if (gameRoomId === '') {
@@ -283,8 +279,43 @@ onMounted(() => {
 
 onUnmounted(() => {
   isActive = false
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   closeWaitingWebSocket()
 })
+
+onBeforeRouteLeave((to) => {
+  if (isAllowedGameStartRouteLeave(to)) {
+    return true
+  }
+
+  if (!shouldWarnBeforeLeaving()) {
+    return true
+  }
+
+  return window.confirm(t('gameWaiting.leaveWarning'))
+})
+
+function handleBeforeUnload() {
+  if (!shouldWarnBeforeLeaving()) {
+    return
+  }
+
+  const event = arguments[0]
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+function shouldWarnBeforeLeaving() {
+  return (
+    gameWaitingPayload.value !== undefined &&
+    !hasFinalGameSocketFailure &&
+    !hasCompletedGameStartTransition
+  )
+}
+
+function isAllowedGameStartRouteLeave(to = {}) {
+  return hasCompletedGameStartTransition && Reflect.get(Object(to), 'name') === ROUTE_NAMES.gamePlay
+}
 
 function returnToMatch() {
   void router.replace({ name: ROUTE_NAMES.match }).catch((error) => {
@@ -325,7 +356,7 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
           return
         }
 
-        startGameVideoPreload(payload.game.videoUrl)
+        sendClientReadyOnce()
       },
       onMessage: (message) => {
         if (!canHandleGameSocketCallback()) {
@@ -352,6 +383,7 @@ function connectWaitingWebSocket(payload = gameWaitingPayload.value) {
       },
     })
 
+    gameWebSocketConnection.value = connection
     closeGameWebSocket = connection.close
     sendGameSocketClientReady = connection.sendClientReady
     sendGameSocketRttPong = (seq = 0) => connection.sendRttPong(seq)
@@ -380,45 +412,6 @@ function clearGameWaitingWatchdog() {
 
   window.clearTimeout(gameWaitingWatchdogId)
   gameWaitingWatchdogId = 0
-}
-
-function startGameVideoPreload(videoUrl = '') {
-  cleanupGameVideoPreload()
-  gameSocketStatus.value = 'preloading'
-
-  const video = document.createElement('video')
-  videoPreloadElement.value = video
-  video.preload = 'auto'
-  video.muted = true
-  video.playsInline = true
-
-  const completePreload = () => {
-    if (videoPreloadElement.value !== video || !canHandleGameSocketCallback()) {
-      return
-    }
-
-    cleanupGameVideoPreload()
-    sendClientReadyOnce()
-  }
-  const failPreload = () => {
-    if (videoPreloadElement.value !== video || !canHandleGameSocketCallback()) {
-      return
-    }
-
-    failGameSocketAndReturnToMatch(t('gameWaiting.videoPreloadFailed'))
-  }
-
-  video.addEventListener('loadeddata', completePreload)
-  video.addEventListener('canplaythrough', completePreload)
-  video.addEventListener('error', failPreload)
-  cleanupVideoPreloadListeners = () => {
-    video.removeEventListener('loadeddata', completePreload)
-    video.removeEventListener('canplaythrough', completePreload)
-    video.removeEventListener('error', failPreload)
-  }
-
-  video.src = videoUrl
-  video.load()
 }
 
 function sendClientReadyOnce() {
@@ -555,7 +548,7 @@ function handleGameStartMessage(payload = {}) {
   gameSocketStatus.value = 'starting'
   gameSocketErrorMessage.value = ''
   hasCompletedGameStartTransition = true
-  closeWaitingWebSocket()
+  handoffWaitingWebSocket(routeGameRoomId)
 
   void router
     .push({
@@ -571,6 +564,7 @@ function handleGameStartMessage(payload = {}) {
 
       const routeErrorMessage =
         error instanceof Error && error.message.trim() !== '' ? ` ${error.message}` : ''
+      takeGameWebSocketHandoff(routeGameRoomId)?.close()
       hasCompletedGameStartTransition = false
       failGameSocket(`${t('gameWaiting.gameStartTransitionFailed')}${routeErrorMessage}`.trim())
     })
@@ -613,7 +607,6 @@ function failGameSocket(message = t('gameWaiting.websocketFailed')) {
   hasFinalGameSocketFailure = true
   clearGameWaitingWatchdog()
   resetGameCountdown()
-  cleanupGameVideoPreload()
   gameSocketStatus.value = 'failed'
   gameSocketErrorMessage.value = message
 }
@@ -631,8 +624,25 @@ function canHandleGameSocketCallback() {
 function closeWaitingWebSocket() {
   clearGameWaitingWatchdog()
   resetGameCountdown()
-  cleanupGameVideoPreload()
   closeGameWebSocket()
+  gameWebSocketConnection.value = undefined
+  closeGameWebSocket = () => {}
+  sendGameSocketClientReady = () => {}
+  sendGameSocketRttPong = (seq = 0) => {
+    void seq
+  }
+}
+
+function handoffWaitingWebSocket(gameRoomId = '') {
+  clearGameWaitingWatchdog()
+  resetGameCountdown()
+
+  if (gameWebSocketConnection.value !== undefined) {
+    gameWebSocketConnection.value.setHandlers()
+    handoffGameWebSocket(gameRoomId, gameWebSocketConnection.value)
+  }
+
+  gameWebSocketConnection.value = undefined
   closeGameWebSocket = () => {}
   sendGameSocketClientReady = () => {}
   sendGameSocketRttPong = (seq = 0) => {
@@ -652,12 +662,6 @@ function normalizeGameRoomId(gameRoomId = '') {
   return String(gameRoomId).trim()
 }
 
-function cleanupGameVideoPreload() {
-  cleanupVideoPreloadListeners()
-  cleanupVideoPreloadListeners = () => {}
-  videoPreloadElement.value = undefined
-}
-
 function getLoadingStepLabel(key = '') {
   if (key === 'matchId') {
     return t('gameWaiting.matchData')
@@ -669,10 +673,6 @@ function getLoadingStepLabel(key = '') {
 
   if (key === 'gameRoomId') {
     return t('gameWaiting.gameSetup')
-  }
-
-  if (key === 'videoUrl') {
-    return t('gameWaiting.video')
   }
 
   return t('gameWaiting.socket')
@@ -699,8 +699,8 @@ function getLoadingStepLabel(key = '') {
   font-family: var(--font-sans);
   color: var(--waiting-text);
   background:
-    linear-gradient(180deg, rgba(5, 10, 24, 0.78), rgba(5, 10, 24, 0.92)),
-    linear-gradient(90deg, rgba(4, 9, 23, 0.88), rgba(4, 9, 23, 0.3) 50%, rgba(4, 9, 23, 0.88)),
+    linear-gradient(180deg, rgba(5, 10, 24, 0.42), rgba(5, 10, 24, 0.6)),
+    linear-gradient(90deg, rgba(4, 9, 23, 0.52), rgba(4, 9, 23, 0.12) 50%, rgba(4, 9, 23, 0.5)),
     var(--game-waiting-background-image) center / cover no-repeat;
 }
 
@@ -969,7 +969,6 @@ function getLoadingStepLabel(key = '') {
 .socket-status-indicator.is-rttMeasuring,
 .socket-status-indicator.is-countdown,
 .socket-status-indicator.is-starting,
-.socket-status-indicator.is-preloading,
 .socket-status-indicator.is-connecting {
   background: var(--waiting-violet);
   box-shadow: 0 0 12px rgba(215, 185, 255, 0.44);

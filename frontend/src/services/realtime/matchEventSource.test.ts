@@ -148,7 +148,6 @@ describe('connectMatchEventSource', () => {
       },
       game: {
         gameRoomId: 10,
-        videoUrl: 'https://example.com/game.mp4',
         webSocketUrl: 'ws://localhost:8080/game',
       },
     }

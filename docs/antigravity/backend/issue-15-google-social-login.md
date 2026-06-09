@@ -37,7 +37,7 @@ sequenceDiagram
 ## 📚 Tasks
 
 ### 1. 설정 및 인프라 (Setup)
-- [x] **의존성 추가**: `smite-api/build.gradle`에 `spring-boot-starter-oauth2-client` 추가
+- [x] **의존성 추가**: `league-of-star-api/build.gradle`에 `spring-boot-starter-oauth2-client` 추가
 - [x] **환경 설정**: `application-security.yml`로 OAuth2 설정 통합 및 `application.yml` 프로파일 정리
 - [x] **보안**: `.gitignore`에 `application-security.yml` 등록하여 기밀 정보 유출 방지
 
@@ -91,4 +91,4 @@ sequenceDiagram
     - **API 문서화 자동화**: `openapi3.yaml` 생성 및 Swagger UI(WebJar) 연동 완료. (`/docs/index.html`에서 확인 가능)
     - **테스트 고도화**: 4단계 테스트 전략 도입으로 도메인부터 API까지 빈틈없는 검증 체계 구축.
     - **코드 품질**: CQRS-lite, Record 도입, Magic String 제거를 통해 유지보수성 극대화.
-- **검증**: `./gradlew :smite-api:copyOasToSwagger`를 통해 테스트 통과 및 문서 생성 자동화 확인 완료.
+- **검증**: `./gradlew :league-of-star-api:copyOasToSwagger`를 통해 테스트 통과 및 문서 생성 자동화 확인 완료.

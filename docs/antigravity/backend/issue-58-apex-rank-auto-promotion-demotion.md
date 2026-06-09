@@ -62,14 +62,14 @@ flowchart TD
 
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
-| record/rank 정산 orchestration | `smite-core` `domain/record/service` | FINISHED gameRoom 기준 record/rank 정산 호출, record 생성 |
-| rank 정책 반영 | `smite-core` `domain/rank/service` | 일반 RANK / RankSeries / Apex LP 정책 반영 |
-| rank 상태 Entity | `smite-core` `domain/rank/domain` | `UserRankInfo` rank/lp/누적 전적 상태 변경 |
-| rank value object | `smite-core` `domain/rank/domain/vo` | `Rank`, `Tier`, `Division`, LP 계산 공식 |
-| record snapshot | `smite-core` `domain/record/domain` | `rankBefore/rankAfter`, `lpBefore/lpAfter`, `lpChange` 저장 |
+| record/rank 정산 orchestration | `league-of-star-core` `domain/record/service` | FINISHED gameRoom 기준 record/rank 정산 호출, record 생성 |
+| rank 정책 반영 | `league-of-star-core` `domain/rank/service` | 일반 RANK / RankSeries / Apex LP 정책 반영 |
+| rank 상태 Entity | `league-of-star-core` `domain/rank/domain` | `UserRankInfo` rank/lp/누적 전적 상태 변경 |
+| rank value object | `league-of-star-core` `domain/rank/domain/vo` | `Rank`, `Tier`, `Division`, LP 계산 공식 |
+| record snapshot | `league-of-star-core` `domain/record/domain` | `rankBefore/rankAfter`, `lpBefore/lpAfter`, `lpChange` 저장 |
 
-- Apex 자동 승급/강등 정책은 `smite-core` 내부 랭크 정책으로 처리함.
-- `smite-api`, `smite-matching`, `smite-infra-redis`는 이번 이슈에서 변경 대상이 아님.
+- Apex 자동 승급/강등 정책은 `league-of-star-core` 내부 랭크 정책으로 처리함.
+- `league-of-star-api`, `league-of-star-matching`, `league-of-star-infra-redis`는 이번 이슈에서 변경 대상이 아님.
 - API 응답 DTO나 WebSocket `GAME_RESULT` payload는 변경하지 않음.
 - summary API는 이미 저장된 `game_records` snapshot을 읽기만 하므로 이번 이슈의 쓰기 로직에 의존하지 않음.
 

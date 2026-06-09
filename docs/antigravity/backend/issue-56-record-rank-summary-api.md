@@ -116,19 +116,19 @@ sequenceDiagram
 
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
-| HTTP endpoint | `smite-api` `game/summary/controller` | 인증 유저 주입, path variable 처리, HTTP 응답 반환 |
-| HTTP response DTO | `smite-api` `game/summary/dto` | `PENDING`/`DONE` 응답, player summary, summary status 표현 |
-| 조회 orchestration | `smite-api` `game/summary/service` | 권한 확인, record count 분기, user nickname 조합, DTO 변환 |
-| gameRoom 조회 | `smite-core` `domain/game/service` | gameRoom 상태/result/winnerId/finishedAt/참가자 조회 제공 |
-| record 조회 | `smite-core` `domain/record/service` | gameRoomId 기준 record count와 record 2행 조회 제공 |
-| user 조회 | `smite-core` `domain/user/service` | 참가자 nickname 조회 제공 |
+| HTTP endpoint | `league-of-star-api` `game/summary/controller` | 인증 유저 주입, path variable 처리, HTTP 응답 반환 |
+| HTTP response DTO | `league-of-star-api` `game/summary/dto` | `PENDING`/`DONE` 응답, player summary, summary status 표현 |
+| 조회 orchestration | `league-of-star-api` `game/summary/service` | 권한 확인, record count 분기, user nickname 조합, DTO 변환 |
+| gameRoom 조회 | `league-of-star-core` `domain/game/service` | gameRoom 상태/result/winnerId/finishedAt/참가자 조회 제공 |
+| record 조회 | `league-of-star-core` `domain/record/service` | gameRoomId 기준 record count와 record 2행 조회 제공 |
+| user 조회 | `league-of-star-core` `domain/user/service` | 참가자 nickname 조회 제공 |
 
 - API 모듈은 `GameRecordRepository`, `GameRoomRepository`, `UserRepository`를 직접 import하지 않는다.
 - API 모듈은 core read service만 조합한다.
 - core read service는 조회에 필요한 도메인 값만 반환하고 HTTP 응답 DTO를 알지 않는다.
 - core read service가 외부 모듈에 넘기는 read model과 service 결과 모델은 `domain/game/service/dto` 같은 service DTO 패키지에 둔다.
 - summary API는 rank command service, record/rank settlement service를 호출하지 않는다.
-- `smite-matching` Redis 상태는 이번 조회 API와 무관하므로 참조하지 않는다.
+- `league-of-star-matching` Redis 상태는 이번 조회 API와 무관하므로 참조하지 않는다.
 
 ### Status Policy
 
@@ -188,7 +188,7 @@ sequenceDiagram
 
 ### 4. summary application service 구현
 
-- [x] `smite-api` `game/summary/service`에 조회 application service를 추가한다.
+- [x] `league-of-star-api` `game/summary/service`에 조회 application service를 추가한다.
 - [x] service는 `gameId`, `requestUserId`를 입력받는다.
 - [x] gameRoom 참가자 목록에 `requestUserId`가 없으면 `403`으로 차단한다.
 - [x] 미참가자 `403`은 core의 `INVALID_GAME_PARTICIPANTS(400)`를 그대로 쓰지 않고 API 계층에서 `ApiErrorCode.AUTH_FORBIDDEN`으로 표현한다.
@@ -307,7 +307,7 @@ sequenceDiagram
 ### 4. API와 core 패키지 경계 유지
 
 - API 모듈은 `GameRecordRepository`, `GameRoomRepository`, `UserRepository`를 직접 참조하지 않음.
-- `smite-core`의 `GameRoomReadService`, `GameRecordReadService`, `UserReadService`를 조합해 조회함.
+- `league-of-star-core`의 `GameRoomReadService`, `GameRecordReadService`, `UserReadService`를 조합해 조회함.
 - HTTP 응답 DTO는 `game.summary.dto`에 두어 service가 controller 하위 패키지에 의존하지 않도록 정리함.
 - 트레이드오프: read service와 DTO가 늘어나지만, repository 접근과 HTTP 응답 조립 책임이 섞이지 않음. 이후 summary 조회 정책이 바뀌어도 API orchestration과 core repository 경계를 유지할 수 있음.
 

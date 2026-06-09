@@ -2,7 +2,7 @@
 
 ## 📌 Summary
 
-`smite-matching` 전용 모듈을 생성하고, Redis(Redisson) 기반의 티어별 분할 ZSET 대기열 저장소(`RedisMatchStore`)를 구현했습니다.
+`league-of-star-matching` 전용 모듈을 생성하고, Redis(Redisson) 기반의 티어별 분할 ZSET 대기열 저장소(`RedisMatchStore`)를 구현했습니다.
 또한 모듈 간 관심사 분리 원칙을 정리하고, 테스트 인프라를 각 모듈 독립 구조로 리팩터링했습니다.
 
 ---
@@ -10,17 +10,17 @@
 ## 📚 Changes
 
 ### 1. 모듈 생성 및 환경 설정
-- [x] **smite-matching 멀티 모듈 생성**: 루트 `settings.gradle`에 등록 및 디렉터리 구조 생성 완료.
+- [x] **league-of-star-matching 멀티 모듈 생성**: 루트 `settings.gradle`에 등록 및 디렉터리 구조 생성 완료.
 - [x] **build.gradle 설정**:
-    - `smite-core` 및 `smite-infra-redis` 의존성 추가 완료.
+    - `league-of-star-core` 및 `league-of-star-infra-redis` 의존성 추가 완료.
     - `redisson-spring-boot-starter` 의존성 추가 완료.
 - [x] **Redisson 설정**: Spring Boot 설정을 참조하여 RedissonClient를 Bean으로 등록 완료.
 
-### 2. 도메인 추상화 (smite-core)
+### 2. 도메인 추상화 (league-of-star-core)
 - [x] **매칭 도메인 모델 정의**: `MatchTicket`(대기 정보), `MatchStatus`(프로세스 상태) 정의 완료.
 
-### 3. Redis 기반 대기열 구현 (smite-matching)
-- [x] **MatchStore 인터페이스 정의**: `smite-matching` 모듈 내 `repository` 패키지에 위치. 인프라 기술에 의존하지 않는 대기열 조작 추상화 계층.
+### 3. Redis 기반 대기열 구현 (league-of-star-matching)
+- [x] **MatchStore 인터페이스 정의**: `league-of-star-matching` 모듈 내 `repository` 패키지에 위치. 인프라 기술에 의존하지 않는 대기열 조작 추상화 계층.
     - `core`가 아닌 `matching` 모듈에 두는 것이 적절: `api`는 `matching`을 의존하므로 접근 가능하며, 매칭 관련 지식이 `matching` 모듈에 캡슐화됨.
 - [x] **RedisMatchStore 구현체 작성**: Redisson을 활용한 원자적 대기열 조작 로직 구현.
     - `add()`: 티어 점수를 Score로, userId를 Member로 ZADD
@@ -29,17 +29,17 @@
     - `atomicPairRemove()`: Lua 스크립트로 두 유저를 다른 키에서 원자적 제거
 - [x] **Lua 스크립트 분리**: `atomic_pair_remove.lua`를 `resources/scripts/`에 별도 관리.
 
-### 4. 분산 락 (smite-infra-redis)
+### 4. 분산 락 (league-of-star-infra-redis)
 - [x] **DistributedLockAop**: `@DistributedLock` 어노테이션 기반 AOP로 분산 락 유틸리티 구현. 모든 모듈에서 공통 사용 가능.
 
 ### 5. 테스트 인프라 리팩터링
-- [x] **AbstractRedisTest**: `smite-infra-redis` testFixtures에 위치. Testcontainers 기반 Redis를 띄우는 순수 인프라 베이스 클래스.
+- [x] **AbstractRedisTest**: `league-of-star-infra-redis` testFixtures에 위치. Testcontainers 기반 Redis를 띄우는 순수 인프라 베이스 클래스.
 - [x] **모듈별 독립 테스트 컨텍스트**: 각 모듈(matching, api)이 자체 `@SpringBootTest` 컨텍스트를 가지도록 분리하여 JPA 등 불필요한 빈 스캔 제거.
 - [x] **Redis 초기화 통일**: `@AfterEach`에서 `RedisConnectionFactory.flushAll()` 방식으로 통일 (라이브러리 의존성 없이 스프링 표준 사용).
 
-### 6. 레디스 레포지토리 스캔 구조 개선 (smite-api)
-- [x] **`@RedisRepository` 커스텀 어노테이션**: `smite-api/global/annotation`에 생성. 어노테이션 기반 자동 스캔으로 경로를 수동 추가할 필요 없음.
-- [x] **`RedisRepositoryConfig` 개선**: `basePackages = "com.sang.smite"` + `includeFilters`로 전체 패키지에서 `@RedisRepository`가 붙은 인터페이스만 등록.
+### 6. 레디스 레포지토리 스캔 구조 개선 (league-of-star-api)
+- [x] **`@RedisRepository` 커스텀 어노테이션**: `league-of-star-api/global/annotation`에 생성. 어노테이션 기반 자동 스캔으로 경로를 수동 추가할 필요 없음.
+- [x] **`RedisRepositoryConfig` 개선**: `basePackages = "com.sang.leagueofstar"` + `includeFilters`로 전체 패키지에서 `@RedisRepository`가 붙은 인터페이스만 등록.
 
 ---
 
@@ -47,7 +47,7 @@
 
 ### 아키텍처 결정: `MatchStore` 위치
 - `core` 모듈이 아닌 `matching` 모듈에 인터페이스를 위치시킴.
-- `smite-api → smite-matching` 의존성이 이미 있으므로 `api`에서 접근 가능.
+- `league-of-star-api → league-of-star-matching` 의존성이 이미 있으므로 `api`에서 접근 가능.
 - 매칭 도메인 지식을 `matching` 모듈에 캡슐화하는 것이 응집도 관점에서 적합.
 
 ### `joinQueue()` 동기 처리 결정

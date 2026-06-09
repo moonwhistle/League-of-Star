@@ -4,7 +4,6 @@
 
 Vue 프론트엔드의 `/game/:gameRoomId/waiting` 페이지에서 백엔드 Game WebSocket에 연결하고, 게임 시작 전 대기/READY/RTT/실패 복귀 흐름을 구현한다.
 
-이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `8. [ ] 게임 대기방 WebSocket 구현`을 구현 기준으로 삼는다. Issue 84에서 `GO_TO_GAME_WAITING` 수신 후 game waiting 화면 이동과 payload 저장까지 완료했으므로, 이번 이슈에서는 저장된 `game.webSocketUrl`, `game.videoUrl`을 사용해 WebSocket 대기방 흐름을 연결한다.
 
 핵심은 Game Waiting 화면의 책임을 "게임 시작 전 연결 준비"로 제한하는 것이다. `COUNTDOWN`, `GAME_START`의 countdown UI, scenario 저장, `/game/:gameRoomId/play` 이동은 `front-plan.md` 9번 이슈에서 구현한다. 이번 이슈에서는 `COUNTDOWN`, `GAME_START` 메시지가 와도 화면이 깨지지 않도록 수신 가능한 상태까지만 맞춘다.
 
@@ -16,8 +15,6 @@ flowchart TD
     D --> E["game.webSocketUrl + token으로 WebSocket 연결"]
     E --> F{"handshake 성공?"}
     F -->|no| C
-    F -->|yes| G["MP4 preload"]
-    G --> H{"preload 성공?"}
     H -->|no| I["WebSocket close"]
     I --> C
     H -->|yes| J["CLIENT_READY 전송"]
@@ -58,7 +55,6 @@ interface GameWaitingPayload {
   } | null;
   game: {
     gameRoomId: number;
-    videoUrl: string;
     webSocketUrl: string;
   };
   receivedAt: string;
@@ -133,7 +129,7 @@ type GameWaitingServerMessage =
         serverTime: number;
         startAt: number;
         scenario: {
-          dragonMaxHp: number;
+          starCoreMaxHp: number;
           durationMs: number;
           hpTimeline: {
             timeMs: number;
@@ -153,7 +149,6 @@ type GameWaitingServerMessage =
 - `game.webSocketUrl`을 WebSocket 연결 source로 사용한다.
 - `game.webSocketUrl`이 `/ws/game/{gameRoomId}` 같은 relative path이면 `VITE_WS_BASE_URL`과 합친다.
 - token query는 기존 query 존재 여부에 따라 `?token=` 또는 `&token=`으로 붙인다.
-- WebSocket 연결 후 `game.videoUrl` MP4 preload가 완료되면 `CLIENT_READY`를 한 번만 전송한다.
 - `RTT_PING`을 받으면 payload의 `seq`를 그대로 담아 `RTT_PONG`을 즉시 전송한다.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`, handshake 실패, close/error, client watchdog 만료는 `/match` 복귀 기준으로 처리한다.
 - `COUNTDOWN`, `GAME_START`는 이번 이슈에서 route 이동하지 않고 후속 9번 이슈 입력으로만 안전하게 수신한다.
@@ -165,12 +160,10 @@ type GameWaitingServerMessage =
 - `/game/:gameRoomId/waiting` WebSocket 연결 구현.
 - `game.webSocketUrl` 기반 WebSocket URL 조립 구현.
 - access token query parameter 연결 구현.
-- MP4 preload 완료 후 `CLIENT_READY` 1회 전송 구현.
 - `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT` 대기 상태 표시 구현.
 - `RTT_PING` 수신 시 `RTT_PONG` 즉시 전송 구현.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR` 실패 복귀 구현.
 - handshake 실패, close/error, client 30초 watchdog 실패 복귀 구현.
-- WebSocket/timer/preload listener cleanup 구현.
 - Game waiting WebSocket 상태 한/영 locale 구현.
 - WebSocket service / GameWaitingPage 테스트 구현.
 - `front-plan.md` 이전 완료 단계 체크 정합성 정리.
@@ -183,7 +176,7 @@ type GameWaitingServerMessage =
 - `GAME_START` scenario 저장 구현.
 - `GAME_START` 수신 후 `/game/:gameRoomId/play` 이동 구현.
 - `/game/:gameRoomId/play` 실제 게임 플레이 UI 구현.
-- SMITE 버튼 및 `{ type: 'SMITE', payload: null }` 전송 구현.
+- LIGHTNING 버튼 및 `{ type: 'LIGHTNING', payload: null }` 전송 구현.
 - `GAME_RESULT` 수신 후 결과 화면 이동 구현.
 - Game summary API 호출 구현.
 - WebSocket 재접속/복구 구현.
@@ -222,7 +215,6 @@ type GameWaitingServerMessage =
   - `idle`
   - `connecting`
   - `connected`
-  - `preloading`
   - `readySent`
   - `waitingOpponent`
   - `bothReady`
@@ -237,13 +229,7 @@ type GameWaitingServerMessage =
 - [x] `COUNTDOWN`, `GAME_START` 수신 시 현재 이슈에서는 상태를 깨지 않도록 안전 처리 구현.
 - [x] final failure 이후 늦은 WebSocket callback은 상태를 다시 흔들지 않도록 guard 구현.
 
-### 4. MP4 preload + CLIENT_READY 구현
 
-- [x] `game.videoUrl`로 hidden preload video element 또는 `HTMLVideoElement` 기반 preload 구현.
-- [x] preload 성공 시 `CLIENT_READY` 1회 전송 구현.
-- [x] preload 실패 시 WebSocket close 후 `/match` 복귀 구현.
-- [x] preload 완료 전 WebSocket failure 발생 시 listener/timer 정리 구현.
-- [x] unmount 시 preload listener 정리 구현.
 - [x] `CLIENT_READY` 중복 전송 방지 guard 구현.
 
 ### 5. Timeout / 실패 복귀 구현
@@ -261,7 +247,6 @@ type GameWaitingServerMessage =
 ### 6. Game Waiting UI / Locale 구현
 
 - [x] WebSocket 연결 중 문구 추가.
-- [x] MP4 preload 중 문구 추가.
 - [x] `CLIENT_READY` 전송 완료 문구 추가.
 - [x] 상대 준비 대기 문구 추가.
 - [x] 양쪽 준비 완료 문구 추가.
@@ -279,7 +264,6 @@ type GameWaitingServerMessage =
 - [x] `CLIENT_READY` payload `{}` 전송 테스트.
 - [x] `RTT_PONG` payload `{ seq }` 전송 테스트.
 - [x] GameWaitingPage mount 시 WebSocket 연결 테스트.
-- [x] preload 완료 후 `CLIENT_READY` 1회 전송 테스트.
 - [x] `PLAYER_READY bothReady=false` 상태 표시 테스트.
 - [x] `PLAYER_READY bothReady=true` 상태 표시 테스트.
 - [x] `RTT_PING` 수신 시 `RTT_PONG` 전송 테스트.
@@ -288,7 +272,6 @@ type GameWaitingServerMessage =
 - [x] `ERROR` 수신 시 `/match` 복귀 테스트.
 - [x] WebSocket close/error 시 `/match` 복귀 테스트.
 - [x] client 30초 watchdog 만료 시 `/match` 복귀 테스트.
-- [x] unmount 시 WebSocket/timer/preload listener 정리 테스트.
 - [x] `COUNTDOWN`, `GAME_START` 수신이 이번 이슈 UI를 깨지 않는지 테스트.
 - [x] locale toggle 시 WebSocket 상태 문구 전환 테스트.
 
@@ -321,14 +304,12 @@ type GameWaitingServerMessage =
 - Game Waiting WebSocket은 `/game/:gameRoomId/waiting` 페이지에서만 연결한다.
 - 연결 source는 `game.webSocketUrl`이다.
 - access token은 WebSocket query parameter로 붙인다.
-- `CLIENT_READY`는 MP4 preload 완료 후 한 번만 전송한다.
 - `CLIENT_READY`는 게임 시작이 아니라 대기 준비 완료 신호다.
 - `PLAYER_READY bothReady=true`도 게임 시작이 아니며 RTT 단계 진입 신호로만 본다.
 - `RTT_PING`에는 즉시 `RTT_PONG`으로 응답한다.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`, WebSocket close/error, client watchdog 만료는 `/match` 복귀로 처리한다.
 - invalid JSON 수신은 정상 백엔드 메시지가 아니므로 프로토콜 위반 또는 중간 계층 payload 손상으로 보고 실패 복귀 경로로 처리한다.
 - client 30초 watchdog은 백엔드 timeout의 source of truth가 아니라 사용자를 무한 대기 상태에 두지 않기 위한 UX fallback이다.
-- `/match` 복귀 라우팅이 실패해도 WebSocket, timer, preload listener 정리 상태를 유지하고 실패 상태를 화면에 남긴다.
 - GAME_START 이전 실패는 유효한 판이 아니므로 큐 자동 복귀나 LP/전적 표시 흐름을 만들지 않는다.
 - `COUNTDOWN`, `GAME_START` route 전환은 이번 이슈에서 하지 않는다.
 - WebSocket 재접속/복구는 이번 이슈에서 하지 않는다.
@@ -341,21 +322,18 @@ type GameWaitingServerMessage =
 
 - `/game/:gameRoomId/waiting` 진입 시 저장된 payload 기준으로 Game WebSocket 연결을 시도함.
 - WebSocket URL에 access token query가 포함됨.
-- MP4 preload 완료 후 `CLIENT_READY`가 한 번만 전송됨.
 - `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT` 수신 시 대기 상태 UI가 갱신됨.
 - `RTT_PING` 수신 시 즉시 `RTT_PONG`이 전송됨.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR` 수신 시 `/match`로 복귀함.
 - WebSocket close/error 또는 client 30초 watchdog 만료 시 `/match`로 복귀함.
 - 실패 복귀 시 match join/leave API를 호출하지 않음.
 - `COUNTDOWN`, `GAME_START` 수신이 이번 이슈에서 play route 이동을 발생시키지 않음.
-- unmount 시 WebSocket, timer, preload listener가 정리됨.
 - lint / format / typecheck / test / build 통과.
 
 ## PR Message
 
 ## 📌 Summary
 
-`/game/:gameRoomId/waiting` 화면에서 Game WebSocket 연결, MP4 preload, `CLIENT_READY`, READY 대기, RTT 응답, 실패 복귀까지 처리함.
 
 이번 PR의 핵심은 게임 대기 화면을 **게임 시작 전 준비 구간**으로 제한하는 것임. 실제 게임 시작 처리인 `COUNTDOWN`, `GAME_START`, play route 이동은 후속 이슈에서 처리하고, 이번 범위에서는 메시지를 안전하게 받을 수 있는 상태까지만 구현함.
 
@@ -367,7 +345,6 @@ flowchart TD
     D -->|no| R["/match 복귀"]
     D -->|yes| E["game.webSocketUrl + token query 연결"]
     E --> F["client 30초 watchdog 시작"]
-    F --> G["MP4 preload"]
     G --> H["CLIENT_READY {} 1회 전송"]
     H --> I["PLAYER_READY 대기"]
     I -->|bothReady=false| I
@@ -379,7 +356,6 @@ flowchart TD
     G --> M
     I --> M
     K --> M
-    M -->|yes| N["WebSocket / timer / preload 정리"]
     N --> R
     K --> O["COUNTDOWN / GAME_START 수신 가능"]
     O --> P["이번 PR에서는 화면 전환 안 함"]
@@ -392,7 +368,6 @@ flowchart TD
 - WebSocket 연결 source는 백엔드가 내려준 `game.webSocketUrl`임.
 - native WebSocket은 Authorization header를 직접 붙일 수 없으므로 access token은 query parameter로 전달함.
 - `CLIENT_READY`는 게임 시작 신호가 아니라 “내 클라이언트가 대기 준비됨” 신호임.
-- `CLIENT_READY`는 MP4 preload 완료 후 한 번만 전송함.
 - `RTT_PING`은 UI 상태와 무관하게 즉시 `RTT_PONG { seq }`로 응답함.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`, WebSocket close/error, client 30초 watchdog 만료는 `/match` 복귀 기준으로 처리함.
 - `COUNTDOWN`, `GAME_START`는 이번 PR에서 수신 가능하게만 두고 play route 이동은 하지 않음.
@@ -414,11 +389,8 @@ flowchart TD
 - WebSocket URL을 `gameRoomId`로 직접 만들지 않고 `game.webSocketUrl`을 source로 사용함.
   백엔드가 게임방별 실제 연결 path를 내려주므로, 프론트가 URL 규칙을 추측하지 않게 함. 대신 native WebSocket 제약 때문에 access token query append만 프론트 책임으로 둠.
 
-- `CLIENT_READY`를 MP4 preload 이후로 제한함.
-  백엔드 timeout 조건은 “WebSocket 연결 + 양쪽 `CLIENT_READY` 완료”임. 영상 데이터가 준비되지 않았는데 ready를 보내면 사용자는 준비되지 않았는데 서버는 준비됐다고 볼 수 있음. 그래서 프론트는 MP4 preload가 끝난 뒤 ready를 한 번만 보냄.
 
 - 실패 복귀 정책을 단순하게 유지함.
-  `GAME_START` 이전 실패는 아직 실제 판이 시작된 것이 아님. 따라서 LP, 전적, 큐 자동 복귀와 섞지 않고 WebSocket/timer/preload만 정리한 뒤 `/match`로 복귀함. 이 방식은 사용자에게 다시 매칭 시작 가능 상태를 명확히 보여주고, 서버 큐 상태를 프론트가 임의로 복구하지 않게 함.
 
 - client 30초 watchdog을 둠.
   백엔드는 gameRoom `createdAt + 30초` 기준으로 waiting timeout을 처리함. 다만 클라이언트가 이벤트를 못 받거나 handshake가 실패할 수 있으므로, 프론트도 30초 watchdog으로 사용자를 무한 대기 상태에 두지 않음.
@@ -427,7 +399,6 @@ flowchart TD
   RTT는 서버가 게임 시작 전에 연결 품질을 판단하기 위한 값임. 사용자가 보는 상태 문구와 관계없이 `seq`를 그대로 담아 즉시 `RTT_PONG`을 보내도록 처리함.
 
 - loading bar의 의미를 payload 수신율로 유지함.
-  현재 loading bar는 matchId, opponent, gameRoomId, videoUrl, webSocketUrl 같은 게임 대기 payload 확보율임. WebSocket 준비율이나 게임 시작 준비율과 섞으면 100%의 의미가 흐려지므로 분리해서 유지함.
 
 - 8번과 9번 이슈 범위를 분리함.
   이번 PR은 Game Waiting WebSocket 연결과 대기 안정화까지임. `COUNTDOWN`, `GAME_START`, scenario 저장, play route 이동은 다음 이슈에서 처리함. 이렇게 해야 waiting 화면의 책임이 커지지 않고, 게임 시작 화면 전환을 별도 테스트 범위로 다룰 수 있음.
@@ -435,7 +406,7 @@ flowchart TD
 ## 📝 Note
 
 - WebSocket 재접속/복구는 이번 범위가 아님.
-- `COUNTDOWN`, `GAME_START`, game play, SMITE, result summary는 후속 이슈에서 구현함.
+- `COUNTDOWN`, `GAME_START`, game play, LIGHTNING, result summary는 후속 이슈에서 구현함.
 - `GAME_WAITING_TIMEOUT`, `GAME_START_FAILED`, `ERROR`는 `/match` 복귀 기준으로 처리함.
 - invalid JSON은 백엔드 정상 응답이 아니므로 안전한 실패 복귀 대상으로 처리함.
 - client 30초 watchdog은 백엔드 timeout 판정 기준이 아니라 UX fallback임.

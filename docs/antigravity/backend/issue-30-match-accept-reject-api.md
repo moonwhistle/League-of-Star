@@ -210,7 +210,7 @@ timeout 정책:
   - 현재 `MatchQueueService`는 join/leave 대기열 책임
   - 수락/거절은 매칭 세션 응답 책임
 - [x] 별도 `MatchResponseService` 추가 검토
-  - 위치: `smite-api/src/main/java/com/sang/smite/match/service`
+  - 위치: `league-of-star-api/src/main/java/com/sang/leagueofstar/match/service`
   - 역할: API layer에서 인증 유저 요청을 matching module로 위임
 - [x] API layer는 JPA rank 조회를 하지 않음
   - 수락/거절은 `matchId`, `userId`만 필요
@@ -224,7 +224,7 @@ timeout 정책:
 - API 모듈 `MatchResponseService`는 JPA rank 조회를 하지 않습니다.
   - 수락/거절에는 `matchId`, `userId`만 필요합니다.
 - matching 모듈에 `MatchResponseCommandService`를 추가했습니다.
-  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service`
+  - 위치: `league-of-star-matching/src/main/java/com/sang/leagueofstar/matching/service`
   - API 모듈은 이 서비스를 호출해 수락/거절 처리를 위임합니다.
   - 실제 세션 상태 변경, `matchId` 기준 Redis lock, timeout 정책은 다음 task에서 구현합니다.
 - `MatchResponseServiceTest`를 추가해 API 서비스가 matching 모듈 서비스로 accept/reject를 위임하는지 검증했습니다.
@@ -232,7 +232,7 @@ timeout 정책:
 ### 6. Matching 모듈 서비스 설계
 
 - [x] `MatchAcceptanceService` 또는 `MatchResponseService` 추가
-  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service`
+  - 위치: `league-of-star-matching/src/main/java/com/sang/leagueofstar/matching/service`
 - [x] 메서드 정의
   - `accept(String matchId, Long userId)`
   - `reject(String matchId, Long userId)`
@@ -363,11 +363,11 @@ DECLINED/TIMEOUT -> 이미 종료된 세션
 ### 7. Redis-only 분산락 어노테이션 구현
 
 - [x] 기존 `@DistributedLock` 역할 재정의
-  - 위치: `smite-infra-redis/src/main/java/com/sang/smite/redis/lock/annotation/DistributedLock.java`
+  - 위치: `league-of-star-infra-redis/src/main/java/com/sang/leagueofstar/redis/lock/annotation/DistributedLock.java`
   - 역할: Redis lock + `AopForTransaction` 기반 `REQUIRES_NEW` 트랜잭션
   - 사용처: DB 트랜잭션 정합성이 필요한 작업
 - [x] 신규 `@DistributedRedisLock` 추가
-  - 위치: `smite-infra-redis/src/main/java/com/sang/smite/redis/lock/annotation/DistributedRedisLock.java`
+  - 위치: `league-of-star-infra-redis/src/main/java/com/sang/leagueofstar/redis/lock/annotation/DistributedRedisLock.java`
   - 역할: Redis lock만 적용
   - 트랜잭션 AOP를 태우지 않음
   - 사용처: Redis-only 작업
@@ -375,7 +375,7 @@ DECLINED/TIMEOUT -> 이미 종료된 세션
     - timeout 처리
     - 향후 Redis 상태 기반 동시성 제어
 - [x] 신규 AOP 추가
-  - 위치: `smite-infra-redis/src/main/java/com/sang/smite/redis/lock/aop/DistributedRedisLockAop.java`
+  - 위치: `league-of-star-infra-redis/src/main/java/com/sang/leagueofstar/redis/lock/aop/DistributedRedisLockAop.java`
   - 기존 `CustomSpringELParser` 재사용
   - 기존 `LockConstants.REDISSON_LOCK_PREFIX` 재사용
   - `RedissonClient.getLock(key)` 사용
@@ -429,8 +429,8 @@ DECLINED/TIMEOUT -> 이미 종료된 세션
 #### 패키지 구조
 
 ```text
-smite-infra-redis
-└── src/main/java/com/sang/smite/redis
+league-of-star-infra-redis
+└── src/main/java/com/sang/leagueofstar/redis
     ├── common/constant
     │   └── LockConstants.java
     └── lock
@@ -487,7 +487,7 @@ public void accept(String matchId, Long userId) {
 검증:
 
 ```bash
-./gradlew :smite-infra-redis:test --tests 'com.sang.smite.redis.lock.aop.*LockAopTest'
+./gradlew :league-of-star-infra-redis:test --tests 'com.sang.leagueofstar.redis.lock.aop.*LockAopTest'
 ```
 
 결과: `BUILD SUCCESSFUL`
@@ -1030,7 +1030,7 @@ matchStore.add(returnTicket);
 ### 14. MatchResponseResultService 구현
 
 - [x] `MatchResponseResultService` 추가
-  - 위치: `smite-matching/src/main/java/com/sang/smite/matching/service`
+  - 위치: `league-of-star-matching/src/main/java/com/sang/leagueofstar/matching/service`
   - `@DistributedRedisLock` 적용 대상
 - [x] `acceptWithLock(String matchId, Long userId)` 구현
   - 세션 조회
@@ -1146,7 +1146,7 @@ matchStore.add(returnTicket);
 - 두 API 모두 인증 헤더와 path parameter `matchId`를 문서화했습니다.
 - 성공 응답은 기존 match API 스타일에 맞춰 `200 OK`로 문서화했습니다.
 - 주요 실패 응답은 API 설명 범위에 반영하고, 실제 에러 응답 스키마는 공통 `GlobalExceptionHandler` 정책을 따릅니다.
-- `:smite-api:test`를 실행해 RestDocs 테스트와 OpenAPI 생성 입력 흐름이 깨지지 않는 것을 확인했습니다.
+- `:league-of-star-api:test`를 실행해 RestDocs 테스트와 OpenAPI 생성 입력 흐름이 깨지지 않는 것을 확인했습니다.
 
 ### 18. 단위 테스트 작성
 
@@ -1189,8 +1189,8 @@ matchStore.add(returnTicket);
   - `RedisMatchSessionStoreTest`
   - `RedisMatchStoreTest`
 - 검증 명령:
-  - `:smite-matching:test`
-  - `:smite-api:test`
+  - `:league-of-star-matching:test`
+  - `:league-of-star-api:test`
 
 ### 19. Redis 통합 테스트 작성
 
@@ -1224,7 +1224,7 @@ matchStore.add(returnTicket);
   - 중복 accept 멱등 처리
 - timeout과 accept/reject가 동시에 들어오는 케이스는 timeout 스케줄러/정산 구현 후 후속 이슈에서 통합 테스트로 다룹니다.
 - 검증 명령:
-  - `:smite-matching:test`
+  - `:league-of-star-matching:test`
 
 ### 20. 관측 지표 검토
 
@@ -1275,9 +1275,9 @@ matchStore.add(returnTicket);
 
 ### 22. 최종 검증
 
-- [x] `:smite-core:test`
-- [x] `:smite-matching:test`
-- [x] `:smite-api:test`
+- [x] `:league-of-star-core:test`
+- [x] `:league-of-star-matching:test`
+- [x] `:league-of-star-api:test`
 - [x] 필요 시 `./gradlew build`
 - [x] 기존 SSE `match_found` 흐름이 깨지지 않는지 확인
 - [x] join/leave 기존 API 회귀 확인
@@ -1287,12 +1287,12 @@ matchStore.add(returnTicket);
 - 아래 명령을 실행해 핵심 모듈 테스트를 통과했습니다.
 
 ```bash
-./gradlew :smite-core:test :smite-matching:test :smite-api:test
+./gradlew :league-of-star-core:test :league-of-star-matching:test :league-of-star-api:test
 ```
 
 - 결과: `BUILD SUCCESSFUL`
 - `./gradlew build` 전체 빌드는 이번 변경 범위가 `core`, `matching`, `api` 테스트로 충분히 검증되어 별도 실행하지 않았습니다.
-- 기존 SSE `match_found` 흐름은 `smite-api` notification 테스트가 함께 통과한 것으로 회귀 확인했습니다.
+- 기존 SSE `match_found` 흐름은 `league-of-star-api` notification 테스트가 함께 통과한 것으로 회귀 확인했습니다.
   - `MatchFoundPubSubPublishListenerTest`
   - `MatchFoundPubSubSubscriberTest`
   - `MatchFoundSseSenderTest`
@@ -1418,7 +1418,7 @@ flowchart TD
 - 검증 완료:
 
 ```bash
-./gradlew :smite-core:test :smite-matching:test :smite-api:test
+./gradlew :league-of-star-core:test :league-of-star-matching:test :league-of-star-api:test
 ```
 
 ## 📌 Related Issue

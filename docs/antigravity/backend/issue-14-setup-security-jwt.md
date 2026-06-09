@@ -1,7 +1,7 @@
 # Issue-14 — Setup Spring Security & JWT Authentication [COMPLETED]
 
 ## 📌 Feature Description
-`smite-api` 모듈에 실시간 경쟁 게임의 기반이 되는 보안 및 인증 체계를 구축함. 유저 식별(userId)의 근거가 되는 JWT 토큰 발급 및 검증 로직을 구현하고, API 엔드포인트별 접근 권한을 설정함.
+`league-of-star-api` 모듈에 실시간 경쟁 게임의 기반이 되는 보안 및 인증 체계를 구축함. 유저 식별(userId)의 근거가 되는 JWT 토큰 발급 및 검증 로직을 구현하고, API 엔드포인트별 접근 권한을 설정함.
 
 ## 📚 Tasks
 

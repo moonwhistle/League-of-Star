@@ -64,16 +64,16 @@ flowchart TD
 
 | 영역 | 패키지 | 책임 |
 |------|--------|------|
-| 매칭 큐 key 범위 | `smite-matching` `common/constant` | Redis queue scan tierScore min/max 상수 관리 |
-| Redis queue store | `smite-matching` `infrastructure/redis` | `matching:queue:{tierScore}` 저장, 전체 queue batch scan, 원자 제거 |
-| 매칭 후보 판정 | `smite-matching` `domain/service` | FIFO 정렬, 대기 시간별 허용 tierScore 차이 계산, candidate pairing |
-| MatchTicket value object | `smite-core` `domain/match/domain` | userId, tierScore, entryTime 전달 |
-| rank tierScore 계산 | `smite-core` `domain/rank/domain` | Rank 기준 tierScore 산출 |
-| API queue join | `smite-api` `match/service` | rank 조회 후 matching command 위임 |
+| 매칭 큐 key 범위 | `league-of-star-matching` `common/constant` | Redis queue scan tierScore min/max 상수 관리 |
+| Redis queue store | `league-of-star-matching` `infrastructure/redis` | `matching:queue:{tierScore}` 저장, 전체 queue batch scan, 원자 제거 |
+| 매칭 후보 판정 | `league-of-star-matching` `domain/service` | FIFO 정렬, 대기 시간별 허용 tierScore 차이 계산, candidate pairing |
+| MatchTicket value object | `league-of-star-core` `domain/match/domain` | userId, tierScore, entryTime 전달 |
+| rank tierScore 계산 | `league-of-star-core` `domain/rank/domain` | Rank 기준 tierScore 산출 |
+| API queue join | `league-of-star-api` `match/service` | rank 조회 후 matching command 위임 |
 
-- 이번 변경은 `smite-matching`의 scan range와 pairing policy 중심으로 처리함.
-- `smite-core`의 `Rank.getTierScore()`와 `MatchTicket` schema는 변경하지 않음.
-- `smite-api`의 queue join 흐름은 변경하지 않음.
+- 이번 변경은 `league-of-star-matching`의 scan range와 pairing policy 중심으로 처리함.
+- `league-of-star-core`의 `Rank.getTierScore()`와 `MatchTicket` schema는 변경하지 않음.
+- `league-of-star-api`의 queue join 흐름은 변경하지 않음.
 - Redis key 구조는 `matching:queue:{tierScore}`를 그대로 유지함.
 - match_found, accept/reject, gameRoom 생성, record/rank 정산 흐름은 변경하지 않음.
 
@@ -360,9 +360,9 @@ Apex 티어가 매칭 엔진 scan 대상에서 누락되지 않도록 Redis queu
 
 검증:
 
-- `./gradlew :smite-matching:test --tests com.sang.smite.matching.domain.service.MatchPairingServiceTest`
-- `./gradlew :smite-matching:test --tests com.sang.smite.matching.infrastructure.redis.RedisMatchQueueStoreTest`
-- `./gradlew :smite-matching:test`
+- `./gradlew :league-of-star-matching:test --tests com.sang.leagueofstar.matching.domain.service.MatchPairingServiceTest`
+- `./gradlew :league-of-star-matching:test --tests com.sang.leagueofstar.matching.infrastructure.redis.RedisMatchQueueStoreTest`
+- `./gradlew :league-of-star-matching:test`
 - `git diff --check`
 
 ## 📌 Related Issue

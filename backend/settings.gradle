@@ -1,6 +1,6 @@
-rootProject.name = 'smite'
+rootProject.name = 'league-of-star'
 
-include 'smite-core'
-include 'smite-api'
-include 'smite-infra-redis'
-include 'smite-matching'
+include 'league-of-star-core'
+include 'league-of-star-api'
+include 'league-of-star-infra-redis'
+include 'league-of-star-matching'

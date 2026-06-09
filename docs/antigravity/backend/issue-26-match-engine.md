@@ -35,7 +35,7 @@ V1 스펙(`matching-v1.md`)에 따라, **모든 티어의 대기열을 인메모
 
 ## 📚 Changes
 
-- `smite-matching` 모듈에 스케줄러 기반 `MatchEngine`을 추가했습니다.
+- `league-of-star-matching` 모듈에 스케줄러 기반 `MatchEngine`을 추가했습니다.
   - `@Scheduled` 기반으로 일정 주기마다 매칭 사이클을 실행합니다.
   - 전용 `ThreadPoolTaskScheduler`를 사용해 일반 스케줄 작업과 분리했습니다.
 
@@ -201,8 +201,8 @@ lock.tryLock(0L, 5L, TimeUnit.SECONDS)
 
 ```mermaid
 sequenceDiagram
-    participant API1 as smite-api-1
-    participant API2 as smite-api-2
+    participant API1 as league-of-star-api-1
+    participant API2 as league-of-star-api-2
     participant Lock as Redis Lock
     participant Queue as Redis Queue
     participant Lua as atomic_pair_remove.lua
@@ -282,7 +282,7 @@ V1은 steady 상황에서는 사용할 수 있지만, 10,000명 burst에서는 �
 
 ## 📚 Tasks
 
-### 1. 매칭 엔진 스케줄러 기반 구축 (smite-matching)
+### 1. 매칭 엔진 스케줄러 기반 구축 (league-of-star-matching)
 - [x] **스케줄러 설정 (`@EnableScheduling`)**
   - 단일 스레드 병목을 막기 위해 전용 `ThreadPoolTaskScheduler` 설정
 - [x] **`MatchEngine` 클래스 생성**
@@ -355,7 +355,7 @@ V1은 steady 상황에서는 사용할 수 있지만, 10,000명 burst에서는 �
 - [x] **대기열 크기 Gauge 최적화**
   - `match_queue_size`: 전체 큐 스캔 대신 티어별 ZSET 크기 조회로 측정
 - [x] **Grafana 대시보드 갱신**
-  - 매칭 엔진 개선 비교용 지표 중심으로 `docs/grafana/smite-match-queue-dashboard.json` 구성
+  - 매칭 엔진 개선 비교용 지표 중심으로 `docs/grafana/league-of-star-match-queue-dashboard.json` 구성
 
 ### 7. 테스트 코드 작성
 - [x] **`MatchEngineServiceTest` 단위 테스트 작성**
@@ -413,16 +413,16 @@ V1은 steady 상황에서는 사용할 수 있지만, 10,000명 burst에서는 �
 
 - [x] **로컬 부하 테스트 실행 환경 구성**
   - `infra/local/docker-compose-infra.yml`로 MySQL, Redis 실행
-    - `smite-local` Docker network 생성
+    - `league-of-star-local` Docker network 생성
   - `infra/local/docker-compose-monitoring.yml`로 Prometheus, Grafana 실행
-  - `smite-api` 인스턴스 2개 실행
+  - `league-of-star-api` 인스턴스 2개 실행
     - Instance A: `server.port=8080`
     - Instance B: `server.port=8081`
     - 두 인스턴스는 동일한 MySQL/Redis를 바라보게 구성
     - `infra/local/docker-compose-app.yml` 단독 실행 가능
   - Prometheus scrape target을 두 인스턴스로 확장
-    - `smite-api-1:8080`
-    - `smite-api-2:8080`
+    - `league-of-star-api-1:8080`
+    - `league-of-star-api-2:8080`
   - 부하 도구는 `k6`를 우선 사용하고, 스크립트는 `docs/load-test` 디렉터리에 보관
 
 - [x] **테스트 데이터 준비**

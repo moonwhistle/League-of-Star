@@ -1,6 +1,6 @@
-# League of Smite - Matching System Roadmap & Specification
+# League of Star - Matching System Roadmap & Specification
 
-이 문서는 League of Smite의 매칭 시스템이 초기 구축(Stage 1)부터 대규모 확장(Stage 3)까지 어떻게 진화하는지 상세 기술 명세를 정의합니다.
+이 문서는 League of Star의 매칭 시스템이 초기 구축(Stage 1)부터 대규모 확장(Stage 3)까지 어떻게 진화하는지 상세 기술 명세를 정의합니다.
 
 매칭 = 티어 큐 + FIFO 우선 + 대기 시간 기반 티어 확장 + Scheduler Batch 매칭 + 분산 락 + 원자적 제거
 ---
@@ -164,7 +164,6 @@ ACCEPTED + ACCEPTED
    outcome=MATCHED
    reason=BOTH_ACCEPTED
    action=GO_TO_GAME_WAITING
-   game={gameRoomId, videoUrl, webSocketUrl}
 ```
 
 정상 종료 후에는 gameRoom 결과와 record/rank 정산이 DB 기준으로 완료된 뒤 `match:status:{userA/userB}=IN_GAME`만 best-effort로 제거합니다. `matching:queue:*`, `match:session:*`, `match:response:timeout:*`는 정상 종료 cleanup 대상이 아닙니다.
@@ -201,7 +200,7 @@ gameRoom 생성 성공
    game=null
 ```
 
-매칭 SSE는 `match_response_result`까지 담당하고, `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/SMITE/종료는 gameRoom WebSocket이 담당합니다.
+매칭 SSE는 `match_response_result`까지 담당하고, `GO_TO_GAME_WAITING` 이후 게임 준비/RTT/카운트다운/LIGHTNING/종료는 gameRoom WebSocket이 담당합니다.
 `match_response_result`는 해당 matchId의 매칭 응답 최종 이벤트이며, 클라이언트의 SSE close 여부는 `action`별로 다릅니다.
 `GO_TO_GAME_WAITING`과 `GO_TO_MATCH_START`는 매칭 SSE를 닫습니다.
 `RETURN_TO_MATCHING`은 백엔드가 이미 기존 `entryTime/tierScore`로 큐 복귀를 완료한 뒤 발행하므로, 클라이언트는 매칭 SSE를 유지하고 `join/leave`를 호출하지 않습니다.

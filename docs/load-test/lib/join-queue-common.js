@@ -149,7 +149,7 @@ export function baseUrlFor(index) {
 
 function userFor(index) {
   return {
-    email: `${userNamespace}-${index}@load.smite`,
+    email: `${userNamespace}-${index}@load.leagueofstar`,
     password,
     nickname: `${nicknamePrefix}${index.toString(36)}`.slice(0, 16),
   };

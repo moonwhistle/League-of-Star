@@ -653,7 +653,7 @@ function userFor(index) {
   const normalized = namespace.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
   const prefix = `mrt${normalized.slice(-8)}`;
   return {
-    email: `${namespace}-${index}@load.smite`,
+    email: `${namespace}-${index}@load.leagueofstar`,
     password,
     nickname: `${prefix}${index.toString(36)}`.slice(0, 16),
   };

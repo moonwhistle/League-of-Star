@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 
-const LOCALE_STORAGE_KEY = 'smite.locale'
+const LOCALE_STORAGE_KEY = 'league-of-star.locale'
 
 const messages = {
   ko: {
@@ -66,12 +66,8 @@ const messages = {
     'gameWaiting.socketConnectingDetail': '게임 대기방에 접속하는 중입니다.',
     'gameWaiting.socketConnected': '대기방 연결됨',
     'gameWaiting.socketConnectedDetail': '전장 데이터를 확인할 준비가 되었습니다.',
-    'gameWaiting.videoPreloading': '전장 데이터 확인 중',
-    'gameWaiting.videoPreloadingDetail':
-      '게임 시작 전에 필요한 MP4 데이터를 미리 불러오는 중입니다.',
     'gameWaiting.readySent': '준비 신호 전송됨',
     'gameWaiting.readySentDetail': '내 준비 신호를 보냈고 상대 준비를 기다리는 중입니다.',
-    'gameWaiting.videoPreloadFailed': '전장 데이터를 불러오지 못했습니다.',
     'gameWaiting.waitingOpponentReady': '상대 준비 대기',
     'gameWaiting.waitingOpponentReadyDetail': '상대방의 준비 신호를 기다리는 중입니다.',
     'gameWaiting.bothReady': '양쪽 준비 완료',
@@ -93,13 +89,42 @@ const messages = {
     'gameWaiting.returnFailed': '매칭 화면 복귀에 실패했습니다.',
     'gameWaiting.playerLeft': '상대 연결 이탈',
     'gameWaiting.socketDetail': '게임 시작 전 연결 상태를 확인하는 중',
+    'gameWaiting.leaveWarning':
+      '게임 대기 중에 이동하면 현재 연결이 끊길 수 있습니다. 그래도 이동하시겠습니까?',
     'gamePlay.title': '전장 시작 데이터 확인됨',
     'gamePlay.status': '서버 시작 시각 기준으로 대기 중',
     'gamePlay.gameRoom': '게임룸',
     'gamePlay.startAt': '시작 시각',
-    'gamePlay.dragonMaxHp': '드래곤 최대 HP',
+    'gamePlay.starCoreMaxHp': '스타 코어 최대 HP',
     'gamePlay.durationMs': '진행 시간',
     'gamePlay.payloadMissing': '게임 시작 정보를 찾을 수 없습니다. 매칭 화면으로 돌아갑니다.',
+    'gamePlay.leaveWarning':
+      '게임 진행 중에 이동하면 화면 복구가 필요할 수 있습니다. 그래도 이동하시겠습니까?',
+    'gamePlay.socketStatus': '연결 상태',
+    'gamePlay.socketPending': '연결 대기',
+    'gamePlay.socketHandoff': '대기방 연결 인계됨',
+    'gamePlay.socketConnecting': '전장 연결 중',
+    'gamePlay.socketConnected': '전장 연결됨',
+    'gamePlay.socketError': '전장 연결 오류',
+    'gamePlay.socketErrorDetail': '전장 연결을 확인하지 못했습니다.',
+    'gamePlay.socketClosed': '전장 연결이 종료되었습니다.',
+    'gamePlay.resultReceived': '결과 수신됨',
+    'gamePlay.hpLabel': '스타 코어 HP',
+    'gamePlay.elapsedMs': '경과 시간',
+    'gamePlay.countdownLabel': '전투 시작',
+    'gamePlay.lightningButton': 'LIGHTNING',
+    'gamePlay.lightningSent': 'LIGHTNING 전송됨',
+    'gamePlay.targetLocked': '타겟 고정',
+    'gamePlay.starCoreAirborne': '스타 코어 이동 중',
+    'gamePlay.videoPending': '영상 대기',
+    'gamePlay.videoLoading': '영상 로딩 중',
+    'gamePlay.videoReady': '영상 준비됨',
+    'gamePlay.videoPlaying': '영상 재생 중',
+    'gamePlay.videoError': '영상 오류',
+    'gamePlay.videoLoadFailed': '전장 영상을 불러오지 못했습니다.',
+    'gamePlay.videoPlayFailed': '전장 영상 재생을 시작하지 못했습니다.',
+    'gamePlay.naturalDeathWaiting':
+      '스타 코어 종료 시간이 지났습니다. 서버 결과를 기다리는 중입니다.',
   },
   en: {
     'login.email': 'Email',
@@ -164,11 +189,8 @@ const messages = {
     'gameWaiting.socketConnectingDetail': 'Connecting to the game waiting room.',
     'gameWaiting.socketConnected': 'Room connected',
     'gameWaiting.socketConnectedDetail': 'Ready to check battle data.',
-    'gameWaiting.videoPreloading': 'Checking battle data',
-    'gameWaiting.videoPreloadingDetail': 'Preloading the required MP4 data before game start.',
     'gameWaiting.readySent': 'Ready signal sent',
     'gameWaiting.readySentDetail': 'Your ready signal was sent. Waiting for the opponent.',
-    'gameWaiting.videoPreloadFailed': 'Failed to load battle data.',
     'gameWaiting.waitingOpponentReady': 'Waiting for opponent',
     'gameWaiting.waitingOpponentReadyDetail': 'Waiting for the opponent ready signal.',
     'gameWaiting.bothReady': 'Both players ready',
@@ -190,13 +212,40 @@ const messages = {
     'gameWaiting.returnFailed': 'Failed to return to matchmaking.',
     'gameWaiting.playerLeft': 'Opponent disconnected',
     'gameWaiting.socketDetail': 'Checking the connection before game start',
+    'gameWaiting.leaveWarning':
+      'Leaving during game waiting may disconnect the current room. Continue?',
     'gamePlay.title': 'Battle start data confirmed',
     'gamePlay.status': 'Waiting on the server start time',
     'gamePlay.gameRoom': 'Game room',
     'gamePlay.startAt': 'Start time',
-    'gamePlay.dragonMaxHp': 'Dragon max HP',
+    'gamePlay.starCoreMaxHp': 'Star core max HP',
     'gamePlay.durationMs': 'Duration',
     'gamePlay.payloadMissing': 'Game start data is missing. Returning to matchmaking.',
+    'gamePlay.leaveWarning': 'Leaving during the game may require screen recovery. Continue?',
+    'gamePlay.socketStatus': 'Connection',
+    'gamePlay.socketPending': 'Connection pending',
+    'gamePlay.socketHandoff': 'Waiting room connection handed off',
+    'gamePlay.socketConnecting': 'Connecting battle',
+    'gamePlay.socketConnected': 'Battle connected',
+    'gamePlay.socketError': 'Battle connection error',
+    'gamePlay.socketErrorDetail': 'Could not verify the battle connection.',
+    'gamePlay.socketClosed': 'Battle connection closed.',
+    'gamePlay.resultReceived': 'Result received',
+    'gamePlay.hpLabel': 'Star Core HP',
+    'gamePlay.elapsedMs': 'Elapsed',
+    'gamePlay.countdownLabel': 'Battle starts',
+    'gamePlay.lightningButton': 'LIGHTNING',
+    'gamePlay.lightningSent': 'LIGHTNING sent',
+    'gamePlay.targetLocked': 'Target locked',
+    'gamePlay.starCoreAirborne': 'Star core moving',
+    'gamePlay.videoPending': 'Video pending',
+    'gamePlay.videoLoading': 'Loading video',
+    'gamePlay.videoReady': 'Video ready',
+    'gamePlay.videoPlaying': 'Playing video',
+    'gamePlay.videoError': 'Video error',
+    'gamePlay.videoLoadFailed': 'Failed to load the battle video.',
+    'gamePlay.videoPlayFailed': 'Failed to start battle video playback.',
+    'gamePlay.naturalDeathWaiting': 'Star core end time has passed. Waiting for the server result.',
   },
 } as const
 
@@ -231,7 +280,8 @@ export function useLocale() {
 }
 
 function readStoredLocale(): Locale {
-  const storedLocale = getStorage()?.getItem(LOCALE_STORAGE_KEY)
+  const storage = getStorage()
+  const storedLocale = storage?.getItem(LOCALE_STORAGE_KEY)
 
   return storedLocale === 'en' || storedLocale === 'ko' ? storedLocale : 'ko'
 }
