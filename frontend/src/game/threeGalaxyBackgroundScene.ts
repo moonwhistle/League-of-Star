@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 
+const CHARACTER_IMAGE_URL = new URL('../../img/character-cutout.png', import.meta.url).href
+const CHARACTER_TARGET_SCALE = 1.46
+
 export interface ThreeGalaxyBackgroundSceneController {
   dispose: () => void
   update: (elapsedMs: number, hpPercent?: number, currentHp?: number) => void
@@ -31,11 +34,14 @@ interface SwooshTarget {
   hpTextLastValue: string
   hpTextSprite: THREE.Sprite
   hpTextTexture: THREE.CanvasTexture
+  lastElapsedMs: number | null
+  position: THREE.Vector3
   segmentDurationMs: number
   segmentStartedAtMs: number
   starCore: THREE.Sprite
   target: THREE.Vector3
   trails: THREE.Sprite[]
+  velocity: THREE.Vector3
 }
 
 export function createThreeGalaxyBackgroundScene(
@@ -68,6 +74,7 @@ export function createThreeGalaxyBackgroundScene(
 
   const glowTexture = createGlowTexture()
   const starTexture = createStarTexture()
+  const characterTexture = createCharacterTexture()
   const galaxyRoot = new THREE.Group()
   const milkyWay = createImmersiveGalaxyBelt(glowTexture)
   const nebulaFields = [
@@ -221,6 +228,7 @@ export function createThreeGalaxyBackgroundScene(
     }),
   ]
   const swooshTarget = createSwooshTarget({
+    characterTexture,
     glowTexture,
     starTexture,
   })
@@ -292,6 +300,7 @@ export function createThreeGalaxyBackgroundScene(
     })
     glowTexture.dispose()
     starTexture.dispose()
+    characterTexture.dispose()
     swooshTarget.hpTextTexture.dispose()
     renderer.dispose()
     callbacks.onReadyChange(false)
@@ -733,6 +742,7 @@ function createBrightStarField(options: {
 }
 
 function createSwooshTarget(options: {
+  characterTexture: THREE.Texture
   glowTexture: THREE.Texture
   starTexture: THREE.Texture
 }): SwooshTarget {
@@ -742,22 +752,23 @@ function createSwooshTarget(options: {
   const halo = new THREE.Sprite(
     new THREE.SpriteMaterial({
       blending: THREE.AdditiveBlending,
-      color: 0xffd75a,
+      color: 0xffdf78,
       depthTest: false,
       depthWrite: false,
       map: options.glowTexture,
-      opacity: 0.88,
+      opacity: 0.68,
       transparent: true,
     }),
   )
   const starCore = new THREE.Sprite(
     new THREE.SpriteMaterial({
-      blending: THREE.AdditiveBlending,
-      color: 0xffe66a,
+      alphaTest: 0.04,
+      color: 0xfff2bf,
       depthTest: false,
       depthWrite: false,
-      map: options.starTexture,
+      map: options.characterTexture,
       opacity: 1,
+      toneMapped: false,
       transparent: true,
     }),
   )
@@ -821,7 +832,7 @@ function createSwooshTarget(options: {
         depthTest: false,
         depthWrite: false,
         map: options.starTexture,
-        opacity: 0.35 - index * 0.035,
+        opacity: 0.42 - index * 0.038,
         transparent: true,
       }),
     )
@@ -831,7 +842,9 @@ function createSwooshTarget(options: {
   })
 
   halo.scale.setScalar(2.34)
-  starCore.scale.setScalar(0.84)
+  starCore.scale.setScalar(CHARACTER_TARGET_SCALE)
+  halo.renderOrder = 8
+  starCore.renderOrder = 12
   hpBarBackground.renderOrder = 20
   hpBarFill.renderOrder = 21
   hpBarGlow.renderOrder = 19
@@ -854,11 +867,14 @@ function createSwooshTarget(options: {
     hpTextLastValue: '',
     hpTextSprite,
     hpTextTexture,
+    lastElapsedMs: null,
+    position: from.clone(),
     segmentDurationMs: 1200,
     segmentStartedAtMs: 0,
     starCore,
     target,
     trails,
+    velocity: new THREE.Vector3(3.4, -1.2, 0),
   }
 }
 
@@ -868,22 +884,31 @@ function updateSwooshTarget(
   hpPercent = 100,
   currentHp = 0,
 ): void {
-  if (elapsedMs - target.segmentStartedAtMs >= target.segmentDurationMs) {
-    const currentPosition = getSwooshTargetPosition(target, elapsedMs)
-    target.from.copy(currentPosition)
+  const dtSeconds =
+    target.lastElapsedMs === null
+      ? 0
+      : Math.min(0.05, Math.max(0, (elapsedMs - target.lastElapsedMs) / 1000))
+  target.lastElapsedMs = elapsedMs
+
+  if (
+    elapsedMs - target.segmentStartedAtMs >= target.segmentDurationMs ||
+    target.position.distanceTo(target.target) < 0.72
+  ) {
+    target.from.copy(target.position)
     target.target.copy(createSwooshTargetPosition())
     target.segmentStartedAtMs = elapsedMs
-    target.segmentDurationMs = 720 + Math.random() * 1080
+    target.segmentDurationMs = 680 + Math.random() * 980
   }
 
+  updateSwooshTargetSteering(target, dtSeconds)
   const position = getSwooshTargetPosition(target, elapsedMs)
   const pulse = 1 + Math.sin(elapsedMs * 0.027) * 0.16
   target.halo.position.copy(position)
-  target.halo.scale.setScalar(2.34 * pulse)
+  target.halo.scale.setScalar(2.2 * pulse)
   target.starCore.position.copy(position)
-  target.starCore.scale.setScalar(0.84 * pulse)
+  target.starCore.scale.setScalar(CHARACTER_TARGET_SCALE * pulse)
   target.starCore.material.rotation = Math.sin(elapsedMs * 0.006) * 0.38
-  target.hpBarGroup.position.copy(position).add(new THREE.Vector3(0, 0.92, 0.03))
+  target.hpBarGroup.position.copy(position).add(new THREE.Vector3(0, 1.34, 0.05))
   target.hpBarGroup.scale.setScalar(1 + Math.sin(elapsedMs * 0.018) * 0.025)
   updateSwooshTargetHpBar(target, hpPercent)
   updateSwooshTargetHpText(target, currentHp)
@@ -893,9 +918,26 @@ function updateSwooshTarget(
   target.trails.forEach((trail, index) => {
     const historyPosition =
       target.history[Math.min(target.history.length - 1, index * 3)] ?? position
-    trail.position.copy(historyPosition)
-    trail.material.opacity = Math.max(0.02, 0.38 - index * 0.041)
+    trail.position.copy(historyPosition).add(new THREE.Vector3(0, 0, -0.08))
+    trail.renderOrder = 6
+    trail.material.opacity = Math.max(0.03, 0.44 - index * 0.046)
   })
+}
+
+function updateSwooshTargetSteering(target: SwooshTarget, dtSeconds: number): void {
+  if (dtSeconds <= 0) {
+    return
+  }
+
+  const targetDirection = target.target.clone().sub(target.position)
+
+  if (targetDirection.lengthSq() === 0) {
+    return
+  }
+
+  const desiredVelocity = targetDirection.normalize().multiplyScalar(5.8)
+  target.velocity.lerp(desiredVelocity, Math.min(1, dtSeconds * 4.8))
+  target.position.addScaledVector(target.velocity, dtSeconds)
 }
 
 function updateSwooshTargetHpBar(target: SwooshTarget, hpPercent: number): void {
@@ -937,18 +979,13 @@ function formatHpValue(currentHp: number): string {
 }
 
 function getSwooshTargetPosition(target: SwooshTarget, elapsedMs: number): THREE.Vector3 {
-  const progress = Math.min(
-    1,
-    Math.max(0, (elapsedMs - target.segmentStartedAtMs) / target.segmentDurationMs),
-  )
-  const easedProgress = progress < 0.5 ? 2 * progress * progress : 1 - (-2 * progress + 2) ** 2 / 2
   const jitter = new THREE.Vector3(
-    Math.sin(elapsedMs * 0.012) * 0.36,
-    Math.cos(elapsedMs * 0.014) * 0.27,
-    Math.sin(elapsedMs * 0.008) * 0.14,
+    Math.sin(elapsedMs * 0.009) * 0.22,
+    Math.cos(elapsedMs * 0.011) * 0.18,
+    Math.sin(elapsedMs * 0.007) * 0.1,
   )
 
-  return target.from.clone().lerp(target.target, easedProgress).add(jitter)
+  return target.position.clone().add(jitter)
 }
 
 function createSwooshTargetPosition(): THREE.Vector3 {
@@ -1016,6 +1053,17 @@ function createStarTexture(): THREE.CanvasTexture {
 
   const texture = new THREE.CanvasTexture(textureCanvas)
   texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+
+  return texture
+}
+
+function createCharacterTexture(): THREE.Texture {
+  const texture = new THREE.TextureLoader().load(CHARACTER_IMAGE_URL)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.generateMipmaps = true
+  texture.magFilter = THREE.LinearFilter
+  texture.minFilter = THREE.LinearMipmapLinearFilter
   texture.needsUpdate = true
 
   return texture

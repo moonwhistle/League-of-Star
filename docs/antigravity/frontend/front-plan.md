@@ -236,6 +236,12 @@ interface GameStartPayload {
 - 배경 animation은 별 평면 이동이 아니라 viewer/camera 기준의 느린 시점 회전으로 구현.
 - 게임 진입마다 카메라 yaw/pitch/roll, 배경 회전 phase, 스타 코어 이동 phase를 프론트 랜덤 시각 연출로 다르게 시작하게 구현.
 - 이 랜덤값은 화면 재미를 위한 visual-only 값이며 `LIGHTNING` 판정 payload나 백엔드 source of truth에는 포함하지 않음.
+- 움직이는 타겟의 본체 이미지는 `frontend/img/character-cutout.png`를 사용하고, 기존 glow/빛 잔상 motion은 유지함.
+- 체크무늬 배경이 제거된 `character-cutout.png` alpha PNG만 런타임 asset으로 유지함.
+- HP indicator는 캐릭터 얼굴을 가리지 않도록 타겟 위쪽으로 분리하고, 잔상은 캐릭터 뒤쪽 레이어로 유지함.
+- 타겟 이동은 목적지마다 감속하는 segment easing 대신 velocity steering으로 처리해 중간 멈칫임을 줄임.
+- 캐릭터 texture는 alpha edge, texture filter, halo opacity를 조정해 배경 glow 속에서도 더 선명하게 보이도록 처리함.
+- 백엔드 payload 필드명 `starCoreMaxHp`/`hpTimeline`은 HP source 계약으로 유지하며 visual asset 이름과 섞지 않음.
 - HP bar, countdown, LIGHTNING button HUD는 후속 전투 UI 단계로 보류.
 - `requestAnimationFrame` 기반 배경 animation 구현.
 - LIGHTNING 클릭 UI와 `{ type: 'LIGHTNING', payload: null }` 전송은 후속 전투 UI 단계로 보류.

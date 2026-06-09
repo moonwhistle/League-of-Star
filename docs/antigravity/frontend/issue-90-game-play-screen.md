@@ -41,6 +41,7 @@ flowchart TD
 | Refresh policy        | 차단이 아니라 경고 + 저장 payload 기반 복구                 |
 | 3D render policy      | Three.js WebGL canvas를 full-bleed galaxy background로 사용 |
 | Visual random policy  | 카메라/배경/스타 코어 시작 phase는 프론트 시각 연출로만 랜덤 처리 |
+| Target visual asset   | 움직이는 타겟 본체는 `frontend/img/character-cutout.png` 사용, glow/trail은 기존 procedural texture 유지 |
 
 `StoredGameStartPayload`:
 
@@ -79,6 +80,11 @@ interface GameWaitingPayload {
 - 실제 시작 기준은 백엔드가 발행한 `GAME_START.payload.startAt`임.
 - 카메라 yaw/pitch/roll, 배경 회전 phase, 스타 코어 이동 phase는 게임 진입마다 프론트에서 랜덤으로 시작함.
 - 이 랜덤값은 visual-only 값이며 `LIGHTNING` payload, HP 계산, 승패 판정 source에 포함하지 않음.
+- 화면상 움직이는 타겟 본체 이미지는 `character-cutout.png`를 사용하지만 HP source 계약은 `scenario.hpTimeline`과 `starCoreMaxHp` 필드를 유지함.
+- 체크무늬 배경을 제거한 `character-cutout.png` alpha PNG를 렌더링 asset으로 사용함.
+- HP indicator는 캐릭터 얼굴을 가리지 않도록 타겟 위쪽에 배치하고, 빛 잔상은 캐릭터 뒤쪽 render layer로 유지함.
+- 움직임은 목적지마다 감속하는 segment easing 대신 velocity steering으로 처리해 중간 멈칫임을 줄임.
+- 캐릭터 선명도는 alpha edge, texture filter, halo opacity 조정으로 처리하고, 백엔드 판정 payload와 분리함.
 - 이번 배경 단계에서는 고정 HUD/LIGHTNING/GAME_RESULT를 화면에 표시하지 않음.
 - 저장된 payload와 WebSocket source는 유지해 route 복구/연결 정책이 깨지지 않게 함.
 
@@ -94,7 +100,11 @@ interface GameWaitingPayload {
 - `gamebackground.png` 레퍼런스처럼 좌측 warm pink/gold 고밀도 별무리와 우측 dark violet/blue 저밀도 별무리 구현.
 - `galaxy-portfolio`처럼 particle star field를 사용하되, play 화면은 시작 즉시 확대된 별무리 안에서 시점 회전을 보는 구조로 구현.
 - 매 게임 진입 시 카메라/배경/스타 코어 phase가 달라지도록 프론트 랜덤 시각 연출 구현.
-- 움직이는 스타 코어 위에 `scenario.hpTimeline` 기반 HP indicator와 현재 HP 숫자 표시.
+- 움직이는 타겟 본체를 체크무늬 배경이 제거된 `character-cutout.png` sprite로 표시하고 기존 glow halo와 빛 잔상 motion 유지.
+- HP indicator를 캐릭터 얼굴 위가 아니라 타겟 위쪽에 분리 배치.
+- velocity steering 기반 이동으로 타겟 방향 전환 시 속도 급감/멈칫임 완화.
+- 캐릭터 scale, alpha edge, texture filter, halo opacity 조정으로 선명도 개선.
+- 움직이는 타겟 위에 `scenario.hpTimeline` 기반 HP indicator와 현재 HP 숫자 표시.
 - 전투 HUD 없이 full-screen canvas와 vignette만 표시.
 - Game WebSocket handoff 우선 사용.
 - handoff가 없으면 저장된 `webSocketUrl`로 재연결.
@@ -143,6 +153,11 @@ interface GameWaitingPayload {
 - [x] 카메라 주변 star sphere와 전방 star mist로 시작 화면을 별들로 채움.
 - [x] 레이어 이동이 아니라 viewer/camera 기준 회전이 느껴지도록 애니메이션 구현.
 - [x] 게임 진입마다 camera yaw/pitch/roll, galaxy roll/time offset, 스타 코어 이동 phase를 랜덤 시작값으로 적용.
+- [x] 움직이는 타겟 본체를 `character-cutout.png` texture로 교체해 체크무늬 배경 제거.
+- [x] glow halo/빛 잔상은 유지하되 캐릭터 뒤쪽 render layer로 배치.
+- [x] HP indicator를 캐릭터 얼굴을 가리지 않도록 위쪽으로 재배치.
+- [x] segment ease-in-out 이동을 velocity steering 이동으로 변경해 멈칫임 완화.
+- [x] 캐릭터 texture filter/alpha edge/halo opacity 조정으로 선명도 개선.
 - [x] 빈 어두운 구간을 채우는 저투명 성운 cloud와 glow star field 구현.
 - [x] `gamebackground.png`처럼 좌측 warm gold/pink 고밀도 영역과 우측 violet/blue 대각선 sparkle ribbon 보강.
 - [x] 큰 성운 cloud 위에 작은 고밀도 sharp galaxy cluster를 얹어 뭉친 은하 영역의 선명도 보강.
@@ -204,6 +219,9 @@ interface GameWaitingPayload {
 
 - 실제 시작 기준은 route 진입 시각이 아니라 `GAME_START.payload.startAt`임.
 - 카메라/배경/스타 코어 시작 phase 랜덤은 visual-only 정책이며 백엔드 판정 계약에 포함하지 않음.
+- 움직이는 타겟의 visual asset은 `character-cutout.png`로 처리하되 백엔드 HP 필드와 판정 계약은 변경하지 않음.
+- 체크무늬 배경 제거는 전처리된 alpha PNG로 처리하고 원본 파일을 덮어쓰지 않음.
+- 움직임은 시각 연출 전용 velocity steering으로 처리하며 백엔드 판정 source에 포함하지 않음.
 - 이번 배경 단계에서는 스타 코어 HP indicator/숫자 외 고정 HP/LIGHTNING/ERROR message를 화면에 표시하지 않음.
 - 프론트는 전투 판정 source of truth가 아님.
 - `GAME_RESULT` 수신 전까지 result route로 이동하지 않음.
@@ -215,8 +233,12 @@ interface GameWaitingPayload {
 
 ## Acceptance Criteria
 
-- `/game/:gameRoomId/play`에서 Three.js galaxy canvas와 스타 코어 HP indicator/숫자만 표시됨.
+- `/game/:gameRoomId/play`에서 Three.js galaxy canvas와 character target HP indicator/숫자만 표시됨.
 - play 진입 직후 빈 우주가 아니라 확대된 별무리가 화면을 채움.
+- 움직이는 타겟 본체가 체크무늬 없는 `character-cutout.png`로 보이고, 기존 glow/빛 잔상이 함께 유지됨.
+- HP indicator와 잔상이 캐릭터 얼굴을 가리지 않음.
+- 타겟 이동 중 목적지 전환 시 눈에 띄는 멈칫임이 줄어듦.
+- 캐릭터가 glow에 묻히지 않고 이전보다 선명하게 보임.
 - 게임에 재진입하면 카메라/배경/스타 코어 시작 phase가 매번 달라져 같은 정적 화면에서 시작하지 않음.
 - galaxy background가 정지 이미지처럼 보이지 않고 시점 기준으로 천천히 회전함.
 - `startAt` 기준 elapsed/HP 계산 data attribute는 유지됨.
@@ -252,6 +274,9 @@ flowchart TD
 - `scenario.hpTimeline`은 스타 코어 HP indicator의 source로 사용함.
 - Three.js WebGL canvas를 full-bleed galaxy background로 사용함.
 - 카메라/배경/스타 코어 시작 phase 랜덤은 visual-only 값으로만 사용함.
+- `character-cutout.png`는 visual asset으로만 사용하고, HP/승패 source는 백엔드 scenario 계약을 유지함.
+- 체크무늬 배경이 제거된 `character-cutout.png`만 런타임 asset으로 유지함.
+- velocity steering과 texture 선명도 조정은 visual-only 정책이며 백엔드 `LIGHTNING` 판정 계약에 포함하지 않음.
 - 고정 HP HUD/LIGHTNING/countdown/target overlay는 이번 배경 단계에서 숨김.
 - 새로고침은 경고와 저장 payload 기반 복구/재연결로 처리함.
 - `GAME_RESULT` 수신 후 result route 이동은 후속 이슈 범위임.
@@ -261,6 +286,8 @@ flowchart TD
 - `GAME_START.payload.startAt`과 `scenario.hpTimeline`은 data attribute/source로 유지하고, HP indicator fill은 `hpPercent`, 숫자는 `currentHp`를 사용함.
 - `game.webSocketUrl`을 Game WebSocket source로 유지함.
 - 프론트 랜덤 카메라/배경 phase는 백엔드로 보내지 않으며, `LIGHTNING` 판정 payload에도 포함하지 않음.
+- `character-cutout.png` 사용은 렌더링 표현만 바꾸며 `starCoreMaxHp`/`hpTimeline` payload 계약은 바꾸지 않음.
+- 캐릭터 얼굴이 가려지지 않도록 HP indicator와 trail render order를 분리함.
 - 이번 배경 단계에서는 LIGHTNING UI를 렌더링하지 않음.
 - `ERROR`는 화면 message가 아니라 data attribute 상태로 유지함.
 - `GAME_RESULT`는 이번 이슈에서 수신만 확인하고 route 이동은 하지 않음.

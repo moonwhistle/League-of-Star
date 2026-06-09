@@ -4,7 +4,7 @@
 
 Vue 프론트엔드의 `/match` 페이지를 실제 매칭 시작/취소 화면으로 구현한다.
 
-현재 `/match` 페이지는 `GET /api/v1/notifications/match/stream` SSE client와 event payload 보관 골격을 가지고 있다. 이번 이슈에서는 `frontend/img/matchingPage.jpeg`를 화면 레퍼런스로 삼고, `frontend/img/background-new.png` 기반 선명화 asset인 `frontend/img/background-new-sharp.png`를 실제 배경 이미지로 사용해 매칭 페이지 UI를 구현한다.
+현재 `/match` 페이지는 `GET /api/v1/notifications/match/stream` SSE client와 event payload 보관 골격을 가지고 있다. 이번 이슈에서는 `frontend/img/matchingPage.jpeg`를 화면 레퍼런스로 삼고, `frontend/img/background-new-sharp.png`를 실제 배경 이미지로 사용해 매칭 페이지 UI를 구현한다.
 
 매칭 기능은 백엔드 `POST /api/v1/match/join`, `DELETE /api/v1/match/leave` 계약에 맞춰 매칭 대기열 진입/취소 요청을 보낸다. 단, `/match` 화면 진입 즉시 SSE를 열지 않고, 사용자가 매칭 시작을 클릭했을 때 먼저 SSE를 연결한 뒤 `connected` 이벤트를 받은 다음 `join` 요청을 보낸다.
 

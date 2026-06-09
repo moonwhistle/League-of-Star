@@ -4,7 +4,7 @@
 
 Vue 프론트엔드의 `/login` 페이지를 실제 로그인 화면으로 구현한다.
 
-현재 프론트엔드는 Vue + Vite + TypeScript 기반 skeleton과 `/login` route placeholder만 존재한다. 이번 이슈에서는 `frontend/img/loginView.png`를 화면 레퍼런스로 삼고, `frontend/img/background-new.png` 기반 선명화 asset인 `frontend/img/background-new-sharp.png`를 실제 배경 이미지로 사용해 로그인 페이지 UI를 구현한다.
+현재 프론트엔드는 Vue + Vite + TypeScript 기반 skeleton과 `/login` route placeholder만 존재한다. 이번 이슈에서는 `frontend/img/loginView.png`를 화면 레퍼런스로 삼고, `frontend/img/background-new-sharp.png`를 실제 배경 이미지로 사용해 로그인 페이지 UI를 구현한다.
 
 로그인 기능은 백엔드 `POST /api/v1/auth/login` 계약에 맞춰 email/password 인증 요청을 보내고, 성공 시 access token과 refresh token을 저장한 뒤 `/match`로 이동하는 흐름까지 구현한다.
 
