@@ -161,7 +161,7 @@ stateDiagram-v2
 
 - **불변(Immutable)**: 한번 기록되면 수정 없음
 - **조건부 생성**: 라이트닝 사용 시에만 생성 (미사용 시 행 없음)
-- **게임당 최대 2행**: UK 제약으로 중복 방지
+- **게임당 0~N행**: 유저별 2초 LIGHTNING cooldown은 service가 최근 action 시각으로 검증하며, DB unique 제약으로 입력 횟수를 제한하지 않음
 
 ### 2.7 game_records — Immutable
 
@@ -422,7 +422,6 @@ CREATE TABLE game_actions (
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_game_room_user (game_room_id, user_id),
     CONSTRAINT fk_game_actions_room FOREIGN KEY (game_room_id) REFERENCES game_rooms (id) ON DELETE RESTRICT,
     CONSTRAINT fk_game_actions_user FOREIGN KEY (user_id)      REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -432,9 +431,9 @@ CREATE TABLE game_actions (
 - `lightning_time_ms < 100` 또는 scenario 범위 밖 LIGHTNING은 action으로 저장하지 않습니다.
 - LIGHTNING 데미지는 정책상 `1200` 고정이므로 별도 컬럼으로 저장하지 않습니다.
 - `afterHp = max(0, star_core_hp_at_lightning - 1200)`은 WebSocket 응답에서 계산하는 값이며 DB에는 저장하지 않습니다.
-- `game_actions`는 유저당 1회 LIGHTNING 입력과 판정 스냅샷만 저장합니다. 승패 기록, LP 변동, 배치/승급전 반영은 `game_records`에서 처리합니다.
+- `game_actions`는 LIGHTNING 입력마다 판정 스냅샷을 append-only로 저장합니다. 같은 유저도 cooldown 이후 여러 action을 저장할 수 있으며, 승패 기록, LP 변동, 배치/승급전 반영은 `game_records`에서 처리합니다.
 
-> **uk_game_room_user**: 한 게임에서 유저당 라이트닝 1회만 → 유니크 제약으로 DB 레벨 보장
+> **반복 LIGHTNING 정책**: `game_actions`에는 `(game_room_id, user_id)` unique 제약을 두지 않습니다. 2초 cooldown은 `GameLightningService`가 같은 gameRoom의 같은 user 최근 action을 기준으로 판정하고, 같은 gameRoom의 action 순서는 `server_receive_time_ms ASC`, `id ASC`로 해석합니다.
 
 ---
 
@@ -569,7 +568,7 @@ ZADD game:end:pending naturalDeathAtMillis gameRoomId
 | 4 | `rank_series` | 배치/승급전마다 1행 | 진행 중 Mutable → 완료 후 Immutable | 배치/승급전 통합 시리즈 |
 | 5 | `game_rooms` | 게임당 1행 | 진행 중 Mutable → 종료 후 Immutable | 게임 메타데이터 + 시나리오 |
 | 6 | `game_participants` | 게임당 2행 | 진행 중 Mutable → 종료 후 Immutable | 게임 참여자 상태 |
-| 7 | `game_actions` | 게임당 0~2행 | **Immutable** | 라이트닝 판정 상세 기록 |
+| 7 | `game_actions` | 게임당 0~N행 | **Immutable** | 라이트닝 판정 상세 기록 |
 | 8 | `game_records` | 게임당 2행 | **Immutable** | 전적 기록 (LP 변동 포함) |
 
 ---

@@ -2,7 +2,7 @@
 
 ## Feature Description
 
-이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `11. LIGHTNING 전투 입력 UI 구현` 범위를 구현한다. `/game/:gameRoomId/play`에서 움직이는 스타 코어 위에 정확히 hover한 상태로 `D` 또는 `F` 키를 누를 때만 LIGHTNING을 1회 전송한다.
+이번 이슈는 `docs/antigravity/frontend/front-plan.md`의 `11. LIGHTNING 전투 입력 UI 구현` 범위를 구현한다. `/game/:gameRoomId/play`에서 움직이는 스타 코어 위에 정확히 hover한 상태로 `D` 또는 `F` 키를 누를 때만 LIGHTNING을 전송한다. LIGHTNING은 1회성 스킬이 아니라 2초 쿨타임을 가진 반복 스킬이다.
 
 ```mermaid
 flowchart TD
@@ -12,23 +12,27 @@ flowchart TD
     D -->|no| E["D/F 입력 무시"]
     D -->|yes| F{"D 또는 F 입력?"}
     F -->|no| E
-    F -->|yes| G{"LIGHTNING 미전송?"}
-    G -->|no| H["중복 입력 차단"]
+    F -->|yes| G{"내 LIGHTNING 쿨타임 종료?"}
+    G -->|no| H["입력 무시"]
     G -->|yes| I["WebSocket LIGHTNING 전송"]
-    I --> J["sessionStorage 전송 상태 저장"]
-    J --> K["visual-only 1200 낙관 차감"]
-    K --> L["GAME_RESULT 대기"]
+    I --> J["내 스펠 2초 쿨타임 표시"]
+    J --> K["서버 LIGHTNING_APPLIED 대기"]
+    K --> L["서버 action 기준 HP 차감"]
+    L --> M{"isKill?"}
+    M -->|yes| N["GAME_RESULT 대기"]
+    M -->|no| C
 ```
 
-이번 이슈의 핵심은 전투 입력 UX를 붙이되, 프론트가 판정 source of truth가 되지 않게 하는 것이다. Three.js hover 판정은 사용자의 입력 가능 조건으로만 사용하고, 백엔드로는 좌표나 키 정보를 보내지 않는다. 백엔드는 기존 계약대로 WebSocket 수신 시각과 `GAME_START` 시나리오, 저장된 `game_actions`를 기준으로 승패와 HP 판정을 수행한다.
+이번 이슈의 핵심은 반복 전투 입력 UX를 붙이되, 프론트가 판정 source of truth가 되지 않게 하는 것이다. Three.js hover 판정은 사용자의 입력 가능 조건으로만 사용하고, 백엔드로는 좌표나 키 정보를 보내지 않는다. 백엔드는 WebSocket 수신 시각, `GAME_START` 시나리오, 저장된 `game_actions`를 기준으로 HP와 kill을 판정한다.
 
 이번 이슈에 포함되는 범위:
 
 - 움직이는 스타 코어 hover 판정.
-- hover 중 `D` 또는 `F` 키 입력 시 LIGHTNING 1회 전송.
-- sessionStorage 기반 gameRoom 단위 중복 전송 방지.
-- LIGHTNING 전송 후 visual-only HP 낙관 차감.
-- `GAME_RESULT.actions` 수신 시 확정 데미지 기준 HP 보정 모델 준비.
+- hover 중 `D` 또는 `F` 키 입력 시 LIGHTNING 전송.
+- 내 스펠 중앙 하단 배치. 상대 스펠 HUD는 표시하지 않고 상대 LIGHTNING은 빨간 impact와 HP 반영으로 표현.
+- 2초 쿨타임 시계방향 overlay 표시.
+- 서버 `LIGHTNING_APPLIED` 수신 시 HP 확정 차감.
+- kill이면 `GAME_RESULT` 수신까지 대기.
 - 서버 결과 전까지 승패/결과 화면 이동 금지.
 
 후속 이슈로 미루는 범위:
@@ -37,7 +41,7 @@ flowchart TD
 - result payload 임시 저장/전환 UX 고도화.
 - Game summary API 호출.
 - LP/rank/series 표시.
-- 상대 LIGHTNING 실패를 실시간으로 반영하는 중간 WebSocket event 추가.
+- target 좌표 기반 서버 hit 판정.
 
 ## Backend Contract
 
@@ -66,13 +70,29 @@ Game WebSocket client message:
 백엔드 판정 정책:
 
 - LIGHTNING 데미지는 `1200`.
+- LIGHTNING 쿨타임은 유저별 `2000ms`.
 - `lightningTimeMs = serverReceiveTimeMs - gameStartTime`.
-- 현재 HP는 scenario HP에서 이전 LIGHTNING 데미지를 차감해 계산.
+- 현재 HP는 scenario HP에서 이전 저장 action 수만큼 LIGHTNING 데미지를 차감해 계산.
 - LIGHTNING 적용 전 HP가 `1200` 이하이면 kill.
-- kill이면 `GAME_RESULT(reason=LIGHTNING_KILL)` broadcast.
-- 두 유저가 모두 LIGHTNING을 사용했고 kill이 없으면 `GAME_RESULT(reason=BOTH_LIGHTNINGS_USED_DRAW)` broadcast.
+- LIGHTNING이 저장되면 `LIGHTNING_APPLIED`를 broadcast.
+- kill이면 같은 action을 포함해 `GAME_RESULT(reason=LIGHTNING_KILL)`를 broadcast.
 - 자연사 종료는 scheduler가 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 broadcast.
-- kill 실패 LIGHTNING은 중간 성공 이벤트를 보내지 않는다.
+
+`LIGHTNING_APPLIED` payload shape:
+
+```ts
+interface GameLightningAppliedPayload {
+  gameRoomId: number;
+  userId: number;
+  serverReceiveTime: number;
+  lightningTimeMs: number;
+  starCoreHpAtLightning: number;
+  damage: 1200;
+  afterHp: number;
+  isKill: boolean;
+  cooldownUntil: number;
+}
+```
 
 `GAME_RESULT` payload shape:
 
@@ -99,6 +119,7 @@ interface GameResultPayload {
 
 - HTTP API는 사용하지 않는다.
 - WebSocket `LIGHTNING` 전송은 command이고, 전송 성공이 승패 확정 기준이 아니다.
+- HP 차감은 `LIGHTNING_APPLIED` 수신 기준으로 확정한다.
 - 최종 승패는 `GAME_RESULT` 수신 기준이다.
 - 이번 이슈에서는 `GAME_RESULT` 수신 후 result route로 이동하지 않는다.
 - `GAME_RESULT.actions[].afterHp`는 LIGHTNING 수신 시점의 판정 HP이며 현재 프레임 HP로 직접 덮어쓰지 않는다.
@@ -112,12 +133,12 @@ interface GameResultPayload {
 - hover 상태에 따라 입력 가능 시각 상태 표시.
 - `D` 또는 `F` keydown 처리.
 - hover가 아닐 때 keydown 무시.
-- 이미 전송한 gameRoom이면 keydown 무시.
+- 내 LIGHTNING 2초 쿨타임 중이면 keydown 무시.
 - WebSocket 연결이 없거나 error/close 상태이면 keydown 무시.
 - `sendLightning()`으로 `{ type: 'LIGHTNING', payload: null }` 전송.
-- 전송 직후 sessionStorage에 `league-of-star.gamePlayLightningSent:{gameRoomId}` 저장.
-- 전송 실패 시 sessionStorage 저장하지 않음.
-- `pendingDamage=1200` visual-only HP 차감.
+- 전송 직후 내 스펠 2초 쿨타임 overlay 표시.
+- 전송 실패 시 HP/action을 확정하지 않음.
+- `LIGHTNING_APPLIED` 수신 기준 HP 확정 차감.
 - `GAME_RESULT.actions.length * 1200` 확정 데미지 계산.
 - display HP 단조 감소 clamp 적용.
 - Locale/Test/문서 정합성 반영.
@@ -125,7 +146,7 @@ interface GameResultPayload {
 이번 이슈에서 제외:
 
 - 백엔드 WebSocket contract 변경.
-- `LIGHTNING_APPLIED` 같은 중간 이벤트 추가.
+- 클라이언트 좌표 기반 서버 hit 판정.
 - target 좌표 기반 hit 판정.
 - 클라이언트 timestamp 보정.
 - `GAME_RESULT` 수신 후 route 이동.
@@ -141,7 +162,7 @@ interface GameResultPayload {
 - [x] 백엔드 `LIGHTNING` payload가 비어 있어야 하는 계약 확인.
 - [x] `sendLightning()`이 `{ type: 'LIGHTNING', payload: null }`만 보내는지 유지.
 - [x] `GAME_RESULT.actions[].afterHp`를 현재 HP로 직접 쓰지 않는 정책 문서화.
-- [x] kill 실패 LIGHTNING에는 중간 성공 이벤트가 없음을 문서화.
+- [x] LIGHTNING_APPLIED 중간 이벤트와 GAME_RESULT 최종 이벤트 책임 분리 문서화.
 
 확인 결과:
 
@@ -150,7 +171,7 @@ interface GameResultPayload {
 - 프론트 `GameWebSocketConnection.sendLightning()`은 `{ type: 'LIGHTNING', payload: null }`만 전송한다.
 - 백엔드 `GameLightningJudgementService`는 client time 없이 `serverReceiveTimeMs - gameStartTime` 기준으로 `lightningTimeMs`를 계산한다.
 - 백엔드 `GameResultPayload.ActionSummary.afterHp`는 `starCoreHpAtLightning - 1200`으로 계산된 action 시점 결과이므로, 프론트 현재 HP로 직접 덮어쓰지 않는다.
-- 백엔드 `GameLightningService`는 kill 실패 후 양쪽 LIGHTNING이 모두 소모되지 않은 경우 중간 응답 없이 종료 deadline만 앞당기고 `GAME_RESULT`를 보내지 않는다.
+- 백엔드 `GameLightningService`는 저장된 LIGHTNING마다 `LIGHTNING_APPLIED`를 broadcast하고, kill action이면 `GAME_RESULT`를 이어서 broadcast한다.
 
 ### 2. Three.js Hover Contract 구현
 
@@ -173,63 +194,91 @@ interface GameResultPayload {
 - [x] `GamePlayPage`에서 `D`/`F` keydown listener 등록.
 - [x] hover true일 때만 LIGHTNING 입력 허용.
 - [x] `D`/`F` 외 키는 무시.
-- [x] 이미 전송한 gameRoom이면 중복 전송 차단.
+- [x] 내 LIGHTNING 2초 쿨타임 중이면 중복 전송 차단.
 - [x] WebSocket 연결 불가, error, close, result 수신 이후에는 전송 차단.
 - [x] key repeat으로 중복 전송되지 않게 방어.
 
 구현 결과:
 
 - `GamePlayPage`는 mount 시 `window.keydown` listener를 등록하고 unmount 시 제거한다.
-- LIGHTNING 입력 가능 조건은 `target hover`, `D/F key`, `WebSocket connected 또는 handoff`, `미전송`, `GAME_RESULT 미수신`, `key repeat 아님`으로 제한한다.
+- LIGHTNING 입력 가능 조건은 `target hover`, `D/F key`, `WebSocket connected 또는 handoff`, `내 cooldown 종료`, `GAME_RESULT 미수신`, `key repeat 아님`으로 제한한다.
 - 조건이 맞으면 기존 `GameWebSocketConnection.sendLightning()`을 호출하므로 wire payload는 `{ type: 'LIGHTNING', payload: null }` 계약을 그대로 따른다.
-- 전송 성공 직후 페이지 상태의 `lightningSent`를 true로 바꿔 같은 화면 생명주기에서 중복 입력을 막는다.
+- 전송 성공 직후 내 슬롯을 2초 cooldown 상태로 전환해 같은 cooldown window의 중복 입력을 막는다.
 - 전송 실패 시 `lightningSent`를 false로 유지하고 socket error 상태만 표시한다.
-- sessionStorage 영구 저장과 새로고침 후 중복 방지는 4번 `LIGHTNING Storage / State 구현`에서 처리한다.
+- 쿨타임 상태와 서버 `LIGHTNING_APPLIED.cooldownUntil` 보정은 4번 `LIGHTNING Cooldown / State 구현`에서 처리한다.
 
-### 4. LIGHTNING Storage / State 구현
+### 4. LIGHTNING Cooldown / State 구현
 
-- [x] sessionStorage key를 `league-of-star.gamePlayLightningSent:{gameRoomId}`로 유지.
-- [x] 전송 성공 직후 sessionStorage 저장.
-- [x] 새로고침/재진입 후 같은 gameRoom이면 전송 불가 상태로 복구.
-- [x] 전송 실패 시 sessionStorage 저장하지 않고 error 상태만 표시.
+- [x] 내 LIGHTNING 2초 쿨타임 상태 관리.
+- [x] 상대 LIGHTNING 2초 쿨타임 상태 관리.
+- [x] `LIGHTNING_APPLIED.cooldownUntil` 수신 시 서버 기준 쿨타임 보정.
+- [x] 전송 실패 시 쿨타임/HP 확정하지 않고 error 상태만 표시.
 - [x] 프론트는 전송 성공 직후 승패를 확정하지 않음.
 
 구현 결과:
 
 - `GamePlayPage`는 진입 시 `league-of-star.gamePlayLightningSent:{gameRoomId}`를 읽어 `lightningSent` 상태를 복구한다.
 - LIGHTNING 전송이 예외 없이 끝난 뒤에만 같은 key에 `true`를 저장한다.
-- storage 저장 실패는 클라이언트 중복 방지 실패로만 보고 서버 unique 제약을 최종 방어선으로 둔다.
+- 반복 스킬이므로 sessionStorage 기반 영구 lock은 사용하지 않고, 서버 action/cooldown 이벤트를 최종 기준으로 둔다.
 - WebSocket `sendLightning()` 예외가 발생하면 storage를 저장하지 않고 `lightningSent=false`를 유지한다.
 - 전송 성공 직후에도 `GAME_RESULT`를 받기 전까지 승패/result route 이동을 확정하지 않는다.
 
 ### 5. HP Display Model 구현
 
-- [ ] 기본 HP는 `GAME_START.scenario.hpTimeline`과 `startAt` 기준으로 계산.
-- [ ] LIGHTNING 전송 직후 `pendingDamage=1200` visual-only 차감 적용.
-- [ ] `GAME_RESULT.actions` 수신 시 확정 데미지를 `actions.length * 1200`으로 계산.
-- [ ] `afterHp`를 현재 HP로 직접 덮어쓰지 않음.
-- [ ] `displayHp = min(previousDisplayHp, rawEffectiveHp)`로 HP 증가 방지.
-- [ ] HP 보정은 표시용이며 승패 판정과 분리.
+- [x] 기본 HP는 `GAME_START.scenario.hpTimeline`과 `startAt` 기준으로 계산.
+- [x] `LIGHTNING_APPLIED` 수신 시 확정 damage 반영.
+- [x] `GAME_RESULT.actions` 수신 시 확정 데미지를 `actions.length * 1200`으로 계산.
+- [x] `afterHp`를 현재 HP로 직접 덮어쓰지 않음.
+- [x] `displayHp = min(previousDisplayHp, rawEffectiveHp)`로 HP 증가 방지.
+- [x] HP 보정은 표시용이며 승패 판정과 분리.
+
+구현 결과:
+
+- `scenarioHp`는 `GAME_START.scenario.hpTimeline`과 `startAt` 기준 자연 HP로 유지한다.
+- `currentHp`는 `scenarioHp - confirmedDamage`를 기반으로 한 표시용 effective HP다.
+- `LIGHTNING_APPLIED` 수신 후 applied action 수만큼 HP를 확정 차감한다.
+- `GAME_RESULT` 수신 후에는 `actions.length * 1200`을 확정 damage로 계산한다.
+- `GAME_RESULT.actions[].afterHp`는 action 시점 결과이므로 현재 HP로 직접 덮어쓰지 않는다.
+- `displayedHp`는 이전 표시값과 다음 effective HP 중 작은 값만 사용해 HP가 다시 차오르지 않게 한다.
+- 이 HP 모델은 visual-only이며 최종 승패와 route 전환은 여전히 `GAME_RESULT`와 후속 result 이슈 기준이다.
 
 ### 6. UI / Locale 구현
 
-- [ ] hover 가능 상태를 canvas 위에서 확인 가능하게 표시.
-- [ ] `D / F` 입력 준비 상태 HUD 구현.
-- [ ] LIGHTNING 전송 후 서버 결과 대기 상태 표시.
-- [ ] WebSocket error/close 상태에서 입력 불가 표시.
-- [ ] 한국어/영어 locale 문구 추가.
-- [ ] 모바일 viewport에서도 텍스트 overflow 없게 구성.
+- [x] hover 가능 상태를 내부 입력 조건으로만 유지하고 화면에는 노출하지 않음.
+- [x] 중앙 하단 내 `D / F` 스펠 슬롯 HUD 구현.
+- [x] 상대 스펠 HUD 제거.
+- [x] 내 LIGHTNING은 파란 impact, 상대 LIGHTNING은 빨간 impact로 구분.
+- [x] LIGHTNING 전송 후 2초 cooldown overlay 상태 표시.
+- [x] WebSocket error/close 상태에서 입력 불가 표시.
+- [x] 한국어/영어 locale 문구 추가.
+- [x] 모바일 viewport에서도 텍스트 overflow 없게 구성.
+
+구현 결과:
+
+- Game Play canvas 위 중앙 하단에 내 LIGHTNING 스펠 슬롯만 추가한다.
+- HUD는 `lightning-spell.png` 이미지와 `D`/`F` key cap만 표시한다.
+- `발동 준비`, `타겟 조준 대기`, `타겟 고정` 같은 hover 성공 안내 문구는 표시하지 않는다. hover는 난이도 유지를 위한 내부 입력 조건으로만 사용한다.
+- 상태는 `active`, `cooldown`, `result`, `error`, `offline`으로 계산하며 `ready/targeted` 상태를 사용자에게 노출하지 않는다.
+- LIGHTNING 전송 성공 후에는 내 슬롯을 2초 쿨타임 상태로 전환하고, 내 `LIGHTNING_APPLIED` 수신 시 서버 `cooldownUntil` 기준으로 보정한다.
+- 전송 성공 직후 star 위치에 파란 번개 impact를 표시하되, 이 연출은 판정 결과가 아니라 입력 피드백으로만 취급한다.
+- 상대 `LIGHTNING_APPLIED` 수신 시에는 상대 HUD를 표시하지 않고 star 위치에 빨간 번개 impact를 표시한다.
+- HUD는 desktop/mobile 모두 중앙 하단에 고정하고 텍스트 상태 label을 제거해 viewport 폭 변화로 인한 overflow 가능성을 낮춘다.
 
 ### 7. Test 구현
 
 - [ ] hover false에서 `D`/`F` 입력 시 `sendLightning()` 미호출 검증.
-- [ ] hover true에서 `D` 입력 시 `sendLightning()` 1회 호출 검증.
-- [ ] hover true에서 `F` 입력 시 `sendLightning()` 1회 호출 검증.
+- [ ] cooldown이 없고 hover true에서 `D` 입력 시 `sendLightning()` 1회 호출 검증.
+- [ ] cooldown이 없고 hover true에서 `F` 입력 시 `sendLightning()` 1회 호출 검증.
 - [ ] 기타 키와 key repeat 무시 검증.
-- [ ] 같은 gameRoom 중복 전송 차단 검증.
-- [ ] sessionStorage 전송 상태가 있으면 재진입 후 전송 차단 검증.
+- [ ] 같은 gameRoom의 2초 cooldown 중 재전송 차단 검증.
+- [ ] 2초 쿨타임 중 재입력 차단 검증.
 - [ ] WebSocket 연결 실패/close/error 상태에서 전송 차단 검증.
-- [ ] 전송 실패 시 sessionStorage 미저장 검증.
+- [ ] 전송 실패 시 HP/action 미확정 검증.
+- [ ] 내 LIGHTNING 스펠 슬롯이 중앙 하단에 렌더링되고 상대 스펠 HUD가 렌더링되지 않는지 검증.
+- [ ] hover 성공 안내 문구가 화면에 노출되지 않는지 검증.
+- [ ] LIGHTNING 전송 후 슬롯이 2초 cooldown overlay 상태로 전환되는지 검증.
+- [ ] 내 LIGHTNING 전송 성공 시 파란 번개 impact 연출이 호출되는지 검증.
+- [ ] 상대 LIGHTNING_APPLIED 수신 시 빨간 번개 impact 연출이 호출되는지 검증.
 - [ ] LIGHTNING payload가 null만 포함하는지 검증.
 - [ ] pending damage와 confirmed damage가 HP display에 반영되는지 검증.
 - [ ] `afterHp`로 현재 HP를 덮어쓰지 않는지 검증.
@@ -260,8 +309,9 @@ interface GameResultPayload {
 - 프론트 hover는 입력 가능 조건일 뿐 판정 source가 아니다.
 - 프론트는 target 좌표, pointer 좌표, 키 종류, timestamp, HP, elapsed time을 백엔드로 보내지 않는다.
 - 최종 승패는 `GAME_RESULT`만 기준으로 한다.
+- 최종 처치자/승자는 `LIGHTNING_APPLIED.isKill`이 아니라 `GAME_RESULT.winnerUserId`를 기준으로 한다.
 - LIGHTNING 전송 성공은 command ack도 아니며, 브라우저 send 성공은 서버 판정 성공을 의미하지 않는다.
-- kill 실패 LIGHTNING은 중간 이벤트가 없으므로 상대 LIGHTNING 실패를 실시간 HP에 반영하지 않는다.
+- LIGHTNING_APPLIED 수신 전에는 HP를 확정 차감하지 않는다.
 - 낙관 HP 차감은 내 입력에 대한 visual-only feedback이다.
 - `GAME_RESULT.actions[].afterHp`는 현재 HP가 아니라 해당 action 시점의 판정 결과다.
 - 현재 표시 HP는 `현재 scenario HP - 확정 damage - pending damage`로 계산한다.
@@ -273,15 +323,19 @@ interface GameResultPayload {
 ## Acceptance Criteria
 
 - hover하지 않은 상태에서 `D`/`F`를 눌러도 LIGHTNING이 전송되지 않는다.
-- 움직이는 스타 코어에 hover한 상태에서 `D` 또는 `F`를 누르면 LIGHTNING이 한 번만 전송된다.
+- 움직이는 스타 코어에 hover한 상태에서 `D` 또는 `F`를 누르면 LIGHTNING이 전송되고, 2초 cooldown 중에는 재전송되지 않는다.
+- cooldown 종료 후 다시 hover + `D`/`F`를 누르면 LIGHTNING을 다시 전송할 수 있다.
 - 전송 payload가 정확히 `{ type: 'LIGHTNING', payload: null }`이다.
 - 클라이언트 timestamp/HP/elapsed/좌표/키 정보가 payload에 포함되지 않는다.
-- 같은 gameRoom에서 새로고침/재진입 후에도 중복 전송되지 않는다.
+- 같은 gameRoom에서 새로고침/재진입 후에도 서버 `cooldownUntil` 기준으로 cooldown 상태가 보정된다.
 - 전송 실패 시 중복 방지 저장을 하지 않고 재시도 가능 상태를 유지한다.
 - 전송 직후 HP가 visual-only로 차감된다.
 - 서버 결과 보정 시 HP가 다시 차오르지 않는다.
 - `afterHp`를 현재 HP로 직접 덮어쓰지 않는다.
 - `GAME_RESULT` 수신 전까지 승패/결과 화면 이동이 발생하지 않는다.
+- 내 스펠 HUD만 중앙 하단에 표시되고 상대 스펠 HUD는 표시되지 않는다.
+- 내 LIGHTNING impact는 파란색, 상대 LIGHTNING impact는 빨간색으로 표시된다.
+- LIGHTNING 처치 승자는 `GAME_RESULT.winnerUserId`로만 해석된다.
 - format/lint/typecheck/test/build가 통과한다.
 - desktop/mobile viewport에서 horizontal overflow와 text overflow 후보가 없다.
 
@@ -299,8 +353,8 @@ flowchart TD
     B --> C{"D/F keydown"}
     C -->|invalid| D["ignore"]
     C -->|valid| E["send LIGHTNING payload null"]
-    E --> F["sessionStorage sent lock"]
-    F --> G["visual pending damage"]
+    E --> F["server LIGHTNING_APPLIED"]
+    F --> G["server applied damage"]
     G --> H["wait GAME_RESULT"]
 ```
 
@@ -316,7 +370,7 @@ flowchart TD
 
 - 백엔드는 WebSocket 수신 시각과 저장된 scenario/action을 source of truth로 삼음.
 - kill 여부는 서버가 `starCoreHpAtLightning <= 1200` 기준으로 판정함.
-- kill 실패 LIGHTNING은 중간 성공 이벤트가 없으므로 프론트가 상대 실패 입력을 실시간 확정하지 않음.
+- kill 실패 LIGHTNING도 `LIGHTNING_APPLIED`로 broadcast되며, 프론트는 이 이벤트 기준으로 HP를 확정하고 내 cooldown만 HUD에 표시함.
 - 최종 전환 기준은 `GAME_RESULT`이며, 이번 이슈에서는 route 이동하지 않음.
 
 ## 📚 Changes
@@ -324,8 +378,8 @@ flowchart TD
 - 입력 조건을 hover + `D`/`F`로 좁힘.
   버튼을 누르면 언제든 발동되는 구조보다 게임성이 있고, target 좌표를 서버에 보내는 구조보다 백엔드 판정 계약이 단순함. hover는 클라이언트 UX 조건으로만 쓰고, 서버 판정은 기존 WebSocket 수신 시각 기준을 유지함.
 
-- LIGHTNING 중복 전송을 gameRoom 단위로 막음.
-  백엔드는 `game_actions` unique 제약으로 최종 방어하지만, 프론트도 sessionStorage로 같은 gameRoom 중복 입력을 막아 사용자가 같은 입력을 여러 번 눌러도 계약 밖 요청을 반복하지 않게 함.
+- LIGHTNING 반복 입력을 2초 cooldown 단위로 제한함.
+  백엔드는 gameRoom lock과 유저별 최근 action 시각으로 2초 쿨타임을 판정하고, 프론트도 같은 쿨타임 동안 반복 입력을 막아 불필요한 요청을 줄임.
 
 - HP 표시를 effective HP 모델로 정리함.
   `afterHp`를 현재 HP로 덮어쓰면 서버 결과가 늦게 도착했을 때 HP가 다시 차는 것처럼 보일 수 있음. 그래서 현재 scenario HP에서 확정 데미지와 pending 데미지를 빼고, display HP는 단조 감소만 허용함.
@@ -337,7 +391,7 @@ flowchart TD
 
 - 이번 PR에서 result route 이동은 제외함.
 - Game summary API 호출은 제외함.
-- 상대 LIGHTNING 실패 실시간 반영은 백엔드 중간 이벤트가 없어 제외함.
+- 상대 LIGHTNING 반영은 `LIGHTNING_APPLIED` 이벤트 기준으로 포함하되, 상대 스펠 HUD는 표시하지 않고 빨간 impact로만 표현함.
 - 새 패키지는 추가하지 않음.
 - 검증 결과를 여기에 기재함.
 

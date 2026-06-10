@@ -248,14 +248,12 @@ stateDiagram-v2
     
     state IN_PROGRESS {
         [*] --> WAITING_ACTION: 라이트닝 대기
-        WAITING_ACTION --> WAITING_ACTION: LIGHTNING 저장<br/>미처치 + 상대 입력 남음
+        WAITING_ACTION --> WAITING_ACTION: LIGHTNING 저장<br/>미처치 + cooldown 진행
         WAITING_ACTION --> LIGHTNING_KILL: LIGHTNING 저장<br/>HP 0 이하
-        WAITING_ACTION --> BOTH_LIGHTNING_USED: 양쪽 LIGHTNING 저장<br/>미처치
         WAITING_ACTION --> WAITING_ACTION: GAME_START 이후 disconnect<br/>서버 timer/scheduler가 clock 유지
     }
     
     LIGHTNING_KILL --> FINISHED: 판정 완료 (Winner Decided)
-    BOTH_LIGHTNING_USED --> FINISHED: 즉시 DRAW
     IN_PROGRESS --> FINISHED: effective naturalDeathAt 도달 후<br/>scheduler 자연사 DRAW 정산
     FINISHED --> RECORDED: Step 9 record/rank 정산 완료
     RECORDED --> MATCH_STATUS_CLEANED: Step 10 match:status IN_GAME 제거
@@ -283,11 +281,10 @@ stateDiagram-v2
 - LIGHTNING 판정 시각은 `serverReceiveTimeMs - startAt`으로 계산하며, median RTT 또는 `RTT_PONG` 측정값으로 보정하지 않습니다.
 - `lightningTimeMs < 100` 또는 scenario 범위 밖 LIGHTNING은 action으로 저장하지 않습니다.
 - 서버는 저장된 HP scenario와 기존 `game_actions`를 기준으로 해당 시점 HP를 계산하고, 이전 LIGHTNING이 킬 실패였더라도 `1200` 데미지를 차감합니다.
-- 유저당 gameRoom당 LIGHTNING은 한 번만 저장하며, 중복 LIGHTNING은 새 action을 만들지 않습니다.
-- 결과가 확정되지 않은 LIGHTNING은 중간 응답을 전송하지 않습니다.
+- 유저당 gameRoom당 LIGHTNING은 반복 저장할 수 있으며, 같은 유저의 최근 LIGHTNING 이후 2초 cooldown 안에 들어온 요청은 새 action을 만들지 않습니다.
+- 결과가 확정되지 않은 LIGHTNING도 `LIGHTNING_APPLIED`로 broadcast하여 양쪽 클라이언트가 서버 기준 HP/cooldown을 표시합니다.
 - LIGHTNING 적용 후 HP가 `0` 이하이면 같은 처리 흐름에서 gameRoom을 `FINISHED`로 확정하고 `GAME_RESULT`를 broadcast합니다.
-- 양쪽 유저가 모두 LIGHTNING을 사용했는데 처치하지 못한 경우 같은 처리 흐름에서 gameRoom을 `DRAW`로 확정하고 `GAME_RESULT`를 broadcast합니다.
-- 한 명만 LIGHTNING을 사용했고 처치하지 못한 경우 gameRoom은 `IN_PROGRESS`를 유지하며, 이후 상대 LIGHTNING 또는 자연사/제한 시간 종료 정산을 기다립니다.
+- LIGHTNING이 처치하지 못한 경우 gameRoom은 `IN_PROGRESS`를 유지하며, 이후 추가 LIGHTNING 또는 자연사/제한 시간 종료 정산을 기다립니다.
 - 이미 `FINISHED`된 gameRoom에 늦게 도착한 LIGHTNING은 새 action을 저장하지 않고 현재 session에 확정된 `GAME_RESULT`만 재응답합니다.
 - scheduler는 `naturalDeathAt`에 도달한 gameRoom을 정산 대상으로 삼고, 이미 `IN_PROGRESS`가 아니면 no-op 처리합니다.
 - scheduler는 due gameRoom을 row lock으로 다시 조회하고, 저장된 action 목록과 원본 scenario를 합성해 effective HP를 재계산합니다.

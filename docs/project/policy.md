@@ -118,7 +118,7 @@
 | **스타 코어 초기 HP** | 10,000 |
 | **라이트닝 데미지** | 1,200 (True Damage, 고정) |
 | **게임 제한 시간** | **8 ~ 17초** (매판 랜덤, 서버가 시나리오 생성 시 결정) |
-| **라이트닝 입력** | 1인당 **1회만** 가능 |
+| **라이트닝 입력** | 1인당 반복 가능. 단, 서버 기준 최근 LIGHTNING 이후 **2초 cooldown** 필요 |
 | **라이트닝 사용 조건** | 스타 코어 위에 마우스를 올린 상태에서 **D 또는 F 키** 입력 |
 | **HP 감소 패턴** | 200ms 단위 랜덤 버스트 (서버 사전 생성 시나리오) |
 | **스타 코어 종료 시** | HP가 0에 도달하면 **즉시 게임 종료** |
@@ -137,7 +137,7 @@
 
 - 스타 코어 영역에 마우스 커서를 올린 상태에서 **D 또는 F 키를 누를 때** 라이트닝 발동
 - 마우스가 스타 코어 영역 밖에 있으면 키를 눌러도 **라이트닝이 발동되지 않음**
-- 한 번 라이트닝을 사용하면 **재사용 불가** (UI에서 비활성화)
+- 라이트닝 사용 후 **2초 cooldown** 동안 재사용 불가. cooldown 이후 다시 입력 가능
 - 게임 종료까지 라이트닝을 사용하지 않으면 → 자동으로 **미사용 처리**
 
 ### 2.3 승패 판정
@@ -178,10 +178,10 @@
 - `GAME_START` 확정 후 `game:end:pending` 등록에 실패하면 서버가 종료 정산을 보장할 수 없으므로 gameRoom과 participants를 `ABORTED` 처리하고 `COUNTDOWN`/`GAME_START`를 전송하지 않는다. 이 경우 `game:end:pending`, match user status, RTT 상태, waiting 상태 cleanup을 시도하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫으며, record와 LP/티어 변동은 반영하지 않는다.
 - `GAME_START` 메시지 전송에 실패하면 이미 등록된 `game:end:pending` deadline을 제거하고 gameRoom과 participants를 `ABORTED` 처리한다. 이 경우 match user status, RTT 상태, waiting 상태를 정리하고 `GAME_START_FAILED` 전송 후 WebSocket을 닫는다.
 - game end scheduler는 `naturalDeathAt`에 도달한 gameRoom만 정산 대상으로 삼고, 정산 시 gameRoom이 이미 `IN_PROGRESS`가 아니면 no-op 처리한다.
-- LIGHTNING으로 승/패가 확정되거나 두 유저가 모두 LIGHTNING을 소모해 `DRAW`가 확정된 경우에도 `game:end:pending` member cleanup은 필수로 하지 않는다. DB의 `game_rooms.status`가 최종 기준이며, 후속 game end scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
+- LIGHTNING으로 승/패가 확정된 경우에도 `game:end:pending` member cleanup은 필수로 하지 않는다. DB의 `game_rooms.status`가 최종 기준이며, 후속 game end scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
 - 자연사 종료 정산은 DB gameRoom 결과 확정을 먼저 수행하고, 연결된 local WebSocket session이 있으면 `GAME_RESULT`를 보낸다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
 - 자연사 종료 후 pending cleanup은 WebSocket 전송 성공의 의미가 아니라 DB 기준으로 정산 완료된 후보를 제거하는 의미다. cleanup을 생략하면 이미 종료된 gameRoom이 scheduler tick마다 반복 조회될 수 있다.
-- `GAME_RESULT.reason`은 종료 사유에 따라 `LIGHTNING_KILL`, `BOTH_LIGHTNINGS_USED_DRAW`, `NATURAL_DEATH_DRAW`를 사용한다.
+- `GAME_RESULT.reason`은 종료 사유에 따라 `LIGHTNING_KILL`, `NATURAL_DEATH_DRAW`를 사용한다. 반복 LIGHTNING 정책에서는 두 유저의 1회 소모 완료를 종료 조건으로 보지 않는다.
 - record/LP/배치/승급전 반영은 gameRoom 결과 확정 및 `GAME_RESULT` 전송 흐름과 분리한다. `game_rooms`/`game_participants` 결과 확정 이후 Step 9 record/rank 정산이 `game_records` 생성과 LP/RankSeries 반영을 별도 transaction으로 처리한다.
 
 ### 2.5 서버 권위 타임스탬프 (공정성 핵심)
@@ -208,7 +208,7 @@
 - LIGHTNING 판정은 실제 롤 라이트닝 감각에 맞춰 서버가 받은 입력 순서를 기준으로 처리
 - 스타 코어 초기 HP는 `10000`, LIGHTNING 데미지는 `1200` 고정값으로 둔다.
 - `game_actions.star_core_hp_at_lightning`는 레거시 컬럼명이며, scenario 원본 HP가 아니라 이전 LIGHTNING 데미지를 반영한 이번 LIGHTNING 적용 전 현재 스타 코어 HP를 저장한다.
-- `game_actions`는 유저당 1회 LIGHTNING 입력 기록으로 유지하고, 승패 기록과 LP/배치/승급전 반영은 `game_records`에서 처리한다.
+- `game_actions`는 LIGHTNING 입력마다 append-only로 저장한다. 같은 유저도 서버 cooldown을 통과하면 같은 gameRoom에 여러 action을 남길 수 있고, 승패 기록과 LP/배치/승급전 반영은 `game_records`에서 처리한다.
 - 킬 실패한 LIGHTNING도 이후 HP 판정에는 `1200` 데미지로 반영한다.
 - `afterHp = max(0, starCoreHpAtLightning - 1200)`은 응답 payload에서 계산하고 DB에는 저장하지 않는다.
 - `lightningTimeMs`가 HP timeline step 사이에 있으면 인접한 두 step의 HP를 선형 보간해 base HP를 계산한다.
@@ -253,11 +253,11 @@ LIGHTNING 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에�
 | **판정 기준** | `serverReceiveTimeMs`가 빠른 action부터 판정 |
 | **동일 수신 시각** | `id ASC` 순서로 판정 |
 | **HP 반영** | 앞선 LIGHTNING이 킬 실패였더라도 이후 action의 현재 HP에서 `1200`을 차감 |
-| **결과 확정** | LIGHTNING 적용 후 HP가 `0` 이하가 되면 즉시 `FINISHED`, 두 유저가 모두 실패하면 즉시 `DRAW` |
+| **결과 확정** | LIGHTNING 적용 후 HP가 `0` 이하가 되면 즉시 `FINISHED`. 킬 실패 action은 누적 damage와 자연사 deadline에만 반영 |
 
 - 서버는 처치 LIGHTNING을 저장한 transaction에서 gameRoom 결과를 확정한다.
-- 두 유저가 모두 LIGHTNING을 사용했고 둘 다 처치하지 못했다면 두 번째 실패 LIGHTNING을 저장한 transaction에서 gameRoom을 `DRAW`로 확정한다.
-- 결과가 확정되지 않은 LIGHTNING은 중간 응답을 전송하지 않는다.
+- 두 유저가 모두 LIGHTNING을 사용했더라도 반복 입력 가능 정책에서는 즉시 `DRAW`로 확정하지 않는다.
+- 결과가 확정되지 않은 LIGHTNING도 `LIGHTNING_APPLIED`로 broadcast하여 양쪽 클라이언트의 HP/cooldown 표시를 서버 판정값으로 맞춘다.
 - LIGHTNING으로 결과가 확정되었으면 양쪽 클라이언트에 `GAME_RESULT`를 broadcast한다.
 - 이미 `FINISHED`인 gameRoom에 늦게 도착한 LIGHTNING은 새 action으로 저장하지 않고 현재 session에 `GAME_RESULT`만 재응답한다.
 - record/LP 반영은 `GAME_RESULT` 전송 흐름과 분리한다. `game_records` 생성, LP 반영, 배치/승급전 처리는 Step 9 record/rank 정산에서 확정된 gameRoom 결과를 기준으로 수행한다.
@@ -307,7 +307,7 @@ LIGHTNING 판정에는 RTT 보정을 적용하지 않는다. 같은 gameRoom에�
 | **입력 검증** | 클라이언트는 LIGHTNING 의도만 전송. 현재 wire type은 레거시 `"LIGHTNING"`이며 시간 정보 포함 시 요청 무효 처리 |
 | **셀프 매칭 방지** | 동일 IP에서 양쪽 플레이어 접속 시 매칭 차단 |
 | **입력 시점 판정** | 게임 시작 후 비정상적으로 빠른 입력 (`lightningTimeMs < 100`) 또는 scenario 범위 밖 입력은 무효 처리 |
-| **요청 중복 차단** | 동일 게임에서 2회 이상 LIGHTNING 요청 수신 시 첫 번째만 유효 |
+| **요청 중복 차단** | 같은 유저의 최근 LIGHTNING 이후 2초 이내 요청은 새 action으로 저장하지 않음 |
 
 ### 2.7 WebSocket 라우팅 정책
 
