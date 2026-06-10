@@ -12,7 +12,7 @@ flowchart TD
     D -->|no| C
     D -->|yes| G{"내 LIGHTNING 쿨타임 종료?"}
     G -->|no| H["입력 무시"]
-    G -->|yes| I["마우스 위치에 파란 번개 impact"]
+    G -->|yes| I["마우스 위치에 impact burst"]
     I --> J["내 스펠 2초 쿨타임 표시"]
     J --> K{"target hovered + WebSocket ready?"}
     K -->|no| C
@@ -29,9 +29,9 @@ flowchart TD
 이번 이슈에 포함되는 범위:
 
 - 움직이는 스타 코어 hover 판정.
-- `D` 또는 `F` 키 입력 시 마우스 위치에 LIGHTNING 시전 impact 표시.
+- `D` 또는 `F` 키 입력 시 마우스 위치에 LIGHTNING 시전 impact burst 표시.
 - hover 중 `D` 또는 `F` 키 입력 시에만 백엔드 LIGHTNING 전송.
-- 내 스펠 중앙 하단 배치. 상대 스펠 HUD는 표시하지 않고 상대 LIGHTNING은 빨간 impact와 HP 반영으로 표현.
+- 내 스펠 중앙 하단 배치. 상대 스펠 HUD는 표시하지 않고 상대 LIGHTNING은 빨간 impact burst와 HP 반영으로 표현.
 - 2초 쿨타임 시계방향 overlay 표시.
 - 서버 `LIGHTNING_APPLIED` 수신 시 HP 확정 차감.
 - kill이면 `GAME_RESULT` 수신까지 대기.
@@ -250,7 +250,7 @@ interface GameResultPayload {
 - [x] hover 가능 상태를 내부 입력 조건으로만 유지하고 화면에는 노출하지 않음.
 - [x] 중앙 하단 내 `D / F` 스펠 슬롯 HUD 구현.
 - [x] 상대 스펠 HUD 제거.
-- [x] 내 LIGHTNING은 파란 impact, 상대 LIGHTNING은 빨간 impact로 구분.
+- [x] hover miss는 흰색 impact, 내 LIGHTNING hit는 파란 impact, 상대 LIGHTNING hit는 빨간 impact로 구분.
 - [x] LIGHTNING 전송 후 2초 cooldown overlay 상태 표시.
 - [x] WebSocket error/close 상태에서 입력 불가 표시.
 - [x] 한국어/영어 locale 문구 추가.
@@ -263,46 +263,49 @@ interface GameResultPayload {
 - `발동 준비`, `타겟 조준 대기`, `타겟 고정` 같은 hover 성공 안내 문구는 표시하지 않는다. hover는 난이도 유지를 위한 내부 입력 조건으로만 사용한다.
 - 상태는 `active`, `cooldown`, `result`, `error`, `offline`으로 계산하며 `ready/targeted` 상태를 사용자에게 노출하지 않는다.
 - LIGHTNING 전송 성공 후에는 내 슬롯을 2초 쿨타임 상태로 전환하고, 내 `LIGHTNING_APPLIED` 수신 시 서버 `cooldownUntil` 기준으로 보정한다.
-- 전송 성공 직후 star 위치에 파란 번개 impact를 표시하되, 이 연출은 판정 결과가 아니라 입력 피드백으로만 취급한다.
-- 상대 `LIGHTNING_APPLIED` 수신 시에는 상대 HUD를 표시하지 않고 star 위치에 빨간 번개 impact를 표시한다.
+- LIGHTNING 시각 효과는 번개 줄기 형태를 쓰지 않고, 타격 지점 중심의 ring/core/particle impact burst로 표시한다.
+- hover miss는 마우스 위치에 흰색 impact burst를 표시하되, 백엔드 전송/HP 차감/승패 판정에는 관여하지 않는다.
+- 전송 성공 직후 star 위치에 파란 impact burst를 표시하되, 이 연출은 판정 결과가 아니라 입력 피드백으로만 취급한다.
+- 상대 `LIGHTNING_APPLIED` 수신 시에는 상대 HUD를 표시하지 않고 star 위치에 빨간 impact burst를 표시한다.
 - HUD는 desktop/mobile 모두 중앙 하단에 고정하고 텍스트 상태 label을 제거해 viewport 폭 변화로 인한 overflow 가능성을 낮춘다.
 
 ### 7. Test 구현
 
-- [ ] hover false에서 `D`/`F` 입력 시 마우스 위치 impact와 cooldown은 적용되고 `sendLightning()`은 미호출되는지 검증.
-- [ ] cooldown이 없고 hover true에서 `D` 입력 시 `sendLightning()` 1회 호출 검증.
-- [ ] cooldown이 없고 hover true에서 `F` 입력 시 `sendLightning()` 1회 호출 검증.
-- [ ] 기타 키와 key repeat 무시 검증.
-- [ ] 같은 gameRoom의 2초 cooldown 중 재전송 차단 검증.
-- [ ] 2초 쿨타임 중 재입력 차단 검증.
-- [ ] WebSocket 연결 실패/close/error 상태에서 전송 차단 검증.
-- [ ] 전송 실패 시 HP/action 미확정 검증.
-- [ ] 내 LIGHTNING 스펠 슬롯이 중앙 하단에 렌더링되고 상대 스펠 HUD가 렌더링되지 않는지 검증.
-- [ ] hover 성공 안내 문구가 화면에 노출되지 않는지 검증.
-- [ ] LIGHTNING 전송 후 슬롯이 2초 cooldown overlay 상태로 전환되는지 검증.
-- [ ] 내 LIGHTNING 전송 성공 시 파란 번개 impact 연출이 호출되는지 검증.
-- [ ] 상대 LIGHTNING_APPLIED 수신 시 빨간 번개 impact 연출이 호출되는지 검증.
-- [ ] LIGHTNING payload가 null만 포함하는지 검증.
-- [ ] pending damage와 confirmed damage가 HP display에 반영되는지 검증.
-- [ ] `afterHp`로 현재 HP를 덮어쓰지 않는지 검증.
-- [ ] display HP가 다시 증가하지 않는지 검증.
+- [x] hover false에서 `D`/`F` 입력 시 마우스 위치 impact와 cooldown은 적용되고 `sendLightning()`은 미호출되는지 검증.
+- [x] cooldown이 없고 hover true에서 `D` 입력 시 `sendLightning()` 1회 호출 검증.
+- [x] cooldown이 없고 hover true에서 `F` 입력 시 `sendLightning()` 1회 호출 검증.
+- [x] 기타 키와 key repeat 무시 검증.
+- [x] 같은 gameRoom의 2초 cooldown 중 재전송 차단 검증.
+- [x] 2초 쿨타임 중 재입력 차단 검증.
+- [x] WebSocket 연결 실패/close/error 상태에서 전송 차단 검증.
+- [x] 전송 실패 시 HP/action 미확정 검증.
+- [x] 내 LIGHTNING 스펠 슬롯이 중앙 하단에 렌더링되고 상대 스펠 HUD가 렌더링되지 않는지 검증.
+- [x] hover 성공 안내 문구가 화면에 노출되지 않는지 검증.
+- [x] LIGHTNING 전송 후 슬롯이 2초 cooldown overlay 상태로 전환되는지 검증.
+- [x] hover miss 시 흰색 impact burst가 표시되고 LIGHTNING 전송은 발생하지 않는지 검증.
+- [x] 내 LIGHTNING 전송 성공 시 파란 impact burst 연출이 호출되는지 검증.
+- [x] 상대 LIGHTNING_APPLIED 수신 시 빨간 impact burst 연출이 호출되는지 검증.
+- [x] LIGHTNING payload가 null만 포함하는지 검증.
+- [x] pending damage와 confirmed damage가 HP display에 반영되는지 검증.
+- [x] `afterHp`로 현재 HP를 덮어쓰지 않는지 검증.
+- [x] display HP가 다시 증가하지 않는지 검증.
 
 ### 8. 문서 정합성 구현
 
-- [ ] `front-plan.md` 11번 입력 방식을 `hover + D/F`로 갱신.
-- [ ] `front-plan.md` Issue Split Recommendation 상태 확인.
-- [ ] issue-90에서 LIGHTNING UI가 후속 범위였다는 설명과 충돌 없는지 확인.
-- [ ] 백엔드 issue-48/50의 LIGHTNING/GAME_RESULT 정책과 정합성 확인.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
+- [x] `front-plan.md` 11번 입력 방식을 `hover + D/F`로 갱신.
+- [x] `front-plan.md` Issue Split Recommendation 상태 확인.
+- [x] issue-90에서 LIGHTNING UI가 후속 범위였다는 설명과 충돌 없는지 확인.
+- [x] 백엔드 issue-48/50의 LIGHTNING/GAME_RESULT 정책과 정합성 확인.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
 
 ### 9. 검증
 
-- [ ] `npm run test -- GamePlayPage gameWebSocket` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
+- [x] `npm run test -- GamePlayPage gameWebSocket` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
 - [ ] desktop `1440x900` overflow 확인.
 - [ ] mobile `390x844` overflow 확인.
 - [ ] 브라우저에서 hover + `D`/`F` 입력 시 payload가 `{ type: 'LIGHTNING', payload: null }`인지 확인.
@@ -325,7 +328,7 @@ interface GameResultPayload {
 
 ## Acceptance Criteria
 
-- hover하지 않은 상태에서 `D`/`F`를 누르면 마우스 위치에 번개가 떨어지고 2초 cooldown이 적용되지만 LIGHTNING은 전송되지 않는다.
+- hover하지 않은 상태에서 `D`/`F`를 누르면 마우스 위치에 흰색 impact burst와 2초 cooldown이 적용되지만 LIGHTNING은 전송되지 않는다.
 - 움직이는 스타 코어에 hover한 상태에서 `D` 또는 `F`를 누르면 LIGHTNING이 전송되고, 2초 cooldown 중에는 재전송되지 않는다.
 - cooldown 종료 후 다시 hover + `D`/`F`를 누르면 LIGHTNING을 다시 전송할 수 있다.
 - 전송 payload가 정확히 `{ type: 'LIGHTNING', payload: null }`이다.
@@ -337,7 +340,8 @@ interface GameResultPayload {
 - `afterHp`를 현재 HP로 직접 덮어쓰지 않는다.
 - `GAME_RESULT` 수신 전까지 승패/결과 화면 이동이 발생하지 않는다.
 - 내 스펠 HUD만 중앙 하단에 표시되고 상대 스펠 HUD는 표시되지 않는다.
-- 내 LIGHTNING impact는 파란색, 상대 LIGHTNING impact는 빨간색으로 표시된다.
+- LIGHTNING 시각 효과는 번개 줄기가 아닌 impact burst로 표시된다.
+- hover miss impact는 흰색, 내 LIGHTNING hit impact는 파란색, 상대 LIGHTNING hit impact는 빨간색으로 표시된다.
 - LIGHTNING 처치 승자는 `GAME_RESULT.winnerUserId`로만 해석된다.
 - format/lint/typecheck/test/build가 통과한다.
 - desktop/mobile viewport에서 horizontal overflow와 text overflow 후보가 없다.
@@ -394,9 +398,12 @@ flowchart TD
 
 - 이번 PR에서 result route 이동은 제외함.
 - Game summary API 호출은 제외함.
-- 상대 LIGHTNING 반영은 `LIGHTNING_APPLIED` 이벤트 기준으로 포함하되, 상대 스펠 HUD는 표시하지 않고 빨간 impact로만 표현함.
+- 상대 LIGHTNING 반영은 `LIGHTNING_APPLIED` 이벤트 기준으로 포함하되, 상대 스펠 HUD는 표시하지 않고 빨간 impact burst로만 표현함.
 - 새 패키지는 추가하지 않음.
-- 검증 결과를 여기에 기재함.
+- 검증 결과: `npm run test -- GamePlayPage gameWebSocket` 통과, 3 files / 36 passed.
+- 검증 결과: `npm run format`, `npm run lint`, `npm run typecheck` 통과.
+- 검증 결과: `npm run test` 통과, 15 files / 154 passed.
+- 검증 결과: `npm run build` 통과.
 
 ## 📌 Related Issue
 

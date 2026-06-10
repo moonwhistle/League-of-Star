@@ -43,10 +43,13 @@
         :style="lightningImpactStyle"
         aria-hidden="true"
       >
-        <span class="lightning-impact__bolt lightning-impact__bolt--main" />
-        <span class="lightning-impact__bolt lightning-impact__bolt--branch-a" />
-        <span class="lightning-impact__bolt lightning-impact__bolt--branch-b" />
-        <span class="lightning-impact__flash" />
+        <span class="lightning-impact__ring lightning-impact__ring--outer" />
+        <span class="lightning-impact__ring lightning-impact__ring--inner" />
+        <span class="lightning-impact__core" />
+        <span class="lightning-impact__particle lightning-impact__particle--a" />
+        <span class="lightning-impact__particle lightning-impact__particle--b" />
+        <span class="lightning-impact__particle lightning-impact__particle--c" />
+        <span class="lightning-impact__particle lightning-impact__particle--d" />
       </div>
       <div
         class="lightning-hud lightning-hud--mine"
@@ -180,25 +183,41 @@ const hpPercent = computed(() => {
   )
 })
 const lightningImpactStyle = computed(() => {
-  const targetY = Math.max(1, lightningImpactScreenPosition.value.y)
-  const isOpponentImpact = lightningImpactOwner.value === 'opponent'
+  const impactOwner = lightningImpactOwner.value
+  const isOpponentImpact = impactOwner === 'opponent'
+  const isMissImpact = impactOwner === 'miss'
+  const colorSet = isOpponentImpact
+    ? {
+        core: '#fff3f4',
+        mid: '#ff405a',
+        edge: '#ff9aa8',
+        glow: 'rgba(255, 64, 90, 0.78)',
+        flare: 'rgba(255, 138, 151, 0.54)',
+      }
+    : isMissImpact
+      ? {
+          core: '#ffffff',
+          mid: '#f7fbff',
+          edge: '#dfe8ff',
+          glow: 'rgba(255, 255, 255, 0.82)',
+          flare: 'rgba(224, 235, 255, 0.56)',
+        }
+      : {
+          core: '#f4fdff',
+          mid: '#58dfff',
+          edge: '#8ff8ff',
+          glow: 'rgba(87, 222, 255, 0.78)',
+          flare: 'rgba(107, 240, 255, 0.48)',
+        }
 
   return {
     '--lightning-impact-x': `${lightningImpactScreenPosition.value.x}px`,
-    '--lightning-impact-y': `${targetY}px`,
-    '--lightning-impact-y-26': `${targetY * 0.26}px`,
-    '--lightning-impact-y-34': `${targetY * 0.34}px`,
-    '--lightning-impact-y-46': `${targetY * 0.46}px`,
-    '--lightning-impact-y-58': `${targetY * 0.58}px`,
-    '--lightning-impact-core': isOpponentImpact ? '#fff3f4' : '#f4fdff',
-    '--lightning-impact-mid': isOpponentImpact ? '#ff405a' : '#58dfff',
-    '--lightning-impact-edge': isOpponentImpact ? '#ff9aa8' : '#8ff8ff',
-    '--lightning-impact-glow': isOpponentImpact
-      ? 'rgba(255, 64, 90, 0.78)'
-      : 'rgba(87, 222, 255, 0.78)',
-    '--lightning-impact-flare': isOpponentImpact
-      ? 'rgba(255, 138, 151, 0.54)'
-      : 'rgba(107, 240, 255, 0.48)',
+    '--lightning-impact-y': `${lightningImpactScreenPosition.value.y}px`,
+    '--lightning-impact-core': colorSet.core,
+    '--lightning-impact-mid': colorSet.mid,
+    '--lightning-impact-edge': colorSet.edge,
+    '--lightning-impact-glow': colorSet.glow,
+    '--lightning-impact-flare': colorSet.flare,
   }
 })
 
@@ -330,7 +349,7 @@ function handleLightningKeyDown() {
   event.preventDefault()
   const shouldSendLightning = canSendLightningCommand.value
   myLightningCooldownUntil.value = Date.now() + LIGHTNING_COOLDOWN_MS
-  triggerLightningImpact('mine', resolveLightningCastPosition())
+  triggerLightningImpact(shouldSendLightning ? 'mine' : 'miss', resolveLightningCastPosition())
 
   if (!shouldSendLightning) {
     return
@@ -507,9 +526,8 @@ function handleLightningApplied(payload = {}) {
 }
 
 function triggerLightningImpact(owner = 'mine', position = resolveLightningCastPosition()) {
-  lightningImpactOwner.value = owner === 'opponent' ? 'opponent' : 'mine'
+  lightningImpactOwner.value = ['mine', 'opponent', 'miss'].includes(owner) ? owner : 'mine'
   lightningImpactScreenPosition.value = position
-  threeSceneController.triggerLightningImpact()
   lightningImpactId.value += 1
 }
 
@@ -652,79 +670,82 @@ function disposeThreeScene() {
   pointer-events: none;
 }
 
-.lightning-impact__bolt {
-  position: absolute;
-  top: -8vh;
-  left: var(--lightning-impact-x);
-  width: 12px;
-  height: calc(var(--lightning-impact-y) + 12vh);
-  clip-path: polygon(
-    46% 0,
-    80% 30%,
-    58% 30%,
-    92% 62%,
-    58% 58%,
-    70% 100%,
-    18% 52%,
-    42% 54%,
-    8% 22%,
-    36% 26%
-  );
-  background:
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.98), transparent),
-    linear-gradient(
-      180deg,
-      var(--lightning-impact-core),
-      var(--lightning-impact-edge) 34%,
-      var(--lightning-impact-mid) 68%,
-      #ffffff
-    );
-  filter: drop-shadow(0 0 8px var(--lightning-impact-glow))
-    drop-shadow(0 0 24px var(--lightning-impact-flare));
-  opacity: 0;
-  transform: translateX(-50%) rotate(12deg);
-  transform-origin: 50% 0;
-  animation: lightning-bolt-strike 720ms ease-out both;
-}
-
-.lightning-impact__bolt--branch-a {
-  width: 8px;
-  height: var(--lightning-impact-y-58);
-  opacity: 0;
-  transform: translateX(-50%) translateX(-30px) translateY(var(--lightning-impact-y-26))
-    rotate(-38deg);
-  animation-delay: 40ms;
-}
-
-.lightning-impact__bolt--branch-b {
-  width: 7px;
-  height: var(--lightning-impact-y-46);
-  opacity: 0;
-  transform: translateX(-50%) translateX(32px) translateY(var(--lightning-impact-y-34))
-    rotate(36deg);
-  animation-delay: 70ms;
-}
-
-.lightning-impact__flash {
+.lightning-impact__ring,
+.lightning-impact__core,
+.lightning-impact__particle {
   position: absolute;
   top: var(--lightning-impact-y);
   left: var(--lightning-impact-x);
-  width: 160px;
-  height: 160px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.lightning-impact__ring {
+  width: 180px;
+  height: 180px;
+  border: 2px solid var(--lightning-impact-mid);
+  box-shadow:
+    0 0 22px var(--lightning-impact-glow),
+    inset 0 0 24px var(--lightning-impact-flare);
+  opacity: 0;
+  animation: lightning-impact-ring 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.lightning-impact__ring--inner {
+  width: 96px;
+  height: 96px;
+  border-width: 3px;
+  animation-delay: 70ms;
+}
+
+.lightning-impact__core {
+  width: 112px;
+  height: 112px;
   background:
     radial-gradient(
       circle,
       rgba(255, 255, 255, 0.95) 0 10%,
-      var(--lightning-impact-core) 11% 24%,
-      var(--lightning-impact-glow) 25% 48%,
-      transparent 62%
+      var(--lightning-impact-core) 11% 22%,
+      var(--lightning-impact-mid) 23% 42%,
+      var(--lightning-impact-glow) 43% 58%,
+      transparent 72%
     ),
     radial-gradient(circle, var(--lightning-impact-flare), transparent 68%);
-  filter: blur(0.2px) drop-shadow(0 0 28px var(--lightning-impact-glow));
-  border-radius: 999px;
+  filter: blur(0.1px) drop-shadow(0 0 30px var(--lightning-impact-glow));
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.22);
-  animation: lightning-impact-flash 720ms ease-out both;
+  animation: lightning-impact-core 760ms ease-out both;
+}
+
+.lightning-impact__particle {
+  width: 14px;
+  height: 14px;
+  background: var(--lightning-impact-core);
+  box-shadow: 0 0 16px var(--lightning-impact-glow);
+  opacity: 0;
+  animation: lightning-impact-particle 760ms ease-out both;
+}
+
+.lightning-impact__particle--a {
+  --lightning-impact-particle-x: -86px;
+  --lightning-impact-particle-y: -42px;
+}
+
+.lightning-impact__particle--b {
+  --lightning-impact-particle-x: 78px;
+  --lightning-impact-particle-y: -36px;
+  animation-delay: 30ms;
+}
+
+.lightning-impact__particle--c {
+  --lightning-impact-particle-x: -62px;
+  --lightning-impact-particle-y: 66px;
+  animation-delay: 60ms;
+}
+
+.lightning-impact__particle--d {
+  --lightning-impact-particle-x: 84px;
+  --lightning-impact-particle-y: 58px;
+  animation-delay: 90ms;
 }
 
 .lightning-hud {
@@ -742,52 +763,63 @@ function disposeThreeScene() {
   transform: translateX(-50%);
 }
 
-@keyframes lightning-bolt-strike {
+@keyframes lightning-impact-ring {
   0% {
     opacity: 0;
-    filter: drop-shadow(0 0 2px rgba(189, 250, 255, 0.2))
-      drop-shadow(0 0 8px rgba(255, 232, 74, 0.2));
+    transform: translate(-50%, -50%) scale(0.18);
   }
 
-  10%,
-  46% {
-    opacity: 1;
-  }
-
-  24% {
-    opacity: 0.34;
-  }
-
-  34% {
-    opacity: 1;
+  18% {
+    opacity: 0.92;
+    transform: translate(-50%, -50%) scale(0.48);
   }
 
   100% {
     opacity: 0;
-    filter: drop-shadow(0 0 12px rgba(189, 250, 255, 0.6))
-      drop-shadow(0 0 34px rgba(255, 232, 74, 0.4));
+    transform: translate(-50%, -50%) scale(1.48);
   }
 }
 
-@keyframes lightning-impact-flash {
+@keyframes lightning-impact-core {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.2);
+    transform: translate(-50%, -50%) scale(0.12);
   }
 
-  12% {
+  14% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(0.72);
+    transform: translate(-50%, -50%) scale(0.88);
   }
 
   42% {
-    opacity: 0.82;
+    opacity: 0.88;
     transform: translate(-50%, -50%) scale(1.08);
   }
 
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(1.38);
+    transform: translate(-50%, -50%) scale(1.34);
+  }
+}
+
+@keyframes lightning-impact-particle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--lightning-impact-particle-x)),
+        calc(-50% + var(--lightning-impact-particle-y))
+      )
+      scale(0.1);
   }
 }
 

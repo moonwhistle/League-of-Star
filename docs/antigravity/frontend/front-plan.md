@@ -258,7 +258,7 @@ interface GameStartPayload {
 - 클라이언트 timestamp, HP, elapsed time, target 좌표는 payload에 포함하지 않음.
 - 서버 판정 source of truth는 WebSocket 수신 시각과 백엔드 `GAME_START` scenario임.
 - 유저별 2초 쿨타임으로 반복 전송을 제한하고, 서버 LIGHTNING_APPLIED.cooldownUntil 기준으로 내 cooldown을 보정.
-- 내 스펠 HUD만 중앙 하단에 표시하고, 상대 LIGHTNING은 빨간 impact와 HP 반영으로만 표현.
+- 내 스펠 HUD만 중앙 하단에 표시하고, LIGHTNING 시각 효과는 번개 줄기가 아닌 impact burst로 표현. hover miss는 흰색, 내 hit는 파란색, 상대 hit는 빨간색으로 구분.
 - 전송 직후 승패를 프론트에서 확정하지 않고 `GAME_RESULT` 수신을 기다림.
 - 전송 실패나 WebSocket close/error는 화면 상태로 표시하고, 서버 결과를 임의 생성하지 않음.
 - `GAME_RESULT` route 이동과 summary API 호출은 다음 이슈로 유지.
@@ -356,7 +356,7 @@ type GameSummaryResponse =
 - 2초 쿨타임 중 LIGHTNING 재입력이 막히는지 검증.
 - 2초 쿨타임 종료 후 LIGHTNING 재입력이 가능한지 검증.
 - 내 스펠 HUD 중앙 하단 배치와 상대 스펠 HUD 미표시 검증.
-- 내 LIGHTNING 파란 impact, 상대 LIGHTNING 빨간 impact 검증.
+- hover miss 흰색 impact, 내 LIGHTNING hit 파란 impact, 상대 LIGHTNING hit 빨간 impact 검증.
 - 처치 승자는 `GAME_RESULT.winnerUserId` 기준으로 해석되는지 검증.
 - `GAME_RESULT` 수신 후 result 이동 검증.
 - summary `PENDING` polling 검증.

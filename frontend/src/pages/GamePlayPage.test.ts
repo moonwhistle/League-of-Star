@@ -530,9 +530,10 @@ describe('GamePlayPage', () => {
 
     expect(firstEvent.defaultPrevented).toBe(true)
     expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
-    expect(threeSceneMock.controller.triggerLightningImpact).toHaveBeenCalledTimes(1)
     expect(wrapper.find('.lightning-impact').exists()).toBe(true)
     expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe('mine')
+    expect(wrapper.find('.lightning-impact__bolt').exists()).toBe(false)
+    expect(wrapper.find('.lightning-impact__ring').exists()).toBe(true)
     expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
     expect(
@@ -576,8 +577,7 @@ describe('GamePlayPage', () => {
     await wrapper.vm.$nextTick()
 
     expect(gameWebSocketMock.state.connection.sendLightning).not.toHaveBeenCalled()
-    expect(threeSceneMock.controller.triggerLightningImpact).toHaveBeenCalledTimes(1)
-    expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe('mine')
+    expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe('miss')
     expect(wrapper.get('.lightning-impact').attributes('style')).toContain(
       '--lightning-impact-x: 123px',
     )
@@ -643,7 +643,7 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('SEND_FAILED')
-    expect(threeSceneMock.controller.triggerLightningImpact).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe('mine')
     expect(
       wrapper.get('[data-testid="lightning-hud"]').attributes('data-lightning-hud-status'),
     ).toBe('cooldown')
@@ -783,7 +783,6 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe(
       'opponent',
     )
-    expect(threeSceneMock.controller.triggerLightningImpact).toHaveBeenCalledTimes(1)
     expect(Number(wrapper.get('main').attributes('data-game-current-hp'))).toBeLessThanOrEqual(
       hpBeforeLightning - 1200,
     )

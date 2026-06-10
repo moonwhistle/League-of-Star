@@ -624,7 +624,7 @@ LIGHTNING 관련 `ERROR.payload.code`:
 
 ## 13. LIGHTNING 입력 UI
 
-클라이언트는 `GAME_START` 이후 사용자가 `D` 또는 `F`를 누르면 스킬을 시전합니다. 스타 코어에 hover한 상태이면 LIGHTNING 의도를 전송하고, hover가 아니면 로컬 miss impact와 cooldown만 표시합니다.
+클라이언트는 `GAME_START` 이후 사용자가 `D` 또는 `F`를 누르면 스킬을 시전합니다. 스타 코어에 hover한 상태이면 LIGHTNING 의도를 전송하고, hover가 아니면 로컬 miss impact와 cooldown만 표시합니다. 시각 효과는 번개 줄기가 아닌 impact burst이며, miss는 흰색, 내 hit는 파란색, 상대 hit는 빨간색으로 구분합니다.
 
 - 현재 wire type `LIGHTNING`는 gameRoom WebSocket으로 반복 전송할 수 있습니다.
 - `LIGHTNING` payload에는 클라이언트 timestamp를 포함하지 않으며 `null`로 전송합니다.
