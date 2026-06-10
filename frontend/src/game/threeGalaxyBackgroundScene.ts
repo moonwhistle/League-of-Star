@@ -1242,7 +1242,6 @@ function createCharacterTexture(): THREE.Texture {
   texture.generateMipmaps = true
   texture.magFilter = THREE.LinearFilter
   texture.minFilter = THREE.LinearMipmapLinearFilter
-  texture.needsUpdate = true
 
   return texture
 }
