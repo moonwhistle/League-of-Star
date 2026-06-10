@@ -24,6 +24,7 @@ const threeSceneMock = vi.hoisted(() => ({
   },
   controller: {
     dispose: vi.fn(),
+    triggerLightningImpact: vi.fn(),
     update: vi.fn(),
   },
   createThreeGalaxyBackgroundScene: vi.fn((canvas = {}, callbacks = {}) => {
@@ -140,6 +141,7 @@ describe('GamePlayPage', () => {
     gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReset()
     threeSceneMock.state.callbacks = undefined
     threeSceneMock.controller.dispose.mockClear()
+    threeSceneMock.controller.triggerLightningImpact.mockClear()
     threeSceneMock.controller.update.mockClear()
     threeSceneMock.createThreeGalaxyBackgroundScene.mockClear()
     setLocale('ko')
@@ -177,7 +179,10 @@ describe('GamePlayPage', () => {
     expect(wrapper.find('.target-reticle').exists()).toBe(false)
     expect(wrapper.find('.star-core-hp-slot').exists()).toBe(false)
     expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
-    expect(wrapper.text()).toBe('')
+    expect(wrapper.get('.lightning-spell__icon').attributes('alt')).toBe('LIGHTNING')
+    expect(
+      wrapper.get('[data-testid="lightning-hud"]').attributes('data-lightning-hud-status'),
+    ).toBe('offline')
     expect(gameWebSocketMock.connect).toHaveBeenCalledWith('/ws/game/100', expect.any(Object))
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
@@ -199,7 +204,7 @@ describe('GamePlayPage', () => {
     expect(wrapper.find('[data-testid="three-scene"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
-    expect(wrapper.text()).toBe('')
+    expect(wrapper.find('[data-testid="lightning-hud"]').exists()).toBe(true)
   })
 
   it('uses a handed off game websocket before reconnecting from storage', async () => {
@@ -216,7 +221,9 @@ describe('GamePlayPage', () => {
     expect(gameWebSocketMock.connect).not.toHaveBeenCalled()
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('handoff')
     expect(wrapper.get('main').attributes('data-game-socket-lightning-ready')).toBe('true')
-    expect(wrapper.text()).toBe('')
+    expect(
+      wrapper.get('[data-testid="lightning-hud"]').attributes('data-lightning-hud-status'),
+    ).toBe('active')
   })
 
   it('handles play websocket ERROR and GAME_RESULT without moving to match', async () => {
@@ -282,7 +289,9 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
       'RECONNECT_FAILED',
     )
-    expect(wrapper.text()).toBe('')
+    expect(
+      wrapper.get('[data-testid="lightning-hud"]').attributes('data-lightning-hud-status'),
+    ).toBe('error')
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
@@ -320,7 +329,7 @@ describe('GamePlayPage', () => {
 
     expect(wrapper.get('main').attributes('data-game-natural-death-waiting')).toBe('true')
     expect(wrapper.get('main').attributes('data-game-current-hp')).toBe('0')
-    expect(wrapper.text()).toBe('')
+    expect(wrapper.find('[data-testid="lightning-hud"]').exists()).toBe(true)
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
@@ -467,13 +476,12 @@ describe('GamePlayPage', () => {
     expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
-  it('renders only the galaxy background without combat overlays or top navigation', async () => {
+  it('renders the galaxy background and LIGHTNING HUD without legacy combat overlays or top navigation', async () => {
     saveValidPlayPayloads()
 
     const wrapper = mount(GamePlayPage)
     await flushPromises()
 
-    expect(wrapper.text()).toBe('')
     expect(wrapper.find('.game-play-header').exists()).toBe(false)
     expect(wrapper.find('.locale-toggle').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('LEAGUE OF STAR')
@@ -481,6 +489,16 @@ describe('GamePlayPage', () => {
     expect(wrapper.find('.target-reticle').exists()).toBe(false)
     expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="three-scene"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="opponent-lightning-hud"]').exists()).toBe(false)
+    expect(wrapper.find('.lightning-hud--opponent').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="lightning-hud"]').classes()).toContain('lightning-hud--mine')
+    expect(wrapper.get('[data-testid="lightning-hud"]').text()).toContain('D')
+    expect(wrapper.get('[data-testid="lightning-hud"]').text()).toContain('F')
+    expect(wrapper.get('[data-testid="lightning-damage"]').text()).toBe('1,200')
+    expect(wrapper.get('.lightning-spell__icon').attributes('alt')).toBe('LIGHTNING')
+    expect(wrapper.text()).not.toContain('발동 준비')
+    expect(wrapper.text()).not.toContain('타겟 조준 대기')
+    expect(wrapper.text()).not.toContain('타겟 고정')
   })
 
   it('sends LIGHTNING once when D is pressed while the target is hovered', async () => {
@@ -496,6 +514,9 @@ describe('GamePlayPage', () => {
 
     expect(wrapper.get('main').attributes('data-game-star-targeted')).toBe('true')
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('true')
+    expect(
+      wrapper.get('[data-testid="lightning-hud"]').attributes('data-lightning-hud-status'),
+    ).toBe('active')
 
     const firstEvent = new KeyboardEvent('keydown', {
       cancelable: true,
@@ -506,9 +527,15 @@ describe('GamePlayPage', () => {
 
     expect(firstEvent.defaultPrevented).toBe(true)
     expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
-    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('true')
+    expect(threeSceneMock.controller.triggerLightningImpact).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.lightning-impact').exists()).toBe(true)
+    expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe('mine')
+    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
-    expect(window.sessionStorage.getItem('league-of-star.gamePlayLightningSent:100')).toBe('true')
+    expect(
+      wrapper.get('[data-testid="lightning-hud"]').attributes('data-lightning-hud-status'),
+    ).toBe('cooldown')
+    expect(window.sessionStorage.getItem('league-of-star.gamePlayLightningSent:100')).toBeNull()
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
     await wrapper.vm.$nextTick()
@@ -530,7 +557,7 @@ describe('GamePlayPage', () => {
     await wrapper.vm.$nextTick()
 
     expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
-    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
   })
 
   it('does not send LIGHTNING when hover, key, repeat, socket, or result conditions are invalid', async () => {
@@ -595,8 +622,28 @@ describe('GamePlayPage', () => {
     expect(window.sessionStorage.getItem('league-of-star.gamePlayLightningSent:100')).toBeNull()
   })
 
-  it('blocks LIGHTNING after re-entering a gameRoom that was already sent in session storage', async () => {
-    window.sessionStorage.setItem('league-of-star.gamePlayLightningSent:100', 'true')
+  it('blocks LIGHTNING while the local 2 second cooldown is active', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+    expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows LIGHTNING again after server cooldown correction has expired', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:05.000Z'))
     saveValidPlayPayloads()
 
     const wrapper = mount(GamePlayPage)
@@ -609,9 +656,232 @@ describe('GamePlayPage', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('true')
+    expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
-    expect(gameWebSocketMock.state.connection.sendLightning).not.toHaveBeenCalled()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'LIGHTNING_APPLIED',
+        payload: {
+          gameRoomId: 100,
+          userId: 1,
+          serverReceiveTime: Date.now(),
+          lightningTimeMs: 2000,
+          starCoreHpAtLightning: 8667,
+          damage: 1200,
+          afterHp: 7467,
+          isKill: false,
+          cooldownUntil: Date.now() - 1,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(2)
+  })
+
+  it('applies LIGHTNING damage after LIGHTNING_APPLIED is received', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    const hpBeforeLightning = Number(wrapper.get('main').attributes('data-game-current-hp'))
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'LIGHTNING_APPLIED',
+        payload: {
+          gameRoomId: 100,
+          userId: 1,
+          serverReceiveTime: Date.now(),
+          lightningTimeMs: 2000,
+          starCoreHpAtLightning: hpBeforeLightning,
+          damage: 1200,
+          afterHp: hpBeforeLightning - 1200,
+          isKill: false,
+          cooldownUntil: Date.now() + 2000,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    const hpAfterLightning = Number(wrapper.get('main').attributes('data-game-current-hp'))
+
+    expect(hpAfterLightning).toBeLessThanOrEqual(hpBeforeLightning - 1200)
+    expect(hpAfterLightning).toBeGreaterThanOrEqual(hpBeforeLightning - 1210)
+    expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('false')
+  })
+
+  it('renders opponent LIGHTNING as a red impact without showing an opponent spell HUD', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    const hpBeforeLightning = Number(wrapper.get('main').attributes('data-game-current-hp'))
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'LIGHTNING_APPLIED',
+        payload: {
+          gameRoomId: 100,
+          userId: 2,
+          serverReceiveTime: Date.now(),
+          lightningTimeMs: 2000,
+          starCoreHpAtLightning: hpBeforeLightning,
+          damage: 1200,
+          afterHp: hpBeforeLightning - 1200,
+          isKill: false,
+          cooldownUntil: Date.now() + 2000,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="opponent-lightning-hud"]').exists()).toBe(false)
+    expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe(
+      'opponent',
+    )
+    expect(threeSceneMock.controller.triggerLightningImpact).toHaveBeenCalledTimes(1)
+    expect(Number(wrapper.get('main').attributes('data-game-current-hp'))).toBeLessThanOrEqual(
+      hpBeforeLightning - 1200,
+    )
+  })
+
+  it('waits for GAME_RESULT winnerUserId before treating a kill LIGHTNING as a result', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'LIGHTNING_APPLIED',
+        payload: {
+          gameRoomId: 100,
+          userId: 2,
+          serverReceiveTime: Date.now(),
+          lightningTimeMs: 2000,
+          starCoreHpAtLightning: 1000,
+          damage: 1200,
+          afterHp: 0,
+          isKill: true,
+          cooldownUntil: Date.now() + 2000,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('LIGHTNING_APPLIED')
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: {
+          gameRoomId: 100,
+          result: 'PLAYER2_WIN',
+          winnerUserId: 2,
+          reason: 'LIGHTNING_KILL',
+          finishedAt: Date.now(),
+          actions: [
+            {
+              userId: 2,
+              serverReceiveTime: Date.now(),
+              lightningTimeMs: 2000,
+              starCoreHpAtLightning: 1000,
+              damage: 1200,
+              afterHp: 0,
+              isKill: true,
+            },
+          ],
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-socket-last-event')).toBe('GAME_RESULT')
+  })
+
+  it('does not overwrite the current HP with GAME_RESULT action afterHp', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'LIGHTNING_APPLIED',
+        payload: {
+          gameRoomId: 100,
+          userId: 1,
+          serverReceiveTime: Date.now(),
+          lightningTimeMs: 2000,
+          starCoreHpAtLightning: 8666,
+          damage: 1200,
+          afterHp: 7466,
+          isKill: false,
+          cooldownUntil: Date.now() + 2000,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    const hpAfterPendingDamage = Number(wrapper.get('main').attributes('data-game-current-hp'))
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: {
+          gameRoomId: 100,
+          result: 'PLAYER1_WIN',
+          winnerUserId: 1,
+          reason: 'LIGHTNING_KILL',
+          finishedAt: Date.now(),
+          actions: [
+            {
+              userId: 1,
+              serverReceiveTime: Date.now(),
+              lightningTimeMs: 2000,
+              starCoreHpAtLightning: 10000,
+              damage: 1200,
+              afterHp: 8800,
+              isKill: false,
+            },
+          ],
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(Number(wrapper.get('main').attributes('data-game-current-hp'))).toBe(
+      hpAfterPendingDamage,
+    )
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('true')
   })
 })
 
