@@ -1,7 +1,6 @@
 package com.sang.leagueofstar.game.result.service;
 
 import com.sang.leagueofstar.domain.game.domain.GameAction;
-import com.sang.leagueofstar.domain.game.domain.GameRoom;
 import com.sang.leagueofstar.domain.game.domain.GameRules;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.game.result.domain.GameResultReason;
@@ -23,21 +22,6 @@ public class GameResultPayloadFactory {
                 result,
                 winnerUserId,
                 GameResultReason.LIGHTNING_KILL,
-                finishedAt,
-                actions
-        );
-    }
-
-    public GameResultPayload bothLightningsUsedDraw(Long gameRoomId,
-                                                GameResult result,
-                                                Long winnerUserId,
-                                                long finishedAt,
-                                                List<GameAction> actions) {
-        return create(
-                gameRoomId,
-                result,
-                winnerUserId,
-                GameResultReason.BOTH_LIGHTNINGS_USED_DRAW,
                 finishedAt,
                 actions
         );
@@ -95,18 +79,7 @@ public class GameResultPayloadFactory {
         if (winnerUserId != null) {
             return GameResultReason.LIGHTNING_KILL;
         }
-        if (bothUsersUsedLightningWithoutKill(actions)) {
-            return GameResultReason.BOTH_LIGHTNINGS_USED_DRAW;
-        }
         return GameResultReason.NATURAL_DEATH_DRAW;
-    }
-
-    private boolean bothUsersUsedLightningWithoutKill(List<GameAction> actions) {
-        return actions.stream()
-                .map(GameAction::getUserId)
-                .distinct()
-                .count() == GameRoom.MAX_PARTICIPANTS
-                && actions.stream().noneMatch(GameAction::isKill);
     }
 
     private GameResultPayload.ActionSummary toActionSummary(GameAction action) {

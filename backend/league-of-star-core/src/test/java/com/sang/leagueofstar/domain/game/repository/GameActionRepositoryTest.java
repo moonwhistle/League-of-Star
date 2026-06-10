@@ -11,13 +11,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -33,8 +31,8 @@ class GameActionRepositoryTest {
     private UserRepository userRepository;
 
     @Test
-    @DisplayName("동일한 게임방에서 한 유저가 두 번의 액션을 등록하려고 하면 예외가 발생해야 한다")
-    void save_ShouldThrowException_WhenDuplicateActionBySameUser() {
+    @DisplayName("동일한 게임방에서 한 유저가 반복 LIGHTNING action을 등록할 수 있다")
+    void save_ShouldAllowRepeatedActionBySameUser() {
         // given
         User p1 = userRepository.save(User.builder().email("p1@test.com").nickname("p1").build());
         User p2 = userRepository.save(User.builder().email("p2@test.com").nickname("p2").build());
@@ -54,37 +52,19 @@ class GameActionRepositoryTest {
         gameActionRepository.save(action1);
         gameActionRepository.flush();
 
-        // when & then
         GameAction action2 = GameAction.lightning(
                 room.getId(), p1.getId(), 1100L, 1080, 900
         );
-
-        assertThatThrownBy(() -> {
-            gameActionRepository.save(action2);
-            gameActionRepository.flush();
-        }).isInstanceOf(DataIntegrityViolationException.class);
-    }
-
-    @Test
-    @DisplayName("findByGameRoomIdAndUserId - 같은 gameRoom의 유저 action을 조회한다")
-    void findByGameRoomIdAndUserId() {
-        // given
-        User p1 = userRepository.save(User.builder().email("p3@test.com").nickname("p3").build());
-        User p2 = userRepository.save(User.builder().email("p4@test.com").nickname("p4").build());
-        GameRoom room = createRoom(p1.getId(), p2.getId());
-        GameAction action = gameActionRepository.save(GameAction.lightning(
-                room.getId(),
-                p1.getId(),
-                1000L,
-                900,
-                1000
-        ));
+        gameActionRepository.save(action2);
+        gameActionRepository.flush();
 
         // when
-        var result = gameActionRepository.findByGameRoomIdAndUserId(room.getId(), p1.getId());
+        List<GameAction> result = gameActionRepository.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
+                room.getId()
+        );
 
         // then
-        assertThat(result).contains(action);
+        assertThat(result).containsExactly(action1, action2);
     }
 
     @Test
