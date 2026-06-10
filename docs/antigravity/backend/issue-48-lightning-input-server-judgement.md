@@ -13,14 +13,14 @@ LIGHTNING 정책값은 고정이다.
 | 스타 코어 초기 HP | `10,000` |
 | LIGHTNING 데미지 | `1,200` |
 | 킬 성공 조건 | LIGHTNING 적용 전 현재 HP가 `1,200` 이하 |
-| 사용 횟수 | 유저당 게임당 1회 |
+| 사용 횟수 | 유저당 반복 가능. 단, 서버 기준 최근 LIGHTNING 이후 2초 cooldown 필요 |
 | 입력 채널 | gameRoom WebSocket |
 
 HP 판정은 단순히 scenario HP만 보지 않는다. 같은 gameRoom에서 이미 더 이른 시점에 반영된 LIGHTNING이 있으면, 그 LIGHTNING이 킬 실패였더라도 `1,200` 데미지를 현재 HP에서 차감한다.
 
-LIGHTNING 적용 후 HP가 `0` 이하가 되면 해당 action은 스타 코어 처치 action이다. 서버는 같은 DB transaction 안에서 action 저장과 gameRoom 결과 확정을 끝내고, commit 이후 최종 `GAME_RESULT`만 WebSocket으로 반환한다. 같은 순간 두 사용자가 LIGHTNING을 누르는 경합은 서버 수신 시각 기준으로 처리하고, 동률은 `id` 순서로 결정한다.
+LIGHTNING 적용 후 HP가 `0` 이하가 되면 해당 action은 스타 코어 처치 action이다. 서버는 같은 DB transaction 안에서 action 저장과 gameRoom 결과 확정을 끝내고, commit 이후 `LIGHTNING_APPLIED`와 최종 `GAME_RESULT`를 WebSocket으로 반환한다. 같은 순간 두 사용자가 LIGHTNING을 누르는 경합은 서버 수신 시각 기준으로 처리하고, 동률은 `id` 순서로 결정한다.
 
-두 유저가 모두 LIGHTNING을 사용했고 어느 action도 처치하지 못했다면 더 들어올 LIGHTNING 입력은 없다. 이 경우 남은 HP 재생을 끝까지 기다리지 않고 같은 transaction에서 `DRAW`로 확정한다. 클라이언트는 `GAME_RESULT` 수신 즉시 게임 UI를 종료한다.
+두 유저가 모두 LIGHTNING을 사용했더라도 반복 입력 가능 정책에서는 더 들어올 LIGHTNING 입력이 남아 있을 수 있다. 처치하지 못한 LIGHTNING은 `LIGHTNING_APPLIED`로 broadcast하고 gameRoom은 `IN_PROGRESS`를 유지하며, 이후 추가 LIGHTNING 또는 자연사 scheduler 정산을 기다린다.
 
 시나리오는 gameRoom 생성 시 서버가 먼저 만든다. 정책 기준으로 스타 코어는 `8~17초` 중 서버가 고른 duration 안에서 자연사해야 하며, HP는 1초 단위 선형 감소가 아니라 랜덤하게 스타 코어가 공격받는 것처럼 burst 구간을 포함해 감소해야 한다. LIGHTNING 판정은 새 시나리오를 만들지 않고 이미 저장된 `gameRoom.scenarioData`와 `startAt`을 기준으로 계산한다.
 
@@ -33,10 +33,10 @@ flowchart TD
     C --> D[Resolve gameRoomId and userId from session]
     D --> E[Open LIGHTNING judgement transaction]
     E --> F[Lock gameRoom row]
-    F --> G{Existing action for gameRoomId and userId}
-    G -- Yes --> H[No intermediate response]
-    G -- No --> I[Validate IN_PROGRESS and participant]
-    I --> J[Load startAt and scenario]
+    F --> G[Load same user latest action]
+    G --> H{Cooldown elapsed?}
+    H -- No --> I[Ignore without new action]
+    H -- Yes --> J[Validate IN_PROGRESS and participant]
     J --> K[Calculate lightningTimeMs]
     K --> L[Read scenario HP at lightningTimeMs]
     L --> M[Subtract earlier LIGHTNING damage]
@@ -49,18 +49,16 @@ flowchart TD
     R --> S[Save game_actions]
     S --> T{afterHp is 0}
     T -- Yes --> U[Finish gameRoom as winner]
-    T -- No --> V{Both users used LIGHTNING}
-    V -- No --> W[Keep game IN_PROGRESS]
-    V -- Yes --> X[Finish gameRoom as DRAW]
+    T -- No --> W[Keep game IN_PROGRESS]
     U --> Y[Commit transaction]
     W --> Y
-    X --> Y
-    Y --> Z{Game result decided}
-    Z -- Yes --> AA[Broadcast GAME_RESULT]
-    Z -- No --> AB[No intermediate response<br/>wait for next input or end scheduler]
+    Y --> Z[Broadcast LIGHTNING_APPLIED]
+    Z --> AA{Game result decided}
+    AA -- Yes --> AB[Broadcast GAME_RESULT]
+    AA -- No --> AC[Wait for next input or end scheduler]
 ```
 
-이번 이슈는 LIGHTNING 입력을 서버 판정 가능한 액션으로 저장하고, 최종 결과가 확정된 경우에만 WebSocket으로 `GAME_RESULT`를 응답하는 범위까지 다룬다. LIGHTNING으로 스타 코어 HP가 `0` 이하가 되면 즉시 `game_rooms.status=FINISHED`와 승패 결과를 확정하고 `GAME_RESULT`를 전송한다. 두 유저가 모두 LIGHTNING을 사용하고도 처치하지 못하면 즉시 `DRAW`로 확정한다. record/LP 반영은 이후 game end settlement 또는 record 처리 흐름에서 처리한다.
+이번 이슈는 LIGHTNING 입력을 서버 판정 가능한 액션으로 저장하고, 적용된 action은 `LIGHTNING_APPLIED`로 양쪽 클라이언트에 broadcast하는 범위까지 다룬다. LIGHTNING으로 스타 코어 HP가 `0` 이하가 되면 즉시 `game_rooms.status=FINISHED`와 승패 결과를 확정하고 `GAME_RESULT`를 전송한다. 처치하지 못한 LIGHTNING은 HP/cooldown 표시만 갱신하고 게임은 계속 진행한다. record/LP 반영은 이후 game end settlement 또는 record 처리 흐름에서 처리한다.
 
 ## 📚 Tasks
 
@@ -79,11 +77,11 @@ flowchart TD
 
 - [x] client message `LIGHTNING`를 `GameWebSocketMessageType`에 추가한다.
 - [x] `LIGHTNING` payload 계약에는 클라이언트 timestamp를 포함하지 않는다.
-- [x] LIGHTNING 중간 응답 message는 두지 않고 최종 결과는 `GAME_RESULT`로만 전달한다.
+- [x] 결과가 확정되지 않은 LIGHTNING은 `LIGHTNING_APPLIED`로 전달하고 최종 결과는 `GAME_RESULT`로 전달한다.
 - [x] server message `GAME_RESULT`를 정의한다.
 - [x] `GAME_RESULT` payload에는 `gameRoomId`, `result`, `winnerUserId`, `reason`, `finishedAt`, `actions` 요약을 포함한다.
 - [x] LIGHTNING으로 스타 코어 HP가 `0` 이하가 되면 양쪽 클라이언트에 `GAME_RESULT`를 브로드캐스트한다.
-- [x] 두 유저가 모두 LIGHTNING을 사용하고 처치하지 못하면 즉시 `DRAW GAME_RESULT`를 양쪽 클라이언트에 브로드캐스트한다.
+- [x] LIGHTNING 처치 실패 시에는 `LIGHTNING_APPLIED`만 브로드캐스트하고 gameRoom은 `IN_PROGRESS`를 유지한다.
 - [x] 잘못된 payload, 게임 상태 불일치, 참가자 아님 등은 기존 `ERROR` 메시지 구조로 응답한다.
 
 ### 3. WebSocket handler 연결
@@ -127,13 +125,13 @@ flowchart TD
 - [x] `GameLightningService`는 `GameRttMeasurementService` / `GameRttMeasurementStore`에 의존하지 않는다.
 - [x] RTT cleanup은 기존처럼 `GAME_START_FAILED`, `GAME_START` 이후 시작 처리 완료, abort/finish cleanup 경로에서 수행한다.
 
-### 6. 멱등성과 중복 입력 보장
+### 6. Cooldown과 중복 입력 보장
 
-- [x] `game_actions`의 `UNIQUE(game_room_id, user_id)` 제약을 최종 방어선으로 사용한다.
-- [x] 서비스 진입 시 `gameRoomId + userId`로 기존 LIGHTNING action을 먼저 조회한다.
-- [x] 기존 action이 있으면 새로 판정하지 않고 중간 응답 없이 처리한다.
-- [x] 동시에 같은 유저의 LIGHTNING이 두 번 들어와 unique 충돌이 발생하면 기존 action을 다시 조회해 멱등 처리하되 중간 응답은 보내지 않는다.
-- [x] 클라이언트는 버튼 클릭 즉시 LIGHTNING 버튼을 비활성화하는 정책을 문서에 반영한다.
+- [x] `game_actions`에는 `(game_room_id, user_id)` unique 제약을 두지 않는다.
+- [x] 서비스 진입 시 같은 gameRoom의 같은 user 최근 LIGHTNING action을 조회한다.
+- [x] 최근 action 이후 2초 cooldown이 지나지 않았으면 새 action을 저장하지 않는다.
+- [x] cooldown을 통과한 LIGHTNING은 같은 유저라도 새 action으로 저장한다.
+- [x] 클라이언트는 서버 `cooldownUntil` 기준으로 LIGHTNING 슬롯 cooldown을 표시한다.
 
 ### 7. 동시성 제어와 판정 순서
 
@@ -196,23 +194,23 @@ flowchart TD
 - [x] `GAME_RESULT` 전송은 transaction commit 이후 수행한다.
 - [x] record/LP 반영은 `GAME_RESULT` 전송과 분리하고, 기존 record 처리 정책과 이어지게 둔다.
 
-### 11. 두 유저 LIGHTNING 소모 후 즉시 DRAW 확정
+### 11. 처치 실패 LIGHTNING 후 진행 유지
 
-- [x] 두 유저가 모두 LIGHTNING을 사용했고 어느 action도 처치하지 못했다면 더 이상 입력이 들어올 수 없다고 본다.
-- [x] 두 번째 실패 LIGHTNING 저장 transaction 안에서 gameRoom을 `DRAW`로 `FINISHED` 처리한다.
-- [x] 이 경우 `game:end:pending` score를 변경하거나 별도 scheduler를 추가하지 않는다.
-- [ ] 후속 end scheduler 구현 시 기존 `game:end:pending` member가 남아 있어도 이미 `FINISHED`인 gameRoom은 no-op 처리한다.
-- [x] 두 유저 LIGHTNING 소모 후 즉시 `DRAW GAME_RESULT`를 브로드캐스트한다.
+- [x] 두 유저가 모두 LIGHTNING을 사용했더라도 반복 입력 가능 정책에서는 즉시 `DRAW`로 확정하지 않는다.
+- [x] 처치 실패 LIGHTNING 저장 transaction 안에서는 gameRoom을 `IN_PROGRESS`로 유지한다.
+- [x] 실패 action이 저장되면 effective HP 기준으로 더 빠른 자연사 deadline을 계산해 `game:end:pending` score를 앞당길 수 있다.
+- [x] 후속 end scheduler는 이미 `FINISHED`인 gameRoom을 no-op 처리한다.
+- [x] 처치 실패 LIGHTNING은 `LIGHTNING_APPLIED`로 브로드캐스트한다.
 
 ### 12. GameAction 저장/조회 보강
 
-- [x] `GameActionRepository`에 `findByGameRoomIdAndUserId(...)`를 추가한다.
+- [x] `GameActionRepository`는 gameRoom 단위 정렬 조회를 제공하고, 유저별 최근 action은 service에서 필터링한다.
 - [x] `GameActionRepository`에 gameRoom 단위 action 정렬 조회 메서드를 추가한다.
   - 정렬 기준: `serverReceiveTimeMs ASC`, `id ASC`
 - [x] `GameAction.lightning(...)` 정적 팩토리로 LIGHTNING action 생성 의미와 `isKill` 계산 기준을 명확히 한다.
 - [x] DDL 문서에서 `star_core_hp_at_lightning` 의미를 “이전 LIGHTNING 데미지 반영 후, 이번 LIGHTNING 적용 전 HP”로 명확히 한다.
 - [x] DDL 문서에서 `rtt_ms` 컬럼을 제거하고 `lightning_time_ms` 의미를 “서버 수신 시각 기준 게임 시작 후 경과 ms”로 수정한다.
-- [x] `game_actions`는 유저당 1회 입력 기록으로 유지하고, record/LP 결과 저장은 `game_records`에서 처리한다.
+- [x] `game_actions`는 LIGHTNING 입력마다 append-only로 저장하고, record/LP 결과 저장은 `game_records`에서 처리한다.
 
 ### 13. 실패/예외 응답
 
@@ -220,7 +218,7 @@ flowchart TD
 - [x] gameRoom이 이미 `FINISHED`이면 현재 gameRoom 결과를 `GAME_RESULT`로 재응답한다.
 - [x] userId가 gameRoom participant가 아니면 LIGHTNING을 거절한다.
 - [x] scenario 또는 `startAt`이 없으면 LIGHTNING을 거절한다.
-- [x] unique 충돌은 중복 입력 실패가 아니라 기존 결과 재응답으로 처리한다.
+- [x] cooldown 미충족 입력은 중복 입력 실패가 아니라 무시 가능한 no-op으로 처리한다.
 - [x] 저장 중 복구 불가능한 DB 예외는 `ERROR` 응답으로 내리고 WebSocket 연결은 유지한다.
 
 ### 14. 테스트
@@ -236,13 +234,13 @@ flowchart TD
 - [x] scenario HP에서 이전 LIGHTNING 데미지를 차감해 current HP를 계산하는지 검증한다.
 - [x] HP `1200` 이하이면 킬 성공, 초과이면 킬 실패로 저장하는지 검증한다.
 - [x] 킬 실패한 LIGHTNING도 이후 action의 HP 계산에 `1200` 데미지로 반영되는지 검증한다.
-- [x] 같은 유저 중복 LIGHTNING은 기존 결과를 재응답하는지 검증한다.
-- [x] 같은 유저 동시 LIGHTNING unique 충돌도 멱등 응답으로 처리되는지 검증한다.
+- [x] 같은 유저 cooldown 중 LIGHTNING은 새 action을 저장하지 않는지 검증한다.
+- [x] 같은 유저 cooldown 이후 반복 LIGHTNING은 새 action으로 저장되는지 검증한다.
 - [x] 서로 다른 두 유저 LIGHTNING 처리 흐름이 gameRoom row lock 이후 기존 action 조회, 판정, 저장 순서로 진행되는지 검증한다.
 - [x] 두 유저가 같은 `serverReceiveTimeMs`로 LIGHTNING을 보냈을 때 `serverReceiveTimeMs`, `id` 정렬 기준으로 조회되고 앞선 action 데미지가 후속 판정에 반영되는지 검증한다.
 - [x] LIGHTNING 적용 후 `afterHp <= 0`이면 gameRoom이 즉시 `FINISHED`로 전환되고 `GAME_RESULT`가 브로드캐스트되는지 검증한다.
-- [x] 두 유저가 모두 LIGHTNING을 사용하고 처치하지 못한 경우 즉시 `DRAW GAME_RESULT`가 반환되는지 검증한다.
-- [x] 두 유저가 모두 LIGHTNING을 사용한 실패 판은 scheduler 자연사 deadline을 기다리지 않는지 검증한다.
+- [x] 처치 실패 LIGHTNING은 `LIGHTNING_APPLIED`가 반환되고 gameRoom이 `IN_PROGRESS`를 유지하는지 검증한다.
+- [x] 처치 실패 action 이후 effective natural death deadline이 갱신되는지 검증한다.
 - [x] 이미 `FINISHED`된 gameRoom에 늦게 도착한 LIGHTNING은 action 저장 없이 `GAME_RESULT`를 재응답하는지 검증한다.
 - [x] `IN_PROGRESS`가 아닌 gameRoom, participant 아님, scenario 없음 실패 케이스를 검증한다.
 
@@ -252,10 +250,10 @@ flowchart TD
 - [x] `docs/project/policy.md`에 킬 실패 LIGHTNING도 `1200` 데미지를 반영한다는 정책을 추가한다.
 - [x] `docs/project/policy.md`에 LIGHTNING은 RTT 보정 없이 서버 수신 시각 기준으로 판정한다는 정책을 추가한다.
 - [x] `docs/project/policy.md`에 동시 LIGHTNING 정렬 기준과 처치 시 `GAME_RESULT` 반환 정책을 추가한다.
-- [x] `docs/project/policy.md`에 두 유저 LIGHTNING 소모 후 처치하지 못하면 즉시 `DRAW`로 확정한다는 정책을 추가한다.
+- [x] `docs/project/policy.md`에 처치 실패 LIGHTNING은 `LIGHTNING_APPLIED`로 전파하고 즉시 `DRAW`로 확정하지 않는다는 정책을 추가한다.
 - [x] `docs/project/policy.md`에 LIGHTNING으로 먼저 `FINISHED`된 gameRoom의 `game:end:pending` member는 필수 cleanup하지 않고 scheduler no-op으로 처리한다는 정책을 추가한다.
 - [x] `docs/project/overallplan.md`의 판정 프로세스에 이전 LIGHTNING 데미지 차감 규칙을 반영한다.
-- [x] `docs/project/websocket client.md`에 `LIGHTNING`, `GAME_RESULT` 메시지와 클라이언트 버튼 1회 사용 정책을 추가한다.
+- [x] `docs/project/websocket client.md`에 `LIGHTNING`, `LIGHTNING_APPLIED`, `GAME_RESULT` 메시지와 클라이언트 cooldown 정책을 추가한다.
 - [x] `docs/project/domain status.md`에 `IN_PROGRESS` 중 LIGHTNING action 저장 흐름을 반영한다.
 - [x] `docs/DB/DDL.md`의 `game_actions` 컬럼 설명, Redis RTT 구조, `game:end:pending` no-op 정책을 실제 판정 의미와 맞춘다.
 
@@ -264,21 +262,21 @@ flowchart TD
 - 클라이언트는 `GAME_START` 이후 WebSocket으로 `LIGHTNING`를 보낼 수 있다.
 - gameRoom 생성 시 `8~17초` 안에 자연사하는 랜덤 burst HP scenario가 저장된다.
 - 서버는 클라이언트 timestamp 없이 서버 수신 시각만으로 `lightningTimeMs`를 계산한다.
-- 유저당 gameRoom당 LIGHTNING은 한 번만 저장된다.
-- 중복 LIGHTNING 요청은 기존 결과를 재응답한다.
+- 유저당 gameRoom당 LIGHTNING은 2초 cooldown 이후 반복 저장될 수 있다.
+- cooldown 중 LIGHTNING 요청은 새 action을 저장하지 않는다.
 - 이전 LIGHTNING이 킬 실패였더라도 이후 HP 계산에서 `1200` 데미지로 반영된다.
 - `game_actions`에는 LIGHTNING 판정에 필요한 값이 저장된다.
 - LIGHTNING으로 스타 코어 HP가 `0` 이하가 되면 gameRoom 결과를 확정하고 `GAME_RESULT`를 WebSocket으로 반환한다.
-- 두 유저가 모두 LIGHTNING을 사용하고 처치하지 못하면 즉시 `DRAW GAME_RESULT`를 반환한다.
+- 처치 실패 LIGHTNING은 `LIGHTNING_APPLIED`로 양쪽 클라이언트에 반환하고 게임은 계속 진행한다.
 - 한 명만 사용/둘 다 미사용 자연사, record/LP 반영은 이후 game end settlement 또는 record 처리 흐름으로 남긴다.
 
 ## 📝 Note
 
 - 이번 이슈의 핵심은 “입력 수신”이 아니라 “서버가 판정 가능한 action을 일관되게 저장”하는 것이다.
 - REST API가 아니라 기존 gameRoom WebSocket에서 처리한다.
-- 클라이언트 버튼 비활성화는 UX 방어이고, 실제 1회 보장은 서버 멱등 처리와 DB unique 제약이 담당한다.
+- 클라이언트 cooldown 표시는 UX 방어이고, 실제 2초 cooldown 보장은 서버가 최근 action 시각을 기준으로 담당한다.
 - LIGHTNING 판정 transaction 안에서 WebSocket 전송을 하지 않는다.
-- LIGHTNING action 저장 결과는 중간 응답으로 보내지 않고, 클라이언트에는 최종 `GAME_RESULT`만 전달한다.
+- LIGHTNING action 저장 결과는 `LIGHTNING_APPLIED`로 전달하고, 최종 승패는 `GAME_RESULT`만 기준으로 전달한다.
 - RTT 측정은 `GAME_START` 전 품질 검사이며, LIGHTNING 판정 보정에는 사용하지 않는다.
 
 ---
@@ -360,27 +358,26 @@ flowchart LR
     F -->|no| H[Non-kill action]
 ```
 
-### 1회 입력 보장은 UX가 아니라 서버 멱등성으로 처리
+### 반복 입력 보장은 서버 cooldown으로 처리
 
-클라이언트는 LIGHTNING 버튼을 즉시 비활성화하지만, 실제 1회 입력 보장은 서버가 담당함.
-서비스 진입 시 기존 action을 먼저 조회하고, DB unique 제약으로 `gameRoomId + userId` 중복 저장을 최종 차단함.
-동시 중복 입력으로 unique 충돌이 나도 실패 응답으로 끝내지 않고 기존 action을 다시 조회해 멱등 처리함.
+클라이언트는 LIGHTNING 입력 후 2초 cooldown overlay를 표시하지만, 실제 cooldown 보장은 서버가 담당함.
+서비스 진입 시 같은 user의 최근 action을 조회하고, 서버 수신 시각이 `lastServerReceiveTimeMs + 2000` 이전이면 새 action을 저장하지 않음.
+cooldown을 통과한 입력은 같은 유저라도 새 action으로 append-only 저장함.
 
-중복 LIGHTNING은 새 action을 만들지 않고, 결과가 아직 확정되지 않았다면 중간 응답도 보내지 않음.
+cooldown 중 LIGHTNING은 새 action을 만들지 않음.
 이미 결과가 확정된 gameRoom이면 현재 session에 최종 `GAME_RESULT`만 재응답함.
-단순히 중복 요청을 `ERROR`로 막는 방식보다 구현은 조금 복잡하지만, 네트워크 재시도나 더블 클릭이 있어도 판정 결과가 흔들리지 않음.
+단순히 중복 요청을 `ERROR`로 막는 방식보다 구현은 조금 복잡하지만, 네트워크 재시도나 빠른 연타가 있어도 판정 결과가 서버 cooldown 기준에서 흔들리지 않음.
 
 ### 결과 확정과 action 저장을 같은 트랜잭션 경계에 배치
 
 LIGHTNING으로 HP가 `0` 이하가 되면 action 저장과 gameRoom `FINISHED` 전환을 같은 처리 흐름에서 수행함.
-두 유저가 모두 LIGHTNING을 사용했고 둘 다 처치하지 못한 경우에도 더 이상 유효 입력이 남지 않으므로 자연사 deadline을 기다리지 않고 즉시 `DRAW`로 확정함.
+처치 실패 LIGHTNING은 게임을 종료하지 않고 `LIGHTNING_APPLIED`로 broadcast함. 이후 추가 LIGHTNING 또는 effective natural death scheduler가 결과를 확정함.
 
 ```mermaid
 stateDiagram-v2
     [*] --> IN_PROGRESS
-    IN_PROGRESS --> IN_PROGRESS: first failed LIGHTNING
+    IN_PROGRESS --> IN_PROGRESS: failed LIGHTNING + LIGHTNING_APPLIED
     IN_PROGRESS --> FINISHED: LIGHTNING kill
-    IN_PROGRESS --> FINISHED: both failed LIGHTNING -> DRAW
     IN_PROGRESS --> FINISHED: natural death / later settlement
     FINISHED --> [*]
 ```

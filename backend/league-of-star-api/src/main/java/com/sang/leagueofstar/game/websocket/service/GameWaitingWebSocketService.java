@@ -9,6 +9,7 @@ import com.sang.leagueofstar.game.rtt.service.GameRttMeasurementService;
 import com.sang.leagueofstar.game.lightning.domain.GameLightningCommand;
 import com.sang.leagueofstar.game.lightning.domain.GameLightningFailureReason;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
+import com.sang.leagueofstar.game.lightning.dto.GameLightningAppliedPayload;
 import com.sang.leagueofstar.game.lightning.dto.GameLightningHandleResponse;
 import com.sang.leagueofstar.game.lightning.service.GameLightningService;
 import com.sang.leagueofstar.game.result.service.GameResultWebSocketSender;
@@ -131,8 +132,23 @@ public class GameWaitingWebSocketService {
 
     private void sendLightningResponse(GameRoomWebSocketSession currentSession,
                                    GameLightningHandleResponse response) {
+        response.lightningAppliedOptional()
+                .ifPresent(lightningApplied -> broadcastLightningApplied(currentSession, lightningApplied));
         response.gameResultOptional()
-                .ifPresent(gameResult -> sendGameResult(currentSession, gameResult, response.broadcast()));
+                .ifPresent(gameResult -> sendGameResult(currentSession, gameResult, response.gameResultBroadcast()));
+    }
+
+    private void broadcastLightningApplied(GameRoomWebSocketSession currentSession,
+                                           GameLightningAppliedPayload payload) {
+        try {
+            messageSender.broadcast(
+                    currentSession.getGameRoomId(),
+                    GameWebSocketServerMessage.lightningApplied(payload)
+            );
+        } catch (IOException e) {
+            log.warn("Failed to broadcast LIGHTNING_APPLIED. gameRoomId={}, userId={}",
+                    currentSession.getGameRoomId(), currentSession.getUserId(), e);
+        }
     }
 
     private void sendGameResult(GameRoomWebSocketSession currentSession,

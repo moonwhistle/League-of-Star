@@ -9,6 +9,7 @@ import com.sang.leagueofstar.game.end.service.GameEndScheduleService;
 import com.sang.leagueofstar.game.rtt.domain.GameRttPongResult;
 import com.sang.leagueofstar.game.rtt.service.GameRttMeasurementService;
 import com.sang.leagueofstar.game.lightning.domain.GameLightningFailureReason;
+import com.sang.leagueofstar.game.lightning.dto.GameLightningAppliedPayload;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
 import com.sang.leagueofstar.game.lightning.dto.GameLightningHandleResponse;
 import com.sang.leagueofstar.game.lightning.service.GameLightningService;
@@ -321,10 +322,22 @@ class GameWaitingWebSocketHandlerTest {
     }
 
     @Test
-    @DisplayName("handleTextMessage - LIGHTNING 처치 응답이면 GAME_RESULT만 broadcast한다")
-    void handleTextMessage_LightningKill_BroadcastGameResultOnly() throws Exception {
+    @DisplayName("handleTextMessage - LIGHTNING 처치 응답이면 LIGHTNING_APPLIED와 GAME_RESULT를 broadcast한다")
+    void handleTextMessage_LightningKill_BroadcastAppliedAndGameResult() throws Exception {
         // given
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
+        WebSocketSession secondSession = session(SECOND_SESSION_ID, SECOND_USER_ID);
+        GameLightningAppliedPayload lightningApplied = new GameLightningAppliedPayload(
+                GAME_ROOM_ID,
+                FIRST_USER_ID,
+                SERVER_RECEIVE_TIME.toEpochMilli(),
+                2_000,
+                1_000,
+                1_200,
+                0,
+                true,
+                SERVER_RECEIVE_TIME.toEpochMilli() + 2_000
+        );
         GameResultPayload gameResult = new GameResultPayload(
                 GAME_ROOM_ID,
                 GameResult.PLAYER1_WIN,
@@ -334,14 +347,25 @@ class GameWaitingWebSocketHandlerTest {
                 List.of()
         );
         handler.afterConnectionEstablished(session);
-        clearInvocations(session);
+        handler.afterConnectionEstablished(secondSession);
+        clearInvocations(session, secondSession);
         when(gameLightningService.handleLightning(any()))
-                .thenReturn(Optional.of(GameLightningHandleResponse.broadcast(gameResult)));
+                .thenReturn(Optional.of(GameLightningHandleResponse.appliedAndBroadcastResult(
+                        lightningApplied,
+                        gameResult
+                )));
 
         // when
         handler.handleTextMessage(session, new TextMessage("{\"type\":\"LIGHTNING\",\"payload\":{}}"));
 
         // then
+        JsonNode firstMessage = firstSentMessage(session);
+        JsonNode secondMessage = firstSentMessage(secondSession);
+        assertThat(firstMessage.get("type").asText()).isEqualTo(GameWebSocketMessageType.LIGHTNING_APPLIED.name());
+        assertThat(secondMessage.get("type").asText()).isEqualTo(GameWebSocketMessageType.LIGHTNING_APPLIED.name());
+        assertThat(firstMessage.get("payload").get("afterHp").asInt()).isZero();
+        assertThat(firstMessage.get("payload").get("cooldownUntil").asLong())
+                .isEqualTo(SERVER_RECEIVE_TIME.toEpochMilli() + 2_000);
         verify(gameResultWebSocketSender).broadcastGameResult(GAME_ROOM_ID, gameResult);
         verify(gameResultWebSocketSender, never()).sendGameResult(any(), any());
     }
@@ -656,6 +680,12 @@ class GameWaitingWebSocketHandlerTest {
         verify(session, atLeastOnce()).sendMessage(messageCaptor.capture());
         TextMessage lastMessage = messageCaptor.getAllValues().get(messageCaptor.getAllValues().size() - 1);
         return objectMapper.readTree(lastMessage.getPayload());
+    }
+
+    private JsonNode firstSentMessage(WebSocketSession session) throws Exception {
+        ArgumentCaptor<TextMessage> messageCaptor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session, atLeastOnce()).sendMessage(messageCaptor.capture());
+        return objectMapper.readTree(messageCaptor.getAllValues().get(0).getPayload());
     }
 
     private List<JsonNode> sentMessages(WebSocketSession session) throws Exception {

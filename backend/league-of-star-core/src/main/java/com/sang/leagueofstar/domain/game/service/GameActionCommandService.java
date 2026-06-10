@@ -4,7 +4,6 @@ import com.sang.leagueofstar.domain.game.domain.GameAction;
 import com.sang.leagueofstar.domain.game.repository.GameActionRepository;
 import com.sang.leagueofstar.domain.game.service.dto.GameActionSaveResult;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,19 +14,7 @@ public class GameActionCommandService {
 
     private final GameActionRepository gameActionRepository;
 
-    public GameActionSaveResult saveIfAbsent(GameAction action) {
-        return gameActionRepository.findByGameRoomIdAndUserId(action.getGameRoomId(), action.getUserId())
-                .map(GameActionSaveResult::idempotent)
-                .orElseGet(() -> saveOrFindExisting(action));
-    }
-
-    private GameActionSaveResult saveOrFindExisting(GameAction action) {
-        try {
-            return GameActionSaveResult.saved(gameActionRepository.saveAndFlush(action));
-        } catch (DataIntegrityViolationException e) {
-            return gameActionRepository.findByGameRoomIdAndUserId(action.getGameRoomId(), action.getUserId())
-                    .map(GameActionSaveResult::idempotent)
-                    .orElseThrow(() -> e);
-        }
+    public GameActionSaveResult save(GameAction action) {
+        return GameActionSaveResult.saved(gameActionRepository.saveAndFlush(action));
     }
 }

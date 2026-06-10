@@ -13,6 +13,7 @@ import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
 import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
 import com.sang.leagueofstar.game.lightning.domain.GameLightningCommand;
+import com.sang.leagueofstar.game.lightning.dto.GameLightningAppliedPayload;
 import com.sang.leagueofstar.game.lightning.dto.GameLightningHandleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,28 +44,29 @@ public class GameLightningService {
             return Optional.of(currentGameResult(command.gameRoomId(), gameRoom));
         }
 
-        Optional<GameAction> existingAction = gameActionReadService.findByGameRoomIdAndUserId(
-                command.gameRoomId(),
-                command.userId()
-        );
-        if (existingAction.isPresent()) {
-            return Optional.empty();
-        }
-
         List<GameAction> existingActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
                 command.gameRoomId()
         );
+        if (!isCooldownReady(command.userId(), command.serverReceiveTimeMs(), existingActions)) {
+            return Optional.empty();
+        }
+
         return gameLightningJudgementService
                 .judge(gameRoom, command.userId(), command.serverReceiveTimeMs(), existingActions)
-                .map(gameActionCommandService::saveIfAbsent)
+                .map(gameActionCommandService::save)
                 .flatMap(saveResult -> toResponse(command.gameRoomId(), gameRoom, saveResult));
     }
 
     private Optional<GameLightningHandleResponse> toResponse(Long gameRoomId,
                                                          GameRoom gameRoom,
                                                          GameActionSaveResult saveResult) {
+        GameLightningAppliedPayload lightningApplied = toLightningAppliedPayload(gameRoomId, saveResult.action());
         if (saveResult.action().getStarCoreHpAtLightning() > GameRules.LIGHTNING_DAMAGE) {
-            return nonKillResponse(gameRoomId, gameRoom);
+            gameEndDeadlineAdvanceService.advanceAfterFailedLightning(
+                    gameRoom,
+                    gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(gameRoomId)
+            );
+            return Optional.of(GameLightningHandleResponse.applied(lightningApplied));
         }
 
         Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByLightningKill(
@@ -73,38 +75,22 @@ public class GameLightningService {
         );
         return finishedGameRoom.map(finishedRoom -> {
             gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
-            return GameLightningHandleResponse.broadcast(lightningKillGameResult(gameRoomId, finishedRoom));
+            return GameLightningHandleResponse.appliedAndBroadcastResult(
+                    lightningApplied,
+                    lightningKillGameResult(gameRoomId, finishedRoom)
+            );
         });
     }
 
-    private Optional<GameLightningHandleResponse> nonKillResponse(Long gameRoomId, GameRoom gameRoom) {
-        List<GameAction> currentActions = gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(
-                gameRoomId
-        );
-        if (!bothUsersUsedLightningWithoutKill(currentActions)) {
-            gameEndDeadlineAdvanceService.advanceAfterFailedLightning(gameRoom, currentActions);
-            return Optional.empty();
-        }
-
-        Optional<GameRoom> finishedGameRoom = gameRoomCommandService.finishInProgressRoomByBothLightningsUsedDraw(
-                gameRoomId
-        );
-        return finishedGameRoom.map(finishedRoom -> {
-            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
-            return GameLightningHandleResponse.broadcast(bothLightningsUsedDrawGameResult(
-                    gameRoomId,
-                    finishedRoom,
-                    currentActions
-            ));
-        });
-    }
-
-    private boolean bothUsersUsedLightningWithoutKill(List<GameAction> actions) {
-        return actions.stream()
-                .map(GameAction::getUserId)
-                .distinct()
-                .count() == GameRoom.MAX_PARTICIPANTS
-                && actions.stream().noneMatch(GameAction::isKill);
+    private boolean isCooldownReady(Long userId, long serverReceiveTimeMs, List<GameAction> existingActions) {
+        return existingActions.stream()
+                .filter(action -> action.getUserId().equals(userId))
+                .mapToLong(GameAction::getServerReceiveTimeMs)
+                .max()
+                .stream()
+                .allMatch(lastServerReceiveTimeMs ->
+                        serverReceiveTimeMs >= lastServerReceiveTimeMs + GameRules.LIGHTNING_COOLDOWN_MS
+                );
     }
 
     private GameLightningHandleResponse currentGameResult(Long gameRoomId, GameRoom gameRoom) {
@@ -127,15 +113,17 @@ public class GameLightningService {
         );
     }
 
-    private GameResultPayload bothLightningsUsedDrawGameResult(Long gameRoomId,
-                                                           GameRoom gameRoom,
-                                                           List<GameAction> actions) {
-        return gameResultPayloadFactory.bothLightningsUsedDraw(
+    private GameLightningAppliedPayload toLightningAppliedPayload(Long gameRoomId, GameAction action) {
+        return new GameLightningAppliedPayload(
                 gameRoomId,
-                gameRoom.getResult(),
-                gameRoom.getWinnerId(),
-                Instant.now(clock).toEpochMilli(),
-                actions
+                action.getUserId(),
+                action.getServerReceiveTimeMs(),
+                action.getLightningTimeMs(),
+                action.getStarCoreHpAtLightning(),
+                GameRules.LIGHTNING_DAMAGE,
+                Math.max(0, action.getStarCoreHpAtLightning() - GameRules.LIGHTNING_DAMAGE),
+                action.isKill(),
+                action.getServerReceiveTimeMs() + GameRules.LIGHTNING_COOLDOWN_MS
         );
     }
 }

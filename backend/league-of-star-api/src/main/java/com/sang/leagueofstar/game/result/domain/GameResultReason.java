@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 public enum GameResultReason {
 
     LIGHTNING_KILL("LIGHTNING_KILL"),
-    BOTH_LIGHTNINGS_USED_DRAW("BOTH_LIGHTNINGS_USED_DRAW"),
     NATURAL_DEATH_DRAW("NATURAL_DEATH_DRAW");
 
     private final String code;

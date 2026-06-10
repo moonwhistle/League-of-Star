@@ -176,7 +176,7 @@ Step 7은 LIGHTNING 처치 또는 양쪽 LIGHTNING 실패로 즉시 종료되는
 - 자연사 종료는 effective HP 기준으로 즉시 대상이 된다. 서버 수신 시각이 effective naturalDeathAt을 지난 LIGHTNING은 저장하지 않고 자연사 정산 결과를 따른다.
 - scenario는 원본 timeline으로 보존한다. LIGHTNING 데미지는 action으로만 저장하고, 현재 HP와 자연사 deadline은 scenario와 action을 합성해 계산한다.
 - LIGHTNING 즉시 종료와 scheduler 자연사 종료가 경합해도 gameRoom row lock과 상태 조건으로 한쪽만 결과를 확정해야 한다.
-- 자연사 종료는 `DRAW` 정책으로 처리한다. 이 정책은 현재 2인 게임과 유저당 LIGHTNING 1회 정책을 전제로 한다.
+- 자연사 종료는 `DRAW` 정책으로 처리한다. 이 정책은 현재 2인 게임과 반복 LIGHTNING cooldown 정책을 전제로 하며, LIGHTNING 실패 action으로 앞당겨진 effective HP 기준 deadline도 scheduler 정산 대상이 된다.
 - `GAME_RESULT` 전송은 사용자 경험 보조 경로다. 연결이 없거나 전송에 실패해도 DB 결과 확정은 되돌리지 않는다.
 - `game_records` 생성, LP 반영, 배치/승급전 처리는 Step 9에서 처리한다.
 
@@ -289,7 +289,7 @@ Trade-off:
 ```mermaid
 flowchart TD
     A[LIGHTNING kill] --> R[GAME_RESULT LIGHTNING_KILL]
-    B[Both failed LIGHTNING] --> R2[GAME_RESULT BOTH_LIGHTNINGS_USED_DRAW]
+    B[Failed LIGHTNING] --> P[LIGHTNING_APPLIED<br/>game continues]
     C[Natural death scheduler] --> R3[GAME_RESULT NATURAL_DEATH_DRAW]
 ```
 

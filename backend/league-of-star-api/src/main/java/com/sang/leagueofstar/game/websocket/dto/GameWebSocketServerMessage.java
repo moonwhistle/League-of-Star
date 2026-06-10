@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.game.websocket.dto;
 
 import com.sang.leagueofstar.game.start.dto.GameStartScenarioPayload;
+import com.sang.leagueofstar.game.lightning.dto.GameLightningAppliedPayload;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
 
 /**
@@ -78,6 +79,13 @@ public record GameWebSocketServerMessage(
     public static GameWebSocketServerMessage gameResult(GameResultPayload payload) {
         return new GameWebSocketServerMessage(
                 GameWebSocketMessageType.GAME_RESULT,
+                payload
+        );
+    }
+
+    public static GameWebSocketServerMessage lightningApplied(GameLightningAppliedPayload payload) {
+        return new GameWebSocketServerMessage(
+                GameWebSocketMessageType.LIGHTNING_APPLIED,
                 payload
         );
     }

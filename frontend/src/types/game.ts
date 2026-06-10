@@ -95,6 +95,10 @@ export type GameWebSocketServerMessage =
       payload: GameResultPayload
     }
   | {
+      type: 'LIGHTNING_APPLIED'
+      payload: GameLightningAppliedPayload
+    }
+  | {
       type: 'ERROR'
       payload: GameWebSocketErrorPayload
     }
@@ -160,6 +164,11 @@ export interface GameActionSummary {
   damage: number
   afterHp: number
   isKill: boolean
+}
+
+export interface GameLightningAppliedPayload extends GameActionSummary {
+  gameRoomId: GameRoomId
+  cooldownUntil: number
 }
 
 export interface GameWebSocketErrorPayload {

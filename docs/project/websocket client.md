@@ -4,13 +4,13 @@
 
 범위:
 
-- 제외: LIGHTNING 서버 판정 상세, game record/LP 반영
+- 제외: LIGHTNING 서버 내부 판정 알고리즘, game record/LP 반영
 
 ## 0. League of Star 명칭 및 WebSocket 호환 정책
 
 - 사용자에게 보이는 서비스명은 **League of Star**, 전투 입력명은 **LIGHTNING**, 대상명은 **Star Core**다.
-- 현재 백엔드 WebSocket client message type은 호환성을 위해 `LIGHTNING`를 유지한다. 즉, 프론트 UI의 LIGHTNING 버튼은 `{ "type": "LIGHTNING", "payload": null }`을 전송한다.
-- `LIGHTNING`, `LIGHTNING_KILL`, `BOTH_LIGHTNINGS_USED_DRAW`, `INVALID_LIGHTNING_*`, `lightningTimeMs`, `starCoreHpAtLightning`는 현재 백엔드 wire/schema 식별자다. 문서에서는 새 개념명과 레거시 식별자를 함께 적어 프론트 표시 정책과 백엔드 계약을 분리한다.
+- 현재 백엔드 WebSocket client message type은 호환성을 위해 `LIGHTNING`를 유지한다. 즉, 프론트 UI의 LIGHTNING 입력은 `{ "type": "LIGHTNING", "payload": null }`을 전송한다.
+- `LIGHTNING`, `LIGHTNING_APPLIED`, `GAME_RESULT`, `LIGHTNING_KILL`, `INVALID_LIGHTNING_*`, `lightningTimeMs`, `starCoreHpAtLightning`는 현재 백엔드 wire/schema 식별자다. 문서에서는 새 개념명과 레거시 식별자를 함께 적어 프론트 표시 정책과 백엔드 계약을 분리한다.
 - 새 프론트 저장 key는 `league-of-star.*`를 우선 사용하고, 기존 `lightning.*` key는 진행 중인 세션 복구용 읽기 fallback으로만 유지한다.
 
 ## 1. 책임 경계
@@ -545,6 +545,7 @@ sequenceDiagram
 | `GAME_START_FAILED` | RTT 실패/초과 또는 GAME_START 확정 중 실패로 gameRoom이 `ABORTED` 되어 start 버튼 화면으로 복귀해야 함 |
 | `COUNTDOWN` | 서버 기준 `startAt`까지 남은 시간을 렌더링하기 위한 시작 예고 |
 | `GAME_START` | `startAt`과 HP scenario를 포함한 실제 게임 시작 데이터 |
+| `LIGHTNING_APPLIED` | 서버가 LIGHTNING action을 저장했고 HP/cooldown 표시를 갱신할 수 있음 |
 | `GAME_RESULT` | gameRoom 승패/무승부 확정 결과 |
 | `ERROR` | 잘못된 메시지 또는 처리 불가 |
 
@@ -553,8 +554,28 @@ sequenceDiagram
 | reason | 의미 | 전송 방식 |
 |------|------|------|
 | `LIGHTNING_KILL` | LIGHTNING 적용 후 effective HP가 0 이하가 되어 승패가 확정됨. reason 값은 레거시 계약상 `LIGHTNING_KILL` 유지 | gameRoom session broadcast |
-| `BOTH_LIGHTNINGS_USED_DRAW` | 두 유저가 모두 LIGHTNING을 사용했고 둘 다 처치하지 못해 즉시 DRAW 확정 | gameRoom session broadcast |
 | `NATURAL_DEATH_DRAW` | scheduler가 effective naturalDeathAt 이후 자연사 DRAW를 확정 | 연결된 local gameRoom session broadcast. 연결이 없으면 메시지 없이 DB 결과만 확정 |
+
+반복 LIGHTNING 정책에서는 두 유저가 각각 한 번씩 사용했다는 이유만으로 `DRAW`를 확정하지 않는다. 따라서 현재 게임 흐름의 `GAME_RESULT.reason`은 `LIGHTNING_KILL` 또는 `NATURAL_DEATH_DRAW`를 기준으로 처리한다.
+
+`LIGHTNING_APPLIED` 예시:
+
+```json
+{
+  "type": "LIGHTNING_APPLIED",
+  "payload": {
+    "gameRoomId": 100,
+    "userId": 1,
+    "serverReceiveTime": 1716192010000,
+    "lightningTimeMs": 6000,
+    "starCoreHpAtLightning": 3000,
+    "damage": 1200,
+    "afterHp": 1800,
+    "isKill": false,
+    "cooldownUntil": 1716192012000
+  }
+}
+```
 
 `GAME_RESULT` 예시:
 
@@ -603,12 +624,14 @@ LIGHTNING 관련 `ERROR.payload.code`:
 
 ## 13. LIGHTNING 입력 UI
 
-클라이언트는 `GAME_START` 이후 사용자가 LIGHTNING 버튼을 클릭하면 즉시 버튼을 비활성화합니다.
+클라이언트는 `GAME_START` 이후 사용자가 `D` 또는 `F`를 누르면 스킬을 시전합니다. 스타 코어에 hover한 상태이면 LIGHTNING 의도를 전송하고, hover가 아니면 로컬 miss impact와 cooldown만 표시합니다. 시각 효과는 번개 줄기가 아닌 impact burst이며, miss는 흰색, 내 hit는 파란색, 상대 hit는 빨간색으로 구분합니다.
 
-- 현재 wire type `LIGHTNING`는 gameRoom WebSocket으로 한 번만 전송합니다.
+- 현재 wire type `LIGHTNING`는 gameRoom WebSocket으로 반복 전송할 수 있습니다.
 - `LIGHTNING` payload에는 클라이언트 timestamp를 포함하지 않으며 `null`로 전송합니다.
-- 같은 유저가 같은 gameRoom에서 중복 전송하더라도 서버는 첫 action만 유효하게 유지하고 새 중간 응답을 전송하지 않습니다.
-- 결과가 확정되지 않은 LIGHTNING에는 서버 응답이 없으며, 클라이언트는 `GAME_RESULT`를 받을 때만 종료 UI로 전환합니다.
+- hover가 아닌 D/F 입력은 서버로 전송하지 않습니다. 백엔드는 좌표 기반 hit 판정을 하지 않으므로, miss 시전은 프론트 visual-only로 처리합니다.
+- 같은 유저가 같은 gameRoom에서 최근 LIGHTNING 이후 2초 cooldown 안에 다시 전송하면 서버는 새 action으로 저장하지 않습니다.
+- 저장된 LIGHTNING은 `LIGHTNING_APPLIED`로 broadcast됩니다. 클라이언트는 이 이벤트 기준으로 HP를 확정 표시하고, 내 action이면 내 cooldown HUD를 서버 `cooldownUntil`으로 보정합니다.
+- 클라이언트는 `GAME_RESULT`를 받을 때만 종료 UI로 전환합니다.
 - 자연사 `DRAW`는 클라이언트 입력 없이 서버 scheduler가 확정할 수 있으므로, 플레이 중에는 LIGHTNING 응답이 없어도 `GAME_RESULT(reason=NATURAL_DEATH_DRAW)`를 받을 수 있습니다.
 - WebSocket이 끊겨 `GAME_RESULT`를 받지 못해도 서버 DB 결과가 최종 기준입니다. 재접속/늦은 LIGHTNING 등으로 이미 `FINISHED`인 gameRoom 결과를 조회하게 되면 현재 session에 확정된 `GAME_RESULT`만 재응답됩니다.
 
@@ -657,14 +680,14 @@ stateDiagram-v2
 - `GO_TO_GAME_WAITING`일 때만 게임 대기 화면으로 이동합니다.
 - `RETURN_TO_MATCHING`에서는 매칭 SSE를 유지하고 `join/leave`를 호출하지 않습니다.
 - `game.webSocketUrl`에 access token query parameter를 붙여 WebSocket에 연결합니다.
-- WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `GAME_RESULT`, `ERROR`를 처리합니다.
+- WebSocket 연결 후 `PLAYER_JOINED`, `PLAYER_READY`, `PLAYER_LEFT`, `GAME_WAITING_TIMEOUT`, `RTT_PING`, `GAME_START_FAILED`, `COUNTDOWN`, `GAME_START`, `LIGHTNING_APPLIED`, `GAME_RESULT`, `ERROR`를 처리합니다.
 - `GAME_WAITING_TIMEOUT`, handshake 실패, close/error, 자체 30초 timer 만료 시 start 버튼 화면으로 복귀합니다.
 - RTT 단계의 `GAME_START_FAILED` 수신 시 start 버튼 화면으로 복귀합니다.
 - 복귀 시 기존 waiting 화면 상태, WebSocket 객체, 자체 timer를 정리합니다.
 - `bothReady=true`를 `GAME_START`로 오해하지 않습니다.
 - RTT 성공을 `GAME_START`로 오해하지 않습니다.
 - `COUNTDOWN`과 `GAME_START`를 받아도 즉시 시작하지 않고, 같은 `startAt` 기준으로 대기한 뒤 게임을 시작합니다.
-- LIGHTNING 버튼은 클릭 즉시 비활성화하고, 최종 `GAME_RESULT` 수신 전까지 중간 LIGHTNING 응답을 기다리지 않습니다.
+- LIGHTNING 입력 후 중앙 하단 내 스펠에 2초 cooldown overlay를 표시하고, `LIGHTNING_APPLIED` 기준으로 HP와 내 cooldown을 보정하며, 최종 전환은 `GAME_RESULT` 기준으로만 처리합니다.
 
 ## 변경 이력
 

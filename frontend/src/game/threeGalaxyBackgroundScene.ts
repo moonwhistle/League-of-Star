@@ -5,11 +5,14 @@ const CHARACTER_TARGET_SCALE = 1.46
 
 export interface ThreeGalaxyBackgroundSceneController {
   dispose: () => void
+  triggerLightningImpact: () => void
   update: (elapsedMs: number, hpPercent?: number, currentHp?: number) => void
 }
 
 interface ThreeGalaxyBackgroundSceneCallbacks {
   onReadyChange: (isReady: boolean) => void
+  onTargetHoverChange?: (isTargetHovered: boolean) => void
+  onTargetScreenPositionChange?: (position: { x: number; y: number }) => void
 }
 
 interface ThreeGalaxyVisualStart {
@@ -34,7 +37,11 @@ interface SwooshTarget {
   hpTextLastValue: string
   hpTextSprite: THREE.Sprite
   hpTextTexture: THREE.CanvasTexture
+  isHovered: boolean
   lastElapsedMs: number | null
+  lightningBolt: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>
+  lightningFlash: THREE.Sprite
+  lightningImpactStartedAtMs: number | null
   position: THREE.Vector3
   segmentDurationMs: number
   segmentStartedAtMs: number
@@ -50,6 +57,7 @@ export function createThreeGalaxyBackgroundScene(
 ): ThreeGalaxyBackgroundSceneController | null {
   if (typeof window.WebGLRenderingContext === 'undefined') {
     callbacks.onReadyChange(false)
+    callbacks.onTargetHoverChange?.(false)
     return null
   }
 
@@ -239,6 +247,11 @@ export function createThreeGalaxyBackgroundScene(
   camera.add(swooshTarget.group)
 
   let resizeObserver: ResizeObserver | null = null
+  const targetRaycaster = new THREE.Raycaster()
+  const pointerNdc = new THREE.Vector2()
+  const targetWorldPosition = new THREE.Vector3()
+  const targetProjectedPosition = new THREE.Vector3()
+  let hasPointerPosition = false
 
   function resizeScene(): void {
     const rect = canvas.getBoundingClientRect()
@@ -279,12 +292,23 @@ export function createThreeGalaxyBackgroundScene(
       hpPercent,
       currentHp,
     )
+    updateTargetHoverState()
+    updateTargetScreenPosition()
+    applySwooshTargetHoverVisual(swooshTarget, elapsedMs + visualStart.targetTimeOffsetMs)
+    updateLightningImpact(swooshTarget, elapsedMs + visualStart.targetTimeOffsetMs)
     renderer.render(scene, camera)
   }
 
+  function triggerLightningImpact(): void {
+    swooshTarget.lightningImpactStartedAtMs = swooshTarget.lastElapsedMs ?? 0
+  }
+
   function dispose(): void {
+    canvas.removeEventListener('pointermove', handlePointerMove)
+    canvas.removeEventListener('pointerleave', handlePointerLeave)
     resizeObserver?.disconnect()
     resizeObserver = null
+    setTargetHovered(false)
     scene.traverse((object) => {
       const maybeMesh = object as THREE.Mesh
       maybeMesh.geometry?.dispose()
@@ -304,6 +328,68 @@ export function createThreeGalaxyBackgroundScene(
     swooshTarget.hpTextTexture.dispose()
     renderer.dispose()
     callbacks.onReadyChange(false)
+    callbacks.onTargetHoverChange?.(false)
+  }
+
+  function handlePointerMove(event: PointerEvent): void {
+    const rect = canvas.getBoundingClientRect()
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      hasPointerPosition = false
+      setTargetHovered(false)
+      return
+    }
+
+    pointerNdc.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -(((event.clientY - rect.top) / rect.height) * 2 - 1),
+    )
+    hasPointerPosition = true
+    updateTargetHoverState()
+  }
+
+  function handlePointerLeave(): void {
+    hasPointerPosition = false
+    setTargetHovered(false)
+  }
+
+  function updateTargetHoverState(): void {
+    if (!hasPointerPosition) {
+      setTargetHovered(false)
+      return
+    }
+
+    camera.updateMatrixWorld()
+    swooshTarget.starCore.updateMatrixWorld()
+    targetRaycaster.setFromCamera(pointerNdc, camera)
+    setTargetHovered(targetRaycaster.intersectObject(swooshTarget.starCore, false).length > 0)
+  }
+
+  function updateTargetScreenPosition(): void {
+    const rect = canvas.getBoundingClientRect()
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      return
+    }
+
+    camera.updateMatrixWorld()
+    swooshTarget.starCore.updateMatrixWorld()
+    swooshTarget.starCore.getWorldPosition(targetWorldPosition)
+    targetProjectedPosition.copy(targetWorldPosition).project(camera)
+    callbacks.onTargetScreenPositionChange?.({
+      x: rect.left + ((targetProjectedPosition.x + 1) / 2) * rect.width,
+      y: rect.top + ((1 - targetProjectedPosition.y) / 2) * rect.height,
+    })
+  }
+
+  function setTargetHovered(isHovered: boolean): void {
+    if (swooshTarget.isHovered === isHovered) {
+      return
+    }
+
+    swooshTarget.isHovered = isHovered
+    canvas.style.cursor = isHovered ? 'crosshair' : 'default'
+    callbacks.onTargetHoverChange?.(isHovered)
   }
 
   resizeScene()
@@ -312,11 +398,15 @@ export function createThreeGalaxyBackgroundScene(
     resizeObserver.observe(canvas)
   }
 
+  canvas.addEventListener('pointermove', handlePointerMove)
+  canvas.addEventListener('pointerleave', handlePointerLeave)
   callbacks.onReadyChange(true)
+  callbacks.onTargetHoverChange?.(false)
   update(0)
 
   return {
     dispose,
+    triggerLightningImpact,
     update,
   }
 }
@@ -324,6 +414,7 @@ export function createThreeGalaxyBackgroundScene(
 export function createNoopThreeGalaxyBackgroundSceneController(): ThreeGalaxyBackgroundSceneController {
   return {
     dispose: () => {},
+    triggerLightningImpact: () => {},
     update: () => {},
   }
 }
@@ -824,6 +915,34 @@ function createSwooshTarget(options: {
       transparent: true,
     }),
   )
+  const lightningBolt = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 0),
+    ]),
+    new THREE.LineBasicMaterial({
+      blending: THREE.AdditiveBlending,
+      color: 0xe8fbff,
+      depthTest: false,
+      depthWrite: false,
+      opacity: 0,
+      transparent: true,
+    }),
+  )
+  const lightningFlash = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      blending: THREE.AdditiveBlending,
+      color: 0xdffaff,
+      depthTest: false,
+      depthWrite: false,
+      map: options.glowTexture,
+      opacity: 0,
+      transparent: true,
+    }),
+  )
   const trails = Array.from({ length: 8 }, (_, index) => {
     const trail = new THREE.Sprite(
       new THREE.SpriteMaterial({
@@ -849,10 +968,13 @@ function createSwooshTarget(options: {
   hpBarFill.renderOrder = 21
   hpBarGlow.renderOrder = 19
   hpTextSprite.renderOrder = 22
+  lightningBolt.renderOrder = 34
+  lightningFlash.renderOrder = 33
   hpTextSprite.position.set(0, 0.34, 0.02)
   hpTextSprite.scale.set(1.46, 0.54, 1)
+  lightningFlash.scale.setScalar(3.2)
   hpBarGroup.add(hpBarGlow, hpBarBackground, hpBarFill, hpTextSprite)
-  group.add(halo, starCore, hpBarGroup)
+  group.add(halo, starCore, hpBarGroup, lightningBolt, lightningFlash)
 
   return {
     from,
@@ -867,7 +989,11 @@ function createSwooshTarget(options: {
     hpTextLastValue: '',
     hpTextSprite,
     hpTextTexture,
+    isHovered: false,
     lastElapsedMs: null,
+    lightningBolt,
+    lightningFlash,
+    lightningImpactStartedAtMs: null,
     position: from.clone(),
     segmentDurationMs: 1200,
     segmentStartedAtMs: 0,
@@ -922,6 +1048,58 @@ function updateSwooshTarget(
     trail.renderOrder = 6
     trail.material.opacity = Math.max(0.03, 0.44 - index * 0.046)
   })
+}
+
+function applySwooshTargetHoverVisual(target: SwooshTarget, elapsedMs: number): void {
+  const pulse = 1 + Math.sin(elapsedMs * 0.027) * 0.16
+  const hoverScale = target.isHovered ? 1.08 : 1
+
+  target.halo.scale.setScalar((target.isHovered ? 2.72 : 2.2) * pulse)
+  target.halo.material.opacity = target.isHovered ? 0.92 : 0.68
+  target.starCore.scale.setScalar(CHARACTER_TARGET_SCALE * pulse * hoverScale)
+  target.starCore.material.color.set(target.isHovered ? 0xffffff : 0xfff2bf)
+}
+
+function updateLightningImpact(target: SwooshTarget, elapsedMs: number): void {
+  if (target.lightningImpactStartedAtMs === null) {
+    target.lightningBolt.material.opacity = 0
+    target.lightningFlash.material.opacity = 0
+    return
+  }
+
+  const progress = Math.max(0, (elapsedMs - target.lightningImpactStartedAtMs) / 520)
+
+  if (progress >= 1) {
+    target.lightningImpactStartedAtMs = null
+    target.lightningBolt.material.opacity = 0
+    target.lightningFlash.material.opacity = 0
+    return
+  }
+
+  const impactPosition = getSwooshTargetPosition(target, elapsedMs)
+  const flashScale = 2.4 + Math.sin(progress * Math.PI) * 2.2
+  const opacity = Math.sin(progress * Math.PI)
+  const start = impactPosition.clone().add(new THREE.Vector3(-1.05, 5.2, 0.18))
+  const end = impactPosition.clone().add(new THREE.Vector3(0, 0.18, 0.18))
+  const points = [start]
+
+  for (let index = 1; index < 4; index += 1) {
+    const segmentProgress = index / 4
+    const jitter = Math.sin(elapsedMs * 0.08 + index * 2.2) * 0.28
+    points.push(
+      start
+        .clone()
+        .lerp(end, segmentProgress)
+        .add(new THREE.Vector3(jitter, 0, 0)),
+    )
+  }
+
+  points.push(end)
+  target.lightningBolt.geometry.setFromPoints(points)
+  target.lightningBolt.material.opacity = 0.92 * opacity
+  target.lightningFlash.position.copy(impactPosition).add(new THREE.Vector3(0, 0.1, 0.12))
+  target.lightningFlash.scale.setScalar(flashScale)
+  target.lightningFlash.material.opacity = 0.74 * opacity
 }
 
 function updateSwooshTargetSteering(target: SwooshTarget, dtSeconds: number): void {
@@ -1064,7 +1242,6 @@ function createCharacterTexture(): THREE.Texture {
   texture.generateMipmaps = true
   texture.magFilter = THREE.LinearFilter
   texture.minFilter = THREE.LinearMipmapLinearFilter
-  texture.needsUpdate = true
 
   return texture
 }
