@@ -250,7 +250,7 @@ interface GameStartPayload {
 - PixiJS, Web Worker는 MVP에서 도입하지 않음.
 - Three.js 구현을 위해 `three`, `@types/three` 추가.
 
-### 11. [ ] LIGHTNING 전투 입력 UI 구현
+### 11. [x] LIGHTNING 전투 입력 UI 구현
 
 - `/game/:gameRoomId/play`에서 사용자가 LIGHTNING을 2초 쿨타임으로 반복 입력할 수 있는 UI 구현.
 - 입력 방식은 D/F 키로 스킬을 시전하고, Three.js 스타 코어 hover 중일 때만 백엔드 LIGHTNING을 전송하도록 구현. 최종 HP/kill 판정은 프론트가 하지 않음.
@@ -397,7 +397,7 @@ Accept: text/event-stream
 - [ ] 게임 대기방 WebSocket 구현.
 - [x] 게임 시작 처리 구현.
 - [x] 게임 플레이 화면 구현.
-- [ ] LIGHTNING 전투 입력 UI 구현.
+- [x] LIGHTNING 전투 입력 UI 구현.
 - [ ] 게임 결과 WebSocket 처리 구현.
 - [ ] 게임 결과 Summary 화면 구현.
 - [ ] 공통 UI, 테스트, 문서 정합성 정리.

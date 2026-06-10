@@ -354,28 +354,35 @@ interface GameResultPayload {
 
 이번 PR은 Game Play 화면에 LIGHTNING 전투 입력을 추가함. 사용자는 움직이는 스타 코어 위에 정확히 hover한 상태에서 `D` 또는 `F`를 눌러야 하며, 프론트는 이 조건을 입력 UX로만 사용하고 백엔드 판정 payload에는 어떤 좌표나 시간 값도 보내지 않음.
 
+전투 입력은 반복 스킬로 동작함. hover miss는 서버에 보내지 않고 흰색 impact burst와 2초 cooldown만 표시하며, hover hit일 때만 `{ type: 'LIGHTNING', payload: null }`을 전송함. 내 hit는 파란 impact burst, 상대 hit는 `LIGHTNING_APPLIED` 수신 기준 빨간 impact burst로 표시함.
+
 ```mermaid
 flowchart TD
     A["Game Play"] --> B["target hover"]
     B --> C{"D/F keydown"}
-    C -->|invalid| D["ignore"]
-    C -->|valid| E["send LIGHTNING payload null"]
-    E --> F["server LIGHTNING_APPLIED"]
-    F --> G["server applied damage"]
-    G --> H["wait GAME_RESULT"]
+    C -->|cooldown/result/repeat| D["ignore"]
+    C -->|not hovered| E["white miss impact<br/>local cooldown only"]
+    C -->|hovered + ws ready| F["blue hit impact<br/>send LIGHTNING payload null"]
+    F --> G["server LIGHTNING_APPLIED"]
+    G --> H["apply confirmed HP damage"]
+    H --> I["wait GAME_RESULT"]
+    I --> J["result route is next issue"]
 ```
 
 핵심 정책:
 
 - LIGHTNING payload는 `{ type: 'LIGHTNING', payload: null }`만 사용함.
 - hover/키 입력/HP/elapsed/좌표는 백엔드로 보내지 않음.
-- 프론트 낙관 차감은 visual-only이며 승패 판정 기준이 아님.
+- hover miss는 visual-only 입력 피드백이며 백엔드 전송, HP 차감, 승패 판정에 관여하지 않음.
+- 프론트 impact 연출은 visual-only이며 승패 판정 기준이 아님.
+- 한글 입력 상태에서도 물리 `D/F` 키로 동작하도록 `KeyboardEvent.code`를 함께 사용함.
 - `GAME_RESULT.actions[].afterHp`는 현재 HP가 아니라 action 시점 HP로 해석함.
 - result route 이동과 summary API 호출은 후속 이슈로 유지함.
 
 백엔드와의 구현 계약:
 
 - 백엔드는 WebSocket 수신 시각과 저장된 scenario/action을 source of truth로 삼음.
+- 프론트 hover는 백엔드 hit 판정 값이 아니며, 서버는 클라이언트 좌표나 클라이언트 timestamp를 신뢰하지 않음.
 - kill 여부는 서버가 `starCoreHpAtLightning <= 1200` 기준으로 판정함.
 - kill 실패 LIGHTNING도 `LIGHTNING_APPLIED`로 broadcast되며, 프론트는 이 이벤트 기준으로 HP를 확정하고 내 cooldown만 HUD에 표시함.
 - 최종 전환 기준은 `GAME_RESULT`이며, 이번 이슈에서는 route 이동하지 않음.
@@ -384,6 +391,15 @@ flowchart TD
 
 - 입력 조건을 hover + `D`/`F`로 좁힘.
   버튼을 누르면 언제든 발동되는 구조보다 게임성이 있고, target 좌표를 서버에 보내는 구조보다 백엔드 판정 계약이 단순함. hover는 클라이언트 UX 조건으로만 쓰고, 서버 판정은 기존 WebSocket 수신 시각 기준을 유지함.
+
+- miss와 hit의 책임을 분리함.
+  `D/F`를 누른 행위 자체에는 2초 cooldown과 흰색 miss impact를 부여하지만, star hover가 아니면 WebSocket `LIGHTNING`을 보내지 않음. 이 구조는 사용자가 스킬을 헛친 느낌을 받을 수 있게 하면서도 백엔드에는 유효한 전투 입력만 전달함.
+
+- impact 색상 정책을 판정 흐름과 맞춤.
+  hover miss는 흰색, 내 hit는 파란색, 상대 hit는 빨간색으로 구분함. 상대 hit는 내가 입력한 이벤트가 아니라 서버가 broadcast한 `LIGHTNING_APPLIED` 결과이므로 상대 스펠 HUD 없이 star 위치 impact와 HP 반영으로만 표현함.
+
+- 키보드 레이아웃 영향을 줄임.
+  `KeyboardEvent.key`만 보면 한글 입력 상태에서 물리 `D/F` 키가 다른 문자로 들어올 수 있음. 게임 입력은 물리 키가 중요하므로 `KeyboardEvent.code`의 `KeyD`/`KeyF`도 허용해 입력 환경 차이로 스킬이 안 나가는 문제를 줄임.
 
 - LIGHTNING 반복 입력을 2초 cooldown 단위로 제한함.
   백엔드는 gameRoom lock과 유저별 최근 action 시각으로 2초 쿨타임을 판정하고, 프론트도 같은 쿨타임 동안 반복 입력을 막아 불필요한 요청을 줄임.
@@ -394,13 +410,17 @@ flowchart TD
 - 결과 책임을 분리함.
   LIGHTNING 전송 후에도 프론트가 승패를 확정하지 않고 `GAME_RESULT`를 기다림. result route 이동과 summary API 호출은 후속 이슈로 유지해 이번 PR이 입력 UI와 표시 모델에 집중하도록 함.
 
+- 새 패키지 없이 기존 구조 안에서 구현함.
+  Three.js hover callback, `GamePlayPage` 상태, 기존 `GameWebSocketConnection.sendLightning()` 계약을 연결했으며 WebSocket service의 wire payload는 변경하지 않음. 따라서 백엔드 contract 변경 없이 전투 입력 UX만 확장함.
+
 ## 📝 Note
 
 - 이번 PR에서 result route 이동은 제외함.
 - Game summary API 호출은 제외함.
+- star HP가 0이 되어 서버가 `GAME_RESULT`를 내려주는 계약은 유지하되, `/game/:gameRoomId/result` 이동과 summary polling은 front-plan 12/13번 후속 이슈에서 처리함.
 - 상대 LIGHTNING 반영은 `LIGHTNING_APPLIED` 이벤트 기준으로 포함하되, 상대 스펠 HUD는 표시하지 않고 빨간 impact burst로만 표현함.
 - 새 패키지는 추가하지 않음.
-- 검증 결과: `npm run test -- GamePlayPage gameWebSocket` 통과, 3 files / 36 passed.
+- 검증 결과: `npm run test -- GamePlayPage gameWebSocket` 통과, 3 files / 37 passed.
 - 검증 결과: `npm run format`, `npm run lint`, `npm run typecheck` 통과.
 - 검증 결과: `npm run test` 통과, 15 files / 154 passed.
 - 검증 결과: `npm run build` 통과.
