@@ -306,9 +306,9 @@ interface GameResultPayload {
 - [x] `npm run typecheck` 검증.
 - [x] `npm run test` 검증.
 - [x] `npm run build` 검증.
-- [ ] desktop `1440x900` overflow 확인.
-- [ ] mobile `390x844` overflow 확인.
-- [ ] 브라우저에서 hover + `D`/`F` 입력 시 payload가 `{ type: 'LIGHTNING', payload: null }`인지 확인.
+- [x] desktop `1440x900` overflow 확인.
+- [x] mobile `390x844` overflow 확인.
+- [x] 브라우저에서 hover + `D`/`F` 입력 시 payload가 `{ type: 'LIGHTNING', payload: null }`인지 확인.
 
 ## Implementation Policy
 
@@ -404,6 +404,9 @@ flowchart TD
 - 검증 결과: `npm run format`, `npm run lint`, `npm run typecheck` 통과.
 - 검증 결과: `npm run test` 통과, 15 files / 154 passed.
 - 검증 결과: `npm run build` 통과.
+- 검증 결과: Chrome CDP desktop `1440x900` horizontal overflow 없음, text overflow 후보 없음, Three ready 확인.
+- 검증 결과: Chrome CDP mobile `390x844` horizontal overflow 없음, text overflow 후보 없음, Three ready 확인.
+- 검증 결과: Chrome CDP hover + `D` 입력 시 `{ type: 'LIGHTNING', payload: null }` 전송 확인.
 
 ## 📌 Related Issue
 
