@@ -564,6 +564,23 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
   })
 
+  it('uses physical D/F key codes when the keyboard layout changes the key value', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    setStarTargeted(true)
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD', key: 'ㅇ' }))
+    await wrapper.vm.$nextTick()
+
+    expect(gameWebSocketMock.state.connection.sendLightning).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe('mine')
+  })
+
   it('shows a miss impact at the pointer without sending LIGHTNING when the target is not hovered', async () => {
     saveValidPlayPayloads()
 

@@ -342,7 +342,7 @@ function handleBeforeUnload() {
 function handleLightningKeyDown() {
   const event = arguments[0]
 
-  if (event.repeat || !isLightningKey(event.key) || !canCastLightningSpell.value) {
+  if (event.repeat || !isLightningKey(event) || !canCastLightningSpell.value) {
     return
   }
 
@@ -365,10 +365,18 @@ function handleLightningKeyDown() {
   }
 }
 
-function isLightningKey(key = '') {
-  const normalizedKey = key.trim().toLowerCase()
+function isLightningKey(event = {}) {
+  const normalizedKey = String(Reflect.get(Object(event), 'key') ?? '')
+    .trim()
+    .toLowerCase()
+  const normalizedCode = String(Reflect.get(Object(event), 'code') ?? '').trim()
 
-  return normalizedKey === 'd' || normalizedKey === 'f'
+  return (
+    normalizedKey === 'd' ||
+    normalizedKey === 'f' ||
+    normalizedCode === 'KeyD' ||
+    normalizedCode === 'KeyF'
+  )
 }
 
 function handlePointerMove() {
