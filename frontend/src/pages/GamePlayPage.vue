@@ -21,7 +21,8 @@
     :data-game-result-received="gameResultReceived"
     :data-game-socket-lightning-ready="canSendGameSocketLightning"
     :data-game-star-targeted="isStarTargeted"
-    :data-game-lightning-ready="canSendLightningCommand"
+    :data-game-lightning-ready="canCastLightningSpell"
+    :data-game-lightning-hit-ready="canSendLightningCommand"
     :data-game-lightning-sent="appliedLightningActions.length > 0"
     :data-game-my-lightning-cooldown-ms="myLightningCooldownRemainingMs"
     :data-game-three-ready="isThreeSceneReady"
@@ -116,6 +117,9 @@ const isStarTargeted = shallowRef(false)
 const displayedHp = shallowRef()
 const lightningImpactId = shallowRef(0)
 const lightningImpactOwner = shallowRef('mine')
+const hasPointerScreenPosition = shallowRef(false)
+const pointerScreenPosition = shallowRef({ x: 0, y: 0 })
+const lightningImpactScreenPosition = shallowRef({ x: 0, y: 0 })
 const lightningTargetScreenPosition = shallowRef({ x: 0, y: 0 })
 let animationFrameId = 0
 let closePlayWebSocket = () => {}
@@ -176,11 +180,11 @@ const hpPercent = computed(() => {
   )
 })
 const lightningImpactStyle = computed(() => {
-  const targetY = Math.max(1, lightningTargetScreenPosition.value.y)
+  const targetY = Math.max(1, lightningImpactScreenPosition.value.y)
   const isOpponentImpact = lightningImpactOwner.value === 'opponent'
 
   return {
-    '--lightning-impact-x': `${lightningTargetScreenPosition.value.x}px`,
+    '--lightning-impact-x': `${lightningImpactScreenPosition.value.x}px`,
     '--lightning-impact-y': `${targetY}px`,
     '--lightning-impact-y-26': `${targetY * 0.26}px`,
     '--lightning-impact-y-34': `${targetY * 0.34}px`,
@@ -205,13 +209,16 @@ const isGameSocketReadyForLightning = computed(
 const myLightningCooldownRemainingMs = computed(() =>
   Math.max(0, myLightningCooldownUntil.value - nowMs.value),
 )
+const canCastLightningSpell = computed(
+  () =>
+    hasGameStarted.value && myLightningCooldownRemainingMs.value <= 0 && !gameResultReceived.value,
+)
 const canSendLightningCommand = computed(
   () =>
+    canCastLightningSpell.value &&
     canSendGameSocketLightning.value &&
     isGameSocketReadyForLightning.value &&
-    isStarTargeted.value &&
-    myLightningCooldownRemainingMs.value <= 0 &&
-    !gameResultReceived.value,
+    isStarTargeted.value,
 )
 const myLightningHudStatus = computed(() => {
   if (gameResultReceived.value) {
@@ -258,6 +265,7 @@ const isNaturalDeathWaiting = computed(
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
   window.addEventListener('keydown', handleLightningKeyDown)
+  window.addEventListener('pointermove', handlePointerMove)
   const gameRoomId = readRouteGameRoomId()
 
   if (gameRoomId === '') {
@@ -285,6 +293,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
   window.removeEventListener('keydown', handleLightningKeyDown)
+  window.removeEventListener('pointermove', handlePointerMove)
   closePlayWebSocket()
   playGameWebSocketConnection.value = undefined
   closePlayWebSocket = () => {}
@@ -314,16 +323,21 @@ function handleBeforeUnload() {
 function handleLightningKeyDown() {
   const event = arguments[0]
 
-  if (event.repeat || !isLightningKey(event.key) || !canSendLightningCommand.value) {
+  if (event.repeat || !isLightningKey(event.key) || !canCastLightningSpell.value) {
     return
   }
 
   event.preventDefault()
+  const shouldSendLightning = canSendLightningCommand.value
+  myLightningCooldownUntil.value = Date.now() + LIGHTNING_COOLDOWN_MS
+  triggerLightningImpact('mine', resolveLightningCastPosition())
+
+  if (!shouldSendLightning) {
+    return
+  }
 
   try {
     playGameWebSocketConnection.value?.sendLightning()
-    myLightningCooldownUntil.value = Date.now() + LIGHTNING_COOLDOWN_MS
-    triggerLightningImpact('mine')
     gameSocketErrorMessage.value = ''
   } catch (error) {
     gameSocketStatus.value = 'error'
@@ -336,6 +350,20 @@ function isLightningKey(key = '') {
   const normalizedKey = key.trim().toLowerCase()
 
   return normalizedKey === 'd' || normalizedKey === 'f'
+}
+
+function handlePointerMove() {
+  const event = arguments[0]
+
+  if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
+    return
+  }
+
+  pointerScreenPosition.value = {
+    x: event.clientX,
+    y: event.clientY,
+  }
+  hasPointerScreenPosition.value = true
 }
 
 function shouldWarnBeforeLeaving() {
@@ -470,7 +498,7 @@ function handleLightningApplied(payload = {}) {
   }
 
   if (isOpponentUserId(userId)) {
-    triggerLightningImpact('opponent')
+    triggerLightningImpact('opponent', lightningTargetScreenPosition.value)
   } else {
     myLightningCooldownUntil.value = Number.isFinite(cooldownUntil) ? cooldownUntil : Date.now()
   }
@@ -478,10 +506,26 @@ function handleLightningApplied(payload = {}) {
   updateDisplayedHp()
 }
 
-function triggerLightningImpact(owner = 'mine') {
+function triggerLightningImpact(owner = 'mine', position = resolveLightningCastPosition()) {
   lightningImpactOwner.value = owner === 'opponent' ? 'opponent' : 'mine'
+  lightningImpactScreenPosition.value = position
   threeSceneController.triggerLightningImpact()
   lightningImpactId.value += 1
+}
+
+function resolveLightningCastPosition() {
+  if (hasPointerScreenPosition.value) {
+    return pointerScreenPosition.value
+  }
+
+  if (lightningTargetScreenPosition.value.x > 0 || lightningTargetScreenPosition.value.y > 0) {
+    return lightningTargetScreenPosition.value
+  }
+
+  return {
+    x: typeof window === 'undefined' ? 0 : window.innerWidth / 2,
+    y: typeof window === 'undefined' ? 0 : window.innerHeight / 2,
+  }
 }
 
 function syncAppliedActionsFromGameResult(payload = {}) {

@@ -1,5 +1,5 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
@@ -80,12 +80,15 @@ vi.mock('@/services/realtime/gameWebSocketHandoff', () => ({
 vi.mock('@/game/threeGalaxyBackgroundScene', () => ({
   createNoopThreeGalaxyBackgroundSceneController: () => ({
     dispose: vi.fn(),
+    triggerLightningImpact: vi.fn(),
     update: vi.fn(),
   }),
   createThreeGalaxyBackgroundScene: threeSceneMock.createThreeGalaxyBackgroundScene,
 }))
 
 const { setLocale } = useLocale()
+
+enableAutoUnmount(afterEach)
 
 interface GameWebSocketTestHandlers {
   onOpen?: (event: Event) => void
@@ -170,7 +173,7 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-websocket-url')).toBe('/ws/game/100')
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('connecting')
     expect(wrapper.get('main').attributes('data-game-socket-lightning-ready')).toBe('true')
-    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('true')
     expect(wrapper.get('main').attributes('data-game-lightning-sent')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-three-ready')).toBe('false')
     expect(wrapper.find('video').exists()).toBe(false)
@@ -560,7 +563,7 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
   })
 
-  it('does not send LIGHTNING when hover, key, repeat, socket, or result conditions are invalid', async () => {
+  it('shows a miss impact at the pointer without sending LIGHTNING when the target is not hovered', async () => {
     saveValidPlayPayloads()
 
     const wrapper = mount(GamePlayPage)
@@ -568,10 +571,31 @@ describe('GamePlayPage', () => {
     getGameWebSocketHandlers().onOpen?.(new Event('open'))
     await wrapper.vm.$nextTick()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }))
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 123, clientY: 234 }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', cancelable: true }))
     await wrapper.vm.$nextTick()
 
     expect(gameWebSocketMock.state.connection.sendLightning).not.toHaveBeenCalled()
+    expect(threeSceneMock.controller.triggerLightningImpact).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe('mine')
+    expect(wrapper.get('.lightning-impact').attributes('style')).toContain(
+      '--lightning-impact-x: 123px',
+    )
+    expect(wrapper.get('.lightning-impact').attributes('style')).toContain(
+      '--lightning-impact-y: 234px',
+    )
+    expect(
+      wrapper.get('[data-testid="lightning-hud"]').attributes('data-lightning-hud-status'),
+    ).toBe('cooldown')
+  })
+
+  it('does not cast LIGHTNING when key, repeat, or result conditions are invalid', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    getGameWebSocketHandlers().onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
 
     setStarTargeted(true)
     await wrapper.vm.$nextTick()
@@ -599,7 +623,7 @@ describe('GamePlayPage', () => {
     expect(gameWebSocketMock.state.connection.sendLightning).not.toHaveBeenCalled()
   })
 
-  it('keeps LIGHTNING retryable when websocket send fails', async () => {
+  it('keeps the local LIGHTNING cooldown when websocket send fails after casting', async () => {
     gameWebSocketMock.state.connection.sendLightning.mockImplementationOnce(() => {
       throw new Error('SEND_FAILED')
     })
@@ -619,6 +643,10 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
     expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('SEND_FAILED')
+    expect(threeSceneMock.controller.triggerLightningImpact).toHaveBeenCalledTimes(1)
+    expect(
+      wrapper.get('[data-testid="lightning-hud"]').attributes('data-lightning-hud-status'),
+    ).toBe('cooldown')
     expect(window.sessionStorage.getItem('league-of-star.gamePlayLightningSent:100')).toBeNull()
   })
 

@@ -624,10 +624,11 @@ LIGHTNING 관련 `ERROR.payload.code`:
 
 ## 13. LIGHTNING 입력 UI
 
-클라이언트는 `GAME_START` 이후 사용자가 스타 코어에 hover한 상태에서 `D` 또는 `F`를 누르면 LIGHTNING 의도를 전송합니다.
+클라이언트는 `GAME_START` 이후 사용자가 `D` 또는 `F`를 누르면 스킬을 시전합니다. 스타 코어에 hover한 상태이면 LIGHTNING 의도를 전송하고, hover가 아니면 로컬 miss impact와 cooldown만 표시합니다.
 
 - 현재 wire type `LIGHTNING`는 gameRoom WebSocket으로 반복 전송할 수 있습니다.
 - `LIGHTNING` payload에는 클라이언트 timestamp를 포함하지 않으며 `null`로 전송합니다.
+- hover가 아닌 D/F 입력은 서버로 전송하지 않습니다. 백엔드는 좌표 기반 hit 판정을 하지 않으므로, miss 시전은 프론트 visual-only로 처리합니다.
 - 같은 유저가 같은 gameRoom에서 최근 LIGHTNING 이후 2초 cooldown 안에 다시 전송하면 서버는 새 action으로 저장하지 않습니다.
 - 저장된 LIGHTNING은 `LIGHTNING_APPLIED`로 broadcast됩니다. 클라이언트는 이 이벤트 기준으로 HP를 확정 표시하고, 내 action이면 내 cooldown HUD를 서버 `cooldownUntil`으로 보정합니다.
 - 클라이언트는 `GAME_RESULT`를 받을 때만 종료 UI로 전환합니다.

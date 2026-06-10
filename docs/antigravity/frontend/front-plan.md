@@ -253,7 +253,7 @@ interface GameStartPayload {
 ### 11. [ ] LIGHTNING 전투 입력 UI 구현
 
 - `/game/:gameRoomId/play`에서 사용자가 LIGHTNING을 2초 쿨타임으로 반복 입력할 수 있는 UI 구현.
-- 입력 방식은 Three.js 스타 코어 hover + D/F 키로 구현하되, 최종 HP/kill 판정은 프론트가 하지 않음.
+- 입력 방식은 D/F 키로 스킬을 시전하고, Three.js 스타 코어 hover 중일 때만 백엔드 LIGHTNING을 전송하도록 구현. 최종 HP/kill 판정은 프론트가 하지 않음.
 - WebSocket 전송 payload는 백엔드 계약대로 `{ type: 'LIGHTNING', payload: null }`만 사용.
 - 클라이언트 timestamp, HP, elapsed time, target 좌표는 payload에 포함하지 않음.
 - 서버 판정 source of truth는 WebSocket 수신 시각과 백엔드 `GAME_START` scenario임.
@@ -350,6 +350,7 @@ type GameSummaryResponse =
 - `COUNTDOWN` 수신 시 countdown 상태 표시 검증.
 - `GAME_START` 수신 시 play 이동 및 scenario 저장 검증.
 - hover + `D`/`F` 입력 시 `{ type: 'LIGHTNING', payload: null }`이 전송되고, 2초 cooldown 중 재입력이 막히는지 검증.
+- hover가 아닌 상태의 `D`/`F` 입력은 마우스 위치 impact와 cooldown만 적용하고 payload를 전송하지 않는지 검증.
 - LIGHTNING 전송 payload에 timestamp, HP, elapsed time, target 좌표가 포함되지 않는지 검증.
 - LIGHTNING 전송 후 프론트가 HP/승패를 즉시 확정하지 않고 `LIGHTNING_APPLIED`와 `GAME_RESULT`를 기다리는지 검증.
 - 2초 쿨타임 중 LIGHTNING 재입력이 막히는지 검증.

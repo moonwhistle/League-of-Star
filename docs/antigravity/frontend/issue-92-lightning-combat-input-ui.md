@@ -7,20 +7,21 @@
 ```mermaid
 flowchart TD
     A["/game/{gameRoomId}/play"] --> B["GAME_START payload 기준 HP 계산"]
-    B --> C["Three.js target hover 판정"]
-    C --> D{"target hovered?"}
-    D -->|no| E["D/F 입력 무시"]
-    D -->|yes| F{"D 또는 F 입력?"}
-    F -->|no| E
-    F -->|yes| G{"내 LIGHTNING 쿨타임 종료?"}
+    B --> C["마우스 위치 추적"]
+    C --> D{"D 또는 F 입력?"}
+    D -->|no| C
+    D -->|yes| G{"내 LIGHTNING 쿨타임 종료?"}
     G -->|no| H["입력 무시"]
-    G -->|yes| I["WebSocket LIGHTNING 전송"]
+    G -->|yes| I["마우스 위치에 파란 번개 impact"]
     I --> J["내 스펠 2초 쿨타임 표시"]
-    J --> K["서버 LIGHTNING_APPLIED 대기"]
-    K --> L["서버 action 기준 HP 차감"]
-    L --> M{"isKill?"}
-    M -->|yes| N["GAME_RESULT 대기"]
-    M -->|no| C
+    J --> K{"target hovered + WebSocket ready?"}
+    K -->|no| C
+    K -->|yes| L["WebSocket LIGHTNING 전송"]
+    L --> M["서버 LIGHTNING_APPLIED 대기"]
+    M --> N["서버 action 기준 HP 차감"]
+    N --> O{"isKill?"}
+    O -->|yes| P["GAME_RESULT 대기"]
+    O -->|no| C
 ```
 
 이번 이슈의 핵심은 반복 전투 입력 UX를 붙이되, 프론트가 판정 source of truth가 되지 않게 하는 것이다. Three.js hover 판정은 사용자의 입력 가능 조건으로만 사용하고, 백엔드로는 좌표나 키 정보를 보내지 않는다. 백엔드는 WebSocket 수신 시각, `GAME_START` 시나리오, 저장된 `game_actions`를 기준으로 HP와 kill을 판정한다.
@@ -28,7 +29,8 @@ flowchart TD
 이번 이슈에 포함되는 범위:
 
 - 움직이는 스타 코어 hover 판정.
-- hover 중 `D` 또는 `F` 키 입력 시 LIGHTNING 전송.
+- `D` 또는 `F` 키 입력 시 마우스 위치에 LIGHTNING 시전 impact 표시.
+- hover 중 `D` 또는 `F` 키 입력 시에만 백엔드 LIGHTNING 전송.
 - 내 스펠 중앙 하단 배치. 상대 스펠 HUD는 표시하지 않고 상대 LIGHTNING은 빨간 impact와 HP 반영으로 표현.
 - 2초 쿨타임 시계방향 overlay 표시.
 - 서버 `LIGHTNING_APPLIED` 수신 시 HP 확정 차감.
@@ -132,7 +134,7 @@ interface GameResultPayload {
 - hover 상태를 `GamePlayPage`로 callback 전달.
 - hover 상태에 따라 입력 가능 시각 상태 표시.
 - `D` 또는 `F` keydown 처리.
-- hover가 아닐 때 keydown 무시.
+- hover가 아닐 때 keydown은 마우스 위치 miss impact와 2초 쿨타임만 적용하고 백엔드 전송은 하지 않음.
 - 내 LIGHTNING 2초 쿨타임 중이면 keydown 무시.
 - WebSocket 연결이 없거나 error/close 상태이면 keydown 무시.
 - `sendLightning()`으로 `{ type: 'LIGHTNING', payload: null }` 전송.
@@ -201,9 +203,10 @@ interface GameResultPayload {
 구현 결과:
 
 - `GamePlayPage`는 mount 시 `window.keydown` listener를 등록하고 unmount 시 제거한다.
-- LIGHTNING 입력 가능 조건은 `target hover`, `D/F key`, `WebSocket connected 또는 handoff`, `내 cooldown 종료`, `GAME_RESULT 미수신`, `key repeat 아님`으로 제한한다.
-- 조건이 맞으면 기존 `GameWebSocketConnection.sendLightning()`을 호출하므로 wire payload는 `{ type: 'LIGHTNING', payload: null }` 계약을 그대로 따른다.
-- 전송 성공 직후 내 슬롯을 2초 cooldown 상태로 전환해 같은 cooldown window의 중복 입력을 막는다.
+- LIGHTNING 시전 가능 조건은 `D/F key`, `내 cooldown 종료`, `GAME_RESULT 미수신`, `key repeat 아님`으로 제한한다.
+- LIGHTNING 백엔드 전송 가능 조건은 시전 가능 조건에 `target hover`, `WebSocket connected 또는 handoff`를 추가한다.
+- 백엔드 전송 조건이 맞으면 기존 `GameWebSocketConnection.sendLightning()`을 호출하므로 wire payload는 `{ type: 'LIGHTNING', payload: null }` 계약을 그대로 따른다.
+- 시전 직후 내 슬롯을 2초 cooldown 상태로 전환해 같은 cooldown window의 중복 입력을 막는다.
 - 전송 실패 시 `lightningSent`를 false로 유지하고 socket error 상태만 표시한다.
 - 쿨타임 상태와 서버 `LIGHTNING_APPLIED.cooldownUntil` 보정은 4번 `LIGHTNING Cooldown / State 구현`에서 처리한다.
 
@@ -266,7 +269,7 @@ interface GameResultPayload {
 
 ### 7. Test 구현
 
-- [ ] hover false에서 `D`/`F` 입력 시 `sendLightning()` 미호출 검증.
+- [ ] hover false에서 `D`/`F` 입력 시 마우스 위치 impact와 cooldown은 적용되고 `sendLightning()`은 미호출되는지 검증.
 - [ ] cooldown이 없고 hover true에서 `D` 입력 시 `sendLightning()` 1회 호출 검증.
 - [ ] cooldown이 없고 hover true에서 `F` 입력 시 `sendLightning()` 1회 호출 검증.
 - [ ] 기타 키와 key repeat 무시 검증.
@@ -322,7 +325,7 @@ interface GameResultPayload {
 
 ## Acceptance Criteria
 
-- hover하지 않은 상태에서 `D`/`F`를 눌러도 LIGHTNING이 전송되지 않는다.
+- hover하지 않은 상태에서 `D`/`F`를 누르면 마우스 위치에 번개가 떨어지고 2초 cooldown이 적용되지만 LIGHTNING은 전송되지 않는다.
 - 움직이는 스타 코어에 hover한 상태에서 `D` 또는 `F`를 누르면 LIGHTNING이 전송되고, 2초 cooldown 중에는 재전송되지 않는다.
 - cooldown 종료 후 다시 hover + `D`/`F`를 누르면 LIGHTNING을 다시 전송할 수 있다.
 - 전송 payload가 정확히 `{ type: 'LIGHTNING', payload: null }`이다.
