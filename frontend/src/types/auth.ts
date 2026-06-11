@@ -21,3 +21,7 @@ export interface SignupResponse {
   email: string
   nickname: string
 }
+
+export interface LogoutRequest {
+  refreshToken: string
+}
