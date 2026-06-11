@@ -39,7 +39,6 @@ describe('SignupPage', () => {
     const wrapper = mount(SignupPage)
 
     expect(wrapper.get('h1').text()).toBe('LEAGUE OF STAR')
-    expect(wrapper.get('.signup-heading p').text()).toBe('CREATE YOUR STAR ACCOUNT')
     expect(wrapper.find('#signup-email').exists()).toBe(true)
     expect(wrapper.find('#signup-password').exists()).toBe(true)
     expect(wrapper.find('#signup-nickname').exists()).toBe(true)

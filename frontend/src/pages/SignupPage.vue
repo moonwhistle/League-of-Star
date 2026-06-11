@@ -8,7 +8,6 @@
     <section class="signup-card" aria-labelledby="signup-title">
       <div class="signup-heading">
         <h1 id="signup-title">{{ t('signup.title') }}</h1>
-        <p>{{ t('signup.subtitle') }}</p>
       </div>
 
       <form class="signup-form" aria-label="Signup form" @submit.prevent="handleSubmit">
