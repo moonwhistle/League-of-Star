@@ -102,6 +102,8 @@ interface GameSummaryPlayer {
 - `PENDING`은 실패가 아니므로 `retryAfterMillis` 기준으로 polling한다.
 - 프론트는 임의 timeout이나 polling 최대 횟수로 실패 처리하지 않는다.
 - `DONE`을 받으면 Summary 응답 기준으로 `YOU WIN`/`YOU LOSE`/`DRAW`와 player summary를 최종 표시한다.
+- 종료 시각, 종료 사유, 게임룸, seriesType, rankSeriesId는 화면 UI에 노출하지 않는다.
+- rank가 변경되지 않았으면 `SILVER_I -> SILVER_I`가 아니라 `SILVER_I`처럼 단일 값으로 표시한다.
 - 오류 상태에서는 서버 `ErrorResponse.message`가 있으면 우선 표시하고 `/match` 복귀 버튼을 제공한다.
 
 ## Scope Boundary
@@ -161,9 +163,9 @@ interface GameSummaryPlayer {
 - [x] `YOU WIN` / `YOU LOSE` / `DRAW` title 표시.
 - [x] `PENDING` 정산 중 상태 표시.
 - [x] 내 player summary와 상대 player summary를 나란히 표시.
-- [x] nickname, result, rankBefore → rankAfter, lpBefore → lpAfter, lpChange, seriesType 표시.
-- [x] `rankSeriesId`는 값이 있을 때만 보조 정보로 표시.
-- [x] 종료 사유와 게임룸 UI는 표시하지 않음.
+- [x] nickname, result, rankBefore/rankAfter, lpBefore → lpAfter, lpChange 표시.
+- [x] rank 변경이 없으면 단일 rank 값만 표시.
+- [x] 종료 시각, 종료 사유, 게임룸, seriesType, rankSeriesId UI는 표시하지 않음.
 - [x] `/match` 복귀 버튼 제공.
 - [x] desktop/mobile overflow 확인.
 
@@ -174,7 +176,7 @@ interface GameSummaryPlayer {
 - [x] `DONE` 응답 시 `YOU WIN` 표시 검증.
 - [x] `DONE` 응답 시 `YOU LOSE` 표시 검증.
 - [x] `DONE` 응답 시 `DRAW` 표시 검증.
-- [x] `me/opponent` LP/rank/series 표시 검증.
+- [x] `me/opponent` LP/rank 표시 검증.
 - [x] 403/404/409 error 상태와 `/match` 복귀 버튼 검증.
 - [x] unmount 시 polling timeout과 request abort 정리 검증.
 - [x] `DONE` 이후 polling 중단 검증.
@@ -210,7 +212,8 @@ interface GameSummaryPlayer {
 - `DONE` 이후 polling은 반드시 중단한다.
 - unmount 시 polling timer와 in-flight request를 정리한다.
 - 403/404/409는 전역 `ErrorResponse` message를 우선 표시한다.
-- 종료 사유와 게임룸 정보는 화면 UI에 노출하지 않는다.
+- 종료 시각, 종료 사유, 게임룸, seriesType, rankSeriesId는 화면 UI에 노출하지 않는다.
+- rank 변경이 없으면 단일 rank 값만 표시한다.
 - 새 패키지를 추가하지 않는다.
 
 ## Acceptance Criteria
@@ -219,10 +222,11 @@ interface GameSummaryPlayer {
 - `PENDING` 응답을 받으면 `retryAfterMillis` 기준으로 polling한다.
 - `DONE` 응답을 받으면 polling을 멈추고 Summary 기준 최종 결과를 표시한다.
 - `YOU WIN` / `YOU LOSE` / `DRAW`가 Summary 응답 기준으로 표시된다.
-- 내 정보와 상대 정보의 nickname, result, LP 변화, rank 변화, series 정보가 표시된다.
+- 내 정보와 상대 정보의 nickname, result, LP 변화, rank 정보가 표시된다.
+- rank 변경이 없으면 단일 rank 값만 표시된다.
 - 403/404/409 오류 상태에서 사용자에게 안내와 `/match` 복귀 버튼을 제공한다.
 - unmount 시 timer와 request가 정리된다.
-- 종료 사유와 게임룸 UI가 표시되지 않는다.
+- 종료 시각, 종료 사유, 게임룸, seriesType, rankSeriesId UI가 표시되지 않는다.
 - format/lint/typecheck/test/build가 통과한다.
 
 ## PR Message
@@ -270,7 +274,7 @@ flowchart TD
   프론트 임의 timeout을 두지 않고 `retryAfterMillis`를 source로 삼아 정산 지연을 정상 대기 상태로 표현함.
 
 - 결과 UI는 정산 정보 중심으로 구성함.
-  종료 사유와 게임룸은 노출하지 않고, `me`/`opponent`의 승패, LP 변화, rank 변화, series 정보를 표시함.
+  종료 시각, 종료 사유, 게임룸, seriesType, rankSeriesId는 노출하지 않고, `me`/`opponent`의 승패, LP 변화, rank 정보를 표시함. rank가 변경되지 않았으면 단일 rank 값만 표시함.
 
 ## 📝 Note
 
@@ -288,6 +292,7 @@ flowchart TD
   - 브라우저 mock API `DONE` 직접 응답 확인함. mobile 390x844에서 `YOU WIN`, `done`, `win` 표시 확인함.
   - 브라우저 mock API 403 error 확인함. `errorStatus=403`, 오류 상태 표시 확인함.
   - desktop 1440x900, mobile 390x844에서 horizontal overflow 없음, text overflow 후보 없음 확인함.
+  - 종료 시각/종료 사유/게임룸/seriesType/rankSeriesId 미노출과 rank 미변경 단일 표시 정책 확인함.
 
 ## 📌 Related Issue
 

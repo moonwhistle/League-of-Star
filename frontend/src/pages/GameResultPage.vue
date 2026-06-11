@@ -39,10 +39,6 @@
         class="summary-panel"
         :aria-label="t('gameResult.summarySection')"
       >
-        <p class="summary-panel__finished-at">
-          {{ t('gameResult.finishedAt') }} {{ formatFinishedAt(gameSummaryPayload.finishedAt) }}
-        </p>
-
         <div class="summary-players">
           <article class="summary-player summary-player--me" data-result-player="me">
             <p class="summary-player__label">{{ t('gameResult.me') }}</p>
@@ -55,7 +51,12 @@
               <div>
                 <dt>{{ t('gameResult.rank') }}</dt>
                 <dd>
-                  {{ gameSummaryPayload.me.rankBefore }} -> {{ gameSummaryPayload.me.rankAfter }}
+                  {{
+                    formatRankChange(
+                      gameSummaryPayload.me.rankBefore,
+                      gameSummaryPayload.me.rankAfter,
+                    )
+                  }}
                 </dd>
               </div>
               <div>
@@ -65,14 +66,6 @@
                     formatLpChange(gameSummaryPayload.me.lpChange)
                   }})
                 </dd>
-              </div>
-              <div>
-                <dt>{{ t('gameResult.series') }}</dt>
-                <dd>{{ formatSeriesType(gameSummaryPayload.me.seriesType) }}</dd>
-              </div>
-              <div v-if="gameSummaryPayload.me.rankSeriesId !== null">
-                <dt>{{ t('gameResult.seriesId') }}</dt>
-                <dd>{{ gameSummaryPayload.me.rankSeriesId }}</dd>
               </div>
             </dl>
           </article>
@@ -88,8 +81,12 @@
               <div>
                 <dt>{{ t('gameResult.rank') }}</dt>
                 <dd>
-                  {{ gameSummaryPayload.opponent.rankBefore }} ->
-                  {{ gameSummaryPayload.opponent.rankAfter }}
+                  {{
+                    formatRankChange(
+                      gameSummaryPayload.opponent.rankBefore,
+                      gameSummaryPayload.opponent.rankAfter,
+                    )
+                  }}
                 </dd>
               </div>
               <div>
@@ -99,14 +96,6 @@
                   {{ gameSummaryPayload.opponent.lpAfter }}
                   ({{ formatLpChange(gameSummaryPayload.opponent.lpChange) }})
                 </dd>
-              </div>
-              <div>
-                <dt>{{ t('gameResult.series') }}</dt>
-                <dd>{{ formatSeriesType(gameSummaryPayload.opponent.seriesType) }}</dd>
-              </div>
-              <div v-if="gameSummaryPayload.opponent.rankSeriesId !== null">
-                <dt>{{ t('gameResult.seriesId') }}</dt>
-                <dd>{{ gameSummaryPayload.opponent.rankSeriesId }}</dd>
               </div>
             </dl>
           </article>
@@ -325,23 +314,8 @@ function formatLpChange(lpChange = 0) {
   return lpChange > 0 ? `+${lpChange}` : String(lpChange)
 }
 
-function formatSeriesType(seriesTypeValue = '') {
-  const seriesType = String(seriesTypeValue)
-
-  switch (seriesType) {
-    case 'PLACEMENT':
-      return t('gameResult.placement')
-    case 'PROMOTION':
-      return t('gameResult.promotion')
-    case 'RANK':
-      return t('gameResult.rankSeries')
-    default:
-      return String(seriesType)
-  }
-}
-
-function formatFinishedAt(finishedAt = '') {
-  return finishedAt.replace('T', ' ')
+function formatRankChange(rankBefore = '', rankAfter = '') {
+  return rankBefore === rankAfter ? rankAfter : `${rankBefore} -> ${rankAfter}`
 }
 
 function returnToMatch() {

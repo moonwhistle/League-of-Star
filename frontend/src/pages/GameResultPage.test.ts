@@ -170,7 +170,7 @@ describe('GameResultPage', () => {
     expect(wrapper.get('h1').text()).toBe('DRAW')
   })
 
-  it('renders player LP, rank, and series summary fields from DONE', async () => {
+  it('renders player LP and rank summary fields from DONE', async () => {
     getGameSummaryMock.mockResolvedValue(
       createDoneSummary({
         me: createPlayerSummary({
@@ -203,12 +203,14 @@ describe('GameResultPage', () => {
     expect(text).toContain('Starlord')
     expect(text).toContain('Voidwalker')
     expect(text).toContain('GOLD_IV -> GOLD_III')
+    expect(text).toContain('SILVER_I')
+    expect(text).not.toContain('SILVER_I -> SILVER_I')
     expect(text).toContain('100 -> 125 (+25)')
-    expect(text).toContain('승급전')
-    expect(text).toContain('77')
     expect(text).toContain('80 -> 65 (-15)')
     expect(text).not.toContain('종료 사유')
     expect(text).not.toContain('게임룸')
+    expect(text).not.toContain('종료 시각')
+    expect(text).not.toContain('시리즈')
   })
 
   it('renders API error messages and allows returning to match', async () => {
