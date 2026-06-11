@@ -115,7 +115,9 @@ describe('SignupPage', () => {
   })
 
   it('shows backend error message after signup failure', async () => {
-    signupMock.mockRejectedValue(new ApiClientError(400, { message: '이미 사용 중인 이메일입니다.' }))
+    signupMock.mockRejectedValue(
+      new ApiClientError(400, { message: '이미 사용 중인 이메일입니다.' }),
+    )
 
     const wrapper = mount(SignupPage)
 

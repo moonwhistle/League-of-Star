@@ -120,69 +120,69 @@ interface SignupResponse {
 
 ### 1. Backend Contract 재확인
 
-- [ ] 백엔드 `AuthPath.SIGN_UP`가 `/api/v1/auth/signUp`인지 확인.
-- [ ] `SignupRequest` request shape 확인.
-- [ ] `SignupResponse` response shape 확인.
-- [ ] 회원가입 성공 응답에 token이 없음을 문서화.
-- [ ] 회원가입 성공 후 `/login` 이동 정책 문서화.
+- [x] 백엔드 `AuthPath.SIGN_UP`가 `/api/v1/auth/signUp`인지 확인.
+- [x] `SignupRequest` request shape 확인.
+- [x] `SignupResponse` response shape 확인.
+- [x] 회원가입 성공 응답에 token이 없음을 문서화.
+- [x] 회원가입 성공 후 `/login` 이동 정책 문서화.
 
 ### 2. Signup Route / Service 구현
 
-- [ ] `ROUTE_PATHS.signup` 추가.
-- [ ] `ROUTE_NAMES.signup` 추가.
-- [ ] router에 `/signup` route 추가.
-- [ ] `/signup` route에 `guestOnly: true` 적용.
-- [ ] `SignupRequest`, `SignupResponse` 타입 추가.
-- [ ] `authService.signup` 구현.
-- [ ] signup API는 `auth: false`로 호출.
+- [x] `ROUTE_PATHS.signup` 추가.
+- [x] `ROUTE_NAMES.signup` 추가.
+- [x] router에 `/signup` route 추가.
+- [x] `/signup` route에 `guestOnly: true` 적용.
+- [x] `SignupRequest`, `SignupResponse` 타입 추가.
+- [x] `authService.signup` 구현.
+- [x] signup API는 `auth: false`로 호출.
 
 ### 3. SignupPage 구현
 
-- [ ] `SignupPage.vue` 추가.
-- [ ] email input 구현.
-- [ ] password input 구현.
-- [ ] nickname input 구현.
-- [ ] 필수 입력 client validation 구현.
-- [ ] submit 중 중복 요청 방지 구현.
-- [ ] 성공 시 token 저장 없이 `/login` 이동.
-- [ ] 실패 시 백엔드 message 또는 fallback message 표시.
-- [ ] 로그인 페이지로 돌아가기 버튼 구현.
+- [x] `SignupPage.vue` 추가.
+- [x] email input 구현.
+- [x] password input 구현.
+- [x] nickname input 구현.
+- [x] 필수 입력 client validation 구현.
+- [x] submit 중 중복 요청 방지 구현.
+- [x] 성공 시 token 저장 없이 `/login` 이동.
+- [x] 실패 시 백엔드 message 또는 fallback message 표시.
+- [x] 로그인 페이지로 돌아가기 버튼 구현.
 
 ### 4. LoginPage 연결 / Locale 구현
 
-- [ ] LoginPage 회원가입 버튼에 signup route 이동 연결.
-- [ ] 한국어 signup locale 추가.
-- [ ] 영어 signup locale 추가.
-- [ ] 기존 로그인 locale과 naming 충돌 없는지 확인.
+- [x] LoginPage 회원가입 버튼에 signup route 이동 연결.
+- [x] 한국어 signup locale 추가.
+- [x] 영어 signup locale 추가.
+- [x] 기존 로그인 locale과 naming 충돌 없는지 확인.
 
 ### 5. Test 구현
 
-- [ ] SignupPage 렌더링 테스트.
-- [ ] 필수 입력 누락 시 API 미호출 검증.
-- [ ] 성공 시 signup payload 검증.
-- [ ] 성공 시 `/login` 이동 검증.
-- [ ] 성공 시 `setAuthTokens` 미호출 검증.
-- [ ] ApiClientError message 표시 검증.
-- [ ] LoginPage 회원가입 버튼 route 이동 검증.
-- [ ] router meta에서 signup guestOnly 검증.
+- [x] SignupPage 렌더링 테스트.
+- [x] 필수 입력 누락 시 API 미호출 검증.
+- [x] 성공 시 signup payload 검증.
+- [x] 성공 시 `/login` 이동 검증.
+- [x] 성공 시 `setAuthTokens` 미호출 검증.
+- [x] ApiClientError message 표시 검증.
+- [x] LoginPage 회원가입 버튼 route 이동 검증.
+- [x] router meta에서 signup guestOnly 검증.
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 1-1 완료 상태 반영.
-- [ ] `front-plan.md` 회원가입 후속 범위 문구 정합성 확인.
-- [ ] issue-98 task 완료 상태 반영.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
+- [x] `docs/last-구현.md` Section 1-1 완료 상태 반영.
+- [x] `front-plan.md` 회원가입 후속 범위 문구 정합성 확인.
+- [x] issue-98 task 완료 상태 반영.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
 
 ### 7. 검증
 
-- [ ] `npm run test -- SignupPage LoginPage router authService` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] desktop 1440x900 overflow 확인.
-- [ ] mobile 390x844 overflow 확인.
+- [x] `npm run test -- SignupPage LoginPage router authService` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] desktop 1440x900 overflow 확인.
+- [x] mobile 390x844 overflow 확인.
 
 ## Implementation Policy
 
@@ -254,7 +254,10 @@ flowchart TD
 
 - OAuth, 비밀번호 찾기, token refresh/retry, 로그아웃은 이번 PR에서 제외함.
 - profile/rank 조회와 MatchPage 실데이터 전환도 후속 이슈로 유지함.
-- 검증 결과를 여기에 기록함.
+- `npm run test -- SignupPage LoginPage router authService` 검증 완료함.
+- `npm run format`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` 검증 완료함.
+- 전체 테스트 20 files / 188 passed 확인함.
+- headless Chrome 기준 desktop 1440x900, mobile 390x844에서 horizontal overflow 없음과 화면 밖 요소 없음 확인함.
 
 ## 📌 Related Issue
 

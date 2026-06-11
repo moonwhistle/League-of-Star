@@ -76,7 +76,9 @@ describe('LoginPage', () => {
 
     const wrapper = mount(LoginPage)
 
-    expect(wrapper.get('[role="status"]').text()).toBe('회원가입이 완료되었습니다. 로그인해 주세요.')
+    expect(wrapper.get('[role="status"]').text()).toBe(
+      '회원가입이 완료되었습니다. 로그인해 주세요.',
+    )
   })
 
   it('submits email and password through the login service', async () => {
