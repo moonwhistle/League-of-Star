@@ -1,4 +1,10 @@
-import type { LoginRequest, LoginResponse, SignupRequest, SignupResponse } from '@/types/auth'
+import type {
+  LoginRequest,
+  LoginResponse,
+  LogoutRequest,
+  SignupRequest,
+  SignupResponse,
+} from '@/types/auth'
 
 import { requestJson } from './apiClient'
 
@@ -17,5 +23,15 @@ export function signup(request: SignupRequest, signal?: AbortSignal): Promise<Si
     body: request,
     signal,
     auth: false,
+  })
+}
+
+export function logout(refreshToken: string, signal?: AbortSignal): Promise<void> {
+  return requestJson<void, LogoutRequest>('/api/v1/auth/logout', {
+    method: 'POST',
+    body: {
+      refreshToken,
+    },
+    signal,
   })
 }

@@ -82,39 +82,39 @@ Acceptance Criteria:
 - [x] 필수 입력 validation이 동작한다.
 - [x] 기존 로그인/매칭 flow가 깨지지 않는다.
 
-### 1-2. [ ] 로그아웃 구현
+### 1-2. [x] 로그아웃 구현
 
 우선순위: P1
 
 목표:
 
-- [ ] MatchPage 상단 로그아웃 버튼을 실제 동작으로 연결한다.
+- [x] MatchPage 상단 로그아웃 버튼을 실제 동작으로 연결한다.
 
 Backend:
 
-- [ ] logout API가 필요한지 결정한다.
-- [ ] 서버에서 refresh token revoke를 관리한다면 endpoint를 확정한다.
+- [x] logout API가 필요한지 결정한다.
+- [x] 서버에서 refresh token revoke를 관리한다면 endpoint를 확정한다.
   - `POST /api/v1/auth/logout`
-- [ ] 서버 revoke가 없다면 프론트 local token clear만 수행한다고 문서화한다.
+- [x] 서버 revoke 실패와 무관하게 프론트 local token clear를 수행한다고 문서화한다.
 
 Frontend:
 
-- [ ] MatchPage logout 버튼에 handler를 연결한다.
-- [ ] `clearAuthTokens()` 호출 후 `/login`으로 이동한다.
-- [ ] 매칭 중 로그아웃 허용 정책을 정한다.
+- [x] MatchPage logout 버튼에 handler를 연결한다.
+- [x] `clearAuthTokens()` 호출 후 `/login`으로 이동한다.
+- [x] 매칭 중 로그아웃 허용 정책을 정한다.
   - 추천: queued 상태에서는 먼저 leave 후 logout.
   - 게임 대기/플레이 중 logout은 route guard가 아니라 게임 이탈 정책 이슈에서 다룬다.
 
 Policy:
 
-- [ ] 로그아웃은 인증 세션 종료 기능으로 둔다.
-- [ ] 게임 진행 중 정상 종료/패배/이탈 정산 정책과 섞지 않는다.
+- [x] 로그아웃은 인증 세션 종료 기능으로 둔다.
+- [x] 게임 진행 중 정상 종료/패배/이탈 정산 정책과 섞지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 로그아웃 클릭 시 token이 제거된다.
-- [ ] 로그아웃 후 `/match` 접근 시 `/login`으로 이동한다.
-- [ ] queued 상태에서 로그아웃 정책이 문서화되어 있다.
+- [x] 로그아웃 클릭 시 token이 제거된다.
+- [x] 로그아웃 후 `/match` 접근 시 `/login`으로 이동한다.
+- [x] queued 상태에서 로그아웃 정책이 문서화되어 있다.
 
 ### 1-3. [ ] Token Refresh 구현
 
@@ -442,7 +442,7 @@ Policy:
 
 1. [x] Section 1-1. 회원가입 페이지 구현
 2. [ ] Section 2-1. 내 프로필 / 랭크 조회
-3. [ ] Section 1-2. 로그아웃 구현
+3. [x] Section 1-2. 로그아웃 구현
 4. [ ] Section 2-2. 랭킹 조회
 5. [ ] Section 3-1. 내 전적 조회
 6. [ ] Section 3-2. 내 프로필 페이지
