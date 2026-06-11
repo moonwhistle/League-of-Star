@@ -229,6 +229,8 @@ flowchart TD
 - refresh 성공 응답의 token을 source of truth로 삼음.
 - 원 요청 재시도는 1회만 허용함.
 - login/signup/refresh/logout은 refresh 루프에서 제외함.
+- `auth: false` 요청과 `skipAuthRefresh: true` 요청은 refresh 대상에서 제외함.
+- 동시에 여러 HTTP API가 `401`을 받아도 refresh 요청은 1회만 발생하도록 단일 promise를 공유함.
 - SSE/WebSocket 인증 정책은 변경하지 않음.
 
 백엔드와의 구현 계약:
@@ -237,6 +239,7 @@ flowchart TD
 - request는 `{ refreshToken }`임.
 - response는 `{ accessToken, refreshToken }`임.
 - refresh API는 만료된 access token에 의존하지 않도록 `auth: false`로 호출함.
+- logout API는 기존 Authorization header 계약을 유지하되, 세션 종료 요청이므로 `skipAuthRefresh: true`로 refresh/retry 대상에서 제외함.
 
 ## 📚 Changes
 
@@ -246,6 +249,8 @@ flowchart TD
   token 만료의 source of truth는 백엔드 HTTP `401` 응답이므로 guard에서 JWT를 임의로 해석하지 않음.
 - refresh 동시 요청을 단일화함.
   여러 API가 동시에 `401`을 받아도 refresh token rotation 또는 서버 부하 문제가 생기지 않도록 하나의 refresh promise를 공유함.
+- refresh 성공 후 원 요청을 재시도할 때도 `skipAuthRefresh`를 적용함.
+  재시도 요청이 다시 `401`을 반환해도 refresh를 반복하지 않아 무한 루프가 생기지 않게 하기 위함임.
 - 인증 만료 이동은 event로 분리함.
   service 계층이 router에 직접 의존하지 않게 해서 API client와 UI routing 책임을 분리함.
 - logout은 refresh/retry 대상에서 제외함.
