@@ -23,6 +23,14 @@ export const router = createRouter({
       },
     },
     {
+      path: ROUTE_PATHS.signup,
+      name: ROUTE_NAMES.signup,
+      component: () => import('@/pages/SignupPage.vue'),
+      meta: {
+        guestOnly: true,
+      },
+    },
+    {
       path: ROUTE_PATHS.match,
       name: ROUTE_NAMES.match,
       component: () => import('@/pages/MatchPage.vue'),

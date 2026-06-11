@@ -44,8 +44,12 @@
 
         <div class="login-links">
           <button type="button">{{ t('login.forgotPassword') }}</button>
-          <button type="button">{{ t('login.signUp') }}</button>
+          <button type="button" @click="goToSignup">{{ t('login.signUp') }}</button>
         </div>
+
+        <p v-if="successMessage !== ''" class="login-success" role="status">
+          {{ successMessage }}
+        </p>
 
         <p v-if="errorMessage !== ''" class="login-error" role="alert">
           {{ errorMessage }}
@@ -89,7 +93,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
@@ -100,12 +104,18 @@ import { setAuthTokens } from '@/services/authToken'
 import backgroundImageUrl from '../../img/background-new-sharp.png'
 
 const router = useRouter()
+const route = useRoute()
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
 
 const email = ref('')
 const password = ref('')
 const errorMessage = ref('')
+const successMessage = ref(route.query.signup === 'success' ? t('login.signupSuccess') : '')
 const isSubmitting = ref(false)
+
+async function goToSignup() {
+  await router.push({ name: ROUTE_NAMES.signup })
+}
 
 async function handleSubmit() {
   if (isSubmitting.value) {
@@ -113,6 +123,7 @@ async function handleSubmit() {
   }
 
   errorMessage.value = ''
+  successMessage.value = ''
 
   if (email.value === '' || password.value === '') {
     errorMessage.value = t('login.required')
@@ -347,6 +358,14 @@ async function handleSubmit() {
   min-height: 18px;
   margin: 16px 0 0;
   color: #ffd3d3;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.login-success {
+  min-height: 18px;
+  margin: 16px 0 0;
+  color: #63f2e8;
   font-size: 0.76rem;
   font-weight: 700;
 }

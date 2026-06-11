@@ -28,6 +28,10 @@ describe('router route meta', () => {
     expect(getRoute(ROUTE_NAMES.login).meta.guestOnly).toBe(true)
   })
 
+  it('marks signup as guest only', () => {
+    expect(getRoute(ROUTE_NAMES.signup).meta.guestOnly).toBe(true)
+  })
+
   it('redirects home to match', () => {
     const homeRoute = getRoute(ROUTE_NAMES.home)
 
