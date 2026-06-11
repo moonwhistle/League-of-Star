@@ -199,9 +199,12 @@ describe('MatchPage', () => {
 
     expect(leaveMatchQueueMock).toHaveBeenCalledWith(expect.any(AbortSignal))
     expect(logoutMock).toHaveBeenCalledWith('refresh-token', expect.any(AbortSignal))
-    expect(leaveMatchQueueMock.mock.invocationCallOrder[0]).toBeLessThan(
-      logoutMock.mock.invocationCallOrder[0],
-    )
+    const leaveCallOrder = leaveMatchQueueMock.mock.invocationCallOrder[0]
+    const logoutCallOrder = logoutMock.mock.invocationCallOrder[0]
+
+    expect(leaveCallOrder).toBeDefined()
+    expect(logoutCallOrder).toBeDefined()
+    expect(leaveCallOrder!).toBeLessThan(logoutCallOrder!)
     expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
     expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.login })
     expect(closeMatchEventSourceMock).toHaveBeenCalled()

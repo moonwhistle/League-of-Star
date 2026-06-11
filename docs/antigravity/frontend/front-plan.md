@@ -95,6 +95,19 @@ flowchart TD
 - route guard는 access token 존재 여부만 판단하는 MVP 정책으로 구현.
 - route guard 단위 테스트와 router meta 정합성 테스트로 protected/guest only/public route 정책 검증.
 
+### 2-1. [x] 로그아웃 구현
+
+- MatchPage 로그아웃 버튼을 실제 인증 세션 종료 흐름에 연결.
+- `POST /api/v1/auth/logout` 호출 구현.
+- request `{ refreshToken }` 반영.
+- logout API는 인증 API이므로 기존 `apiClient` Authorization header 기본 정책 유지.
+- backend logout 성공/실패와 무관하게 `clearAuthTokens()` 호출 구현.
+- refresh token이 없으면 backend logout 호출 없이 local token clear 후 `/login` 이동 구현.
+- queued/joining 상태에서는 `leaveMatchQueue()`를 먼저 시도한 뒤 logout 진행.
+- queue leave 실패는 local logout을 막지 않음.
+- `match_found`, accept/reject command 진행 중 logout은 매칭 응답 정책과 섞지 않도록 차단.
+- 게임 대기/플레이 중 logout과 이탈 정산은 후속 이슈에서 다룸.
+
 ### 3. [x] SSE 인증 계약 확정 및 매칭 스트림 연결 구현
 
 - `GET /api/v1/notifications/match/stream` 연결 client 구현.

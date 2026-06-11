@@ -111,69 +111,69 @@ Response:
 
 ### 1. Backend Contract 재확인
 
-- [ ] 백엔드 `AuthPath.LOGOUT`가 `/api/v1/auth/logout`인지 확인.
-- [ ] request body가 `{ refreshToken }`인지 확인.
-- [ ] response가 body 없는 `200 OK`인지 확인.
-- [ ] logout API는 Authorization header 기본 정책을 따른다는 점 문서화.
-- [ ] backend logout 실패와 local token clear 책임을 분리해 문서화.
+- [x] 백엔드 `AuthPath.LOGOUT`가 `/api/v1/auth/logout`인지 확인.
+- [x] request body가 `{ refreshToken }`인지 확인.
+- [x] response가 body 없는 `200 OK`인지 확인.
+- [x] logout API는 Authorization header 기본 정책을 따른다는 점 문서화.
+- [x] backend logout 실패와 local token clear 책임을 분리해 문서화.
 
 ### 2. Auth Logout Service 구현
 
-- [ ] `LogoutRequest` 타입 추가.
-- [ ] `authService.logout(refreshToken)` 구현.
-- [ ] `POST /api/v1/auth/logout` 호출 구현.
-- [ ] request body `{ refreshToken }` 전달.
-- [ ] `auth: false`를 사용하지 않도록 구현.
-- [ ] service는 API 호출만 담당하고 token clear/router 이동을 하지 않음.
+- [x] `LogoutRequest` 타입 추가.
+- [x] `authService.logout(refreshToken)` 구현.
+- [x] `POST /api/v1/auth/logout` 호출 구현.
+- [x] request body `{ refreshToken }` 전달.
+- [x] `auth: false`를 사용하지 않도록 구현.
+- [x] service는 API 호출만 담당하고 token clear/router 이동을 하지 않음.
 
 ### 3. MatchPage Logout Flow 구현
 
-- [ ] 로그아웃 버튼에 click handler 연결.
-- [ ] `isLoggingOut` 상태 추가.
-- [ ] 로그아웃 중 버튼 중복 클릭 방지.
-- [ ] ready 상태에서는 바로 logout 진행.
-- [ ] queued/joining 상태에서는 `leaveMatchQueue()` 후 logout 진행.
-- [ ] queue leave 실패 여부와 무관하게 logout finalizer 진행.
-- [ ] refresh token이 있으면 backend logout 호출.
-- [ ] refresh token이 없으면 backend logout 호출 생략.
-- [ ] backend logout 실패 여부와 무관하게 `clearAuthTokens()` 호출.
-- [ ] Match SSE close.
-- [ ] `/login` 이동.
+- [x] 로그아웃 버튼에 click handler 연결.
+- [x] `isLoggingOut` 상태 추가.
+- [x] 로그아웃 중 버튼 중복 클릭 방지.
+- [x] ready 상태에서는 바로 logout 진행.
+- [x] queued/joining 상태에서는 `leaveMatchQueue()` 후 logout 진행.
+- [x] queue leave 실패 여부와 무관하게 logout finalizer 진행.
+- [x] refresh token이 있으면 backend logout 호출.
+- [x] refresh token이 없으면 backend logout 호출 생략.
+- [x] backend logout 실패 여부와 무관하게 `clearAuthTokens()` 호출.
+- [x] Match SSE close.
+- [x] `/login` 이동.
 
 ### 4. Active Match Response 상태 정책 구현
 
-- [ ] `match_found` modal open 상태에서 logout 차단.
-- [ ] accept/reject command pending 상태에서 logout 차단.
-- [ ] match response result 처리 중 logout 차단.
-- [ ] 차단 상태는 기존 매칭 응답/전환 정책과 섞지 않도록 문서화.
+- [x] `match_found` modal open 상태에서 logout 차단.
+- [x] accept/reject command pending 상태에서 logout 차단.
+- [x] match response result 처리 중 logout 차단.
+- [x] 차단 상태는 기존 매칭 응답/전환 정책과 섞지 않도록 문서화.
 
 ### 5. Test 구현
 
-- [ ] `authService.logout` endpoint/body/auth 기본 정책 검증.
-- [ ] ready 상태 logout 성공 시 backend logout, token clear, `/login` 이동 검증.
-- [ ] refresh token 없음 상태에서 backend logout 미호출, token clear, `/login` 이동 검증.
-- [ ] backend logout 실패 시에도 token clear, `/login` 이동 검증.
-- [ ] queued 상태 logout 시 `leaveMatchQueue()` 후 logout 진행 검증.
-- [ ] queue leave 실패 시에도 logout finalizer 진행 검증.
-- [ ] match_found/accept/reject 진행 중 logout 차단 검증.
-- [ ] logout 중 중복 클릭이 추가 요청을 만들지 않는지 검증.
-- [ ] logout 후 `/match` 접근 시 route guard가 `/login`으로 보내는지 기존 테스트와 정합성 확인.
+- [x] `authService.logout` endpoint/body/auth 기본 정책 검증.
+- [x] ready 상태 logout 성공 시 backend logout, token clear, `/login` 이동 검증.
+- [x] refresh token 없음 상태에서 backend logout 미호출, token clear, `/login` 이동 검증.
+- [x] backend logout 실패 시에도 token clear, `/login` 이동 검증.
+- [x] queued 상태 logout 시 `leaveMatchQueue()` 후 logout 진행 검증.
+- [x] queue leave 실패 시에도 logout finalizer 진행 검증.
+- [x] match_found/accept/reject 진행 중 logout 차단 검증.
+- [x] logout 중 중복 클릭이 추가 요청을 만들지 않는지 검증.
+- [x] logout 후 `/match` 접근 시 route guard가 `/login`으로 보내는지 기존 테스트와 정합성 확인.
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 1-2 완료 상태 반영.
-- [ ] `front-plan.md` logout 구현 상태 반영.
-- [ ] issue-100 task 완료 상태 반영.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
+- [x] `docs/last-구현.md` Section 1-2 완료 상태 반영.
+- [x] `front-plan.md` logout 구현 상태 반영.
+- [x] issue-100 task 완료 상태 반영.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
 
 ### 7. 검증
 
-- [ ] `npm run test -- authService MatchPage authGuard router` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
+- [x] `npm run test -- authService MatchPage authGuard router` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
 
 ## Implementation Policy
 
@@ -254,7 +254,10 @@ flowchart TD
 
 - 게임 대기/플레이 중 로그아웃과 이탈 정산은 이번 PR에서 제외함.
 - access token blacklist, token refresh/retry, OAuth logout은 후속 이슈로 유지함.
-- 검증 결과를 여기에 기록함.
+- `npm run test -- authService MatchPage` 검증 완료함.
+- `npm run test -- authService MatchPage authGuard router` 검증 완료함.
+- `npm run format`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` 검증 완료함.
+- 전체 테스트 20 files / 196 passed 확인함.
 
 ## 📌 Related Issue
 
