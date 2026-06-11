@@ -88,8 +88,8 @@ flowchart TD
 - `/match`, `/game/:gameRoomId/waiting`, `/game/:gameRoomId/play`, `/game/:gameRoomId/result` 인증 필요 route로 처리.
 - token 없으면 `/login` 이동 구현.
 - token 있는 상태에서 `/login` 접근 시 `/match` 이동 구현.
-- refresh token 자동 재발급은 후속 작업으로 보류.
-- 만료된 access token으로 API 호출 시 refresh/retry 처리 정책은 후속 token refresh 이슈에서 결정.
+- HTTP API의 access token 만료는 issue-102에서 `401 -> refresh -> 원 요청 1회 재시도` 정책으로 구현.
+- route guard는 JWT 만료를 직접 판정하지 않고 access token 존재 여부만 확인.
 - Pinia는 아직 도입하지 않고 기존 token storage와 작은 helper 중심으로 처리.
 - 현재 token 저장소는 `localStorage`이며, XSS 대비 저장 전략 변경 여부는 인증 보안 고도화 이슈에서 결정.
 - route guard는 access token 존재 여부만 판단하는 MVP 정책으로 구현.
@@ -109,6 +109,18 @@ flowchart TD
 - `match_found`, accept/reject command 진행 중 logout은 매칭 응답 정책과 섞지 않도록 차단.
 - 게임 대기/플레이 중 logout과 이탈 정산은 후속 이슈에서 다룸.
 
+### 2-2. [x] Token Refresh 구현
+
+- `POST /api/v1/auth/refresh` 호출 구현.
+- request `{ refreshToken }` 반영.
+- response `{ accessToken, refreshToken }` 반영.
+- refresh API는 만료된 access token에 의존하지 않도록 `auth: false`로 호출.
+- 일반 HTTP 인증 API에서 `401` 수신 시 refresh 후 원 요청 1회 재시도 구현.
+- 동시 `401` 요청은 refresh promise를 공유해 refresh API 중복 호출 방지.
+- refresh token 없음, refresh 실패, 재시도 후 `401`은 local token clear 후 `/login` 이동.
+- login/signup/refresh/logout은 refresh/retry 루프에서 제외.
+- SSE/WebSocket token refresh/retry는 기존 연결 정책을 유지하고 후속 이슈에서 별도 판단.
+
 ### 3. [x] SSE 인증 계약 확정 및 매칭 스트림 연결 구현
 
 - `GET /api/v1/notifications/match/stream` 연결 client 구현.
@@ -121,7 +133,7 @@ flowchart TD
 - 백엔드 Authorization header 요구와 native `EventSource` 제약 충돌은 `@microsoft/fetch-event-source` 도입으로 해소.
 - query token 방식은 token 노출 위험 때문에 사용하지 않음.
 - cookie auth 전환은 백엔드 인증 전략 변경 범위이므로 이번 단계에서 제외.
-- token 만료에 따른 refresh/retry는 후속 token refresh 이슈에서 구현.
+- token 만료에 따른 SSE refresh/retry는 이번 흐름에서 제외하고 HTTP API token refresh와 분리.
 
 ### 4. [x] 매칭 페이지 구현
 
@@ -353,7 +365,7 @@ type GameSummaryResponse =
 - `game`은 HP scenario, message factory, runtime 계산 담당.
 - `types`는 백엔드 DTO, SSE event, WebSocket message type 담당.
 - API 호출, 라우터 이동, WebSocket/EventSource 연결은 presentational component에 넣지 않음.
-- Pinia, TanStack Query Vue, OAuth, 비밀번호 재설정, 자동 token refresh는 이번 흐름 구현에서 제외.
+- Pinia, TanStack Query Vue, OAuth, 비밀번호 재설정은 이번 흐름 구현에서 제외.
 - `accessToken`, `refreshToken` 외 `userId`, `nickname` 저장 위치와 profile 조회 전략은 후속 auth state/profile 이슈에서 결정.
 - transport error 세분화와 request abort 처리는 공통 service/error handling 이슈에서 결정.
 - accept/reject 이후 전환을 HTTP response 기준으로 구현하지 않도록 테스트에 명시.
@@ -411,7 +423,8 @@ Accept: text/event-stream
 - query token 방식은 token 노출 위험 때문에 사용하지 않음.
 - cookie auth 전환은 백엔드 인증 전략 변경 범위이므로 이번 흐름에서 제외.
 - access token 없음, 401/403, 네트워크 오류는 page local error 상태로 처리.
-- token refresh/retry는 후속 auth 이슈에서 구현.
+- HTTP API token refresh/retry는 issue-102에서 구현.
+- SSE token refresh/retry는 기존 연결 error 정책을 유지하고 후속 auth/transport 이슈에서 판단.
 
 ## Issue Split Recommendation
 
@@ -428,6 +441,7 @@ Accept: text/event-stream
 - [x] LIGHTNING 전투 입력 UI 구현.
 - [x] 게임 결과 WebSocket 처리 구현.
 - [x] 게임 결과 Summary 화면 구현.
+- [x] Token Refresh 구현.
 - [x] 공통 UI, 테스트, 문서 정합성 정리.
 
 ## Assumptions

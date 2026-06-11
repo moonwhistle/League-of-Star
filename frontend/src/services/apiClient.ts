@@ -1,7 +1,11 @@
 import { API_BASE_URL } from '@/constants/env'
 import type { ApiErrorBody, ApiRequestOptions } from '@/types/api'
+import type { TokenRefreshRequest, TokenRefreshResponse } from '@/types/auth'
 
-import { getAccessToken } from './authToken'
+import { clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens } from './authToken'
+import { notifyAuthSessionExpired } from './authSessionEvents'
+
+let refreshRequestPromise: Promise<boolean> | null = null
 
 export class ApiClientError extends Error {
   readonly status: number
@@ -19,17 +23,38 @@ export async function requestJson<TResponse, TBody = unknown>(
   path: string,
   options: ApiRequestOptions<TBody> = {},
 ): Promise<TResponse> {
-  const response = await fetch(buildApiUrl(path), {
-    method: options.method ?? 'GET',
-    headers: buildHeaders(options),
-    body: serializeBody(options.body),
-    signal: options.signal,
-  })
+  const response = await sendRequest(path, options)
 
   const responseBody = await readResponseBody(response)
 
   if (!response.ok) {
-    throw new ApiClientError(response.status, responseBody)
+    const error = new ApiClientError(response.status, responseBody)
+
+    if (!isRefreshEligible(response.status, options)) {
+      throw error
+    }
+
+    const isRefreshSuccessful = await refreshAuthSession()
+
+    if (!isRefreshSuccessful) {
+      throw error
+    }
+
+    const retryResponse = await sendRequest(path, {
+      ...options,
+      skipAuthRefresh: true,
+    })
+    const retryResponseBody = await readResponseBody(retryResponse)
+
+    if (!retryResponse.ok) {
+      if (retryResponse.status === 401) {
+        expireAuthSession()
+      }
+
+      throw new ApiClientError(retryResponse.status, retryResponseBody)
+    }
+
+    return retryResponseBody as TResponse
   }
 
   return responseBody as TResponse
@@ -47,6 +72,15 @@ function buildApiUrl(path: string): string {
   const normalizedPath = path.replace(/^\//, '')
 
   return `${baseUrl}/${normalizedPath}`
+}
+
+function sendRequest<TBody>(path: string, options: ApiRequestOptions<TBody>): Promise<Response> {
+  return fetch(buildApiUrl(path), {
+    method: options.method ?? 'GET',
+    headers: buildHeaders(options),
+    body: serializeBody(options.body),
+    signal: options.signal,
+  })
 }
 
 function buildHeaders<TBody>(options: ApiRequestOptions<TBody>): Headers {
@@ -69,6 +103,72 @@ function buildHeaders<TBody>(options: ApiRequestOptions<TBody>): Headers {
 
 function serializeBody(body: unknown): BodyInit | undefined {
   return body === undefined ? undefined : JSON.stringify(body)
+}
+
+function isRefreshEligible<TBody>(status: number, options: ApiRequestOptions<TBody>): boolean {
+  return status === 401 && options.auth !== false && options.skipAuthRefresh !== true
+}
+
+async function refreshAuthSession(): Promise<boolean> {
+  refreshRequestPromise ??= performRefreshAuthSession().finally(() => {
+    refreshRequestPromise = null
+  })
+
+  return refreshRequestPromise
+}
+
+async function performRefreshAuthSession(): Promise<boolean> {
+  const refreshToken = getRefreshToken()
+
+  if (refreshToken === null || refreshToken.trim() === '') {
+    expireAuthSession()
+    return false
+  }
+
+  try {
+    const response = await fetch(buildApiUrl('/api/v1/auth/refresh'), {
+      method: 'POST',
+      headers: buildRefreshHeaders(),
+      body: serializeBody({
+        refreshToken,
+      } satisfies TokenRefreshRequest),
+    })
+    const responseBody = await readResponseBody(response)
+
+    if (!response.ok || !isTokenRefreshResponse(responseBody)) {
+      expireAuthSession()
+      return false
+    }
+
+    setAuthTokens(responseBody.accessToken, responseBody.refreshToken)
+    return true
+  } catch {
+    expireAuthSession()
+    return false
+  }
+}
+
+function expireAuthSession(): void {
+  clearAuthTokens()
+  notifyAuthSessionExpired()
+}
+
+function buildRefreshHeaders(): Headers {
+  const headers = new Headers()
+
+  headers.set('Content-Type', 'application/json')
+
+  return headers
+}
+
+function isTokenRefreshResponse(body: unknown): body is TokenRefreshResponse {
+  if (typeof body !== 'object' || body === null) {
+    return false
+  }
+
+  const response = body as Partial<TokenRefreshResponse>
+
+  return typeof response.accessToken === 'string' && typeof response.refreshToken === 'string'
 }
 
 async function readResponseBody(response: Response): Promise<unknown> {
