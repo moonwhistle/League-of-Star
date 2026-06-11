@@ -131,74 +131,74 @@ interface GameSummaryPlayer {
 
 ### 1. Backend Contract 재확인
 
-- [ ] `GET /api/v1/games/{gameId}/summary` 경로와 `gameId = gameRoomId` 정책 확인.
-- [ ] `PENDING` / `DONE` response shape가 `frontend/src/types/game.ts`와 정합한지 확인.
-- [ ] 403/404/409 전역 `ErrorResponse` 처리 정책 확인.
-- [ ] `GAME_RESULT`는 전환 트리거, Summary API는 최종 source of truth임을 문서화.
+- [x] `GET /api/v1/games/{gameId}/summary` 경로와 `gameId = gameRoomId` 정책 확인.
+- [x] `PENDING` / `DONE` response shape가 `frontend/src/types/game.ts`와 정합한지 확인.
+- [x] 403/404/409 전역 `ErrorResponse` 처리 정책 확인.
+- [x] `GAME_RESULT`는 전환 트리거, Summary API는 최종 source of truth임을 문서화.
 
 ### 2. Summary Fetch / Polling 구현
 
-- [ ] 기존 `gameSummaryService.getGameSummary` 사용 여부 확인.
-- [ ] result route `gameRoomId`를 number로 정규화.
-- [ ] route id가 invalid면 `/match` 복귀.
-- [ ] mount 시 Summary API 호출.
-- [ ] `PENDING.retryAfterMillis` 기준으로 `setTimeout` polling 예약.
-- [ ] `retryAfterMillis`가 비정상 값이면 기본 `1000ms` 사용.
-- [ ] `DONE` 수신 시 polling 중단.
-- [ ] unmount 시 timeout과 `AbortController` 정리.
+- [x] 기존 `gameSummaryService.getGameSummary` 사용 여부 확인.
+- [x] result route `gameRoomId`를 number로 정규화.
+- [x] route id가 invalid면 `/match` 복귀.
+- [x] mount 시 Summary API 호출.
+- [x] `PENDING.retryAfterMillis` 기준으로 `setTimeout` polling 예약.
+- [x] `retryAfterMillis`가 비정상 값이면 기본 `1000ms` 사용.
+- [x] `DONE` 수신 시 polling 중단.
+- [x] unmount 시 timeout과 `AbortController` 정리.
 
 ### 3. GameResultPage 상태 모델 구현
 
-- [ ] `idle/loading/pending/done/error` 상태 모델 정리.
-- [ ] 저장된 `GAME_RESULT` payload가 있으면 즉시 임시 title 표시.
-- [ ] 저장 payload가 없어도 Summary API로 복구.
-- [ ] Summary `DONE` 수신 시 title을 Summary 기준으로 최종 보정.
-- [ ] `DRAW`는 `winnerUserId=null`과 `gameResult=DRAW` 기준으로 처리.
-- [ ] Summary API error message 추출 및 fallback message 처리.
+- [x] `idle/loading/pending/done/error` 상태 모델 정리.
+- [x] 저장된 `GAME_RESULT` payload가 있으면 즉시 임시 title 표시.
+- [x] 저장 payload가 없어도 Summary API로 복구.
+- [x] Summary `DONE` 수신 시 title을 Summary 기준으로 최종 보정.
+- [x] `DRAW`는 `winnerUserId=null`과 `gameResult=DRAW` 기준으로 처리.
+- [x] Summary API error message 추출 및 fallback message 처리.
 
 ### 4. Result Summary UI / Locale 구현
 
-- [ ] `YOU WIN` / `YOU LOSE` / `DRAW` title 표시.
-- [ ] `PENDING` 정산 중 상태 표시.
-- [ ] 내 player summary와 상대 player summary를 나란히 표시.
-- [ ] nickname, result, rankBefore → rankAfter, lpBefore → lpAfter, lpChange, seriesType 표시.
-- [ ] `rankSeriesId`는 값이 있을 때만 보조 정보로 표시.
-- [ ] 종료 사유와 게임룸 UI는 표시하지 않음.
-- [ ] `/match` 복귀 버튼 제공.
-- [ ] desktop/mobile overflow 확인.
+- [x] `YOU WIN` / `YOU LOSE` / `DRAW` title 표시.
+- [x] `PENDING` 정산 중 상태 표시.
+- [x] 내 player summary와 상대 player summary를 나란히 표시.
+- [x] nickname, result, rankBefore → rankAfter, lpBefore → lpAfter, lpChange, seriesType 표시.
+- [x] `rankSeriesId`는 값이 있을 때만 보조 정보로 표시.
+- [x] 종료 사유와 게임룸 UI는 표시하지 않음.
+- [x] `/match` 복귀 버튼 제공.
+- [x] desktop/mobile overflow 확인.
 
 ### 5. Test 구현
 
-- [ ] 저장 payload가 없어도 Summary API를 호출하는지 검증.
-- [ ] `PENDING` 응답 시 `retryAfterMillis` 기준 재조회 검증.
-- [ ] `DONE` 응답 시 `YOU WIN` 표시 검증.
-- [ ] `DONE` 응답 시 `YOU LOSE` 표시 검증.
-- [ ] `DONE` 응답 시 `DRAW` 표시 검증.
-- [ ] `me/opponent` LP/rank/series 표시 검증.
-- [ ] 403/404/409 error 상태와 `/match` 복귀 버튼 검증.
-- [ ] unmount 시 polling timeout과 request abort 정리 검증.
-- [ ] `DONE` 이후 polling 중단 검증.
+- [x] 저장 payload가 없어도 Summary API를 호출하는지 검증.
+- [x] `PENDING` 응답 시 `retryAfterMillis` 기준 재조회 검증.
+- [x] `DONE` 응답 시 `YOU WIN` 표시 검증.
+- [x] `DONE` 응답 시 `YOU LOSE` 표시 검증.
+- [x] `DONE` 응답 시 `DRAW` 표시 검증.
+- [x] `me/opponent` LP/rank/series 표시 검증.
+- [x] 403/404/409 error 상태와 `/match` 복귀 버튼 검증.
+- [x] unmount 시 polling timeout과 request abort 정리 검증.
+- [x] `DONE` 이후 polling 중단 검증.
 
 ### 6. 문서 정합성 구현
 
-- [ ] `front-plan.md` 13번 완료 상태 반영.
-- [ ] issue-94에서 후속으로 남긴 Summary API 범위가 이번 이슈에서 완료됨을 반영.
-- [ ] `docs/project/websocket client.md`의 `GAME_RESULT`/summary 책임 분리와 정합성 확인.
-- [ ] `docs/project/policy.md`의 record/rank summary 정책과 정합성 확인.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
+- [x] `front-plan.md` 13번 완료 상태 반영.
+- [x] issue-94에서 후속으로 남긴 Summary API 범위가 이번 이슈에서 완료됨을 반영.
+- [x] `docs/project/websocket client.md`의 `GAME_RESULT`/summary 책임 분리와 정합성 확인.
+- [x] `docs/project/policy.md`의 record/rank summary 정책과 정합성 확인.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
 
 ### 7. 검증
 
-- [ ] `npm run test -- GameResultPage gameSummaryService` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] 브라우저에서 mock API `PENDING -> DONE` 흐름 확인.
-- [ ] 브라우저에서 mock API `DONE` 직접 응답 확인.
-- [ ] 브라우저에서 mock API 403/404/409 error 상태 확인.
-- [ ] desktop 1440x900, mobile 390x844 overflow 확인.
+- [x] `npm run test -- GameResultPage gameSummaryService` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] 브라우저에서 mock API `PENDING -> DONE` 흐름 확인.
+- [x] 브라우저에서 mock API `DONE` 직접 응답 확인.
+- [x] 브라우저에서 mock API 403/404/409 error 상태 확인.
+- [x] desktop 1440x900, mobile 390x844 overflow 확인.
 
 ## Implementation Policy
 
@@ -277,7 +277,17 @@ flowchart TD
 - 이번 PR에서 백엔드 Summary API 계약은 변경하지 않음.
 - `GAME_RESULT` payload는 확장하지 않음.
 - 새 패키지는 추가하지 않음.
-- 검증 결과를 여기에 기재함.
+- 검증 결과:
+  - `npm run test -- GameResultPage gameSummaryService` 통과함. 2 files / 13 passed 확인함.
+  - `npm run format` 통과함.
+  - `npm run lint` 통과함.
+  - `npm run typecheck` 통과함.
+  - `npm run test` 통과함. 18 files / 176 passed 확인함.
+  - `npm run build` 통과함.
+  - 브라우저 mock API `PENDING -> DONE` 확인함. Summary API GET 2회 호출 후 `YOU WIN`, `done`, `win` 표시 확인함.
+  - 브라우저 mock API `DONE` 직접 응답 확인함. mobile 390x844에서 `YOU WIN`, `done`, `win` 표시 확인함.
+  - 브라우저 mock API 403 error 확인함. `errorStatus=403`, 오류 상태 표시 확인함.
+  - desktop 1440x900, mobile 390x844에서 horizontal overflow 없음, text overflow 후보 없음 확인함.
 
 ## 📌 Related Issue
 

@@ -291,7 +291,7 @@ interface GameResultPayload {
 - 최종 결과 source of truth는 summary API로 처리.
 - `YOU WIN`/`YOU LOSE`/`DRAW` 최소 표시는 저장된 `GAME_RESULT.winnerUserId`와 waiting payload의 opponent 기준으로 해석.
 
-### 13. [ ] 게임 결과 Summary 화면 구현
+### 13. [x] 게임 결과 Summary 화면 구현
 
 - `/game/:gameRoomId/result` 페이지에서 `GET /api/v1/games/{gameId}/summary` 호출 구현.
 - 현재 백엔드 기준 `gameId = gameRoomId`로 호출.
@@ -400,7 +400,7 @@ Accept: text/event-stream
 - [x] 게임 플레이 화면 구현.
 - [x] LIGHTNING 전투 입력 UI 구현.
 - [x] 게임 결과 WebSocket 처리 구현.
-- [ ] 게임 결과 Summary 화면 구현.
+- [x] 게임 결과 Summary 화면 구현.
 - [ ] 공통 UI, 테스트, 문서 정합성 정리.
 
 ## Assumptions
