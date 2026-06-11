@@ -94,6 +94,7 @@ import {
   createNoopThreeGalaxyBackgroundSceneController,
   createThreeGalaxyBackgroundScene,
 } from '@/game/threeGalaxyBackgroundScene'
+import { saveGameResultPayloadFromMessage } from '@/services/gameResultPayload'
 import { readGameStartPayload } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
@@ -111,7 +112,8 @@ const gameSocketStatus = shallowRef('idle')
 const gameSocketLastEvent = shallowRef('')
 const gameSocketErrorMessage = shallowRef('')
 const gameResultReceived = shallowRef(false)
-const gameResultPayload = shallowRef(null)
+const gameResultPayload = shallowRef()
+const isResultRouteTransitioning = shallowRef(false)
 const playGameWebSocketConnection = shallowRef()
 const appliedLightningActions = shallowRef([{}].slice(1))
 const myLightningCooldownUntil = shallowRef(0)
@@ -322,6 +324,10 @@ onUnmounted(() => {
 })
 
 onBeforeRouteLeave(() => {
+  if (isResultRouteTransitioning.value) {
+    return true
+  }
+
   if (!shouldWarnBeforeLeaving()) {
     return true
   }
@@ -471,6 +477,10 @@ function updateDisplayedHp() {
 }
 
 function handlePlayWebSocketError() {
+  if (gameResultReceived.value) {
+    return
+  }
+
   const error = arguments[0]
   gameSocketStatus.value = 'error'
   gameSocketErrorMessage.value =
@@ -491,17 +501,47 @@ function handlePlayWebSocketMessage(message = {}) {
   }
 
   if (messageType === 'GAME_RESULT') {
-    gameResultReceived.value = true
-    gameResultPayload.value = payload
-    syncAppliedActionsFromGameResult(payload)
-    gameSocketStatus.value = 'resultReceived'
-    gameSocketErrorMessage.value = ''
-    updateDisplayedHp()
+    handleGameResult(payload)
   }
 
   if (messageType === 'LIGHTNING_APPLIED') {
     handleLightningApplied(payload)
   }
+}
+
+function handleGameResult(payload = {}) {
+  if (gameResultReceived.value || isResultRouteTransitioning.value) {
+    return
+  }
+
+  const storedPayload = saveGameResultPayloadFromMessage(payload)
+
+  if (storedPayload === null) {
+    gameSocketStatus.value = 'error'
+    gameSocketErrorMessage.value = t('gamePlay.resultPayloadInvalid')
+    return
+  }
+
+  gameResultReceived.value = true
+  gameResultPayload.value = storedPayload
+  syncAppliedActionsFromGameResult(storedPayload)
+  gameSocketStatus.value = 'resultReceived'
+  gameSocketErrorMessage.value = ''
+  isResultRouteTransitioning.value = true
+  updateDisplayedHp()
+
+  void router
+    .replace({
+      name: ROUTE_NAMES.gameResult,
+      params: {
+        gameRoomId: String(storedPayload.gameRoomId),
+      },
+    })
+    .catch(() => {
+      isResultRouteTransitioning.value = false
+      gameSocketStatus.value = 'error'
+      gameSocketErrorMessage.value = t('gamePlay.resultTransitionFailed')
+    })
 }
 
 function handleLightningApplied(payload = {}) {

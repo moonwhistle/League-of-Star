@@ -263,7 +263,7 @@ interface GameStartPayload {
 - 전송 실패나 WebSocket close/error는 화면 상태로 표시하고, 서버 결과를 임의 생성하지 않음.
 - `GAME_RESULT` route 이동과 summary API 호출은 다음 이슈로 유지.
 
-### 12. [ ] 게임 결과 WebSocket 처리 구현
+### 12. [x] 게임 결과 WebSocket 처리 구현
 
 - `GAME_RESULT` payload shape 반영.
 
@@ -289,6 +289,7 @@ interface GameResultPayload {
 - `GAME_RESULT` 수신 후 `/game/:gameRoomId/result` 이동 구현.
 - WebSocket result payload는 즉시 전환/임시 표시용으로만 사용.
 - 최종 결과 source of truth는 summary API로 처리.
+- `YOU WIN`/`YOU LOSE`/`DRAW` 최소 표시는 저장된 `GAME_RESULT.winnerUserId`와 waiting payload의 opponent 기준으로 해석.
 
 ### 13. [ ] 게임 결과 Summary 화면 구현
 
@@ -398,7 +399,7 @@ Accept: text/event-stream
 - [x] 게임 시작 처리 구현.
 - [x] 게임 플레이 화면 구현.
 - [x] LIGHTNING 전투 입력 UI 구현.
-- [ ] 게임 결과 WebSocket 처리 구현.
+- [x] 게임 결과 WebSocket 처리 구현.
 - [ ] 게임 결과 Summary 화면 구현.
 - [ ] 공통 UI, 테스트, 문서 정합성 정리.
 
