@@ -3,6 +3,7 @@ import type { ApiErrorBody, ApiRequestOptions } from '@/types/api'
 import type { TokenRefreshRequest, TokenRefreshResponse } from '@/types/auth'
 
 import { clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens } from './authToken'
+import { notifyAuthSessionExpired } from './authSessionEvents'
 
 let refreshRequestPromise: Promise<boolean> | null = null
 
@@ -46,6 +47,10 @@ export async function requestJson<TResponse, TBody = unknown>(
     const retryResponseBody = await readResponseBody(retryResponse)
 
     if (!retryResponse.ok) {
+      if (retryResponse.status === 401) {
+        expireAuthSession()
+      }
+
       throw new ApiClientError(retryResponse.status, retryResponseBody)
     }
 
@@ -116,7 +121,7 @@ async function performRefreshAuthSession(): Promise<boolean> {
   const refreshToken = getRefreshToken()
 
   if (refreshToken === null || refreshToken.trim() === '') {
-    clearAuthTokens()
+    expireAuthSession()
     return false
   }
 
@@ -131,16 +136,21 @@ async function performRefreshAuthSession(): Promise<boolean> {
     const responseBody = await readResponseBody(response)
 
     if (!response.ok || !isTokenRefreshResponse(responseBody)) {
-      clearAuthTokens()
+      expireAuthSession()
       return false
     }
 
     setAuthTokens(responseBody.accessToken, responseBody.refreshToken)
     return true
   } catch {
-    clearAuthTokens()
+    expireAuthSession()
     return false
   }
+}
+
+function expireAuthSession(): void {
+  clearAuthTokens()
+  notifyAuthSessionExpired()
 }
 
 function buildRefreshHeaders(): Headers {
