@@ -18,6 +18,7 @@
     :data-can-start-match="canStartMatch"
     :data-queue-status="queueStatus"
     :data-queue-error-message="queueErrorMessage"
+    :data-logout-pending="isLoggingOut"
   >
     <header class="match-app-bar" aria-label="Match navigation">
       <h1>LEAGUE OF STAR</h1>
@@ -34,7 +35,13 @@
             <path d="M16 5v14" />
           </svg>
         </button>
-        <button class="icon-button" type="button" :aria-label="t('match.logout')">
+        <button
+          class="icon-button"
+          type="button"
+          :aria-label="t('match.logout')"
+          :disabled="!canLogout"
+          @click="handleLogout"
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M10 6H6v12h4" />
             <path d="M14 8l4 4-4 4" />
@@ -222,6 +229,8 @@ import { useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { logout } from '@/services/authService'
+import { clearAuthTokens, getRefreshToken } from '@/services/authToken'
 import { saveGameWaitingPayloadFromMatchResult } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
@@ -240,6 +249,7 @@ const streamErrorMessage = ref('')
 const queueStatus = ref('ready')
 const queueErrorMessage = ref('')
 const matchWaitingSeconds = ref(0)
+const isLoggingOut = ref(false)
 const isMatchFoundModalOpen = ref(false)
 const matchFoundCountdownSeconds = ref(0)
 const matchResponseCommandStatus = ref('idle')
@@ -343,6 +353,13 @@ const canUsePrimaryMatchAction = computed(() => {
 
   return queueStatus.value === 'queued'
 })
+const canLogout = computed(
+  () =>
+    !isLoggingOut.value &&
+    !hasActiveMatchFoundResponse.value &&
+    !isMatchResponseCommandPending.value &&
+    !hasSubmittedMatchResponseCommand.value,
+)
 const primaryMatchActionLabel = computed(() => {
   if (streamStatus.value === 'connecting' && queueStatus.value === 'ready') {
     return t('match.connecting')
@@ -379,6 +396,7 @@ let hasCompletedMatchResultTransition = false
 let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
 let matchResponseAbortController = new AbortController()
+let logoutAbortController = new AbortController()
 
 onMounted(() => {
   isActive = true
@@ -391,6 +409,7 @@ onUnmounted(() => {
   abortJoinRequest()
   abortLeaveRequest()
   abortMatchResponseRequest()
+  abortLogoutRequest()
   stopMatchWaitingTimer()
   stopMatchFoundCountdown()
   closeMatchStream()
@@ -408,6 +427,51 @@ function handlePrimaryMatchAction() {
 
   if (queueStatus.value === 'queued') {
     void cancelMatchmaking()
+  }
+}
+
+async function handleLogout() {
+  if (!canLogout.value) {
+    return
+  }
+
+  isLoggingOut.value = true
+  queueErrorMessage.value = ''
+  streamErrorMessage.value = ''
+  abortJoinRequest()
+  abortLeaveRequest()
+
+  try {
+    if (hasQueueJoinRequestStarted) {
+      queueStatus.value = 'leaving'
+      stopMatchWaitingTimer()
+      leaveAbortController = new AbortController()
+      await leaveMatchQueue(leaveAbortController.signal)
+    }
+  } catch {
+    // Logout is a user-requested session termination. Queue cleanup is best-effort.
+  } finally {
+    await finalizeLogout()
+  }
+}
+
+async function finalizeLogout() {
+  abortLogoutRequest()
+  logoutAbortController = new AbortController()
+  const refreshToken = getRefreshToken()
+
+  try {
+    if (refreshToken !== null && refreshToken.trim() !== '') {
+      await logout(refreshToken, logoutAbortController.signal)
+    }
+  } catch {
+    // Backend revoke failure must not keep the current browser session authenticated.
+  } finally {
+    clearAuthTokens()
+    closeMatchStream()
+    resetLocalLogoutState()
+
+    await router.push({ name: ROUTE_NAMES.login })
   }
 }
 
@@ -857,6 +921,25 @@ function abortLeaveRequest() {
 function abortMatchResponseRequest() {
   matchResponseAbortController.abort()
   matchResponseAbortController = new AbortController()
+}
+
+function abortLogoutRequest() {
+  logoutAbortController.abort()
+}
+
+function resetLocalLogoutState() {
+  resetMatchFoundModalState()
+  queueStatus.value = 'ready'
+  queueErrorMessage.value = ''
+  matchWaitingSeconds.value = 0
+  streamStatus.value = 'idle'
+  streamErrorMessage.value = ''
+  shouldJoinAfterStreamConnected = false
+  hasQueueJoinRequestStarted = false
+  shouldResetMatchmakingAfterErrorModalClose = false
+  isLoggingOut.value = false
+  stopMatchWaitingTimer()
+  resetStreamPayloads()
 }
 
 function isMatchResponseLockFailure(error = new ApiClientError(0, undefined)) {

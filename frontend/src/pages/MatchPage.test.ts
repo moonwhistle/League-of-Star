@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { logout } from '@/services/authService'
+import { clearAuthTokens, getRefreshToken } from '@/services/authToken'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import {
@@ -32,7 +34,19 @@ vi.mock('@/services/matchService', () => ({
   rejectMatch: vi.fn(),
 }))
 
+vi.mock('@/services/authService', () => ({
+  logout: vi.fn(),
+}))
+
+vi.mock('@/services/authToken', () => ({
+  clearAuthTokens: vi.fn(),
+  getRefreshToken: vi.fn(),
+}))
+
 const connectMatchEventSourceMock = vi.mocked(connectMatchEventSource)
+const logoutMock = vi.mocked(logout)
+const clearAuthTokensMock = vi.mocked(clearAuthTokens)
+const getRefreshTokenMock = vi.mocked(getRefreshToken)
 const acceptMatchMock = vi.mocked(acceptMatch)
 const joinMatchQueueMock = vi.mocked(joinMatchQueue)
 const leaveMatchQueueMock = vi.mocked(leaveMatchQueue)
@@ -54,6 +68,10 @@ function getStartButton(wrapper: VueWrapper) {
   return wrapper.get('[data-testid="match-start-button"]')
 }
 
+function getLogoutButton(wrapper: VueWrapper) {
+  return wrapper.get('[aria-label="로그아웃"]')
+}
+
 describe('MatchPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -62,6 +80,8 @@ describe('MatchPage', () => {
     currentHandlers = undefined
     window.sessionStorage.clear()
     routerPushMock.mockResolvedValue(undefined)
+    getRefreshTokenMock.mockReturnValue('refresh-token')
+    logoutMock.mockResolvedValue(undefined)
     acceptMatchMock.mockResolvedValue(undefined)
     joinMatchQueueMock.mockResolvedValue(undefined)
     leaveMatchQueueMock.mockResolvedValue(undefined)
@@ -124,6 +144,100 @@ describe('MatchPage', () => {
     expect(wrapper.get('[data-testid="match-start-button"]').text()).toContain('Start Matching')
     expect(wrapper.find('[aria-label="Records"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="Logout"]').exists()).toBe(true)
+  })
+
+  it('logs out from ready state with backend revoke before clearing local tokens', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getLogoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(logoutMock).toHaveBeenCalledWith('refresh-token', expect.any(AbortSignal))
+    expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.login })
+    expect(wrapper.get('main').attributes('data-logout-pending')).toBe('false')
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('ready')
+    expect(wrapper.get('main').attributes('data-stream-status')).toBe('idle')
+  })
+
+  it('clears local tokens without backend logout when refresh token is missing', async () => {
+    getRefreshTokenMock.mockReturnValue(null)
+    const wrapper = mount(MatchPage)
+
+    await getLogoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(logoutMock).not.toHaveBeenCalled()
+    expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.login })
+  })
+
+  it('clears local tokens and moves to login even when backend logout fails', async () => {
+    logoutMock.mockRejectedValueOnce(new Error('logout failed'))
+    const wrapper = mount(MatchPage)
+
+    await getLogoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(logoutMock).toHaveBeenCalledTimes(1)
+    expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.login })
+  })
+
+  it('leaves the queue before logout when queued state has joined the backend queue', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    await getLogoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(leaveMatchQueueMock).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(logoutMock).toHaveBeenCalledWith('refresh-token', expect.any(AbortSignal))
+    expect(leaveMatchQueueMock.mock.invocationCallOrder[0]).toBeLessThan(
+      logoutMock.mock.invocationCallOrder[0],
+    )
+    expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.login })
+    expect(closeMatchEventSourceMock).toHaveBeenCalled()
+  })
+
+  it('continues logout even when queue leave fails', async () => {
+    leaveMatchQueueMock.mockRejectedValueOnce(new Error('leave failed'))
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    await getLogoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(leaveMatchQueueMock).toHaveBeenCalledTimes(1)
+    expect(logoutMock).toHaveBeenCalledTimes(1)
+    expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.login })
+  })
+
+  it('blocks duplicate logout clicks while logout is pending', async () => {
+    logoutMock.mockReturnValueOnce(new Promise<void>(() => {}))
+    const wrapper = mount(MatchPage)
+
+    await getLogoutButton(wrapper).trigger('click')
+    await wrapper.vm.$nextTick()
+    await getLogoutButton(wrapper).trigger('click')
+
+    expect(logoutMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('main').attributes('data-logout-pending')).toBe('true')
+    expect(getLogoutButton(wrapper).attributes('disabled')).toBeDefined()
   })
 
   it('starts the waiting timer immediately while the stream is connecting', async () => {
@@ -523,6 +637,36 @@ describe('MatchPage', () => {
     expect(getStartButton(wrapper).attributes('disabled')).toBeDefined()
   })
 
+  it('blocks logout while match found state is active', async () => {
+    const wrapper = mount(MatchPage)
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    getCurrentHandlers().onMatchFound?.({
+      matchId: 'match-1',
+      userId: 1,
+      opponentUserId: 2,
+      acceptTimeoutSeconds: 10,
+      eventCreatedAt: 'invalid-date',
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(getLogoutButton(wrapper).attributes('disabled')).toBeDefined()
+
+    await getLogoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(logoutMock).not.toHaveBeenCalled()
+    expect(clearAuthTokensMock).not.toHaveBeenCalled()
+    expect(routerPushMock).not.toHaveBeenCalled()
+  })
+
   it('returns to ready and closes the stream when result action is GO_TO_MATCH_START', async () => {
     const wrapper = mount(MatchPage)
 
@@ -790,6 +934,13 @@ describe('MatchPage', () => {
     expect(main.attributes('data-match-response-command-status')).toBe('accepting')
     expect(main.attributes('data-match-response-command-pending')).toBe('true')
     expect(wrapper.get('[aria-labelledby="match-found-title"]').text()).toContain('수락 중...')
+    expect(getLogoutButton(wrapper).attributes('disabled')).toBeDefined()
+
+    await getLogoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(logoutMock).not.toHaveBeenCalled()
+    expect(clearAuthTokensMock).not.toHaveBeenCalled()
   })
 
   it('submits reject command and waits for the final SSE result', async () => {
