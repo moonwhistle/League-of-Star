@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { readGameResultPayload } from '@/services/gameResultPayload'
 import { buildGameStartPayloadKey, saveGameStartPayload } from '@/services/gameStartPayload'
 import { buildGameWaitingPayloadKey, saveGameWaitingPayload } from '@/services/gameWaitingPayload'
 
@@ -229,7 +230,7 @@ describe('GamePlayPage', () => {
     ).toBe('active')
   })
 
-  it('handles play websocket ERROR and GAME_RESULT without moving to match', async () => {
+  it('handles play websocket ERROR and invalid GAME_RESULT without moving routes', async () => {
     saveValidPlayPayloads()
 
     const wrapper = mount(GamePlayPage)
@@ -273,9 +274,118 @@ describe('GamePlayPage', () => {
     )
     await wrapper.vm.$nextTick()
 
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      '게임 결과 정보가 올바르지 않습니다.',
+    )
+    expect(readGameResultPayload(100)).toBeNull()
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('stores valid GAME_RESULT and moves to the result route', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onOpen?.(new Event('open'))
+    await wrapper.vm.$nextTick()
+
+    handlers.onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: createGameResultPayload({
+          winnerUserId: 1,
+          result: 'PLAYER1_WIN',
+        }),
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('resultReceived')
     expect(wrapper.get('main').attributes('data-game-result-received')).toBe('true')
-    expect(routerReplaceMock).not.toHaveBeenCalled()
+    expect(readGameResultPayload(100)?.winnerUserId).toBe(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gameResult,
+      params: {
+        gameRoomId: '100',
+      },
+    })
+  })
+
+  it('moves to result only once when duplicate GAME_RESULT messages are received', async () => {
+    saveValidPlayPayloads()
+
+    mount(GamePlayPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+    const message = {
+      type: 'GAME_RESULT',
+      payload: createGameResultPayload({
+        winnerUserId: null,
+        result: 'DRAW',
+        reason: 'NATURAL_DEATH_DRAW',
+      }),
+    }
+
+    handlers.onMessage?.(message, new MessageEvent('message'))
+    handlers.onMessage?.(message, new MessageEvent('message'))
+    await flushPromises()
+
+    expect(routerReplaceMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not downgrade resultReceived status when websocket error or close arrives after GAME_RESULT', async () => {
+    saveValidPlayPayloads()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: createGameResultPayload({
+          winnerUserId: 1,
+          result: 'PLAYER1_WIN',
+        }),
+      },
+      new MessageEvent('message'),
+    )
+    handlers.onError?.(new Error('AFTER_RESULT_ERROR'))
+    handlers.onClose?.(new CloseEvent('close'))
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('resultReceived')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe('')
+  })
+
+  it('does not show the route leave warning during internal result transition', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    saveValidPlayPayloads()
+
+    mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: createGameResultPayload({
+          winnerUserId: 1,
+          result: 'PLAYER1_WIN',
+        }),
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    const guard = getLatestRouteLeaveGuard()
+
+    expect(guard({ name: ROUTE_NAMES.gameResult })).toBe(true)
+    expect(confirmSpy).not.toHaveBeenCalled()
   })
 
   it('renders reconnect failures in place instead of returning to match', async () => {
@@ -928,6 +1038,38 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-result-received')).toBe('true')
   })
 })
+
+function createGameResultPayload(
+  overrides: {
+    result?: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'
+    winnerUserId?: number | null
+    reason?: string
+  } = {},
+) {
+  const winnerUserId = overrides.winnerUserId ?? 1
+
+  return {
+    gameRoomId: 100,
+    result: overrides.result ?? 'PLAYER1_WIN',
+    winnerUserId,
+    reason: overrides.reason ?? 'LIGHTNING_KILL',
+    finishedAt: Date.now(),
+    actions:
+      winnerUserId === null
+        ? []
+        : [
+            {
+              userId: winnerUserId,
+              serverReceiveTime: Date.now(),
+              lightningTimeMs: 2000,
+              starCoreHpAtLightning: 1000,
+              damage: 1200,
+              afterHp: 0,
+              isKill: true,
+            },
+          ],
+  }
+}
 
 function saveValidPlayPayloads(options: { startAt?: number } = {}): void {
   const startAt = options.startAt ?? Date.now() - 2000

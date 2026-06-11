@@ -132,68 +132,68 @@ interface GameResultPayload {
 
 ### 1. Backend Contract 재확인
 
-- [ ] `GAME_RESULT` payload shape와 현재 `frontend/src/types/game.ts` 정합성 확인.
-- [ ] `LIGHTNING_APPLIED.isKill`은 route 이동 기준이 아니고 `GAME_RESULT`만 이동 기준임을 테스트로 고정.
-- [ ] `GAME_RESULT`가 종료 즉시 알림이고 summary API가 최종 정산 source인 정책 문서화.
-- [ ] `LIGHTNING_KILL`, `NATURAL_DEATH_DRAW`, 이미 FINISHED 재응답 흐름을 같은 전환 정책으로 처리.
+- [x] `GAME_RESULT` payload shape와 현재 `frontend/src/types/game.ts` 정합성 확인.
+- [x] `LIGHTNING_APPLIED.isKill`은 route 이동 기준이 아니고 `GAME_RESULT`만 이동 기준임을 테스트로 고정.
+- [x] `GAME_RESULT`가 종료 즉시 알림이고 summary API가 최종 정산 source인 정책 문서화.
+- [x] `LIGHTNING_KILL`, `NATURAL_DEATH_DRAW`, 이미 FINISHED 재응답 흐름을 같은 전환 정책으로 처리.
 
 ### 2. Game Result Payload Storage 구현
 
-- [ ] `league-of-star.gameResultPayload:{gameRoomId}` key 정책 정의.
-- [ ] valid `GAME_RESULT` payload 저장.
-- [ ] `receivedAt` 포함.
-- [ ] invalid payload, broken JSON, route id mismatch는 `null` 반환.
-- [ ] action summary 배열 shape 검증.
-- [ ] storage 단위 테스트 추가.
+- [x] `league-of-star.gameResultPayload:{gameRoomId}` key 정책 정의.
+- [x] valid `GAME_RESULT` payload 저장.
+- [x] `receivedAt` 포함.
+- [x] invalid payload, broken JSON, route id mismatch는 `null` 반환.
+- [x] action summary 배열 shape 검증.
+- [x] storage 단위 테스트 추가.
 
 ### 3. GamePlayPage GAME_RESULT Transition 구현
 
-- [ ] `GAME_RESULT` 수신 시 payload 저장.
-- [ ] 저장 성공 시 `gameResultReceived=true`, `gameSocketStatus=resultReceived` 설정.
-- [ ] 저장 성공 시 `/game/:gameRoomId/result`로 `router.replace`.
-- [ ] 저장 실패 시 result route로 이동하지 않고 error 상태 표시.
-- [ ] 중복 `GAME_RESULT` 수신 시 route 이동 1회만 수행.
-- [ ] `GAME_RESULT` 이후 WebSocket close/error가 상태를 error로 되돌리지 않게 유지.
-- [ ] 내부 result 이동 시 route leave confirm이 뜨지 않게 처리.
+- [x] `GAME_RESULT` 수신 시 payload 저장.
+- [x] 저장 성공 시 `gameResultReceived=true`, `gameSocketStatus=resultReceived` 설정.
+- [x] 저장 성공 시 `/game/:gameRoomId/result`로 `router.replace`.
+- [x] 저장 실패 시 result route로 이동하지 않고 error 상태 표시.
+- [x] 중복 `GAME_RESULT` 수신 시 route 이동 1회만 수행.
+- [x] `GAME_RESULT` 이후 WebSocket close/error가 상태를 error로 되돌리지 않게 유지.
+- [x] 내부 result 이동 시 route leave confirm이 뜨지 않게 처리.
 
 ### 4. GameResultPage 최소 연결 구현
 
-- [ ] route `gameRoomId` 기준 저장된 result payload 읽기.
-- [ ] payload가 있으면 최소 결과 상태 렌더링.
-- [ ] payload가 없거나 mismatch면 `/match`로 복귀.
-- [ ] Summary API는 호출하지 않음.
-- [ ] 최소 data attribute 추가.
-- [ ] 직접 진입/새로고침 테스트 추가.
+- [x] route `gameRoomId` 기준 저장된 result payload 읽기.
+- [x] payload가 있으면 최소 결과 상태 렌더링.
+- [x] payload가 없거나 mismatch면 `/match`로 복귀.
+- [x] Summary API는 호출하지 않음.
+- [x] 최소 data attribute 추가.
+- [x] 직접 진입/새로고침 테스트 추가.
 
 ### 5. Test 구현
 
-- [ ] `LIGHTNING_APPLIED.isKill=true`만으로는 이동하지 않는지 검증.
-- [ ] valid `GAME_RESULT` 수신 시 payload 저장 및 result route 이동 검증.
-- [ ] invalid `GAME_RESULT` 수신 시 저장/이동하지 않는지 검증.
-- [ ] 중복 `GAME_RESULT` 수신 시 중복 이동 방지 검증.
-- [ ] `GAME_RESULT` 이후 close/error가 result 상태를 덮지 않는지 검증.
-- [ ] 내부 result 이동에서 leave confirm이 호출되지 않는지 검증.
-- [ ] GameResultPage가 저장 payload를 읽는지 검증.
-- [ ] GameResultPage payload 누락/mismatch 시 `/match` 복귀 검증.
-- [ ] Summary API가 이번 이슈에서 호출되지 않는지 검증.
+- [x] `LIGHTNING_APPLIED.isKill=true`만으로는 이동하지 않는지 검증.
+- [x] valid `GAME_RESULT` 수신 시 payload 저장 및 result route 이동 검증.
+- [x] invalid `GAME_RESULT` 수신 시 저장/이동하지 않는지 검증.
+- [x] 중복 `GAME_RESULT` 수신 시 중복 이동 방지 검증.
+- [x] `GAME_RESULT` 이후 close/error가 result 상태를 덮지 않는지 검증.
+- [x] 내부 result 이동에서 leave confirm이 호출되지 않는지 검증.
+- [x] GameResultPage가 저장 payload를 읽는지 검증.
+- [x] GameResultPage payload 누락/mismatch 시 `/match` 복귀 검증.
+- [x] Summary API가 이번 이슈에서 호출되지 않는지 검증.
 
 ### 6. 문서 정합성 구현
 
-- [ ] `front-plan.md` 12번 완료 상태 반영.
-- [ ] `front-plan.md` 13번 Summary API 범위와 충돌 없는지 확인.
-- [ ] issue-92에서 result route 이동이 후속 범위였다는 설명과 충돌 없는지 확인.
-- [ ] `docs/project/websocket client.md`의 `GAME_RESULT`/summary 책임 분리와 정합성 확인.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
+- [x] `front-plan.md` 12번 완료 상태 반영.
+- [x] `front-plan.md` 13번 Summary API 범위와 충돌 없는지 확인.
+- [x] issue-92에서 result route 이동이 후속 범위였다는 설명과 충돌 없는지 확인.
+- [x] `docs/project/websocket client.md`의 `GAME_RESULT`/summary 책임 분리와 정합성 확인.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
 
 ### 7. 검증
 
-- [ ] `npm run test -- GamePlayPage GameResultPage gameResultPayload gameWebSocket` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] 브라우저에서 mock WebSocket `GAME_RESULT` 주입 시 `/game/:gameRoomId/result` 이동 확인.
+- [x] `npm run test -- GamePlayPage GameResultPage gameResultPayload gameWebSocket` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] 브라우저에서 mock WebSocket `GAME_RESULT` 주입 시 `/game/:gameRoomId/result` 이동 확인.
 
 ## Implementation Policy
 
@@ -271,7 +271,14 @@ flowchart TD
 - 이번 PR에서 Summary API 호출은 제외함.
 - LP/rank/series/record UI는 제외함.
 - 새 패키지는 추가하지 않음.
-- 검증 결과를 여기에 기재함.
+- 검증 결과:
+  - `npm run test -- GamePlayPage GameResultPage gameResultPayload gameWebSocket` 통과함. 5 files / 50 passed 확인함.
+  - `npm run format` 통과함.
+  - `npm run lint` 통과함.
+  - `npm run typecheck` 통과함.
+  - `npm run test` 통과함. 17 files / 168 passed 확인함.
+  - `npm run build` 통과함.
+  - 브라우저 mock WebSocket으로 `GAME_RESULT` 주입 시 `/game/100/result` 이동, `YOU WIN` 표시, 저장 reason `LIGHTNING_KILL` 확인함.
 
 ## 📌 Related Issue
 
