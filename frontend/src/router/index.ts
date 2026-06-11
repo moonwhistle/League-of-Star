@@ -26,8 +26,9 @@ export const router = createRouter({
       path: ROUTE_PATHS.match,
       name: ROUTE_NAMES.match,
       component: () => import('@/pages/MatchPage.vue'),
-      // TODO(issue-78): Temporary preview access while the match page UI is being implemented.
-      // Restore requiresAuth before merging the completed authenticated match flow.
+      meta: {
+        requiresAuth: true,
+      },
     },
     {
       path: ROUTE_PATHS.gameWaiting,

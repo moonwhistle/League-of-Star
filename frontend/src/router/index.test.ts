@@ -5,6 +5,7 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { router } from './index'
 
 const protectedRouteNames = [
+  ROUTE_NAMES.match,
   ROUTE_NAMES.gameWaiting,
   ROUTE_NAMES.gamePlay,
   ROUTE_NAMES.gameResult,
@@ -33,11 +34,5 @@ describe('router route meta', () => {
     expect(homeRoute.redirect).toEqual({
       name: ROUTE_NAMES.match,
     })
-  })
-
-  it('keeps match public for temporary issue 78 UI preview', () => {
-    const matchRoute = getRoute(ROUTE_NAMES.match)
-
-    expect(matchRoute.meta.requiresAuth).not.toBe(true)
   })
 })
