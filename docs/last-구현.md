@@ -33,28 +33,28 @@
 
 ## Section 1. User / Auth
 
-### 1-1. [ ] 회원가입 페이지 구현
+### 1-1. [x] 회원가입 페이지 구현
 
 우선순위: P1
 
 목표:
 
-- [ ] 사용자가 회원가입 후 로그인 페이지로 이동할 수 있게 한다.
-- [ ] 현재 `LoginPage`에 보이는 회원가입 버튼을 실제 route와 API 흐름에 연결한다.
+- [x] 사용자가 회원가입 후 로그인 페이지로 이동할 수 있게 한다.
+- [x] 현재 `LoginPage`에 보이는 회원가입 버튼을 실제 route와 API 흐름에 연결한다.
 
 Backend:
 
-- [ ] 회원가입 API 계약을 확정하거나 구현한다.
-- [ ] 후보 endpoint를 확정한다.
-  - `POST /api/v1/auth/signup`
-- [ ] request shape를 확정한다.
+- [x] 회원가입 API 계약을 확정하거나 구현한다.
+- [x] endpoint를 확정한다.
+  - `POST /api/v1/auth/signUp`
+- [x] request shape를 확정한다.
   - `email`
   - `password`
   - `nickname`
-- [ ] response 정책을 확정한다.
+- [x] response 정책을 확정한다.
   - 추천: 가입 성공은 command ack로 처리하고 `/login`으로 이동한다.
   - 가입 성공 즉시 token 발급 후 `/match` 이동은 후순위로 둔다.
-- [ ] ErrorResponse를 문서화한다.
+- [x] ErrorResponse를 문서화한다.
   - 이메일 중복
   - 닉네임 중복
   - password 정책 위반
@@ -62,25 +62,25 @@ Backend:
 
 Frontend:
 
-- [ ] `/signup` route를 추가한다.
-- [ ] `SignupPage`를 구현한다.
-- [ ] `authService.signup()`을 추가한다.
-- [ ] `LoginPage`의 회원가입 버튼을 `/signup`으로 연결한다.
-- [ ] 성공 시 `/login` 이동과 성공 안내를 처리한다.
-- [ ] 실패 시 백엔드 `ErrorResponse.message`를 표시한다.
+- [x] `/signup` route를 추가한다.
+- [x] `SignupPage`를 구현한다.
+- [x] `authService.signup()`을 추가한다.
+- [x] `LoginPage`의 회원가입 버튼을 `/signup`으로 연결한다.
+- [x] 성공 시 `/login` 이동과 성공 안내를 처리한다.
+- [x] 실패 시 백엔드 `ErrorResponse.message`를 표시한다.
 
 Policy:
 
-- [ ] 회원가입 성공은 로그인 상태로 간주하지 않는다.
-- [ ] access/refresh token 저장은 login response에서만 수행한다.
-- [ ] 새 패키지는 추가하지 않는다.
+- [x] 회원가입 성공은 로그인 상태로 간주하지 않는다.
+- [x] access/refresh token 저장은 login response에서만 수행한다.
+- [x] 새 패키지는 추가하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 회원가입 성공 시 `/login`으로 이동한다.
-- [ ] 중복 이메일/닉네임 오류가 사용자에게 표시된다.
-- [ ] 필수 입력 validation이 동작한다.
-- [ ] 기존 로그인/매칭 flow가 깨지지 않는다.
+- [x] 회원가입 성공 시 `/login`으로 이동한다.
+- [x] 중복 이메일/닉네임 오류가 사용자에게 표시된다.
+- [x] 필수 입력 validation이 동작한다.
+- [x] 기존 로그인/매칭 flow가 깨지지 않는다.
 
 ### 1-2. [ ] 로그아웃 구현
 
@@ -440,7 +440,7 @@ Policy:
 
 ## 추천 진행 순서
 
-1. [ ] Section 1-1. 회원가입 페이지 구현
+1. [x] Section 1-1. 회원가입 페이지 구현
 2. [ ] Section 2-1. 내 프로필 / 랭크 조회
 3. [ ] Section 1-2. 로그아웃 구현
 4. [ ] Section 2-2. 랭킹 조회
@@ -454,7 +454,7 @@ Policy:
 ## 판단 기준
 
 - [x] “로그인부터 게임 결과까지”는 현재 MVP Core로 구현되어 있다.
-- [ ] “회원가입부터 매칭까지”라고 말하려면 Section 1-1이 필요하다.
+- [x] “회원가입부터 매칭까지”라고 말하려면 Section 1-1이 필요하다.
 - [ ] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1이 필요하다.
 - [ ] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1과 2-2가 필요하다.
 - [ ] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1이 필요하다.

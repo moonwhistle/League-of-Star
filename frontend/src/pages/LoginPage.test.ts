@@ -10,8 +10,12 @@ import { setAuthTokens } from '@/services/authToken'
 import LoginPage from './LoginPage.vue'
 
 const routerPushMock = vi.hoisted(() => vi.fn())
+const routeQueryMock = vi.hoisted(() => ({ value: {} as Record<string, string> }))
 
 vi.mock('vue-router', () => ({
+  useRoute: () => ({
+    query: routeQueryMock.value,
+  }),
   useRouter: () => ({
     push: routerPushMock,
   }),
@@ -32,6 +36,7 @@ const { setLocale } = useLocale()
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    routeQueryMock.value = {}
     setLocale('ko')
   })
 
@@ -54,6 +59,26 @@ describe('LoginPage', () => {
 
     expect(wrapper.get('.login-button').text()).toBe('Login')
     expect(wrapper.get('.login-links').text()).toContain('Forgot Password?')
+  })
+
+  it('moves to signup route from the sign up button', async () => {
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('.login-links button:nth-child(2)').trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.signup })
+  })
+
+  it('shows a signup success message when redirected from signup', () => {
+    routeQueryMock.value = {
+      signup: 'success',
+    }
+
+    const wrapper = mount(LoginPage)
+
+    expect(wrapper.get('[role="status"]').text()).toBe(
+      '회원가입이 완료되었습니다. 로그인해 주세요.',
+    )
   })
 
   it('submits email and password through the login service', async () => {

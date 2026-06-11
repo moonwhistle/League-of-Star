@@ -68,7 +68,20 @@ flowchart TD
 - 성공 후 `/match` 이동 구현.
 - 실패 시 전역 `ErrorResponse.message` 기준 에러 메시지 표시 구현.
 - 네트워크 오류, CORS 오류, AbortError, timeout 등 transport 계층 오류는 이번 단계에서 client fallback message로 처리하고, 세분화는 공통 error handling 이슈에서 진행.
-- 회원가입, 비밀번호 찾기, OAuth 로그인은 후속 작업으로 보류.
+- 회원가입은 issue-98에서 `/signup` 독립 페이지와 `POST /api/v1/auth/signUp` 연동으로 구현.
+- 비밀번호 찾기, OAuth 로그인은 후속 작업으로 보류.
+
+### 1-1. [x] 회원가입 페이지 구현
+
+- `/signup` route를 `guestOnly`로 추가.
+- `POST /api/v1/auth/signUp` 호출 구현.
+- request `{ email, password, nickname }` 반영.
+- response `{ id, email, nickname }` 반영.
+- 회원가입 성공은 로그인 상태가 아니므로 access/refresh token을 저장하지 않음.
+- 성공 후 `/login?signup=success` 이동 구현.
+- 실패 시 전역 `ErrorResponse.message` 기준 에러 메시지 표시 구현.
+- LoginPage의 회원가입 버튼을 `/signup` route로 연결.
+- 회원가입은 모달이 아니라 독립 페이지로 구현해 직접 접근, 새로고침, 뒤로가기, route guard 정책을 명확히 유지.
 
 ### 2. [x] 인증 라우트 가드 구현
 
@@ -326,7 +339,7 @@ type GameSummaryResponse =
 - `game`은 HP scenario, message factory, runtime 계산 담당.
 - `types`는 백엔드 DTO, SSE event, WebSocket message type 담당.
 - API 호출, 라우터 이동, WebSocket/EventSource 연결은 presentational component에 넣지 않음.
-- Pinia, TanStack Query Vue, OAuth, 회원가입, 비밀번호 재설정, 자동 token refresh는 이번 흐름 구현에서 제외.
+- Pinia, TanStack Query Vue, OAuth, 비밀번호 재설정, 자동 token refresh는 이번 흐름 구현에서 제외.
 - `accessToken`, `refreshToken` 외 `userId`, `nickname` 저장 위치와 profile 조회 전략은 후속 auth state/profile 이슈에서 결정.
 - transport error 세분화와 request abort 처리는 공통 service/error handling 이슈에서 결정.
 - accept/reject 이후 전환을 HTTP response 기준으로 구현하지 않도록 테스트에 명시.

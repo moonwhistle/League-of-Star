@@ -1,6 +1,7 @@
 export const ROUTE_PATHS = {
   home: '/',
   login: '/login',
+  signup: '/signup',
   match: '/match',
   gameWaiting: '/game/:gameRoomId/waiting',
   gamePlay: '/game/:gameRoomId/play',
@@ -10,6 +11,7 @@ export const ROUTE_PATHS = {
 export const ROUTE_NAMES = {
   home: 'home',
   login: 'login',
+  signup: 'signup',
   match: 'match',
   gameWaiting: 'game-waiting',
   gamePlay: 'game-play',
