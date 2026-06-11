@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { requestJson } from './apiClient'
-import { login, logout, signup } from './authService'
+import { login, logout, refresh, signup } from './authService'
 
 vi.mock('./apiClient', () => ({
   requestJson: vi.fn(),
@@ -72,6 +72,22 @@ describe('authService', () => {
         refreshToken: 'refresh-token',
       },
       signal: abortController.signal,
+      skipAuthRefresh: true,
+    })
+  })
+
+  it('refreshes tokens with the public backend refresh contract', async () => {
+    const abortController = new AbortController()
+
+    await refresh('refresh-token', abortController.signal)
+
+    expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/auth/refresh', {
+      method: 'POST',
+      body: {
+        refreshToken: 'refresh-token',
+      },
+      signal: abortController.signal,
+      auth: false,
     })
   })
 })
