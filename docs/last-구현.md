@@ -100,6 +100,7 @@ Backend:
 Frontend:
 
 - [x] MatchPage logout 버튼에 handler를 연결한다.
+- [x] 로그아웃 버튼 클릭 시 확인 모달을 표시한다.
 - [x] `clearAuthTokens()` 호출 후 `/login`으로 이동한다.
 - [x] 매칭 중 로그아웃 허용 정책을 정한다.
   - 추천: queued 상태에서는 먼저 leave 후 logout.

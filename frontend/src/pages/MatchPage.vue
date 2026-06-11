@@ -19,6 +19,7 @@
     :data-queue-status="queueStatus"
     :data-queue-error-message="queueErrorMessage"
     :data-logout-pending="isLoggingOut"
+    :data-logout-confirm-open="isLogoutConfirmOpen"
   >
     <header class="match-app-bar" aria-label="Match navigation">
       <h1>LEAGUE OF STAR</h1>
@@ -40,7 +41,7 @@
           type="button"
           :aria-label="t('match.logout')"
           :disabled="!canLogout"
-          @click="handleLogout"
+          @click="openLogoutConfirm"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M10 6H6v12h4" />
@@ -202,6 +203,37 @@
     </div>
 
     <div
+      v-if="isLogoutConfirmOpen"
+      class="match-logout-backdrop"
+      role="presentation"
+      @click="closeLogoutConfirm"
+    >
+      <section
+        class="match-logout-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="match-logout-title"
+        @click.stop
+      >
+        <h2 id="match-logout-title">{{ t('match.logoutConfirmTitle') }}</h2>
+        <p>{{ t('match.logoutConfirmMessage') }}</p>
+        <div class="match-logout-actions">
+          <button class="match-logout-cancel" type="button" @click="closeLogoutConfirm">
+            {{ t('match.logoutCancel') }}
+          </button>
+          <button
+            class="match-logout-confirm"
+            type="button"
+            :disabled="isLoggingOut"
+            @click="confirmLogout"
+          >
+            {{ isLoggingOut ? t('match.loggingOut') : t('match.logoutConfirm') }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
       v-if="errorModalMessage !== ''"
       class="match-error-backdrop"
       role="presentation"
@@ -250,6 +282,7 @@ const queueStatus = ref('ready')
 const queueErrorMessage = ref('')
 const matchWaitingSeconds = ref(0)
 const isLoggingOut = ref(false)
+const isLogoutConfirmOpen = ref(false)
 const isMatchFoundModalOpen = ref(false)
 const matchFoundCountdownSeconds = ref(0)
 const matchResponseCommandStatus = ref('idle')
@@ -430,12 +463,29 @@ function handlePrimaryMatchAction() {
   }
 }
 
-async function handleLogout() {
+function openLogoutConfirm() {
   if (!canLogout.value) {
     return
   }
 
+  isLogoutConfirmOpen.value = true
+}
+
+function closeLogoutConfirm() {
+  if (isLoggingOut.value) {
+    return
+  }
+
+  isLogoutConfirmOpen.value = false
+}
+
+async function confirmLogout() {
+  if (!canLogout.value || !isLogoutConfirmOpen.value) {
+    return
+  }
+
   isLoggingOut.value = true
+  isLogoutConfirmOpen.value = false
   queueErrorMessage.value = ''
   streamErrorMessage.value = ''
   abortJoinRequest()
@@ -938,6 +988,7 @@ function resetLocalLogoutState() {
   hasQueueJoinRequestStarted = false
   shouldResetMatchmakingAfterErrorModalClose = false
   isLoggingOut.value = false
+  isLogoutConfirmOpen.value = false
   stopMatchWaitingTimer()
   resetStreamPayloads()
 }
@@ -1580,6 +1631,7 @@ function closeErrorModal() {
   border-color: rgba(214, 174, 255, 0.38);
 }
 
+.match-logout-backdrop,
 .match-error-backdrop {
   position: fixed;
   inset: 0;
@@ -1590,6 +1642,7 @@ function closeErrorModal() {
   background: rgba(1, 5, 14, 0.68);
 }
 
+.match-logout-dialog,
 .match-error-dialog {
   width: min(360px, 100%);
   padding: 22px;
@@ -1600,26 +1653,54 @@ function closeErrorModal() {
   box-shadow: 0 18px 54px rgba(0, 0, 0, 0.42);
 }
 
+.match-logout-dialog h2,
 .match-error-dialog h2 {
   margin: 0 0 10px;
   font-size: 1.05rem;
   line-height: 1.2;
 }
 
+.match-logout-dialog p,
 .match-error-dialog p {
   margin: 0 0 18px;
   color: var(--match-muted);
   line-height: 1.5;
 }
 
+.match-logout-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.match-logout-actions button,
 .match-error-dialog button {
   width: 100%;
   min-height: 44px;
-  color: #06101c;
   font-weight: 900;
-  background: var(--match-accent);
   border: 0;
   border-radius: 4px;
+}
+
+.match-error-dialog button {
+  color: #06101c;
+  background: var(--match-accent);
+}
+
+.match-logout-cancel {
+  color: rgba(219, 232, 244, 0.78);
+  background: rgba(8, 15, 34, 0.72);
+  border: 1px solid rgba(206, 224, 255, 0.14);
+}
+
+.match-logout-confirm {
+  color: #06101c;
+  background: var(--match-accent);
+}
+
+.match-logout-confirm:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 @media (max-width: 760px) {

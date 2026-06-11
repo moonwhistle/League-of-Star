@@ -98,6 +98,7 @@ flowchart TD
 ### 2-1. [x] 로그아웃 구현
 
 - MatchPage 로그아웃 버튼을 실제 인증 세션 종료 흐름에 연결.
+- 로그아웃 버튼 클릭 시 즉시 logout하지 않고 확인 모달을 먼저 표시.
 - `POST /api/v1/auth/logout` 호출 구현.
 - request `{ refreshToken }` 반영.
 - logout API는 인증 API이므로 기존 `apiClient` Authorization header 기본 정책 유지.

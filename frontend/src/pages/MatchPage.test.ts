@@ -72,6 +72,17 @@ function getLogoutButton(wrapper: VueWrapper) {
   return wrapper.get('[aria-label="로그아웃"]')
 }
 
+async function openLogoutConfirm(wrapper: VueWrapper) {
+  await getLogoutButton(wrapper).trigger('click')
+  await wrapper.vm.$nextTick()
+}
+
+async function confirmLogout(wrapper: VueWrapper) {
+  await openLogoutConfirm(wrapper)
+  await wrapper.get('.match-logout-confirm').trigger('click')
+  await flushPromises()
+}
+
 describe('MatchPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -149,8 +160,7 @@ describe('MatchPage', () => {
   it('logs out from ready state with backend revoke before clearing local tokens', async () => {
     const wrapper = mount(MatchPage)
 
-    await getLogoutButton(wrapper).trigger('click')
-    await flushPromises()
+    await confirmLogout(wrapper)
 
     expect(logoutMock).toHaveBeenCalledWith('refresh-token', expect.any(AbortSignal))
     expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
@@ -160,12 +170,30 @@ describe('MatchPage', () => {
     expect(wrapper.get('main').attributes('data-stream-status')).toBe('idle')
   })
 
+  it('opens and cancels the logout confirmation without logging out', async () => {
+    const wrapper = mount(MatchPage)
+
+    await openLogoutConfirm(wrapper)
+
+    expect(wrapper.get('main').attributes('data-logout-confirm-open')).toBe('true')
+    expect(wrapper.get('[aria-labelledby="match-logout-title"]').text()).toContain(
+      '로그아웃하시겠습니까?',
+    )
+
+    await wrapper.get('.match-logout-cancel').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-logout-confirm-open')).toBe('false')
+    expect(logoutMock).not.toHaveBeenCalled()
+    expect(clearAuthTokensMock).not.toHaveBeenCalled()
+    expect(routerPushMock).not.toHaveBeenCalled()
+  })
+
   it('clears local tokens without backend logout when refresh token is missing', async () => {
     getRefreshTokenMock.mockReturnValue(null)
     const wrapper = mount(MatchPage)
 
-    await getLogoutButton(wrapper).trigger('click')
-    await flushPromises()
+    await confirmLogout(wrapper)
 
     expect(logoutMock).not.toHaveBeenCalled()
     expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
@@ -176,8 +204,7 @@ describe('MatchPage', () => {
     logoutMock.mockRejectedValueOnce(new Error('logout failed'))
     const wrapper = mount(MatchPage)
 
-    await getLogoutButton(wrapper).trigger('click')
-    await flushPromises()
+    await confirmLogout(wrapper)
 
     expect(logoutMock).toHaveBeenCalledTimes(1)
     expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
@@ -194,8 +221,7 @@ describe('MatchPage', () => {
     })
     await flushPromises()
 
-    await getLogoutButton(wrapper).trigger('click')
-    await flushPromises()
+    await confirmLogout(wrapper)
 
     expect(leaveMatchQueueMock).toHaveBeenCalledWith(expect.any(AbortSignal))
     expect(logoutMock).toHaveBeenCalledWith('refresh-token', expect.any(AbortSignal))
@@ -221,8 +247,7 @@ describe('MatchPage', () => {
     })
     await flushPromises()
 
-    await getLogoutButton(wrapper).trigger('click')
-    await flushPromises()
+    await confirmLogout(wrapper)
 
     expect(leaveMatchQueueMock).toHaveBeenCalledTimes(1)
     expect(logoutMock).toHaveBeenCalledTimes(1)
@@ -234,13 +259,14 @@ describe('MatchPage', () => {
     logoutMock.mockReturnValueOnce(new Promise<void>(() => {}))
     const wrapper = mount(MatchPage)
 
-    await getLogoutButton(wrapper).trigger('click')
+    await openLogoutConfirm(wrapper)
+    await wrapper.get('.match-logout-confirm').trigger('click')
     await wrapper.vm.$nextTick()
     await getLogoutButton(wrapper).trigger('click')
 
     expect(logoutMock).toHaveBeenCalledTimes(1)
     expect(wrapper.get('main').attributes('data-logout-pending')).toBe('true')
-    expect(getLogoutButton(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.match-logout-confirm').exists()).toBe(false)
   })
 
   it('starts the waiting timer immediately while the stream is connecting', async () => {

@@ -25,6 +25,7 @@ flowchart TD
 
 - `POST /api/v1/auth/logout` service 추가.
 - MatchPage 로그아웃 버튼 handler 연결.
+- 로그아웃 확인 모달 추가.
 - queued/joining 상태에서 queue leave 후 logout 진행.
 - backend logout 실패 여부와 무관한 local token clear.
 - logout 후 `/login` 이동.
@@ -35,7 +36,6 @@ flowchart TD
 - token refresh/retry 공통 처리.
 - access token blacklist 정책.
 - 게임 대기/플레이 중 이탈 정산과 로그아웃 정책.
-- 로그아웃 confirm modal.
 - OAuth logout.
 - 새 패키지 추가.
 
@@ -87,6 +87,7 @@ Response:
 - `LogoutRequest` 타입 추가.
 - `authService.logout` 구현.
 - MatchPage 로그아웃 버튼 handler 연결.
+- 로그아웃 버튼 클릭 시 즉시 logout하지 않고 확인 모달 표시.
 - 로그아웃 중 중복 클릭 방지.
 - queued/joining 상태에서는 `leaveMatchQueue()` 후 logout 진행.
 - ready 상태에서는 바로 logout 진행.
@@ -129,6 +130,7 @@ Response:
 ### 3. MatchPage Logout Flow 구현
 
 - [x] 로그아웃 버튼에 click handler 연결.
+- [x] 로그아웃 버튼 클릭 시 확인 모달 표시.
 - [x] `isLoggingOut` 상태 추가.
 - [x] 로그아웃 중 버튼 중복 클릭 방지.
 - [x] ready 상태에서는 바로 logout 진행.
@@ -151,6 +153,7 @@ Response:
 
 - [x] `authService.logout` endpoint/body/auth 기본 정책 검증.
 - [x] ready 상태 logout 성공 시 backend logout, token clear, `/login` 이동 검증.
+- [x] 로그아웃 확인 모달 취소 시 backend logout과 token clear 미호출 검증.
 - [x] refresh token 없음 상태에서 backend logout 미호출, token clear, `/login` 이동 검증.
 - [x] backend logout 실패 시에도 token clear, `/login` 이동 검증.
 - [x] queued 상태 logout 시 `leaveMatchQueue()` 후 logout 진행 검증.
@@ -182,6 +185,7 @@ Response:
 - request body는 `{ refreshToken }`이다.
 - `authService.logout`은 API 호출만 담당한다.
 - `clearAuthTokens()`와 route 이동은 page flow에서 조립한다.
+- 로그아웃 버튼 클릭은 즉시 logout이 아니라 사용자 확인 모달을 먼저 표시한다.
 - backend logout 실패는 local logout을 막지 않는다.
 - refresh token이 없으면 backend logout은 호출하지 않고 local logout만 수행한다.
 - queued/joining 상태에서는 queue leave를 먼저 시도한다.
@@ -193,6 +197,8 @@ Response:
 ## Acceptance Criteria
 
 - MatchPage 로그아웃 버튼 클릭 시 로그아웃 흐름이 시작된다.
+- MatchPage 로그아웃 버튼 클릭 시 확인 모달이 먼저 표시된다.
+- 확인 모달에서 취소하면 backend logout과 local token clear를 수행하지 않는다.
 - ready 상태에서 refresh token이 있으면 `POST /api/v1/auth/logout`을 호출한다.
 - logout API request body는 `{ refreshToken }`이다.
 - logout API는 Authorization header 기본 정책을 따른다.
@@ -254,6 +260,7 @@ flowchart TD
 
 - 게임 대기/플레이 중 로그아웃과 이탈 정산은 이번 PR에서 제외함.
 - access token blacklist, token refresh/retry, OAuth logout은 후속 이슈로 유지함.
+- `npm run test -- MatchPage` 검증 완료함.
 - `npm run test -- authService MatchPage` 검증 완료함.
 - `npm run test -- authService MatchPage authGuard router` 검증 완료함.
 - `npm run format`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` 검증 완료함.
