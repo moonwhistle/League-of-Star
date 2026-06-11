@@ -55,6 +55,8 @@ describe('GameResultPage', () => {
     expect(wrapper.get('main').attributes('data-game-result-outcome')).toBe('win')
     expect(wrapper.get('h1').text()).toBe('YOU WIN')
     expect(wrapper.get('main').attributes('data-game-result-reason')).toBe('LIGHTNING_KILL')
+    expect(wrapper.text()).not.toContain('종료 사유')
+    expect(wrapper.text()).not.toContain('게임룸')
     expect(routerReplaceMock).not.toHaveBeenCalled()
     expect(getGameSummaryMock).not.toHaveBeenCalled()
   })

@@ -17,16 +17,6 @@
       <h1 class="game-result-summary__title">
         {{ resultTitle }}
       </h1>
-      <dl class="game-result-summary__meta">
-        <div>
-          <dt>{{ t('gameResult.reason') }}</dt>
-          <dd>{{ gameResultPayload.reason }}</dd>
-        </div>
-        <div>
-          <dt>{{ t('gameResult.gameRoom') }}</dt>
-          <dd>{{ gameResultPayload.gameRoomId }}</dd>
-        </div>
-      </dl>
     </section>
 
     <p v-else class="payload-error" role="alert">
@@ -167,36 +157,6 @@ function returnToMatch() {
     0 0 42px rgba(255, 212, 101, 0.28);
 }
 
-.game-result-summary__meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-}
-
-.game-result-summary__meta div {
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid rgba(178, 230, 255, 0.22);
-  background: rgba(3, 8, 20, 0.62);
-}
-
-.game-result-summary__meta dt {
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 800;
-  color: rgba(192, 223, 244, 0.72);
-  text-transform: uppercase;
-}
-
-.game-result-summary__meta dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 15px;
-  font-weight: 800;
-}
-
 .payload-error {
   max-width: 420px;
   margin: 0;
@@ -208,10 +168,6 @@ function returnToMatch() {
 @media (max-width: 480px) {
   .game-result-page {
     padding: 20px;
-  }
-
-  .game-result-summary__meta {
-    grid-template-columns: 1fr;
   }
 }
 </style>

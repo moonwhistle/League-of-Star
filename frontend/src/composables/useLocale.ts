@@ -131,8 +131,6 @@ const messages = {
     'gamePlay.resultPayloadInvalid': '게임 결과 정보가 올바르지 않습니다.',
     'gamePlay.resultTransitionFailed': '결과 화면 이동에 실패했습니다.',
     'gameResult.eyebrow': '게임 종료',
-    'gameResult.reason': '종료 사유',
-    'gameResult.gameRoom': '게임룸',
     'gameResult.payloadMissing': '게임 결과 정보를 찾을 수 없습니다. 매칭 화면으로 돌아갑니다.',
   },
   en: {
@@ -261,8 +259,6 @@ const messages = {
     'gamePlay.resultPayloadInvalid': 'Game result data is invalid.',
     'gamePlay.resultTransitionFailed': 'Failed to open the result screen.',
     'gameResult.eyebrow': 'Game Finished',
-    'gameResult.reason': 'Reason',
-    'gameResult.gameRoom': 'Game Room',
     'gameResult.payloadMissing': 'Game result data is missing. Returning to matchmaking.',
   },
 } as const
