@@ -6,6 +6,7 @@ export interface ApiRequestOptions<TBody = unknown> {
   headers?: HeadersInit
   signal?: AbortSignal
   auth?: boolean
+  skipAuthRefresh?: boolean
 }
 
 export interface ApiErrorBody {

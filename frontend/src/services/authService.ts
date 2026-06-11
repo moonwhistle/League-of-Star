@@ -4,6 +4,8 @@ import type {
   LogoutRequest,
   SignupRequest,
   SignupResponse,
+  TokenRefreshRequest,
+  TokenRefreshResponse,
 } from '@/types/auth'
 
 import { requestJson } from './apiClient'
@@ -33,5 +35,17 @@ export function logout(refreshToken: string, signal?: AbortSignal): Promise<void
       refreshToken,
     },
     signal,
+    skipAuthRefresh: true,
+  })
+}
+
+export function refresh(refreshToken: string, signal?: AbortSignal): Promise<TokenRefreshResponse> {
+  return requestJson<TokenRefreshResponse, TokenRefreshRequest>('/api/v1/auth/refresh', {
+    method: 'POST',
+    body: {
+      refreshToken,
+    },
+    signal,
+    auth: false,
   })
 }
