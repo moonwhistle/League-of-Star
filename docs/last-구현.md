@@ -1,62 +1,175 @@
 # Last 구현 정리
 
-## 현재 판단
+## 현재 완료된 MVP Core
 
-로그인 이후 매칭, 게임 대기, 게임 시작, 플레이, LIGHTNING, 결과 Summary까지 이어지는 프론트 코어 흐름은 구현되어 있다. 다만 “MVP 코어가 완전히 닫혔다”고 말하려면 아래 정합성 작업이 먼저 필요하다.
+로그인 이후 매칭, 게임 대기, 게임 시작, 플레이, LIGHTNING, 결과 전환, 결과 Summary까지 이어지는 핵심 게임 흐름은 구현되어 있다.
 
-- `/match` route가 아직 임시 preview public 상태다.
-- `front-plan.md` 하단 `Issue Split Recommendation` 체크 상태가 본문 완료 상태와 다르다.
-- 회원가입은 현재 버튼만 있고 실제 기능은 후속 범위다.
-- MatchPage의 랭크/기록/랭킹/연습 모드/사용자 지정은 MVP 코어가 아니라 부가 기능 또는 실데이터 연동 범위다.
+완료된 범위:
 
-따라서 남은 작업은 “MVP 코어 마감 → 랭크/프로필 조회 → 회원가입 → auth 고도화 → 부가 기능” 순서로 진행한다.
+- [x] 로그인 API 연동
+- [x] 인증 route guard
+- [x] 매칭 join/leave
+- [x] 매칭 수락/거절 command
+- [x] Match SSE 수신
+- [x] Game Waiting WebSocket
+- [x] Game Start handoff
+- [x] Three.js 기반 Game Play 화면
+- [x] LIGHTNING 입력 / cooldown / HP 반영
+- [x] Game Result WebSocket 전환
+- [x] Game Result Summary API 조회
+- [x] `League of Star` 네이밍 정합성
+- [x] `/match` 인증 route 정책 복구
+- [x] `front-plan.md` 핵심 완료 상태 정리
 
-## Step 1. MVP Auth / Document Consistency 마감
+남은 작업은 완료된 MVP Core를 다시 건드리는 작업이 아니라, 화면에 이미 노출된 미완성 기능과 제품 완성도에 필요한 부가 흐름을 닫는 작업이다.
 
-우선순위: P0
+## 남은 작업 관리
 
-목표:
+- [ ] Section 1. User / Auth
+- [ ] Section 2. Match Page 실데이터 전환
+- [ ] Section 3. Record / Profile Page
+- [ ] Section 4. Optional Game Modes
+- [ ] Section 5. Deferred Account Features
 
-- 로그인 후 매칭이라는 MVP 시작점을 인증 route 정책과 일치시킨다.
-- 코드와 문서가 같은 완료 상태를 말하도록 정리한다.
+## Section 1. User / Auth
 
-Backend:
-
-- 추가 구현 없음.
-- 기존 Authorization 필수 API 정책을 유지한다.
-
-Frontend:
-
-- `/match` route에 `requiresAuth: true`를 복구한다.
-- `router/index.test.ts`의 “match public preview” 테스트를 제거하고 protected route 테스트로 바꾼다.
-- `authGuard` 테스트에서 `/match` 미인증 접근 시 `/login` 이동을 검증한다.
-- `front-plan.md` 하단 `Issue Split Recommendation`의 매칭/게임 대기 완료 체크를 본문과 맞춘다.
-- issue-74 문서의 `/match requiresAuth` 완료 상태와 실제 router meta를 일치시킨다.
-
-검증:
-
-- `npm run format`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test`
-- `npm run build`
-
-## Step 2. 내 랭크 / 프로필 조회 API 계약 확정
+### 1-1. [ ] 회원가입 페이지 구현
 
 우선순위: P1
 
 목표:
 
-- MatchPage에 표시할 “현재 내 계정 상태”의 백엔드 source of truth를 확정한다.
-- 게임 결과 Summary의 `me/opponent`와 MatchPage의 현재 랭크 정보를 섞지 않는다.
+- [ ] 사용자가 회원가입 후 로그인 페이지로 이동할 수 있게 한다.
+- [ ] 현재 `LoginPage`에 보이는 회원가입 버튼을 실제 route와 API 흐름에 연결한다.
 
 Backend:
 
-- 내 프로필/랭크 조회 API를 확인하거나 구현한다.
-- 후보 endpoint:
-  - `GET /api/v1/me/profile`
-  - `GET /api/v1/users/me/rank`
-- 최소 응답 후보:
+- [ ] 회원가입 API 계약을 확정하거나 구현한다.
+- [ ] 후보 endpoint를 확정한다.
+  - `POST /api/v1/auth/signup`
+- [ ] request shape를 확정한다.
+  - `email`
+  - `password`
+  - `nickname`
+- [ ] response 정책을 확정한다.
+  - 추천: 가입 성공은 command ack로 처리하고 `/login`으로 이동한다.
+  - 가입 성공 즉시 token 발급 후 `/match` 이동은 후순위로 둔다.
+- [ ] ErrorResponse를 문서화한다.
+  - 이메일 중복
+  - 닉네임 중복
+  - password 정책 위반
+  - validation 실패
+
+Frontend:
+
+- [ ] `/signup` route를 추가한다.
+- [ ] `SignupPage`를 구현한다.
+- [ ] `authService.signup()`을 추가한다.
+- [ ] `LoginPage`의 회원가입 버튼을 `/signup`으로 연결한다.
+- [ ] 성공 시 `/login` 이동과 성공 안내를 처리한다.
+- [ ] 실패 시 백엔드 `ErrorResponse.message`를 표시한다.
+
+Policy:
+
+- [ ] 회원가입 성공은 로그인 상태로 간주하지 않는다.
+- [ ] access/refresh token 저장은 login response에서만 수행한다.
+- [ ] 새 패키지는 추가하지 않는다.
+
+Acceptance Criteria:
+
+- [ ] 회원가입 성공 시 `/login`으로 이동한다.
+- [ ] 중복 이메일/닉네임 오류가 사용자에게 표시된다.
+- [ ] 필수 입력 validation이 동작한다.
+- [ ] 기존 로그인/매칭 flow가 깨지지 않는다.
+
+### 1-2. [ ] 로그아웃 구현
+
+우선순위: P1
+
+목표:
+
+- [ ] MatchPage 상단 로그아웃 버튼을 실제 동작으로 연결한다.
+
+Backend:
+
+- [ ] logout API가 필요한지 결정한다.
+- [ ] 서버에서 refresh token revoke를 관리한다면 endpoint를 확정한다.
+  - `POST /api/v1/auth/logout`
+- [ ] 서버 revoke가 없다면 프론트 local token clear만 수행한다고 문서화한다.
+
+Frontend:
+
+- [ ] MatchPage logout 버튼에 handler를 연결한다.
+- [ ] `clearAuthTokens()` 호출 후 `/login`으로 이동한다.
+- [ ] 매칭 중 로그아웃 허용 정책을 정한다.
+  - 추천: queued 상태에서는 먼저 leave 후 logout.
+  - 게임 대기/플레이 중 logout은 route guard가 아니라 게임 이탈 정책 이슈에서 다룬다.
+
+Policy:
+
+- [ ] 로그아웃은 인증 세션 종료 기능으로 둔다.
+- [ ] 게임 진행 중 정상 종료/패배/이탈 정산 정책과 섞지 않는다.
+
+Acceptance Criteria:
+
+- [ ] 로그아웃 클릭 시 token이 제거된다.
+- [ ] 로그아웃 후 `/match` 접근 시 `/login`으로 이동한다.
+- [ ] queued 상태에서 로그아웃 정책이 문서화되어 있다.
+
+### 1-3. [ ] Token Refresh 구현
+
+우선순위: P3
+
+목표:
+
+- [ ] access token 만료 시 refresh token으로 세션을 연장한다.
+
+Backend:
+
+- [ ] refresh API 계약을 확정한다.
+- [ ] 후보 endpoint를 확정한다.
+  - `POST /api/v1/auth/refresh`
+- [ ] refresh token 전달 방식을 결정한다.
+- [ ] 새 access token만 반환할지, refresh token rotation까지 할지 결정한다.
+- [ ] 401/403 ErrorResponse를 정리한다.
+
+Frontend:
+
+- [ ] `apiClient`에 401 refresh/retry 흐름을 추가한다.
+- [ ] refresh 성공 시 원 요청을 1회 재시도한다.
+- [ ] refresh 실패 시 token clear 후 `/login`으로 이동한다.
+- [ ] 동시 401 요청이 여러 개 발생할 때 refresh 요청을 중복으로 보내지 않게 한다.
+
+Policy:
+
+- [ ] refresh/retry는 HTTP API에만 적용한다.
+- [ ] SSE/WebSocket은 기존 연결 정책을 유지하고, token 만료 시 재연결 정책을 별도 이슈에서 판단한다.
+- [ ] 무한 retry를 막기 위해 원 요청 재시도는 1회로 제한한다.
+
+Acceptance Criteria:
+
+- [ ] access token 만료 후 refresh 성공 시 기존 API 요청이 성공한다.
+- [ ] refresh 실패 시 인증 정보가 제거되고 `/login`으로 이동한다.
+- [ ] refresh 중복 호출이 발생하지 않는다.
+
+## Section 2. Match Page 실데이터 전환
+
+### 2-1. [ ] 내 프로필 / 랭크 조회
+
+우선순위: P1
+
+목표:
+
+- [ ] MatchPage의 정적 사용자/랭크 표시를 백엔드 실데이터로 교체한다.
+- [ ] 게임 결과 Summary와 현재 내 계정 상태를 분리한다.
+
+Backend:
+
+- [ ] 내 프로필/랭크 조회 API 계약을 확정하거나 구현한다.
+- [ ] endpoint를 확정한다.
+  - 후보: `GET /api/v1/me/profile`
+  - 후보: `GET /api/v1/users/me/rank`
+- [ ] 최소 response shape를 확정한다.
   - `userId`
   - `nickname`
   - `rank`
@@ -65,179 +178,284 @@ Backend:
   - `wins`
   - `losses`
   - `draws`
-  - `seriesType`
-  - `rankSeriesId`
-- RestDocs와 ErrorResponse를 정리한다.
+  - `rankUpdatedAt`
+- [ ] RestDocs와 ErrorResponse를 정리한다.
 
 Frontend:
 
-- 아직 구현하지 않고 계약만 확정한다.
-- 어떤 UI 영역이 profile/rank API를 source로 삼는지 문서화한다.
+- [ ] profile/rank service를 추가한다.
+- [ ] MatchPage mount 시 내 프로필/랭크 정보를 조회한다.
+- [ ] `Summoner`, `BRONZE IV`, `1,248 LP` 등 정적 표시를 제거한다.
+- [ ] loading/error/empty 상태를 추가한다.
+- [ ] 조회 실패가 매칭 시작/취소를 막지 않게 한다.
 
-정책:
+Policy:
 
-- Result Summary API는 “방금 끝난 게임의 정산 결과”다.
-- MatchPage profile/rank API는 “현재 내 계정 상태”다.
+- [ ] MatchPage profile/rank API는 “현재 내 계정 상태”의 source of truth다.
+- [ ] Game Result Summary API는 “방금 끝난 게임의 정산 결과”의 source of truth다.
+- [ ] 두 응답을 서로 보정하거나 대체하지 않는다.
+- [ ] 새 패키지는 추가하지 않는다.
 
-## Step 3. MatchPage 랭크 / 전적 UI 실데이터 전환
+Acceptance Criteria:
 
-우선순위: P1
+- [ ] API 성공 시 nickname/rank/lp/전적 요약이 표시된다.
+- [ ] API 실패 시 MatchPage 진입과 매칭 버튼 동작은 유지된다.
+- [ ] Authorization header는 기존 `apiClient` 정책을 따른다.
 
-목표:
-
-- MatchPage의 정적 랭크/전적 표시를 실제 API 데이터로 교체한다.
-
-Backend:
-
-- Step 2에서 확정한 API를 제공한다.
-- 랭킹 목록까지 같이 할지, 내 정보만 먼저 할지 분리한다.
-
-Frontend:
-
-- profile/rank service를 추가한다.
-- MatchPage mount 시 내 랭크 정보를 조회한다.
-- loading/error/empty 상태를 표시한다.
-- 기존 매칭 시작/취소/SSE 상태와 독립적인 page local state로 관리한다.
-- 새 패키지는 추가하지 않는다.
-
-테스트:
-
-- API 성공 시 nickname/rank/lp/전적 표시.
-- API 실패 시 매칭 버튼 흐름이 깨지지 않는지 검증.
-- token은 기존 `apiClient` Authorization header 정책을 사용함을 검증.
-
-## Step 4. 랭킹 / 기록 조회 분리 구현
+### 2-2. [ ] 랭킹 조회
 
 우선순위: P2
 
 목표:
 
-- MatchPage의 랭킹/기록성 UI를 실제 데이터로 전환한다.
-- 매칭 코어 플로우와 부가 조회 상태를 분리한다.
+- [ ] MatchPage 왼쪽 랭킹 리스트와 요약 정보를 실제 랭킹 API로 전환한다.
 
 Backend:
 
-- 랭킹 API 후보:
+- [ ] 랭킹 조회 API 계약을 확정하거나 구현한다.
+- [ ] 후보 endpoint를 확정한다.
   - `GET /api/v1/rankings?limit=...`
-- 내 최근 기록 API 후보:
-  - `GET /api/v1/me/game-records`
-  - `GET /api/v1/games/me/summaries`
-- pagination/limit 정책을 정한다.
+- [ ] response shape를 확정한다.
+  - `rankPosition`
+  - `userId`
+  - `nickname`
+  - `rank`
+  - `lp`
+  - `wins`
+  - `losses`
+  - `isCurrentUser`
+- [ ] 내 순위를 목록에 포함할지 별도 필드로 내려줄지 결정한다.
 
 Frontend:
 
-- ranking service와 record service를 분리한다.
-- MatchPage의 랭킹/기록 UI를 API 데이터로 교체한다.
-- 조회 실패가 매칭 시작/취소 기능을 막지 않게 한다.
+- [ ] ranking service를 추가한다.
+- [ ] MatchPage 랭킹 리스트 하드코딩을 제거한다.
+- [ ] 내 순위, top %, season best 표시 정책을 API 계약에 맞춘다.
+- [ ] loading/error/empty 상태를 추가한다.
 
-정책:
+Policy:
 
-- 랭킹/기록 조회는 MVP 코어 매칭 상태와 독립이다.
-- 조회 실패는 부가 UI error로만 표시한다.
+- [ ] 랭킹 조회는 매칭 코어 상태와 독립이다.
+- [ ] 랭킹 조회 실패는 매칭 시작/취소/SSE 흐름을 막지 않는다.
+- [ ] 랭킹 데이터는 화면 장식이 아니라 별도 조회 도메인으로 분리한다.
 
-## Step 5. 회원가입 화면 구현
+Acceptance Criteria:
+
+- [ ] 랭킹 API 성공 시 실제 랭킹 목록이 표시된다.
+- [ ] 랭킹 API 실패 시 부가 UI error만 표시된다.
+- [ ] 매칭 시작/수락/게임 진입 흐름에 영향이 없다.
+
+## Section 3. Record / Profile Page
+
+### 3-1. [ ] 내 전적 조회
 
 우선순위: P2
 
 목표:
 
-- 사용자가 실제로 회원가입 후 로그인까지 갈 수 있게 한다.
+- [ ] MatchPage의 기록 버튼을 실제 전적 조회 화면으로 연결한다.
+- [ ] 단일 게임 결과 Summary와 여러 게임 전적 목록을 분리한다.
 
 Backend:
 
-- 회원가입 API 계약을 확인하거나 구현한다.
-- 후보 endpoint:
-  - `POST /api/v1/auth/signup`
-- request 후보:
-  - `{ email, password, nickname }`
-- 성공 정책을 정한다.
-  - 추천: 가입 성공 후 `/login` 이동.
-  - 대안: 가입 성공 시 token 발급 후 `/match` 이동.
-- 이메일/닉네임 중복 ErrorResponse를 문서화한다.
+- [ ] 내 전적 목록 API 계약을 확정하거나 구현한다.
+- [ ] endpoint를 확정한다.
+  - 후보: `GET /api/v1/me/game-records`
+  - 후보: `GET /api/v1/games/me/summaries`
+- [ ] query 정책을 확정한다.
+  - `page`
+  - `size`
+  - `cursor`
+  - 최신순 정렬
+- [ ] response shape를 확정한다.
+  - `gameId`
+  - `result`
+  - `opponentNickname`
+  - `rankBefore`
+  - `rankAfter`
+  - `lpChange`
+  - `playedAt`
+  - `reason`
 
 Frontend:
 
-- `/signup` route를 추가한다.
-- LoginPage의 `회원가입` 버튼을 `/signup`으로 연결한다.
-- SignupPage를 구현한다.
-- 성공 시 `/login` 이동을 기본 정책으로 삼는다.
-- 실패 시 백엔드 ErrorResponse.message를 표시한다.
+- [ ] `/records` route를 추가한다.
+- [ ] `RecordsPage`를 구현한다.
+- [ ] MatchPage 기록 버튼을 `/records`로 연결한다.
+- [ ] record service를 추가한다.
+- [ ] pagination 또는 더보기 UI를 구현한다.
 
-테스트:
+Policy:
 
-- 회원가입 성공.
-- 중복 이메일/닉네임 실패.
-- 필수 입력 validation.
-- 로그인 페이지 이동.
+- [ ] Game Result Summary는 결과 직후 상세 확인용이다.
+- [ ] RecordsPage는 계정의 누적 기록 조회용이다.
+- [ ] Summary payload를 sessionStorage에서 복원해 전적 목록처럼 사용하지 않는다.
 
-## Step 6. Auth refresh / logout 고도화
+Acceptance Criteria:
+
+- [ ] 기록 버튼 클릭 시 전적 페이지로 이동한다.
+- [ ] 전적 API 성공 시 최근 경기 목록이 표시된다.
+- [ ] 비어 있는 경우 empty 상태가 표시된다.
+- [ ] 조회 실패는 전적 화면 내부 error로 처리된다.
+
+### 3-2. [ ] 내 프로필 페이지
 
 우선순위: P3
 
 목표:
 
-- token 만료와 로그아웃 UX를 정리한다.
+- [ ] 사용자 프로필과 랭크/승패/최근 기록 요약을 별도 화면에서 확인할 수 있게 한다.
 
 Backend:
 
-- refresh API 확인 또는 구현.
-  - `POST /api/v1/auth/refresh`
-- logout API가 필요한지 결정한다.
-- 401/403 ErrorResponse 정책을 정리한다.
+- [ ] 프로필 상세 API가 2-1 API로 충분한지 판단한다.
+- [ ] 부족하면 profile detail endpoint를 확정한다.
+- [ ] 최근 전적 일부를 profile response에 포함할지 별도 record API로 조회할지 결정한다.
 
 Frontend:
 
-- 401 발생 시 refresh/retry 정책을 구현한다.
-- refresh 실패 시 token clear 후 `/login`으로 이동한다.
-- MatchPage logout 버튼을 실제 `clearAuthTokens()`와 route 이동에 연결한다.
-- `userId`, `nickname` 저장 위치를 결정한다.
+- [ ] `/profile` route를 추가한다.
+- [ ] ProfilePage를 구현한다.
+- [ ] 프로필 버튼 또는 avatar 영역에서 이동할 수 있게 한다.
+- [ ] 내 랭크, 승패, 최근 기록 요약을 표시한다.
 
-정책:
+Policy:
 
-- access token 존재 여부만 보는 현재 guard는 MVP 1차로 충분하지만, 만료 검증은 후속 고도화 범위다.
-- 전역 auth store는 필요성이 생길 때 도입한다.
+- [ ] MatchPage는 매칭 시작 화면이다.
+- [ ] ProfilePage는 계정 상태 상세 화면이다.
+- [ ] 두 화면이 같은 API를 쓰더라도 UI state는 각 page local state로 관리한다.
 
-## Step 7. 부가 모드 / 기타 기능
+Acceptance Criteria:
+
+- [ ] 프로필 화면에서 사용자 정보와 랭크 요약을 확인할 수 있다.
+- [ ] MatchPage와 동일한 source of truth 정책을 따른다.
+- [ ] 기록 요약 실패가 프로필 기본 정보 표시를 막지 않는다.
+
+## Section 4. Optional Game Modes
+
+### 4-1. [ ] 연습 모드
 
 우선순위: P4
 
 목표:
 
-- MVP 코어 이후 화면에 있는 부가 버튼을 실제 기능으로 연결한다.
+- [ ] 실제 상대 없이 LIGHTNING/게임 플레이를 테스트할 수 있는 연습 흐름을 제공한다.
 
 Backend:
 
-- 연습 모드 game 생성 API가 필요하다.
-- 사용자 지정 게임은 room 생성/초대/입장 API가 필요하다.
-- OAuth는 redirect/callback/session 정책이 필요하다.
-- 비밀번호 찾기는 이메일 발송/토큰/재설정 API가 필요하다.
+- [ ] 연습 게임 room 생성 API가 필요한지 결정한다.
+- [ ] 후보 endpoint를 확정한다.
+  - `POST /api/v1/games/practice`
+- [ ] scenario 생성 정책을 확정한다.
+  - 서버가 동일한 GAME_START payload shape를 내려준다.
+  - 상대 user 없이도 GamePlayPage가 동작하도록 opponent nullable 정책을 정한다.
 
 Frontend:
 
-- 연습 모드 버튼 연결.
-- 사용자 지정 게임 화면/모달 구현.
-- Google OAuth 버튼 연결.
-- 비밀번호 찾기 route/page 구현.
-- About page 또는 modal 구현.
+- [ ] MatchPage 연습 모드 버튼을 연결한다.
+- [ ] practice 생성 응답을 기존 GameWaiting/GamePlay handoff 구조에 맞춘다.
+- [ ] 필요하면 waiting page를 생략하고 바로 play로 진입하는 정책을 별도 결정한다.
 
-정책:
+Policy:
 
-- 이 단계는 MVP 코어가 아니다.
-- 매칭/게임 결과 흐름과 독립 이슈로 분리한다.
+- [ ] 연습 모드는 랭크/LP/전적 정산에 반영하지 않는다.
+- [ ] 기존 ranked match WebSocket 계약과 섞지 않는다.
 
-## 추천 이슈 순서
+Acceptance Criteria:
 
-1. Issue 98. MVP Auth / Document Consistency 마감
-2. Issue 100. 내 랭크 / 프로필 조회 API 계약 확정
-3. Issue 102. MatchPage 랭크 / 전적 UI 실데이터 전환
-4. Issue 104. 랭킹 / 기록 조회 분리 구현
-5. Issue 106. 회원가입 화면 구현
-6. Issue 108. Auth refresh / logout 고도화
-7. Issue 110. 연습 모드 / 사용자 지정 / OAuth / 비밀번호 찾기
+- [ ] 연습 모드 버튼으로 게임 화면에 진입할 수 있다.
+- [ ] LIGHTNING 입력을 테스트할 수 있다.
+- [ ] 연습 결과가 랭크/전적에 반영되지 않는다.
 
-## 마지막 기준
+### 4-2. [ ] 사용자 지정 게임
 
-- “로그인부터 게임 결과까지”는 Step 1만 마감하면 MVP 코어 완료라고 볼 수 있다.
-- “회원가입부터 매칭까지”라고 말하려면 Step 5까지 필요하다.
-- “랭크 정보가 화면에 제대로 나온다”고 말하려면 Step 2와 Step 3이 필요하다.
-- “현재 화면의 모든 버튼이 기능한다”고 말하려면 Step 7까지 필요하다.
+우선순위: P4
+
+목표:
+
+- [ ] 특정 사용자와 방을 만들어 게임할 수 있게 한다.
+
+Backend:
+
+- [ ] custom room 생성/초대/입장 API 계약을 확정한다.
+- [ ] 후보 endpoint를 확정한다.
+  - `POST /api/v1/custom-games`
+  - `POST /api/v1/custom-games/{roomId}/join`
+  - `POST /api/v1/custom-games/{roomId}/start`
+- [ ] 초대 코드, roomId, host 권한 정책을 정한다.
+
+Frontend:
+
+- [ ] 사용자 지정 버튼을 custom room 생성/입장 UI로 연결한다.
+- [ ] CustomGamePage 또는 modal을 구현한다.
+- [ ] room 생성, 초대 코드 복사, 입장, 시작 대기 UI를 구현한다.
+
+Policy:
+
+- [ ] 사용자 지정 게임은 일반 매칭 queue와 독립이다.
+- [ ] 랭크/LP 반영 여부는 별도 정책으로 명확히 둔다.
+
+Acceptance Criteria:
+
+- [ ] 방 생성과 입장 흐름이 동작한다.
+- [ ] 일반 매칭 queue 상태와 충돌하지 않는다.
+- [ ] custom game result 정책이 문서화되어 있다.
+
+## Section 5. Deferred Account Features
+
+### 5-1. [ ] 비밀번호 찾기
+
+우선순위: P5
+
+Backend:
+
+- [ ] 이메일 발송, reset token, password reset API를 구현한다.
+
+Frontend:
+
+- [ ] 비밀번호 찾기 route/page를 구현한다.
+- [ ] LoginPage의 관련 버튼과 연결한다.
+
+Policy:
+
+- [ ] MVP 매칭/게임 흐름과 독립으로 둔다.
+- [ ] 메일 발송 인프라와 보안 정책을 먼저 확정한다.
+
+### 5-2. [ ] OAuth 로그인
+
+우선순위: P5
+
+Backend:
+
+- [ ] Google OAuth redirect/callback/session 발급 정책을 확정한다.
+
+Frontend:
+
+- [ ] OAuth 버튼을 실제 redirect 흐름에 연결한다.
+- [ ] callback 처리 route가 필요한지 결정한다.
+
+Policy:
+
+- [ ] 기존 email/password login을 대체하지 않고 병렬 로그인 수단으로 둔다.
+
+## 추천 진행 순서
+
+1. [ ] Section 1-1. 회원가입 페이지 구현
+2. [ ] Section 2-1. 내 프로필 / 랭크 조회
+3. [ ] Section 1-2. 로그아웃 구현
+4. [ ] Section 2-2. 랭킹 조회
+5. [ ] Section 3-1. 내 전적 조회
+6. [ ] Section 3-2. 내 프로필 페이지
+7. [ ] Section 1-3. Token Refresh 구현
+8. [ ] Section 4-1. 연습 모드
+9. [ ] Section 4-2. 사용자 지정 게임
+10. [ ] Section 5-1/5-2. 비밀번호 찾기 / OAuth 로그인
+
+## 판단 기준
+
+- [x] “로그인부터 게임 결과까지”는 현재 MVP Core로 구현되어 있다.
+- [ ] “회원가입부터 매칭까지”라고 말하려면 Section 1-1이 필요하다.
+- [ ] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1이 필요하다.
+- [ ] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1과 2-2가 필요하다.
+- [ ] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1이 필요하다.
+- [ ] “현재 화면의 모든 버튼이 기능한다”고 말하려면 Section 4까지 필요하다.
