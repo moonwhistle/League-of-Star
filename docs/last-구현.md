@@ -116,41 +116,41 @@ Acceptance Criteria:
 - [x] 로그아웃 후 `/match` 접근 시 `/login`으로 이동한다.
 - [x] queued 상태에서 로그아웃 정책이 문서화되어 있다.
 
-### 1-3. [ ] Token Refresh 구현
+### 1-3. [x] Token Refresh 구현
 
 우선순위: P3
 
 목표:
 
-- [ ] access token 만료 시 refresh token으로 세션을 연장한다.
+- [x] access token 만료 시 refresh token으로 세션을 연장한다.
 
 Backend:
 
-- [ ] refresh API 계약을 확정한다.
-- [ ] 후보 endpoint를 확정한다.
+- [x] refresh API 계약을 확정한다.
+- [x] 후보 endpoint를 확정한다.
   - `POST /api/v1/auth/refresh`
-- [ ] refresh token 전달 방식을 결정한다.
-- [ ] 새 access token만 반환할지, refresh token rotation까지 할지 결정한다.
-- [ ] 401/403 ErrorResponse를 정리한다.
+- [x] refresh token 전달 방식을 결정한다.
+- [x] 새 access token만 반환할지, refresh token rotation까지 할지 결정한다.
+- [x] 401 ErrorResponse를 HTTP API refresh 트리거로 정리한다.
 
 Frontend:
 
-- [ ] `apiClient`에 401 refresh/retry 흐름을 추가한다.
-- [ ] refresh 성공 시 원 요청을 1회 재시도한다.
-- [ ] refresh 실패 시 token clear 후 `/login`으로 이동한다.
-- [ ] 동시 401 요청이 여러 개 발생할 때 refresh 요청을 중복으로 보내지 않게 한다.
+- [x] `apiClient`에 401 refresh/retry 흐름을 추가한다.
+- [x] refresh 성공 시 원 요청을 1회 재시도한다.
+- [x] refresh 실패 시 token clear 후 `/login`으로 이동한다.
+- [x] 동시 401 요청이 여러 개 발생할 때 refresh 요청을 중복으로 보내지 않게 한다.
 
 Policy:
 
-- [ ] refresh/retry는 HTTP API에만 적용한다.
-- [ ] SSE/WebSocket은 기존 연결 정책을 유지하고, token 만료 시 재연결 정책을 별도 이슈에서 판단한다.
-- [ ] 무한 retry를 막기 위해 원 요청 재시도는 1회로 제한한다.
+- [x] refresh/retry는 HTTP API에만 적용한다.
+- [x] SSE/WebSocket은 기존 연결 정책을 유지하고, token 만료 시 재연결 정책을 별도 이슈에서 판단한다.
+- [x] 무한 retry를 막기 위해 원 요청 재시도는 1회로 제한한다.
 
 Acceptance Criteria:
 
-- [ ] access token 만료 후 refresh 성공 시 기존 API 요청이 성공한다.
-- [ ] refresh 실패 시 인증 정보가 제거되고 `/login`으로 이동한다.
-- [ ] refresh 중복 호출이 발생하지 않는다.
+- [x] access token 만료 후 refresh 성공 시 기존 API 요청이 성공한다.
+- [x] refresh 실패 시 인증 정보가 제거되고 `/login`으로 이동한다.
+- [x] refresh 중복 호출이 발생하지 않는다.
 
 ## Section 2. Match Page 실데이터 전환
 
@@ -446,7 +446,7 @@ Policy:
 4. [ ] Section 2-2. 랭킹 조회
 5. [ ] Section 3-1. 내 전적 조회
 6. [ ] Section 3-2. 내 프로필 페이지
-7. [ ] Section 1-3. Token Refresh 구현
+7. [x] Section 1-3. Token Refresh 구현
 8. [ ] Section 4-1. 연습 모드
 9. [ ] Section 4-2. 사용자 지정 게임
 10. [ ] Section 5-1/5-2. 비밀번호 찾기 / OAuth 로그인

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens } from './authToken'
+import { addAuthSessionExpiredListener } from './authSessionEvents'
 import { ApiClientError, requestJson, requestVoid } from './apiClient'
 
 vi.mock('./authToken', () => ({
@@ -95,26 +96,44 @@ describe('apiClient', () => {
   })
 
   it('clears tokens and keeps the original 401 when refresh token is missing', async () => {
+    const authExpiredListener = vi.fn()
+    const removeListener = addAuthSessionExpiredListener(authExpiredListener)
     getRefreshTokenMock.mockReturnValue(null)
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ message: 'expired' }), { status: 401 }))
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'expired' }), { status: 401 }),
+    )
 
-    await expect(requestVoid('/api/v1/match/join')).rejects.toBeInstanceOf(ApiClientError)
+    try {
+      await expect(requestVoid('/api/v1/match/join')).rejects.toBeInstanceOf(ApiClientError)
+    } finally {
+      removeListener()
+    }
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
+    expect(authExpiredListener).toHaveBeenCalledTimes(1)
     expect(setAuthTokensMock).not.toHaveBeenCalled()
   })
 
   it('clears tokens and does not retry the original request when refresh fails', async () => {
+    const authExpiredListener = vi.fn()
+    const removeListener = addAuthSessionExpiredListener(authExpiredListener)
     fetchMock
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'expired' }), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'invalid refresh' }), { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: 'invalid refresh' }), { status: 401 }),
+      )
 
-    await expect(requestVoid('/api/v1/match/join')).rejects.toBeInstanceOf(ApiClientError)
+    try {
+      await expect(requestVoid('/api/v1/match/join')).rejects.toBeInstanceOf(ApiClientError)
+    } finally {
+      removeListener()
+    }
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock.mock.calls[1]?.[0]).toBe('http://localhost:8080/api/v1/auth/refresh')
     expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
+    expect(authExpiredListener).toHaveBeenCalledTimes(1)
     expect(setAuthTokensMock).not.toHaveBeenCalled()
   })
 
@@ -137,7 +156,9 @@ describe('apiClient', () => {
       protectedRequestCount += 1
 
       if (protectedRequestCount <= 2) {
-        return Promise.resolve(new Response(JSON.stringify({ message: 'expired' }), { status: 401 }))
+        return Promise.resolve(
+          new Response(JSON.stringify({ message: 'expired' }), { status: 401 }),
+        )
       }
 
       return Promise.resolve(new Response('', { status: 200 }))
@@ -158,6 +179,8 @@ describe('apiClient', () => {
   })
 
   it('does not repeat refresh when the retried request also returns 401', async () => {
+    const authExpiredListener = vi.fn()
+    const removeListener = addAuthSessionExpiredListener(authExpiredListener)
     fetchMock
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'expired' }), { status: 401 }))
       .mockResolvedValueOnce(
@@ -169,9 +192,15 @@ describe('apiClient', () => {
           { status: 200 },
         ),
       )
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'still expired' }), { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: 'still expired' }), { status: 401 }),
+      )
 
-    await expect(requestVoid('/api/v1/match/join')).rejects.toBeInstanceOf(ApiClientError)
+    try {
+      await expect(requestVoid('/api/v1/match/join')).rejects.toBeInstanceOf(ApiClientError)
+    } finally {
+      removeListener()
+    }
 
     const refreshCalls = fetchMock.mock.calls.filter(
       ([url]) => url === 'http://localhost:8080/api/v1/auth/refresh',
@@ -179,10 +208,14 @@ describe('apiClient', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(3)
     expect(refreshCalls).toHaveLength(1)
+    expect(clearAuthTokensMock).toHaveBeenCalledTimes(1)
+    expect(authExpiredListener).toHaveBeenCalledTimes(1)
   })
 
   it('does not refresh public requests', async () => {
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ message: 'invalid login' }), { status: 401 }))
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'invalid login' }), { status: 401 }),
+    )
 
     await expect(
       requestVoid('/api/v1/auth/login', {
@@ -196,7 +229,9 @@ describe('apiClient', () => {
   })
 
   it('does not refresh requests that explicitly skip auth refresh', async () => {
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ message: 'logout expired' }), { status: 401 }))
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'logout expired' }), { status: 401 }),
+    )
 
     await expect(
       requestVoid('/api/v1/auth/logout', {

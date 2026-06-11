@@ -112,66 +112,66 @@ interface TokenRefreshResponse {
 
 ### 1. Backend Contract 재확인
 
-- [ ] 백엔드 `AuthPath.REFRESH`가 `/api/v1/auth/refresh`인지 확인.
-- [ ] request body가 `{ refreshToken }`인지 확인.
-- [ ] response body가 `{ accessToken, refreshToken }`인지 확인.
-- [ ] refresh API는 `auth: false`로 호출한다는 정책 문서화.
-- [ ] HTTP `401`을 access token 만료 복구 기준으로 삼는 정책 문서화.
+- [x] 백엔드 `AuthPath.REFRESH`가 `/api/v1/auth/refresh`인지 확인.
+- [x] request body가 `{ refreshToken }`인지 확인.
+- [x] response body가 `{ accessToken, refreshToken }`인지 확인.
+- [x] refresh API는 `auth: false`로 호출한다는 정책 문서화.
+- [x] HTTP `401`을 access token 만료 복구 기준으로 삼는 정책 문서화.
 
 ### 2. Auth Refresh Service 구현
 
-- [ ] `TokenRefreshRequest` 타입 추가.
-- [ ] `TokenRefreshResponse` 타입 추가.
-- [ ] `authService.refresh(refreshToken)` 구현.
-- [ ] `POST /api/v1/auth/refresh` 호출 구현.
-- [ ] request body `{ refreshToken }` 전달.
-- [ ] `auth: false`로 refresh 요청을 보내도록 구현.
+- [x] `TokenRefreshRequest` 타입 추가.
+- [x] `TokenRefreshResponse` 타입 추가.
+- [x] `authService.refresh(refreshToken)` 구현.
+- [x] `POST /api/v1/auth/refresh` 호출 구현.
+- [x] request body `{ refreshToken }` 전달.
+- [x] `auth: false`로 refresh 요청을 보내도록 구현.
 
 ### 3. API Client Refresh / Retry 구현
 
-- [ ] `ApiRequestOptions.skipAuthRefresh` 옵션 추가.
-- [ ] `auth: false` 요청은 refresh 대상에서 제외.
-- [ ] `skipAuthRefresh: true` 요청은 refresh 대상에서 제외.
-- [ ] 최초 요청 `401`에서만 refresh 시도.
-- [ ] refresh 성공 시 새 token 저장.
-- [ ] 원 요청을 새 access token으로 1회 재시도.
-- [ ] 재시도 실패 시 추가 refresh를 반복하지 않도록 구현.
-- [ ] 동시 `401` 요청은 refresh API 1회만 호출하도록 구현.
+- [x] `ApiRequestOptions.skipAuthRefresh` 옵션 추가.
+- [x] `auth: false` 요청은 refresh 대상에서 제외.
+- [x] `skipAuthRefresh: true` 요청은 refresh 대상에서 제외.
+- [x] 최초 요청 `401`에서만 refresh 시도.
+- [x] refresh 성공 시 새 token 저장.
+- [x] 원 요청을 새 access token으로 1회 재시도.
+- [x] 재시도 실패 시 추가 refresh를 반복하지 않도록 구현.
+- [x] 동시 `401` 요청은 refresh API 1회만 호출하도록 구현.
 
 ### 4. Auth Expired Event / Routing 구현
 
-- [ ] auth expired event service 추가.
-- [ ] refresh token 없음 상태에서 token clear 후 event 발행.
-- [ ] refresh 실패 상태에서 token clear 후 event 발행.
-- [ ] app bootstrap에서 event를 구독해 `/login` 이동.
-- [ ] 이미 `/login`에 있으면 중복 이동하지 않도록 구현.
+- [x] auth expired event service 추가.
+- [x] refresh token 없음 상태에서 token clear 후 event 발행.
+- [x] refresh 실패 상태에서 token clear 후 event 발행.
+- [x] app bootstrap에서 event를 구독해 `/login` 이동.
+- [x] 이미 `/login`에 있으면 중복 이동하지 않도록 구현.
 
 ### 5. Test 구현
 
-- [ ] `authService.refresh` endpoint/body/auth 정책 검증.
-- [ ] `401` 후 refresh 성공 시 원 요청이 새 access token으로 재시도되는지 검증.
-- [ ] refresh token 없음 상태에서 token clear 및 auth expired event 발생 검증.
-- [ ] refresh 실패 시 token clear 및 auth expired event 발생 검증.
-- [ ] 동시 `401` 요청에서 refresh API가 1회만 호출되는지 검증.
-- [ ] 재시도 요청이 다시 `401`이어도 refresh를 반복하지 않는지 검증.
-- [ ] `auth: false` 요청은 refresh를 시도하지 않는지 검증.
-- [ ] `skipAuthRefresh: true` 요청은 refresh를 시도하지 않는지 검증.
+- [x] `authService.refresh` endpoint/body/auth 정책 검증.
+- [x] `401` 후 refresh 성공 시 원 요청이 새 access token으로 재시도되는지 검증.
+- [x] refresh token 없음 상태에서 token clear 및 auth expired event 발생 검증.
+- [x] refresh 실패 시 token clear 및 auth expired event 발생 검증.
+- [x] 동시 `401` 요청에서 refresh API가 1회만 호출되는지 검증.
+- [x] 재시도 요청이 다시 `401`이어도 refresh를 반복하지 않는지 검증.
+- [x] `auth: false` 요청은 refresh를 시도하지 않는지 검증.
+- [x] `skipAuthRefresh: true` 요청은 refresh를 시도하지 않는지 검증.
 
 ### 6. 문서 정합성 구현
 
-- [ ] `front-plan.md` token refresh 항목 완료 상태 반영.
-- [ ] issue-102 task 완료 상태 반영.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
-- [ ] 기존 문서의 token refresh 후속 범위와 충돌하지 않는지 확인.
+- [x] `front-plan.md` token refresh 항목 완료 상태 반영.
+- [x] issue-102 task 완료 상태 반영.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
+- [x] 기존 문서의 token refresh 후속 범위와 충돌하지 않는지 확인.
 
 ### 7. 검증
 
-- [ ] `npm run test -- apiClient authService` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
+- [x] `npm run test -- apiClient authService authSessionEvents` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
 
 ## Implementation Policy
 
@@ -256,8 +256,9 @@ flowchart TD
 - Match SSE refresh/retry는 이번 PR에서 제외함.
 - Game WebSocket refresh/reconnect 정책은 이번 PR에서 제외함.
 - JWT exp 사전 파싱, profile 전역 store, 새 패키지 추가는 제외함.
-- `npm run test -- apiClient authService` 검증 예정.
-- `npm run format`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` 검증 예정.
+- `npm run test -- apiClient authService authSessionEvents` 검증 완료함.
+- `npm run format`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` 검증 완료함.
+- 전체 테스트 21 files / 205 passed 확인함.
 
 ## 📌 Related Issue
 
