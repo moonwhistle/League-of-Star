@@ -122,23 +122,25 @@ Authorization: Bearer {accessToken}
 
 ### 3. Test 구현
 
-- [ ] `UserController` API test는 `RestAssuredMockMvc`로 구현.
-- [ ] `UserProfileService`는 core `UserReadService`를 mock 처리하는 unit test로 구현.
-- [ ] 영속성 계층 변경이 생길 경우 `@DataJpaTest` 기반 실 DB 접근 테스트로 검증.
-- [ ] RestDocs 성공 응답 구현.
-- [ ] RestDocs `USER_NOT_FOUND` 실패 응답 구현.
-- [ ] 응답에 rank/stat/avatarUrl이 포함되지 않는지 검증.
+- [x] `UserController` API test는 `RestAssuredMockMvc`로 구현.
+- [x] `UserProfileService`는 core `UserReadService`를 mock 처리하는 unit test로 구현.
+- [x] 영속성 계층 변경이 생길 경우 `@DataJpaTest` 기반 실 DB 접근 테스트로 검증.
+- [x] RestDocs 성공 응답 구현.
+- [x] RestDocs `USER_NOT_FOUND` 실패 응답 구현.
+- [x] 응답에 rank/stat/avatarUrl이 포함되지 않는지 검증.
 
 ### 4. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 2-1 항목과 정책 정합성 확인.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
-- [ ] 구현 완료 후 사용자 허락 전까지 커밋하지 않음.
+- [x] `docs/last-구현.md` 2-1 항목과 정책 정합성 확인.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
+- [x] 구현 완료 후 사용자 허락 기준으로 커밋함.
 
 ### 5. 검증
 
-- [ ] `./gradlew :league-of-star-api:test --tests '*UserProfile*'` 검증.
-- [ ] `./gradlew test` 검증.
+- [x] `./gradlew :league-of-star-api:test --tests '*UserProfile*' --tests '*UserController*'` 검증.
+- [x] `./gradlew :league-of-star-core:test --tests '*UserReadServiceTest'` 검증.
+- [x] `./gradlew :league-of-star-api:test --tests '*MatchResponseResultNotificationFactoryTest'` 검증.
+- [x] `./gradlew test` 검증.
 
 ## Implementation Policy
 
@@ -213,6 +215,7 @@ flowchart TD
 - 인증은 Authorization header 기반이다.
 - 인증 사용자 식별은 `@AuthUser Long userId`를 따른다.
 - response는 `userId`, `email`, `nickname`, `createdAt`이다.
+- `createdAt`은 프론트가 배열 포맷을 방어하지 않도록 `yyyy-MM-dd'T'HH:mm:ss` 문자열로 반환한다.
 
 ## 📚 Changes
 
@@ -230,14 +233,22 @@ flowchart TD
   현재 User 엔티티에 없는 필드라 이번 이슈에서 DB 컬럼을 추가하지 않고 최소 API 계약만 구현함.
 - service와 controller를 얇게 유지함.
   현재 이슈는 조회 API 계약 구현이므로 불필요한 계정 수정/이미지/랭크 조합 책임을 넣지 않음.
+- `createdAt` 직렬화 포맷을 응답 DTO에 명시함.
+  테스트 환경과 실제 API 문서 계약이 다르게 보이지 않도록 LocalDateTime을 문자열 계약으로 고정함.
+- 테스트 책임을 계층별로 나눔.
+  controller/API 계약은 `RestAssuredMockMvc`, profile response 변환은 service unit test, User 없음 예외는 core `UserReadServiceTest`에서 검증함.
 
 ## 📝 Note
 
 - 프론트 연결은 후속 `MatchPage 내 프로필 / 랭크 실데이터 구현`에서 진행함.
 - 내 랭크 조회 API는 별도 이슈에서 진행함.
 - 새 패키지를 추가하지 않음.
-- 자동 커밋하지 않고 사용자 확인 후 커밋함.
-- 검증 결과는 구현 후 갱신함.
+- 구현 커밋은 사용자 지시에 따라 `feat: 내 프로필 조회 API 구현`으로 진행함.
+- 검증 결과:
+  - `./gradlew :league-of-star-api:test --tests '*UserProfile*' --tests '*UserController*'` 통과함.
+  - `./gradlew :league-of-star-core:test --tests '*UserReadServiceTest'` 통과함.
+  - `./gradlew :league-of-star-api:test --tests '*MatchResponseResultNotificationFactoryTest'` 통과함.
+  - `./gradlew test` 통과함.
 
 ## 📌 Related Issue
 

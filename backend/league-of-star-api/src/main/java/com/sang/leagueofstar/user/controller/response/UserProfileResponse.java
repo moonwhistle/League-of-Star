@@ -1,5 +1,6 @@
 package com.sang.leagueofstar.user.controller.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.sang.leagueofstar.domain.user.domain.User;
 
 import java.time.LocalDateTime;
@@ -8,6 +9,7 @@ public record UserProfileResponse(
         Long userId,
         String email,
         String nickname,
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
         LocalDateTime createdAt
 ) {
 
