@@ -137,26 +137,26 @@ Authorization: Bearer {accessToken}
 
 ### 1. Backend Contract 정리
 
-- [ ] endpoint를 `GET /api/v1/users/me/rank`로 확정.
-- [ ] Authorization header 인증 정책 문서화.
-- [ ] response field를 `userId`, `tier`, `division`, `rank`, `lp`, `tierScore`, `wins`, `losses`, `draws`, `rankUpdatedAt`으로 확정.
-- [ ] profile 정보 제외 정책 문서화.
-- [ ] Game Summary 변화량 제외 정책 문서화.
-- [ ] User 없음 시 `USER_NOT_FOUND` 정책 문서화.
-- [ ] Rank 없음 시 `RANK_NOT_FOUND` 정책 문서화.
-- [ ] N+1 발생 가능성 없음과 후속 랭킹 API의 batch 조회 필요성을 문서화.
+- [x] endpoint를 `GET /api/v1/users/me/rank`로 확정.
+- [x] Authorization header 인증 정책 문서화.
+- [x] response field를 `userId`, `tier`, `division`, `rank`, `lp`, `tierScore`, `wins`, `losses`, `draws`, `rankUpdatedAt`으로 확정.
+- [x] profile 정보 제외 정책 문서화.
+- [x] Game Summary 변화량 제외 정책 문서화.
+- [x] User 없음 시 `USER_NOT_FOUND` 정책 문서화.
+- [x] Rank 없음 시 `RANK_NOT_FOUND` 정책 문서화.
+- [x] N+1 발생 가능성 없음과 후속 랭킹 API의 batch 조회 필요성을 문서화.
 
 ### 2. User Rank API 구현
 
-- [ ] `UserPath.ME_RANK` 경로 상수 추가.
-- [ ] `UserController`에 rank 조회 endpoint 추가.
-- [ ] `UserRankService` 구현.
-- [ ] `UserRankResponse` 구현.
-- [ ] `UserReadService.findById(userId)`로 User 존재 확인.
-- [ ] `RankReadService.getUserRankInfo(userId)`로 rank 조회.
-- [ ] User 없음 시 core `UserReadService`의 `CoreException(CoreErrorCode.USER_NOT_FOUND)` 전파.
-- [ ] Rank 없음 시 core `RankReadService`의 `CoreException(CoreErrorCode.RANK_NOT_FOUND)` 전파.
-- [ ] core `UserRankInfo` 엔티티와 DB schema를 변경하지 않음.
+- [x] `UserPath.ME_RANK` 경로 상수 추가.
+- [x] `UserController`에 rank 조회 endpoint 추가.
+- [x] `UserRankService` 구현.
+- [x] `UserRankResponse` 구현.
+- [x] `UserReadService.findById(userId)`로 User 존재 확인.
+- [x] `RankReadService.getUserRankInfo(userId)`로 rank 조회.
+- [x] User 없음 시 core `UserReadService`의 `CoreException(CoreErrorCode.USER_NOT_FOUND)` 전파.
+- [x] Rank 없음 시 core `RankReadService`의 `CoreException(CoreErrorCode.RANK_NOT_FOUND)` 전파.
+- [x] core `UserRankInfo` 엔티티와 DB schema를 변경하지 않음.
 
 ### 3. Test 구현
 

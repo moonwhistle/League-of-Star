@@ -7,6 +7,7 @@ import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.global.restdocs.RestDocsSupport;
 import com.sang.leagueofstar.user.controller.response.UserProfileResponse;
 import com.sang.leagueofstar.user.service.UserProfileService;
+import com.sang.leagueofstar.user.service.UserRankService;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,10 +33,11 @@ class UserControllerRestDocsTest extends RestDocsSupport {
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 6, 12, 10, 0);
 
     private final UserProfileService userProfileService = mock(UserProfileService.class);
+    private final UserRankService userRankService = mock(UserRankService.class);
 
     @Override
     protected Object initController() {
-        return new UserController(userProfileService);
+        return new UserController(userProfileService, userRankService);
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.sang.leagueofstar.common.path.user.UserPath;
 import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.user.controller.response.UserProfileResponse;
 import com.sang.leagueofstar.user.service.UserProfileService;
+import com.sang.leagueofstar.user.service.UserRankService;
 import io.restassured.module.mockmvc.RestAssuredMockMvc;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,10 +30,11 @@ class UserControllerTest {
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 6, 12, 10, 0);
 
     private final UserProfileService userProfileService = mock(UserProfileService.class);
+    private final UserRankService userRankService = mock(UserRankService.class);
 
     @BeforeEach
     void setUp() {
-        RestAssuredMockMvc.mockMvc(MockMvcBuilders.standaloneSetup(new UserController(userProfileService))
+        RestAssuredMockMvc.mockMvc(MockMvcBuilders.standaloneSetup(new UserController(userProfileService, userRankService))
                 .setCustomArgumentResolvers(authUserArgumentResolver())
                 .build());
     }
