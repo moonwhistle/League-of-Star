@@ -18,6 +18,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +65,35 @@ class UserRankInfoRepositoryTest {
         // then
         assertThat(ranks).hasSize(RANKER_COUNT);
         assertThat(statistics.getPrepareStatementCount()).isEqualTo(1 + RANKER_COUNT);
+    }
+
+    @Test
+    @DisplayName("랭킹 userId를 모아 batch 조회하면 1 + 1 조회로 고정된다")
+    void batchUserLookup_UsesSingleInQuery() {
+        // given
+        IntStream.rangeClosed(1, RANKER_COUNT)
+                .mapToObj(this::saveRanker)
+                .forEach(userRankInfoRepository::save);
+        entityManager.flush();
+        entityManager.clear();
+
+        Statistics statistics = statistics();
+        statistics.setStatisticsEnabled(true);
+        statistics.clear();
+
+        // when
+        List<UserRankInfo> ranks = userRankInfoRepository.findAll(rankingSort());
+        List<Long> userIds = ranks.stream()
+                .map(UserRankInfo::getUserId)
+                .distinct()
+                .toList();
+        Map<Long, User> usersById = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        // then
+        assertThat(ranks).hasSize(RANKER_COUNT);
+        assertThat(usersById).hasSize(RANKER_COUNT);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
     }
 
     private UserRankInfo saveRanker(int index) {

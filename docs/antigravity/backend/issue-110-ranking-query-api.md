@@ -225,11 +225,11 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 
 - [x] 현재 구조에서 `UserRankInfo`가 `User` JPA 연관관계를 갖지 않고 `userId`만 갖는다는 점 확인.
 - [x] row별 `UserReadService.findById()` 반복 구현이 왜 `1 + N` query가 되는지 테스트/문서로 설명.
-- [ ] 2쿼리 배치 조립 방식의 query 흐름 문서화.
-- [ ] DTO join projection 방식의 장단점 문서화.
-- [ ] JPA ToOne fetch join 방식이 이번 구조에 왜 과한지 문서화.
-- [ ] ToMany fetch join의 카르테시안 곱/메모리 페이징 문제를 별도 학습 note로 정리.
-- [ ] `default_batch_fetch_size: 100`이 현재 랭킹 nickname 조회에는 직접 해결책이 아닌 이유 문서화.
+- [x] 2쿼리 배치 조립 방식의 query 흐름 문서화.
+- [x] DTO join projection 방식의 장단점 문서화.
+- [x] JPA ToOne fetch join 방식이 이번 구조에 왜 과한지 문서화.
+- [x] ToMany fetch join의 카르테시안 곱/메모리 페이징 문제를 별도 학습 note로 정리.
+- [x] `default_batch_fetch_size: 100`이 현재 랭킹 nickname 조회에는 직접 해결책이 아닌 이유 문서화.
 
 ### 3. Ranking API 구현
 
@@ -343,6 +343,12 @@ for (UserRankInfo rank : ranks) {
 ```
 
 즉, 랭킹 row가 5개면 최소 6회, 50개면 최소 51회 query가 발생한다. 이것이 이번 이슈에서 실제로 조심해야 하는 N+1이다.
+
+이번 이슈에서는 `UserRankInfoRepositoryTest`에 학습용 비교 테스트를 추가했다.
+
+- 나쁜 예시: `user_rank_info` 목록 조회 후 row마다 `users`를 단건 조회하면 `1 + N` query가 발생함.
+- 좋은 예시: rank row의 `userId`를 모아 `findAllById(userIds)`로 batch 조회하면 `1 + 1` query로 고정됨.
+- 검증 방식: Hibernate `Statistics.getPrepareStatementCount()`로 SQL prepare statement 수를 확인함.
 
 ### 왜 fetch join만으로 풀 문제가 아닌가
 
