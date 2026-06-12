@@ -20,6 +20,10 @@
     :data-queue-error-message="queueErrorMessage"
     :data-logout-pending="isLoggingOut"
     :data-logout-confirm-open="isLogoutConfirmOpen"
+    :data-profile-status="profileStatus"
+    :data-profile-error-message="profileErrorMessage"
+    :data-rank-status="rankStatus"
+    :data-rank-error-message="rankErrorMessage"
   >
     <header class="match-app-bar" aria-label="Match navigation">
       <h1>LEAGUE OF STAR</h1>
@@ -55,9 +59,9 @@
     <section class="match-layout" aria-label="Match lobby">
       <aside class="ranking-panel" aria-label="Ranking overview">
         <section class="profile-panel" aria-label="Player profile">
-          <div class="avatar-frame" aria-hidden="true">S</div>
+          <div class="avatar-frame" aria-hidden="true">{{ avatarInitial }}</div>
           <div class="profile-copy">
-            <strong>Summoner</strong>
+            <strong>{{ displayNickname }}</strong>
           </div>
         </section>
 
@@ -96,9 +100,9 @@
             <em>3,105 LP</em>
           </li>
           <li class="is-current">
-            <span>128</span>
-            <strong>Summoner</strong>
-            <em>1,248 LP</em>
+            <span>-</span>
+            <strong>{{ displayNickname }}</strong>
+            <em>{{ displayLp }}</em>
           </li>
           <li>
             <span>129</span>
@@ -112,14 +116,14 @@
         <section class="rank-panel" aria-label="Current rank">
           <div>
             <span>{{ t('match.currentRank') }}</span>
-            <strong>BRONZE IV</strong>
+            <strong>{{ displayRank }}</strong>
           </div>
           <div class="rank-progress">
-            <strong>1,248 LP</strong>
-            <span>{{ t('match.toNextRank') }}</span>
+            <strong>{{ displayLp }}</strong>
+            <span>{{ rankDetailLabel }}</span>
           </div>
           <div class="progress-track" aria-hidden="true">
-            <span />
+            <span :style="{ width: rankProgressWidth }" />
           </div>
         </section>
 
@@ -265,7 +269,10 @@ import { logout } from '@/services/authService'
 import { clearAuthTokens, getRefreshToken } from '@/services/authToken'
 import { saveGameWaitingPayloadFromMatchResult } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
+import { getMyProfile } from '@/services/profileService'
+import { getMyRank } from '@/services/rankService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
+import type { UserProfileResponse, UserRankResponse } from '@/types/user'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
 import logoImageUrl from '../../img/lightning-spell.png'
@@ -283,6 +290,12 @@ const queueErrorMessage = ref('')
 const matchWaitingSeconds = ref(0)
 const isLoggingOut = ref(false)
 const isLogoutConfirmOpen = ref(false)
+const profileStatus = ref('idle')
+const rankStatus = ref('idle')
+const profile = shallowRef<UserProfileResponse>()
+const rank = shallowRef<UserRankResponse>()
+const profileErrorMessage = ref('')
+const rankErrorMessage = ref('')
 const isMatchFoundModalOpen = ref(false)
 const matchFoundCountdownSeconds = ref(0)
 const matchResponseCommandStatus = ref('idle')
@@ -412,6 +425,68 @@ const primaryMatchActionLabel = computed(() => {
 
   return t('match.start')
 })
+const displayNickname = computed(() => {
+  const nickname = profile.value?.nickname.trim() ?? ''
+
+  if (nickname !== '') {
+    return nickname
+  }
+
+  if (profileStatus.value === 'loading') {
+    return t('match.profileLoading')
+  }
+
+  return t('match.profileUnavailable')
+})
+const avatarInitial = computed(() => {
+  const nickname = profile.value?.nickname.trim() ?? ''
+
+  return nickname === '' ? '?' : nickname.charAt(0).toUpperCase()
+})
+const displayRank = computed(() => {
+  const currentRank = rank.value?.rank.trim() ?? ''
+
+  if (currentRank !== '') {
+    return currentRank
+  }
+
+  if (rankStatus.value === 'loading') {
+    return t('match.rankLoading')
+  }
+
+  return t('match.rankUnavailable')
+})
+const displayLp = computed(() => {
+  if (rank.value !== undefined) {
+    return `${formatNumber(rank.value.lp)} LP`
+  }
+
+  if (rankStatus.value === 'loading') {
+    return t('match.rankLoading')
+  }
+
+  return t('match.rankUnavailable')
+})
+const rankDetailLabel = computed(() => {
+  if (rank.value !== undefined) {
+    return `${formatNumber(rank.value.wins)}${t('match.wins')} ${formatNumber(rank.value.losses)}${t(
+      'match.losses',
+    )} ${formatNumber(rank.value.draws)}${t('match.draws')}`
+  }
+
+  if (rankStatus.value === 'loading') {
+    return t('match.rankLoading')
+  }
+
+  return t('match.rankUnavailable')
+})
+const rankProgressWidth = computed(() => {
+  if (rank.value === undefined) {
+    return '0%'
+  }
+
+  return `${clamp(rank.value.lp, 0, 100)}%`
+})
 
 const MATCH_STREAM_ERROR_MESSAGE = 'Match event stream is currently unavailable.'
 const MATCH_QUEUE_ERROR_MESSAGE = 'Match queue request failed. Please try again.'
@@ -430,10 +505,13 @@ let joinAbortController = new AbortController()
 let leaveAbortController = new AbortController()
 let matchResponseAbortController = new AbortController()
 let logoutAbortController = new AbortController()
+let profileAbortController = new AbortController()
+let rankAbortController = new AbortController()
 
 onMounted(() => {
   isActive = true
   streamErrorMessage.value = ''
+  loadAccountPanels()
 })
 
 onUnmounted(() => {
@@ -443,10 +521,70 @@ onUnmounted(() => {
   abortLeaveRequest()
   abortMatchResponseRequest()
   abortLogoutRequest()
+  abortProfileRequest()
+  abortRankRequest()
   stopMatchWaitingTimer()
   stopMatchFoundCountdown()
   closeMatchStream()
 })
+
+function loadAccountPanels() {
+  abortProfileRequest()
+  abortRankRequest()
+  profileAbortController = new AbortController()
+  rankAbortController = new AbortController()
+  profileStatus.value = 'loading'
+  rankStatus.value = 'loading'
+  profileErrorMessage.value = ''
+  rankErrorMessage.value = ''
+
+  void loadProfile(profileAbortController.signal)
+  void loadRank(rankAbortController.signal)
+}
+
+async function loadProfile(signal: AbortSignal) {
+  try {
+    const response = await getMyProfile(signal)
+
+    if (!isActive || signal.aborted) {
+      return
+    }
+
+    profile.value = response
+    profileStatus.value = 'success'
+    profileErrorMessage.value = ''
+  } catch (error) {
+    if (!isActive || isAbortError(error)) {
+      return
+    }
+
+    profile.value = undefined
+    profileStatus.value = 'error'
+    profileErrorMessage.value = getAccountPanelErrorMessage(error, t('match.profileUnavailable'))
+  }
+}
+
+async function loadRank(signal: AbortSignal) {
+  try {
+    const response = await getMyRank(signal)
+
+    if (!isActive || signal.aborted) {
+      return
+    }
+
+    rank.value = response
+    rankStatus.value = 'success'
+    rankErrorMessage.value = ''
+  } catch (error) {
+    if (!isActive || isAbortError(error)) {
+      return
+    }
+
+    rank.value = undefined
+    rankStatus.value = 'error'
+    rankErrorMessage.value = getAccountPanelErrorMessage(error, t('match.rankUnavailable'))
+  }
+}
 
 function handlePrimaryMatchAction() {
   if (hasActiveMatchFoundResponse.value || streamStatus.value === 'error') {
@@ -977,6 +1115,14 @@ function abortLogoutRequest() {
   logoutAbortController.abort()
 }
 
+function abortProfileRequest() {
+  profileAbortController.abort()
+}
+
+function abortRankRequest() {
+  rankAbortController.abort()
+}
+
 function resetLocalLogoutState() {
   resetMatchFoundModalState()
   queueStatus.value = 'ready'
@@ -1007,6 +1153,22 @@ function getApiErrorCode(error = new ApiClientError(0, undefined)) {
   const code = Reflect.get(error.body, 'code')
 
   return typeof code === 'string' ? code : ''
+}
+
+function getAccountPanelErrorMessage(error: unknown, fallbackMessage = '') {
+  return error instanceof Error && error.message.trim() !== '' ? error.message : fallbackMessage
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === 'AbortError'
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat().format(value)
 }
 
 function resetMatchResponseCommandState() {
