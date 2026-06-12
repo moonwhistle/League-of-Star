@@ -155,7 +155,7 @@ Acceptance Criteria:
 
 ## Section 2. Match Page 실데이터 전환
 
-### 2-1. [ ] 내 프로필 조회 API 계약
+### 2-1. [x] 내 프로필 조회 API 계약
 
 담당: Backend
 
@@ -163,35 +163,35 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 로그인한 사용자의 기본 계정 정보 source of truth API를 확정한다.
-- [ ] 프로필 정보와 랭크/전적 상태 조회 책임을 분리한다.
+- [x] 로그인한 사용자의 기본 계정 정보 source of truth API를 확정한다.
+- [x] 프로필 정보와 랭크/전적 상태 조회 책임을 분리한다.
 
 Backend:
 
-- [ ] endpoint를 확정한다.
-  - 후보: `GET /api/v1/users/me/profile`
-- [ ] 최소 response shape를 확정한다.
+- [x] endpoint를 확정한다.
+  - `GET /api/v1/users/me/profile`
+- [x] 최소 response shape를 확정한다.
   - `userId`
   - `nickname`
   - `email`
   - `createdAt`
-- [ ] 인증 실패, 사용자 없음 ErrorResponse를 정리한다.
-- [ ] RestDocs를 작성한다.
+- [x] 인증 실패, 사용자 없음 ErrorResponse를 정리한다.
+- [x] RestDocs를 작성한다.
 
 Policy:
 
-- [ ] 이 API는 user/account 도메인의 source of truth다.
-- [ ] rank, LP, 승패, 최근 전적은 이 API에 섞지 않는다.
-- [ ] avatarUrl은 현재 User 엔티티에 없으므로 이번 API에 포함하지 않는다.
-- [ ] 닉네임/아바타 변경 같은 계정 기능이 생겨도 rank API와 독립으로 유지한다.
+- [x] 이 API는 user/account 도메인의 source of truth다.
+- [x] rank, LP, 승패, 최근 전적은 이 API에 섞지 않는다.
+- [x] avatarUrl은 현재 User 엔티티에 없으므로 이번 API에 포함하지 않는다.
+- [x] 닉네임/아바타 변경 같은 계정 기능이 생겨도 rank API와 독립으로 유지한다.
 
 Acceptance Criteria:
 
-- [ ] 프론트가 정적 nickname/user 표시를 대체할 수 있는 payload가 확정된다.
-- [ ] Authorization header 기반 인증 계약이 문서화된다.
-- [ ] RestDocs와 ErrorResponse가 정리된다.
+- [x] 프론트가 정적 nickname/user 표시를 대체할 수 있는 payload가 확정된다.
+- [x] Authorization header 기반 인증 계약이 문서화된다.
+- [x] RestDocs와 ErrorResponse가 정리된다.
 
-### 2-2. [ ] 내 랭크 조회 API 계약
+### 2-2. [x] 내 랭크 조회 API 계약
 
 담당: Backend
 
@@ -242,7 +242,7 @@ Acceptance Criteria:
 - [x] Authorization header 기반 인증 계약이 문서화된다.
 - [x] RestDocs와 ErrorResponse가 정리된다.
 
-### 2-3. [ ] MatchPage 내 프로필 / 랭크 실데이터 구현
+### 2-3. [x] MatchPage 내 프로필 / 랭크 실데이터 구현
 
 담당: Frontend
 
@@ -250,31 +250,31 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage의 정적 사용자/랭크 표시를 2-1, 2-2 API 실데이터 조합으로 교체한다.
+- [x] MatchPage의 정적 사용자/랭크 표시를 2-1, 2-2 API 실데이터 조합으로 교체한다.
 
 Frontend:
 
-- [ ] profile service를 추가한다.
-- [ ] rank service를 추가한다.
-- [ ] MatchPage mount 시 profile API와 rank API를 병렬 조회한다.
-- [ ] `Summoner`, `BRONZE IV`, `1,248 LP` 등 정적 표시를 제거한다.
-- [ ] loading/error/empty 상태를 추가한다.
-- [ ] 조회 실패가 매칭 시작/취소를 막지 않게 한다.
+- [x] profile service를 추가한다.
+- [x] rank service를 추가한다.
+- [x] MatchPage mount 시 profile API와 rank API를 병렬 조회한다.
+- [x] `Summoner`, `BRONZE IV`, `1,248 LP` 등 정적 표시를 제거한다.
+- [x] loading/error/empty 상태를 추가한다.
+- [x] 조회 실패가 매칭 시작/취소를 막지 않게 한다.
 
 Policy:
 
-- [ ] Authorization header는 기존 `apiClient` 정책을 따른다.
-- [ ] token 만료는 issue-102 refresh/retry 정책을 따른다.
-- [ ] 프로필 조회 실패와 랭크 조회 실패는 각각 독립적으로 표시한다.
-- [ ] 프로필 API와 랭크 API 응답을 프론트에서 보정하거나 합성 저장하지 않고 화면 표시용으로만 조합한다.
-- [ ] 새 패키지는 추가하지 않는다.
+- [x] Authorization header는 기존 `apiClient` 정책을 따른다.
+- [x] token 만료는 issue-102 refresh/retry 정책을 따른다.
+- [x] 프로필 조회 실패와 랭크 조회 실패는 각각 독립적으로 표시한다.
+- [x] 프로필 API와 랭크 API 응답을 프론트에서 보정하거나 합성 저장하지 않고 화면 표시용으로만 조합한다.
+- [x] 새 패키지는 추가하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] profile API 성공 시 nickname/user 정보가 표시된다.
-- [ ] rank API 성공 시 rank/lp/전적 요약이 표시된다.
-- [ ] profile/rank 중 하나가 실패해도 MatchPage 진입과 매칭 버튼 동작은 유지된다.
-- [ ] Game Result Summary payload를 현재 계정 상태 표시로 재사용하지 않는다.
+- [x] profile API 성공 시 nickname/user 정보가 표시된다.
+- [x] rank API 성공 시 rank/lp/전적 요약이 표시된다.
+- [x] profile/rank 중 하나가 실패해도 MatchPage 진입과 매칭 버튼 동작은 유지된다.
+- [x] Game Result Summary payload를 현재 계정 상태 표시로 재사용하지 않는다.
 
 ### 2-4. [ ] 랭킹 조회 API 계약
 
@@ -669,9 +669,9 @@ Policy:
 1. [x] Section 1-1. 회원가입 페이지 구현
 2. [x] Section 1-2. 로그아웃 구현
 3. [x] Section 1-3. Token Refresh 구현
-4. [ ] Section 2-1. 내 프로필 조회 API 계약
-5. [ ] Section 2-2. 내 랭크 조회 API 계약
-6. [ ] Section 2-3. MatchPage 내 프로필 / 랭크 실데이터 구현
+4. [x] Section 2-1. 내 프로필 조회 API 계약
+5. [x] Section 2-2. 내 랭크 조회 API 계약
+6. [x] Section 2-3. MatchPage 내 프로필 / 랭크 실데이터 구현
 7. [ ] Section 2-4. 랭킹 조회 API 계약
 8. [ ] Section 2-5. MatchPage 랭킹 실데이터 구현
 9. [ ] Section 3-1. 내 전적 목록 API 계약
@@ -687,7 +687,7 @@ Policy:
 
 - [x] “로그인부터 게임 결과까지”는 현재 MVP Core로 구현되어 있다.
 - [x] “회원가입부터 매칭까지”라고 말하려면 Section 1-1이 필요하다.
-- [ ] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1부터 2-3까지 필요하다.
+- [x] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1부터 2-3까지 필요하다.
 - [ ] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1부터 2-5까지 필요하다.
 - [ ] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1과 3-2가 필요하다.
 - [ ] “내 프로필 상세를 볼 수 있다”고 말하려면 Section 3-3과 3-4가 필요하다.

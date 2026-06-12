@@ -366,7 +366,7 @@ type GameSummaryResponse =
 - `types`는 백엔드 DTO, SSE event, WebSocket message type 담당.
 - API 호출, 라우터 이동, WebSocket/EventSource 연결은 presentational component에 넣지 않음.
 - Pinia, TanStack Query Vue, OAuth, 비밀번호 재설정은 이번 흐름 구현에서 제외.
-- `accessToken`, `refreshToken` 외 `userId`, `nickname` 저장 위치와 profile 조회 전략은 후속 auth state/profile 이슈에서 결정.
+- `accessToken`, `refreshToken` 외 `userId`, `nickname`은 전역 저장하지 않고, MatchPage에서는 `GET /api/v1/users/me/profile`과 `GET /api/v1/users/me/rank`를 화면 표시 source로 조회한다.
 - transport error 세분화와 request abort 처리는 공통 service/error handling 이슈에서 결정.
 - accept/reject 이후 전환을 HTTP response 기준으로 구현하지 않도록 테스트에 명시.
 - SSE는 `@microsoft/fetch-event-source`로 Authorization header를 전달하고, native `EventSource`와 query token은 사용하지 않음.
@@ -442,6 +442,7 @@ Accept: text/event-stream
 - [x] 게임 결과 WebSocket 처리 구현.
 - [x] 게임 결과 Summary 화면 구현.
 - [x] Token Refresh 구현.
+- [x] MatchPage 내 프로필 / 랭크 실데이터 구현.
 - [x] 공통 UI, 테스트, 문서 정합성 정리.
 
 ## Assumptions

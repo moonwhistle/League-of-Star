@@ -140,71 +140,71 @@ interface UserRankResponse {
 
 ### 1. Frontend API Contract 정리
 
-- [ ] profile response type을 `userId`, `email`, `nickname`, `createdAt`으로 확정.
-- [ ] rank response type을 `userId`, `tier`, `division`, `rank`, `lp`, `tierScore`, `wins`, `losses`, `draws`, `rankUpdatedAt`으로 확정.
-- [ ] rank 표시에는 `rank` field를 우선 사용하는 정책 문서화.
-- [ ] profile/rank 실패가 매칭 동작을 막지 않는 정책 문서화.
-- [ ] Game Summary payload를 현재 계정 상태로 재사용하지 않는 정책 문서화.
+- [x] profile response type을 `userId`, `email`, `nickname`, `createdAt`으로 확정.
+- [x] rank response type을 `userId`, `tier`, `division`, `rank`, `lp`, `tierScore`, `wins`, `losses`, `draws`, `rankUpdatedAt`으로 확정.
+- [x] rank 표시에는 `rank` field를 우선 사용하는 정책 문서화.
+- [x] profile/rank 실패가 매칭 동작을 막지 않는 정책 문서화.
+- [x] Game Summary payload를 현재 계정 상태로 재사용하지 않는 정책 문서화.
 
 ### 2. Profile / Rank Service 구현
 
-- [ ] profile 조회 service 추가.
-- [ ] rank 조회 service 추가.
-- [ ] 두 service 모두 `requestJson` 기반으로 구현.
-- [ ] Authorization header와 token refresh는 `apiClient` 정책에 위임.
-- [ ] AbortSignal 전달을 지원.
-- [ ] 새 패키지를 추가하지 않음.
+- [x] profile 조회 service 추가.
+- [x] rank 조회 service 추가.
+- [x] 두 service 모두 `requestJson` 기반으로 구현.
+- [x] Authorization header와 token refresh는 `apiClient` 정책에 위임.
+- [x] AbortSignal 전달을 지원.
+- [x] 새 패키지를 추가하지 않음.
 
 ### 3. MatchPage 실데이터 연결
 
-- [ ] MatchPage mount 시 profile/rank API를 병렬 조회.
-- [ ] unmount 시 profile/rank request abort.
-- [ ] profile loading/error/data state 구현.
-- [ ] rank loading/error/data state 구현.
-- [ ] profile panel의 `Summoner`를 nickname 기반 표시로 교체.
-- [ ] avatar initial을 nickname 첫 글자 기반으로 표시.
-- [ ] rank panel의 `BRONZE IV`, `1,248 LP`를 API 값으로 교체.
-- [ ] current ranking row의 `Summoner`, `1,248 LP`를 API 값으로 교체.
-- [ ] profile/rank 실패 시 fallback 표시.
-- [ ] 조회 실패가 매칭 시작/취소, SSE, logout 동작을 막지 않게 유지.
+- [x] MatchPage mount 시 profile/rank API를 병렬 조회.
+- [x] unmount 시 profile/rank request abort.
+- [x] profile loading/error/data state 구현.
+- [x] rank loading/error/data state 구현.
+- [x] profile panel의 `Summoner`를 nickname 기반 표시로 교체.
+- [x] avatar initial을 nickname 첫 글자 기반으로 표시.
+- [x] rank panel의 `BRONZE IV`, `1,248 LP`를 API 값으로 교체.
+- [x] current ranking row의 `Summoner`, `1,248 LP`를 API 값으로 교체.
+- [x] profile/rank 실패 시 fallback 표시.
+- [x] 조회 실패가 매칭 시작/취소, SSE, logout 동작을 막지 않게 유지.
 
 ### 4. Locale / UI 상태 구현
 
-- [ ] profile loading 문구 추가.
-- [ ] profile unavailable 문구 추가.
-- [ ] rank loading 문구 추가.
-- [ ] rank unavailable 문구 추가.
-- [ ] wins/losses/draws 요약 문구 추가.
-- [ ] 한국어/영어 locale 정합성 반영.
-- [ ] compact panel 안에서 텍스트 overflow가 나지 않도록 스타일 확인.
+- [x] profile loading 문구 추가.
+- [x] profile unavailable 문구 추가.
+- [x] rank loading 문구 추가.
+- [x] rank unavailable 문구 추가.
+- [x] wins/losses/draws 요약 문구 추가.
+- [x] 한국어/영어 locale 정합성 반영.
+- [x] compact panel 안에서 텍스트 overflow가 나지 않도록 스타일 확인.
 
 ### 5. Test 구현
 
-- [ ] profile service endpoint/method/signal 테스트.
-- [ ] rank service endpoint/method/signal 테스트.
-- [ ] MatchPage mount 시 profile/rank 병렬 조회 테스트.
-- [ ] profile 성공 시 nickname 표시 테스트.
-- [ ] rank 성공 시 rank/lp/전적 표시 테스트.
-- [ ] profile 실패 시 rank 표시와 매칭 버튼 유지 테스트.
-- [ ] rank 실패 시 profile 표시와 매칭 버튼 유지 테스트.
-- [ ] Game Summary service를 현재 계정 상태 표시로 호출하지 않는지 구조 검증.
-- [ ] 기존 match start/accept/reject/logout 테스트 유지.
+- [x] profile service endpoint/method/signal 테스트.
+- [x] rank service endpoint/method/signal 테스트.
+- [x] MatchPage mount 시 profile/rank 병렬 조회 테스트.
+- [x] profile 성공 시 nickname 표시 테스트.
+- [x] rank 성공 시 rank/lp/전적 표시 테스트.
+- [x] profile 실패 시 rank 표시와 매칭 버튼 유지 테스트.
+- [x] rank 실패 시 profile 표시와 매칭 버튼 유지 테스트.
+- [x] Game Summary service를 현재 계정 상태 표시로 호출하지 않는지 구조 검증.
+- [x] 기존 match start/accept/reject/logout 테스트 유지.
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 2-3 완료 상태 반영.
-- [ ] 2-1 profile API, 2-2 rank API, 2-3 frontend 연결 책임 분리 문구 정리.
-- [ ] `front-plan.md` Issue Split Recommendation 또는 관련 항목과 정합성 확인.
-- [ ] issue-108 task 완료 상태 반영.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
+- [x] `docs/last-구현.md` Section 2-3 완료 상태 반영.
+- [x] 2-1 profile API, 2-2 rank API, 2-3 frontend 연결 책임 분리 문구 정리.
+- [x] `front-plan.md` Issue Split Recommendation 또는 관련 항목과 정합성 확인.
+- [x] issue-108 task 완료 상태 반영.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
 
 ### 7. 검증
 
-- [ ] `npm run test -- profileService rankService MatchPage` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run test` 검증.
-- [ ] 필요 시 `npm run build` 검증.
+- [x] `npm run test -- profileService rankService MatchPage` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run test` 검증.
+- [x] 필요 시 `npm run build` 검증.
 
 ## Implementation Policy
 
@@ -294,7 +294,13 @@ flowchart TD
 - 랭킹 리스트 전체 실데이터 전환은 후속 2-4 이후 진행함.
 - ProfilePage 구현은 후속 이슈에서 진행함.
 - 새 패키지를 추가하지 않음.
-- 검증 결과는 구현 후 갱신함.
+- 검증 결과:
+  - `npm run test -- MatchPage profileService rankService` 통과함.
+  - `npm run format` 통과함.
+  - `npm run lint` 통과함.
+  - `npm run typecheck` 통과함.
+  - `npm run test` 통과함. 23 files / 210 tests passed.
+  - `npm run build` 통과함.
 
 ## 📌 Related Issue
 
