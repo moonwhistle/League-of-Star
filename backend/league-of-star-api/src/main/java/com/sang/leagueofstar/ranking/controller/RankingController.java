@@ -4,6 +4,7 @@ import com.sang.leagueofstar.common.path.ranking.RankingPath;
 import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.ranking.controller.response.RankingResponse;
 import com.sang.leagueofstar.ranking.service.RankingService;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Set;
 
 @Validated
 @RestController
@@ -31,6 +34,13 @@ public class RankingController {
             @AuthUser Long userId,
             @RequestParam(defaultValue = DEFAULT_LIMIT_VALUE) @Min(MIN_LIMIT) @Max(MAX_LIMIT) int limit
     ) {
+        validateLimit(limit);
         return ResponseEntity.ok(rankingService.getRankings(userId, limit));
+    }
+
+    private void validateLimit(int limit) {
+        if (limit < MIN_LIMIT || limit > MAX_LIMIT) {
+            throw new ConstraintViolationException("limit must be between 1 and 50", Set.of());
+        }
     }
 }

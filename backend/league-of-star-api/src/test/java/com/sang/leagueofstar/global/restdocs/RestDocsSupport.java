@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
@@ -24,6 +25,7 @@ public abstract class RestDocsSupport {
                 .mockMvc(MockMvcBuilders.standaloneSetup(initController())
                         .setControllerAdvice(new GlobalExceptionHandler())
                         .setCustomArgumentResolvers(customArgumentResolvers())
+                        .setValidator(validator())
                         .apply(documentationConfiguration(provider)
                                 .operationPreprocessors()
                                 .withRequestDefaults(prettyPrint())
@@ -35,5 +37,11 @@ public abstract class RestDocsSupport {
 
     protected HandlerMethodArgumentResolver[] customArgumentResolvers() {
         return new HandlerMethodArgumentResolver[0];
+    }
+
+    private LocalValidatorFactoryBean validator() {
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
+        return validator;
     }
 }

@@ -256,21 +256,21 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 
 ### 5. Test 구현
 
-- [ ] controller API test는 `RestAssuredMockMvc`로 구현.
-- [ ] `GET /api/v1/rankings?limit=5` 요청을 service에 위임하는지 검증.
-- [ ] invalid limit 요청이 400으로 처리되는지 검증.
-- [ ] service unit test에서 row별 `UserReadService.findById()`를 호출하지 않는지 검증.
-- [ ] service unit test에서 `UserReadService.findByIds()` batch 조회를 사용하는지 검증.
-- [ ] service unit test에서 top entries와 currentUser를 올바르게 조립하는지 검증.
-- [ ] repository query는 `@DataJpaTest`로 실제 데이터 기준 검증.
-- [ ] rank 정렬 순서 검증.
-- [ ] tie-breaker 검증.
-- [ ] current user rank position 계산 검증.
-- [ ] `tierScore` 동기화 검증.
-- [ ] RestDocs 성공 응답 구현.
-- [ ] RestDocs `USER_NOT_FOUND` 실패 응답 구현.
-- [ ] RestDocs `RANK_NOT_FOUND` 실패 응답 구현.
-- [ ] RestDocs invalid limit 실패 응답 구현.
+- [x] controller API test는 `RestAssuredMockMvc`로 구현.
+- [x] `GET /api/v1/rankings?limit=5` 요청을 service에 위임하는지 검증.
+- [x] invalid limit 요청이 400으로 처리되는지 검증.
+- [x] service unit test에서 row별 `UserReadService.findById()`를 호출하지 않는지 검증.
+- [x] service unit test에서 `UserReadService.findByIds()` batch 조회를 사용하는지 검증.
+- [x] service unit test에서 top entries와 currentUser를 올바르게 조립하는지 검증.
+- [x] repository query는 `@DataJpaTest`로 실제 데이터 기준 검증.
+- [x] rank 정렬 순서 검증.
+- [x] tie-breaker 검증.
+- [x] current user rank position 계산 검증.
+- [x] `tierScore` 동기화 검증.
+- [x] RestDocs 성공 응답 구현.
+- [x] RestDocs `USER_NOT_FOUND` 실패 응답 구현.
+- [x] RestDocs `RANK_NOT_FOUND` 실패 응답 구현.
+- [x] RestDocs invalid limit 실패 응답 구현.
 
 ### 6. 문서 정합성 구현
 
