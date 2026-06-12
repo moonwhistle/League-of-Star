@@ -1,5 +1,7 @@
 package com.sang.leagueofstar.domain.user.service;
 
+import com.sang.leagueofstar.common.exception.CoreErrorCode;
+import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.user.domain.User;
 import com.sang.leagueofstar.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +19,9 @@ public class UserReadService {
 
     private final UserRepository userRepository;
 
-    public Optional<User> findById(Long userId) {
-        return userRepository.findById(userId);
+    public User findById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.USER_NOT_FOUND));
     }
 
     public List<User> findByIds(Collection<Long> userIds) {

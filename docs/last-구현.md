@@ -174,7 +174,6 @@ Backend:
   - `userId`
   - `nickname`
   - `email`
-  - `avatarUrl`
   - `createdAt`
 - [ ] 인증 실패, 사용자 없음 ErrorResponse를 정리한다.
 - [ ] RestDocs를 작성한다.
@@ -183,6 +182,7 @@ Policy:
 
 - [ ] 이 API는 user/account 도메인의 source of truth다.
 - [ ] rank, LP, 승패, 최근 전적은 이 API에 섞지 않는다.
+- [ ] avatarUrl은 현재 User 엔티티에 없으므로 이번 API에 포함하지 않는다.
 - [ ] 닉네임/아바타 변경 같은 계정 기능이 생겨도 rank API와 독립으로 유지한다.
 
 Acceptance Criteria:
