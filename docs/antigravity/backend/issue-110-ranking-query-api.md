@@ -223,8 +223,8 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 
 ### 2. N+1 학습 / 실험 설계
 
-- [ ] 현재 구조에서 `UserRankInfo`가 `User` JPA 연관관계를 갖지 않고 `userId`만 갖는다는 점 확인.
-- [ ] row별 `UserReadService.findById()` 반복 구현이 왜 `1 + N` query가 되는지 테스트/문서로 설명.
+- [x] 현재 구조에서 `UserRankInfo`가 `User` JPA 연관관계를 갖지 않고 `userId`만 갖는다는 점 확인.
+- [x] row별 `UserReadService.findById()` 반복 구현이 왜 `1 + N` query가 되는지 테스트/문서로 설명.
 - [ ] 2쿼리 배치 조립 방식의 query 흐름 문서화.
 - [ ] DTO join projection 방식의 장단점 문서화.
 - [ ] JPA ToOne fetch join 방식이 이번 구조에 왜 과한지 문서화.
@@ -555,6 +555,42 @@ flowchart TD
 - 시즌 최고 UI 제거도 후속 프론트 이슈에서 진행함.
 - 새 패키지를 추가하지 않음.
 - 자동 커밋하지 않음.
+- N+1 / fetch join 정리:
+  ```mermaid
+  flowchart TD
+      A["Ranking API"] --> B["현재 프로젝트 구조"]
+      B --> C["UserRankInfo.userId<br/>스칼라 값만 보유"]
+      C --> D["User JPA 연관관계 없음"]
+      D --> E["join fetch r.user 사용 불가"]
+      E --> F["row별 UserReadService.findById 호출 시<br/>애플리케이션 레벨 N+1 발생"]
+      F --> G["rank page 1 query + user 단건 N query"]
+      G --> H["해결: userIds 수집 후<br/>UserReadService.findByIds IN query"]
+  ```
+
+  ```mermaid
+  flowchart LR
+      A["ToOne<br/>ManyToOne / OneToOne"] --> B["부모 row 1개당 대상 1개"]
+      B --> C["join해도 row 수 유지"]
+      C --> D["fetch join + pagination 비교적 안전"]
+
+      E["ToMany<br/>OneToMany / ManyToMany"] --> F["부모 row 1개당 자식 여러 개"]
+      F --> G["부모 row가 자식 수만큼 반복"]
+      G --> H["pagination 시 DB가 부모 기준으로 자르기 어려움"]
+      H --> I["Hibernate 메모리 중복 제거 / 메모리 페이징 위험"]
+  ```
+
+  - 이번 랭킹 API에는 N+1 발생 가능성이 있음.
+    top ranking row를 조회한 뒤 각 row마다 `UserReadService.findById(rank.getUserId())`를 호출하면 rank list 1회 + user 단건 N회가 되어 애플리케이션 레벨 N+1이 발생함.
+  - 하지만 현재 `UserRankInfo`는 `User`를 JPA 연관관계로 직접 참조하지 않고 `userId` 스칼라 값만 갖고 있음.
+    따라서 `join fetch r.user`처럼 fetch join을 적용할 연관 그래프가 없고, 이번 이슈에서는 fetch join을 사용하지 않음.
+  - 연관관계가 있다면 fetch join을 사용할 수 있음.
+    예를 들어 `@ManyToOne(fetch = LAZY) private User user` 같은 ToOne 관계는 각 rank row가 user 1개만 가리키므로 fetch join해도 row 수가 늘지 않아 N+1 해결에 비교적 안전함.
+  - 반대로 `@OneToMany(fetch = LAZY) private List<GameRecord> records` 같은 ToMany 관계는 부모 1개가 자식 여러 개를 가지므로 fetch join 시 부모 row가 자식 수만큼 반복됨.
+    이 상태에서 pagination을 걸면 DB가 부모 기준으로 정확히 자르기 어렵고, Hibernate가 많은 row를 가져온 뒤 메모리에서 중복 제거/페이징할 수 있음.
+  - ToMany fetch join + pagination의 위험은 카르테시안 곱처럼 row가 부풀어 서버 메모리에 필요 이상의 엔티티/컬렉션이 적재되는 것임.
+    데이터가 작으면 티가 안 나지만 운영 데이터에서는 GC 압박, 응답 지연, 최악의 경우 OOM으로 이어질 수 있음.
+  - 따라서 일반적인 실무 기준은 ToOne은 fetch join으로 묶고, ToMany는 부모 page를 먼저 DB에서 자른 뒤 batch size 또는 별도 IN query로 컬렉션을 가져오는 방식임.
+  - 이번 랭킹 API는 ToMany 문제가 아니라 row별 nickname 조회 반복 문제이므로, rank page 조회 후 userId 목록으로 `UserReadService.findByIds()`를 호출하는 batch 조회 방식으로 해결함.
 - 검증 결과는 구현 후 갱신함.
 
 ## 📌 Related Issue
