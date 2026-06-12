@@ -233,26 +233,26 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 
 ### 3. Ranking API 구현
 
-- [ ] `RankingPath` 경로 상수 추가.
-- [ ] `RankingController` 구현.
-- [ ] controller에 `@Validated` 적용.
-- [ ] `limit`에 `@Min(1)`, `@Max(50)` 적용.
-- [ ] `RankingService` 구현.
-- [ ] `RankingResponse`, `RankingSummaryResponse`, `RankingEntryResponse` 구현.
-- [ ] `UserReadService.findById(userId)`로 현재 유저 존재 확인.
-- [ ] `RankReadService.getUserRankInfo(userId)`로 현재 유저 rank 존재 확인.
-- [ ] top entries 조회 결과와 current user row를 응답으로 조립.
-- [ ] nickname 조회는 row별 단건 호출 없이 batch 조회.
+- [x] `RankingPath` 경로 상수 추가.
+- [x] `RankingController` 구현.
+- [x] controller에 `@Validated` 적용.
+- [x] `limit`에 `@Min(1)`, `@Max(50)` 적용.
+- [x] `RankingService` 구현.
+- [x] `RankingResponse`, `RankingSummaryResponse`, `RankingEntryResponse` 구현.
+- [x] `UserReadService.findById(userId)`로 현재 유저 존재 확인.
+- [x] `RankReadService.getUserRankInfo(userId)`로 현재 유저 rank 존재 확인.
+- [x] top entries 조회 결과와 current user row를 응답으로 조립.
+- [x] nickname 조회는 row별 단건 호출 없이 batch 조회.
 
 ### 4. Core Ranking Read 구현
 
-- [ ] `RankReadService`에 ranking read method 추가.
-- [ ] `UserRankInfoRepository`에 top ranking 조회 query 추가.
-- [ ] `UserRankInfoRepository`에 total rankers count query 추가.
-- [ ] `UserRankInfoRepository`에 current user rank position 계산 query 추가.
-- [ ] 정렬 기준을 repository query와 테스트에 고정.
-- [ ] `UserRankInfo.updateRankAndLp()` 호출 시 `tierScore` 컬럼도 함께 갱신되도록 보정.
-- [ ] `tierScore` 컬럼과 `rank.getTierScore()` 불일치가 생기지 않도록 테스트 추가.
+- [x] `RankReadService`에 ranking read method 추가.
+- [x] `UserRankInfoRepository`에 top ranking 조회 query 추가.
+- [x] `RankReadService`에서 `UserRankInfoRepository.count()` 기반 total rankers count 제공.
+- [x] `UserRankInfoRepository`에 current user rank position 계산 query 추가.
+- [x] 정렬 기준을 repository query와 테스트에 고정.
+- [x] `UserRankInfo.updateRankAndLp()` 호출 시 `tierScore` 컬럼도 함께 갱신되도록 보정.
+- [x] `tierScore` 컬럼과 `rank.getTierScore()` 불일치가 생기지 않도록 테스트 추가.
 
 ### 5. Test 구현
 

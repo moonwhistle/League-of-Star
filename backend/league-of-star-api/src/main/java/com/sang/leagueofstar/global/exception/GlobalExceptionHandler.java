@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.global.exception;
 
 import com.sang.leagueofstar.common.response.ErrorResponse;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -55,6 +56,14 @@ public class GlobalExceptionHandler {
 		return ResponseEntity
 			.status(GlobalErrorCode.INVALID_INPUT.httpStatus())
 			.body(ErrorResponse.of(GlobalErrorCode.INVALID_INPUT, e.getBindingResult()));
+	}
+
+	@ExceptionHandler(ConstraintViolationException.class)
+	protected ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException e) {
+		log.warn("요청 파라미터 유효성 검증 실패: {}", e.getMessage());
+		return ResponseEntity
+			.status(GlobalErrorCode.INVALID_INPUT.httpStatus())
+			.body(ErrorResponse.of(GlobalErrorCode.INVALID_INPUT));
 	}
 
 	/**
