@@ -8,6 +8,8 @@ import { logout } from '@/services/authService'
 import { clearAuthTokens, getRefreshToken } from '@/services/authToken'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
+import { getMyProfile } from '@/services/profileService'
+import { getMyRank } from '@/services/rankService'
 import {
   connectMatchEventSource,
   type MatchEventSourceHandlers,
@@ -34,6 +36,14 @@ vi.mock('@/services/matchService', () => ({
   rejectMatch: vi.fn(),
 }))
 
+vi.mock('@/services/profileService', () => ({
+  getMyProfile: vi.fn(),
+}))
+
+vi.mock('@/services/rankService', () => ({
+  getMyRank: vi.fn(),
+}))
+
 vi.mock('@/services/authService', () => ({
   logout: vi.fn(),
 }))
@@ -51,6 +61,8 @@ const acceptMatchMock = vi.mocked(acceptMatch)
 const joinMatchQueueMock = vi.mocked(joinMatchQueue)
 const leaveMatchQueueMock = vi.mocked(leaveMatchQueue)
 const rejectMatchMock = vi.mocked(rejectMatch)
+const getMyProfileMock = vi.mocked(getMyProfile)
+const getMyRankMock = vi.mocked(getMyRank)
 const closeMatchEventSourceMock = vi.fn()
 const { setLocale } = useLocale()
 
@@ -97,6 +109,24 @@ describe('MatchPage', () => {
     joinMatchQueueMock.mockResolvedValue(undefined)
     leaveMatchQueueMock.mockResolvedValue(undefined)
     rejectMatchMock.mockResolvedValue(undefined)
+    getMyProfileMock.mockResolvedValue({
+      userId: 1,
+      email: 'moon@example.com',
+      nickname: 'MoonStar',
+      createdAt: '2026-06-12T10:00:00',
+    })
+    getMyRankMock.mockResolvedValue({
+      userId: 1,
+      tier: 'GOLD',
+      division: 'IV',
+      rank: 'GOLD_IV',
+      lp: 40,
+      tierScore: 13,
+      wins: 12,
+      losses: 8,
+      draws: 1,
+      rankUpdatedAt: '2026-06-12T10:00:00',
+    })
     connectMatchEventSourceMock.mockImplementation((handlers = {}) => {
       currentHandlers = handlers
 
@@ -122,25 +152,59 @@ describe('MatchPage', () => {
     expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
   })
 
-  it('renders the match page lobby layout', () => {
+  it('renders the match page lobby layout with profile and rank from backend contracts', async () => {
     const wrapper = mount(MatchPage)
+    await flushPromises()
 
     expect(wrapper.get('h1').text()).toBe('LEAGUE OF STAR')
     expect(wrapper.findAll('.match-actions .icon-button')).toHaveLength(2)
     expect(wrapper.find('[aria-label="전적 보기"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="로그아웃"]').exists()).toBe(true)
-    expect(wrapper.get('[aria-label="Player profile"]').text()).toContain('Summoner')
+    expect(getMyProfileMock).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(getMyRankMock).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(wrapper.get('[aria-label="Player profile"]').text()).toContain('MoonStar')
     expect(wrapper.get('[aria-label="Player profile"]').text()).not.toContain('Bronze IV')
     expect(wrapper.get('[aria-label="Ranking summary"]').text()).toContain('랭킹')
-    expect(wrapper.get('[aria-label="Current rank"]').text()).toContain('BRONZE IV')
+    expect(wrapper.get('[aria-label="Current rank"]').text()).toContain('GOLD_IV')
     expect(wrapper.get('[aria-label="Current rank"]').text()).toContain('현재 랭크')
-    expect(wrapper.get('[aria-label="Current rank"]').text()).toContain('1,248 LP')
+    expect(wrapper.get('[aria-label="Current rank"]').text()).toContain('40 LP')
+    expect(wrapper.get('[aria-label="Current rank"]').text()).toContain('12승 8패 1무')
     expect(wrapper.text()).not.toContain('RP')
     expect(wrapper.get('[data-testid="match-start-button"]').text()).toContain('매칭 시작')
     expect(wrapper.text()).toContain('연습 모드')
     expect(wrapper.text()).toContain('사용자 지정')
     expect(wrapper.get('main').attributes('data-stream-status')).toBe('idle')
     expect(wrapper.get('main').attributes('data-queue-status')).toBe('ready')
+    expect(wrapper.get('main').attributes('data-profile-status')).toBe('success')
+    expect(wrapper.get('main').attributes('data-rank-status')).toBe('success')
+  })
+
+  it('keeps matchmaking available when the profile request fails', async () => {
+    getMyProfileMock.mockRejectedValueOnce(new Error('profile failed'))
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-profile-status')).toBe('error')
+    expect(main.attributes('data-profile-error-message')).toBe('profile failed')
+    expect(main.attributes('data-rank-status')).toBe('success')
+    expect(wrapper.get('[aria-label="Player profile"]').text()).toContain('프로필 정보 없음')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps matchmaking available when the rank request fails', async () => {
+    getMyRankMock.mockRejectedValueOnce(new Error('rank failed'))
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    const main = wrapper.get('main')
+
+    expect(main.attributes('data-profile-status')).toBe('success')
+    expect(main.attributes('data-rank-status')).toBe('error')
+    expect(main.attributes('data-rank-error-message')).toBe('rank failed')
+    expect(wrapper.get('[aria-label="Current rank"]').text()).toContain('랭크 정보 없음')
+    expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
   })
 
   it('toggles match page copy between Korean and English', async () => {
