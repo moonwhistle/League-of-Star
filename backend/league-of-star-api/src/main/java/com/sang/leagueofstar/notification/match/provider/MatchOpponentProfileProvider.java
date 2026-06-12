@@ -26,9 +26,7 @@ public class MatchOpponentProfileProvider {
     private final RankReadService rankReadService;
 
     public MatchResponseResultNotification.Opponent getOpponent(Long opponentUserId, int fallbackTierScore) {
-        String nickname = userReadService.findById(opponentUserId)
-                .map(User::getNickname)
-                .orElse(UNKNOWN_NICKNAME);
+        String nickname = findNickname(opponentUserId);
 
         try {
             UserRankInfo rankInfo = rankReadService.getUserRankInfo(opponentUserId);
@@ -54,6 +52,15 @@ public class MatchOpponentProfileProvider {
                     UNKNOWN_TIER,
                     fallbackTierScore
             );
+        }
+    }
+
+    private String findNickname(Long userId) {
+        try {
+            return userReadService.findById(userId).getNickname();
+        } catch (Exception e) {
+            log.warn("Failed to lookup opponent user info for match response result: userId={}", userId, e);
+            return UNKNOWN_NICKNAME;
         }
     }
 

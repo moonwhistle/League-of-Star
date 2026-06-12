@@ -18,8 +18,6 @@ import com.sang.leagueofstar.notification.match.pubsub.dto.MatchResponseResultPu
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -252,7 +250,7 @@ class MatchResponseResultNotificationFactoryTest {
                 .rank(Rank.of(tier, division))
                 .build();
 
-        when(userReadService.findById(userId)).thenReturn(Optional.of(user));
+        when(userReadService.findById(userId)).thenReturn(user);
         when(rankReadService.getUserRankInfo(userId)).thenReturn(rankInfo);
     }
 }
