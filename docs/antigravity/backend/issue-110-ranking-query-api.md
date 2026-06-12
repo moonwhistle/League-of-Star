@@ -282,11 +282,11 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 
 ### 7. 검증
 
-- [ ] `./gradlew :league-of-star-core:test --tests '*UserRankInfoRepositoryTest'` 검증.
-- [ ] `./gradlew :league-of-star-core:test --tests '*RankReadServiceTest'` 검증.
-- [ ] `./gradlew :league-of-star-api:test --tests '*Ranking*'` 검증.
-- [ ] `./gradlew :league-of-star-api:test --tests '*UserController*'` 영향 검증.
-- [ ] `./gradlew test` 검증.
+- [x] `./gradlew :league-of-star-core:test --tests '*UserRankInfoRepositoryTest'` 검증.
+- [x] `./gradlew :league-of-star-core:test --tests '*RankReadServiceTest'` 검증.
+- [x] `./gradlew :league-of-star-api:test --tests '*Ranking*'` 검증.
+- [x] `./gradlew :league-of-star-api:test --tests '*UserController*'` 영향 검증.
+- [x] `./gradlew test` 검증.
 
 ## Implementation Policy
 
