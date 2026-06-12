@@ -546,6 +546,10 @@ flowchart TD
   제품 방향상 해당 섹션은 프론트에서 제거하기로 했으므로 백엔드 계약에도 넣지 않음.
 - N+1 방지 방식을 명시함.
   `UserRankInfo`는 `User` 연관관계가 없으므로 fetch join 문제가 아니라 userId별 nickname 단건 조회 반복이 위험 지점임. 이를 users IN batch 조회로 차단함.
+- userId 기반 batch 조회를 기본 구현으로 선택함.
+  현재 `UserRankInfo`는 `User`를 JPA 연관관계로 참조하지 않고 `userId`만 보유한다. 따라서 fetch join, EntityGraph, Hibernate batch size처럼 JPA 연관관계 기반 해결책을 적용할 수 없다. 랭킹 row마다 user를 단건 조회하면 애플리케이션 레벨 N+1이 발생하므로, rank rows에서 userId를 수집한 뒤 `UserReadService.findByIds()`로 한 번에 조회하도록 설계함. 이 조회는 `where id in (...)` 형태로 처리되어 row 수만큼 user 조회가 증가하지 않는다.
+- DTO projection을 기본안으로 선택하지 않음.
+  DTO projection으로 `UserRankInfo`와 `User`를 조인하면 한 쿼리로 nickname까지 가져올 수 있지만, core rank repository가 users table과 profile field를 알게 되어 rank/user 도메인 책임 분리가 흐려진다. 반대로 API 모듈에서 projection query를 직접 작성하면 repository 또는 EntityManager 같은 영속성 계층이 API 모듈에 노출된다. 현재 아키텍처는 API 모듈이 core read service를 조합하는 방식이므로, 이번 이슈에서는 `RankReadService`와 `UserReadService`의 책임을 유지한 batch 조립 방식을 선택함.
 - `tierScore` 동기화 정책을 점검함.
   DB 정렬/페이징은 `tierScore` 컬럼에 의존하므로 rank 변경 시 컬럼 값이 embedded rank와 어긋나지 않게 함.
 
@@ -555,42 +559,66 @@ flowchart TD
 - 시즌 최고 UI 제거도 후속 프론트 이슈에서 진행함.
 - 새 패키지를 추가하지 않음.
 - 자동 커밋하지 않음.
-- N+1 / fetch join 정리:
+- N+1 해결 방법 정리:
   ```mermaid
   flowchart TD
-      A["Ranking API"] --> B["현재 프로젝트 구조"]
-      B --> C["UserRankInfo.userId<br/>스칼라 값만 보유"]
-      C --> D["User JPA 연관관계 없음"]
-      D --> E["join fetch r.user 사용 불가"]
-      E --> F["row별 UserReadService.findById 호출 시<br/>애플리케이션 레벨 N+1 발생"]
-      F --> G["rank page 1 query + user 단건 N query"]
-      G --> H["해결: userIds 수집 후<br/>UserReadService.findByIds IN query"]
+      A["N+1 발생 원인 확인"] --> B{"JPA 연관관계가 있는가?"}
+      B -->|있음| C["JPA Lazy Loading N+1"]
+      B -->|없음| D["애플리케이션 레벨 N+1"]
+
+      C --> E{"연관 방향"}
+      E -->|ToOne<br/>ManyToOne / OneToOne| F["fetch join / EntityGraph<br/>비교적 안전"]
+      E -->|ToMany<br/>OneToMany / ManyToMany| G["fetch join + pagination 위험<br/>batch size / 2단계 조회 권장"]
+
+      D --> H["반복문 안 단건 조회<br/>findById N회"]
+      H --> I["findByIds / IN query<br/>또는 DTO projection join"]
+  ```
+
+  ```mermaid
+  flowchart TD
+      A["현재 Ranking API"] --> B["UserRankInfo.userId<br/>스칼라 값만 보유"]
+      B --> C["User JPA 연관관계 없음"]
+      C --> D["join fetch r.user 불가"]
+      D --> E["나쁜 구현:<br/>row마다 UserReadService.findById"]
+      E --> F["rank page 1 query<br/>+ user 단건 N query"]
+      F --> G["1 + N"]
+      G --> H["해결:<br/>userIds 수집 후 UserReadService.findByIds"]
+      H --> I["rank page 1 query<br/>+ users IN 1 query"]
+      I --> J["1 + 1"]
   ```
 
   ```mermaid
   flowchart LR
       A["ToOne<br/>ManyToOne / OneToOne"] --> B["부모 row 1개당 대상 1개"]
       B --> C["join해도 row 수 유지"]
-      C --> D["fetch join + pagination 비교적 안전"]
+      C --> D["fetch join / EntityGraph<br/>pagination 비교적 안전"]
 
       E["ToMany<br/>OneToMany / ManyToMany"] --> F["부모 row 1개당 자식 여러 개"]
       F --> G["부모 row가 자식 수만큼 반복"]
-      G --> H["pagination 시 DB가 부모 기준으로 자르기 어려움"]
-      H --> I["Hibernate 메모리 중복 제거 / 메모리 페이징 위험"]
+      G --> H["카르테시안 곱처럼 row 부풀어짐"]
+      H --> I["pagination 시 DB가 부모 기준으로 자르기 어려움"]
+      I --> J["Hibernate 메모리 중복 제거 / 메모리 페이징 위험"]
   ```
 
-  - 이번 랭킹 API에는 N+1 발생 가능성이 있음.
-    top ranking row를 조회한 뒤 각 row마다 `UserReadService.findById(rank.getUserId())`를 호출하면 rank list 1회 + user 단건 N회가 되어 애플리케이션 레벨 N+1이 발생함.
-  - 하지만 현재 `UserRankInfo`는 `User`를 JPA 연관관계로 직접 참조하지 않고 `userId` 스칼라 값만 갖고 있음.
-    따라서 `join fetch r.user`처럼 fetch join을 적용할 연관 그래프가 없고, 이번 이슈에서는 fetch join을 사용하지 않음.
-  - 연관관계가 있다면 fetch join을 사용할 수 있음.
-    예를 들어 `@ManyToOne(fetch = LAZY) private User user` 같은 ToOne 관계는 각 rank row가 user 1개만 가리키므로 fetch join해도 row 수가 늘지 않아 N+1 해결에 비교적 안전함.
-  - 반대로 `@OneToMany(fetch = LAZY) private List<GameRecord> records` 같은 ToMany 관계는 부모 1개가 자식 여러 개를 가지므로 fetch join 시 부모 row가 자식 수만큼 반복됨.
-    이 상태에서 pagination을 걸면 DB가 부모 기준으로 정확히 자르기 어렵고, Hibernate가 많은 row를 가져온 뒤 메모리에서 중복 제거/페이징할 수 있음.
-  - ToMany fetch join + pagination의 위험은 카르테시안 곱처럼 row가 부풀어 서버 메모리에 필요 이상의 엔티티/컬렉션이 적재되는 것임.
-    데이터가 작으면 티가 안 나지만 운영 데이터에서는 GC 압박, 응답 지연, 최악의 경우 OOM으로 이어질 수 있음.
-  - 따라서 일반적인 실무 기준은 ToOne은 fetch join으로 묶고, ToMany는 부모 page를 먼저 DB에서 자른 뒤 batch size 또는 별도 IN query로 컬렉션을 가져오는 방식임.
-  - 이번 랭킹 API는 ToMany 문제가 아니라 row별 nickname 조회 반복 문제이므로, rank page 조회 후 userId 목록으로 `UserReadService.findByIds()`를 호출하는 batch 조회 방식으로 해결함.
+  | 문제 유형 | 전제 | 나쁜 패턴 | 주요 해결책 | 주의점 |
+  |-----------|------|-----------|-------------|--------|
+  | JPA Lazy Loading N+1 | JPA 연관관계 있음 | `rank.getUser().getNickname()` 반복 접근 | fetch join, EntityGraph, batch size, DTO projection | ToMany fetch join + pagination 주의 |
+  | 애플리케이션 레벨 N+1 | 연관관계 없이 id만 보유 | 반복문 안에서 `findById(userId)` 직접 호출 | `findByIds`, 명시적 `IN query`, batch read service, DTO projection join | fetch join/EntityGraph/batch size 직접 적용 불가 |
+
+  - `fetch join`과 `EntityGraph`는 원리가 비슷함.
+    둘 다 JPA 연관관계를 처음 조회할 때 같이 로딩해 이후 lazy loading 추가 query를 막는 방식임. 차이는 fetch join은 JPQL에 직접 쓰고, EntityGraph는 repository method에 fetch plan을 선언한다는 점임.
+  - `batch size`와 `findByIds / IN query`는 원리가 비슷함.
+    둘 다 여러 id를 모아 `where id in (...)` 형태로 한 번에 조회한다. 차이는 batch size는 Hibernate가 JPA lazy association 초기화 시 자동으로 묶는 방식이고, `findByIds`는 애플리케이션 코드가 직접 id를 모아 batch 조회하는 방식임.
+  - ToOne 관계는 fetch join/EntityGraph가 비교적 안전함.
+    `@ManyToOne(fetch = LAZY) private User user`처럼 row 1개가 대상 1개만 가리키면 join해도 row 수가 늘지 않기 때문임.
+  - ToMany 관계는 fetch join + pagination이 위험함.
+    `@OneToMany(fetch = LAZY) private List<GameRecord> records`처럼 부모 1개가 자식 여러 개를 가지면 부모 row가 자식 수만큼 반복된다. 이 상태에서 paging을 걸면 DB가 부모 기준으로 정확히 자르기 어렵고, Hibernate가 많은 row를 가져온 뒤 메모리에서 중복 제거/페이징할 수 있음.
+  - DTO projection은 두 문제 유형 모두에서 사용할 수 있는 읽기 전용 해결책임.
+    엔티티 전체를 로딩하지 않고 필요한 컬럼만 select해서 DTO/read model로 바로 받는다. fetch join처럼 엔티티 그래프를 로딩하는 방식이 아니며, 화면 전용 조회에 적합함.
+  - 이번 랭킹 API의 실제 문제는 애플리케이션 레벨 N+1임.
+    `UserRankInfo`는 `User`를 직접 참조하지 않고 `userId`만 갖고 있으므로 `join fetch r.user`와 EntityGraph를 사용할 수 없다. `default_batch_fetch_size`도 lazy association이 없으므로 직접 해결책이 아니다.
+  - 이번 랭킹 API의 기본 해결책은 `findByIds / IN query` 방식임.
+    rank page를 먼저 조회하고, 그 결과의 userId 목록으로 `UserReadService.findByIds()`를 호출해 nickname을 batch 조회한 뒤 Java에서 조립함.
 - 검증 결과는 구현 후 갱신함.
 
 ## 📌 Related Issue
