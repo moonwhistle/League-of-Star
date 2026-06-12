@@ -155,7 +155,7 @@ Acceptance Criteria:
 
 ## Section 2. Match Page 실데이터 전환
 
-### 2-1. [ ] 내 프로필 / 랭크 조회 API 계약
+### 2-1. [ ] 내 프로필 조회 API 계약
 
 담당: Backend
 
@@ -163,17 +163,53 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage가 표시할 현재 내 계정 상태의 source of truth API를 확정한다.
-- [ ] 게임 결과 Summary와 현재 계정 상태 조회 책임을 분리한다.
+- [ ] 로그인한 사용자의 기본 계정 정보 source of truth API를 확정한다.
+- [ ] 프로필 정보와 랭크/전적 상태 조회 책임을 분리한다.
 
 Backend:
 
 - [ ] endpoint를 확정한다.
-  - 후보: `GET /api/v1/me/profile`
-  - 후보: `GET /api/v1/users/me/rank`
+  - 후보: `GET /api/v1/users/me/profile`
 - [ ] 최소 response shape를 확정한다.
   - `userId`
   - `nickname`
+  - `email`
+  - `avatarUrl`
+  - `createdAt`
+- [ ] 인증 실패, 사용자 없음 ErrorResponse를 정리한다.
+- [ ] RestDocs를 작성한다.
+
+Policy:
+
+- [ ] 이 API는 user/account 도메인의 source of truth다.
+- [ ] rank, LP, 승패, 최근 전적은 이 API에 섞지 않는다.
+- [ ] 닉네임/아바타 변경 같은 계정 기능이 생겨도 rank API와 독립으로 유지한다.
+
+Acceptance Criteria:
+
+- [ ] 프론트가 정적 nickname/user 표시를 대체할 수 있는 payload가 확정된다.
+- [ ] Authorization header 기반 인증 계약이 문서화된다.
+- [ ] RestDocs와 ErrorResponse가 정리된다.
+
+### 2-2. [ ] 내 랭크 조회 API 계약
+
+담당: Backend
+
+우선순위: P1
+
+목표:
+
+- [ ] 로그인한 사용자의 현재 랭크/LP/승패 상태 source of truth API를 확정한다.
+- [ ] 게임 결과 Summary와 현재 최종 랭크 상태 조회 책임을 분리한다.
+
+Backend:
+
+- [ ] endpoint를 확정한다.
+  - 후보: `GET /api/v1/users/me/rank`
+- [ ] 최소 response shape를 확정한다.
+  - `userId`
+  - `tier`
+  - `division`
   - `rank`
   - `lp`
   - `tierScore`
@@ -186,17 +222,18 @@ Backend:
 
 Policy:
 
-- [ ] 이 API는 “현재 내 계정 상태”의 source of truth다.
-- [ ] Game Result Summary API는 “방금 끝난 게임의 정산 결과”의 source of truth다.
-- [ ] 두 응답을 서로 보정하거나 대체하지 않는다.
+- [ ] 이 API는 rank/season/stat 도메인의 source of truth다.
+- [ ] Game Result Summary API는 “방금 끝난 게임의 변화량”의 source of truth다.
+- [ ] Rank API는 “현재 최종 상태”만 제공한다.
+- [ ] Profile API의 nickname/avatar 정보를 랭크 응답에 중복하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 프론트가 정적 nickname/rank/lp를 대체할 수 있는 payload가 확정된다.
+- [ ] 프론트가 정적 rank/lp/승패 요약을 대체할 수 있는 payload가 확정된다.
 - [ ] Authorization header 기반 인증 계약이 문서화된다.
 - [ ] RestDocs와 ErrorResponse가 정리된다.
 
-### 2-2. [ ] MatchPage 내 프로필 / 랭크 실데이터 구현
+### 2-3. [ ] MatchPage 내 프로필 / 랭크 실데이터 구현
 
 담당: Frontend
 
@@ -204,12 +241,13 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage의 정적 사용자/랭크 표시를 2-1 API 실데이터로 교체한다.
+- [ ] MatchPage의 정적 사용자/랭크 표시를 2-1, 2-2 API 실데이터 조합으로 교체한다.
 
 Frontend:
 
-- [ ] profile/rank service를 추가한다.
-- [ ] MatchPage mount 시 내 프로필/랭크 정보를 조회한다.
+- [ ] profile service를 추가한다.
+- [ ] rank service를 추가한다.
+- [ ] MatchPage mount 시 profile API와 rank API를 병렬 조회한다.
 - [ ] `Summoner`, `BRONZE IV`, `1,248 LP` 등 정적 표시를 제거한다.
 - [ ] loading/error/empty 상태를 추가한다.
 - [ ] 조회 실패가 매칭 시작/취소를 막지 않게 한다.
@@ -218,15 +256,18 @@ Policy:
 
 - [ ] Authorization header는 기존 `apiClient` 정책을 따른다.
 - [ ] token 만료는 issue-102 refresh/retry 정책을 따른다.
+- [ ] 프로필 조회 실패와 랭크 조회 실패는 각각 독립적으로 표시한다.
+- [ ] 프로필 API와 랭크 API 응답을 프론트에서 보정하거나 합성 저장하지 않고 화면 표시용으로만 조합한다.
 - [ ] 새 패키지는 추가하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] API 성공 시 nickname/rank/lp/전적 요약이 표시된다.
-- [ ] API 실패 시 MatchPage 진입과 매칭 버튼 동작은 유지된다.
+- [ ] profile API 성공 시 nickname/user 정보가 표시된다.
+- [ ] rank API 성공 시 rank/lp/전적 요약이 표시된다.
+- [ ] profile/rank 중 하나가 실패해도 MatchPage 진입과 매칭 버튼 동작은 유지된다.
 - [ ] Game Result Summary payload를 현재 계정 상태 표시로 재사용하지 않는다.
 
-### 2-3. [ ] 랭킹 조회 API 계약
+### 2-4. [ ] 랭킹 조회 API 계약
 
 담당: Backend
 
@@ -263,7 +304,7 @@ Acceptance Criteria:
 - [ ] MatchPage 랭킹 UI가 하드코딩 없이 그릴 수 있는 payload가 확정된다.
 - [ ] pagination/limit 정책이 문서화된다.
 
-### 2-4. [ ] MatchPage 랭킹 실데이터 구현
+### 2-5. [ ] MatchPage 랭킹 실데이터 구현
 
 담당: Frontend
 
@@ -271,7 +312,7 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage 왼쪽 랭킹 리스트와 요약 정보를 2-3 API 실데이터로 전환한다.
+- [ ] MatchPage 왼쪽 랭킹 리스트와 요약 정보를 2-4 API 실데이터로 전환한다.
 
 Frontend:
 
@@ -619,25 +660,26 @@ Policy:
 1. [x] Section 1-1. 회원가입 페이지 구현
 2. [x] Section 1-2. 로그아웃 구현
 3. [x] Section 1-3. Token Refresh 구현
-4. [ ] Section 2-1. 내 프로필 / 랭크 조회 API 계약
-5. [ ] Section 2-2. MatchPage 내 프로필 / 랭크 실데이터 구현
-6. [ ] Section 2-3. 랭킹 조회 API 계약
-7. [ ] Section 2-4. MatchPage 랭킹 실데이터 구현
-8. [ ] Section 3-1. 내 전적 목록 API 계약
-9. [ ] Section 3-2. 전적 페이지 구현
-10. [ ] Section 3-3. 프로필 상세 API 계약
-11. [ ] Section 3-4. 프로필 페이지 구현
-12. [ ] Section 4-1/4-2. 연습 모드
-13. [ ] Section 4-3/4-4. 사용자 지정 게임
-14. [ ] Section 5-1/5-2. 비밀번호 찾기
-15. [ ] Section 5-3/5-4. OAuth 로그인
+4. [ ] Section 2-1. 내 프로필 조회 API 계약
+5. [ ] Section 2-2. 내 랭크 조회 API 계약
+6. [ ] Section 2-3. MatchPage 내 프로필 / 랭크 실데이터 구현
+7. [ ] Section 2-4. 랭킹 조회 API 계약
+8. [ ] Section 2-5. MatchPage 랭킹 실데이터 구현
+9. [ ] Section 3-1. 내 전적 목록 API 계약
+10. [ ] Section 3-2. 전적 페이지 구현
+11. [ ] Section 3-3. 프로필 상세 API 계약
+12. [ ] Section 3-4. 프로필 페이지 구현
+13. [ ] Section 4-1/4-2. 연습 모드
+14. [ ] Section 4-3/4-4. 사용자 지정 게임
+15. [ ] Section 5-1/5-2. 비밀번호 찾기
+16. [ ] Section 5-3/5-4. OAuth 로그인
 
 ## 판단 기준
 
 - [x] “로그인부터 게임 결과까지”는 현재 MVP Core로 구현되어 있다.
 - [x] “회원가입부터 매칭까지”라고 말하려면 Section 1-1이 필요하다.
-- [ ] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1과 2-2가 필요하다.
-- [ ] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1부터 2-4까지 필요하다.
+- [ ] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1부터 2-3까지 필요하다.
+- [ ] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1부터 2-5까지 필요하다.
 - [ ] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1과 3-2가 필요하다.
 - [ ] “내 프로필 상세를 볼 수 있다”고 말하려면 Section 3-3과 3-4가 필요하다.
 - [ ] “현재 화면의 모든 버튼이 기능한다”고 말하려면 Section 4까지 필요하다.
