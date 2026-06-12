@@ -160,30 +160,30 @@ Authorization: Bearer {accessToken}
 
 ### 3. Test 구현
 
-- [ ] `UserController` API test는 `RestAssuredMockMvc`로 구현.
-- [ ] `UserRankService`는 core `UserReadService`, `RankReadService`를 mock 처리하는 unit test로 구현.
-- [ ] 영속성 계층 변경이 생길 경우 `@DataJpaTest` 기반 실 DB 접근 테스트로 검증.
-- [ ] RestDocs 성공 응답 구현.
-- [ ] RestDocs `USER_NOT_FOUND` 실패 응답 구현.
-- [ ] RestDocs `RANK_NOT_FOUND` 실패 응답 구현.
-- [ ] 응답에 profile field와 Game Summary 변화량 field가 포함되지 않는지 검증.
-- [ ] division이 null인 Apex rank 문자열 변환을 검증.
-- [ ] User 없음이면 `RankReadService`를 호출하지 않는지 검증.
+- [x] `UserController` API test는 `RestAssuredMockMvc`로 구현.
+- [x] `UserRankService`는 core `UserReadService`, `RankReadService`를 mock 처리하는 unit test로 구현.
+- [x] 영속성 계층 변경이 생길 경우 `@DataJpaTest` 기반 실 DB 접근 테스트로 검증.
+- [x] RestDocs 성공 응답 구현.
+- [x] RestDocs `USER_NOT_FOUND` 실패 응답 구현.
+- [x] RestDocs `RANK_NOT_FOUND` 실패 응답 구현.
+- [x] 응답에 profile field와 Game Summary 변화량 field가 포함되지 않는지 검증.
+- [x] division이 null인 Apex rank 문자열 변환을 검증.
+- [x] User 없음이면 `RankReadService`를 호출하지 않는지 검증.
 
 ### 4. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 2-2 항목과 실제 계약 정합성 확인.
-- [ ] `rankUpdatedAt`은 `UserRankInfo.updatedAt` 기반임을 `docs/last-구현.md`에 반영.
-- [ ] `wins/losses/draws`는 내부 `totalWins/totalLosses/totalDraws` 매핑임을 `docs/last-구현.md`에 반영.
-- [ ] Profile API와 Rank API, Game Summary API 책임 분리 문구를 `docs/last-구현.md`와 issue 문서에 맞춤.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
-- [ ] 구현 완료 후 사용자 허락 전까지 커밋하지 않음.
+- [x] `docs/last-구현.md` Section 2-2 항목과 실제 계약 정합성 확인.
+- [x] `rankUpdatedAt`은 `UserRankInfo.updatedAt` 기반임을 `docs/last-구현.md`에 반영.
+- [x] `wins/losses/draws`는 내부 `totalWins/totalLosses/totalDraws` 매핑임을 `docs/last-구현.md`에 반영.
+- [x] Profile API와 Rank API, Game Summary API 책임 분리 문구를 `docs/last-구현.md`와 issue 문서에 맞춤.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
+- [x] 구현 완료 후 사용자 허락 전까지 커밋하지 않음.
 
 ### 5. 검증
 
-- [ ] `./gradlew :league-of-star-api:test --tests '*UserRank*' --tests '*UserController*'` 검증.
-- [ ] `./gradlew :league-of-star-core:test --tests '*RankReadServiceTest'` 검증.
-- [ ] `./gradlew test` 검증.
+- [x] `./gradlew :league-of-star-api:test --tests '*UserRank*' --tests '*UserController*'` 검증.
+- [x] `./gradlew :league-of-star-core:test --tests '*RankReadServiceTest'` 검증.
+- [x] `./gradlew test` 검증.
 
 ## Implementation Policy
 
@@ -299,7 +299,10 @@ flowchart TD
 - 랭킹 리스트 API는 별도 이슈에서 진행함.
 - 새 패키지를 추가하지 않음.
 - 자동 커밋하지 않고 사용자 확인 후 커밋함.
-- 검증 결과는 구현 후 갱신함.
+- 검증 결과:
+  - `./gradlew :league-of-star-api:test --tests '*UserRank*' --tests '*UserController*'` 통과함.
+  - `./gradlew :league-of-star-core:test --tests '*RankReadServiceTest'` 통과함.
+  - `./gradlew test` 통과함.
 
 ## 📌 Related Issue
 
