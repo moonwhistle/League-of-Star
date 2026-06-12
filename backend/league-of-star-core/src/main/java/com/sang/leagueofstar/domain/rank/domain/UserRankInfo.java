@@ -11,6 +11,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -64,6 +66,7 @@ public class UserRankInfo extends BaseEntity {
 
     public void updateRankAndLp(Rank rank, int lp) {
         this.rank = rank;
+        this.tierScore = rank.getTierScore();
         this.lp = Math.max(lp, 0);
     }
 
@@ -77,5 +80,11 @@ public class UserRankInfo extends BaseEntity {
 
     public int getTierScore() {
         return rank.getTierScore();
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void syncTierScore() {
+        this.tierScore = rank.getTierScore();
     }
 }

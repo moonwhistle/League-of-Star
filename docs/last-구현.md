@@ -276,7 +276,7 @@ Acceptance Criteria:
 - [x] profile/rank 중 하나가 실패해도 MatchPage 진입과 매칭 버튼 동작은 유지된다.
 - [x] Game Result Summary payload를 현재 계정 상태 표시로 재사용하지 않는다.
 
-### 2-4. [ ] 랭킹 조회 API 계약
+### 2-4. [x] 랭킹 조회 API 계약
 
 담당: Backend
 
@@ -284,34 +284,59 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage 왼쪽 랭킹 리스트와 요약 정보의 source of truth API를 확정한다.
+- [x] MatchPage 왼쪽 랭킹 리스트와 요약 정보의 source of truth API를 확정한다.
 
 Backend:
 
-- [ ] endpoint를 확정한다.
-  - 후보: `GET /api/v1/rankings?limit=...`
-- [ ] response shape를 확정한다.
-  - `rankPosition`
-  - `userId`
-  - `nickname`
-  - `rank`
-  - `lp`
-  - `wins`
-  - `losses`
-  - `isCurrentUser`
-- [ ] 내 순위를 목록에 포함할지 별도 필드로 내려줄지 결정한다.
-- [ ] season best, top %, percentile 계산 책임을 백엔드/프론트 중 어디에 둘지 결정한다.
-- [ ] RestDocs와 ErrorResponse를 정리한다.
+- [x] endpoint를 `GET /api/v1/rankings?limit=...`로 확정한다.
+- [x] `limit` query parameter 정책을 확정한다.
+  - 기본값: `5`
+  - 허용 범위: `1~50`
+  - 범위 밖 요청: `400 COMMON_003 INVALID_INPUT`
+- [x] response shape를 확정한다.
+  - `summary`
+    - `myRankPosition`
+    - `topPercent`
+    - `totalRankers`
+  - `entries[]`
+    - `rankPosition`
+    - `userId`
+    - `nickname`
+    - `tier`
+    - `division`
+    - `rank`
+    - `lp`
+    - `tierScore`
+    - `wins`
+    - `losses`
+    - `draws`
+    - `isCurrentUser`
+  - `currentUser`
+    - `entries[]`와 같은 row shape
+- [x] 내 순위는 `currentUser` 별도 필드로 내려준다.
+- [x] top % 계산은 백엔드가 담당한다.
+- [x] season best는 API 계약에서 제외한다.
+- [x] RestDocs와 ErrorResponse를 정리한다.
+- [x] nickname 조회는 row별 단건 조회가 아니라 `findByIds` batch 조회로 조립한다.
+- [x] rank 정렬 기준을 백엔드 source of truth로 확정한다.
+  - `tierScore desc`
+  - `lp desc`
+  - `wins desc`
+  - `losses asc`
+  - `draws desc`
+  - `userId asc`
 
 Policy:
 
-- [ ] 랭킹 조회는 매칭 코어 상태와 독립이다.
-- [ ] 랭킹 데이터는 화면 장식이 아니라 별도 조회 도메인으로 분리한다.
+- [x] 랭킹 조회는 매칭 코어 상태와 독립이다.
+- [x] 랭킹 데이터는 화면 장식이 아니라 별도 조회 도메인으로 분리한다.
+- [x] 랭킹 API 실패는 매칭 시작/수락/게임 진입 흐름을 막지 않는다.
+- [x] API 모듈은 core repository를 직접 참조하지 않고 `RankReadService`, `UserReadService`를 조합한다.
 
 Acceptance Criteria:
 
-- [ ] MatchPage 랭킹 UI가 하드코딩 없이 그릴 수 있는 payload가 확정된다.
-- [ ] pagination/limit 정책이 문서화된다.
+- [x] MatchPage 랭킹 UI가 하드코딩 없이 그릴 수 있는 payload가 확정된다.
+- [x] pagination/limit 정책이 문서화된다.
 
 ### 2-5. [ ] MatchPage 랭킹 실데이터 구현
 
@@ -327,7 +352,8 @@ Frontend:
 
 - [ ] ranking service를 추가한다.
 - [ ] MatchPage 랭킹 리스트 하드코딩을 제거한다.
-- [ ] 내 순위, top %, season best 표시 정책을 API 계약에 맞춘다.
+- [ ] 내 순위, top % 표시 정책을 API 계약에 맞춘다.
+- [ ] season best UI를 제거한다.
 - [ ] loading/error/empty 상태를 추가한다.
 
 Policy:
@@ -337,7 +363,8 @@ Policy:
 
 Acceptance Criteria:
 
-- [ ] 랭킹 API 성공 시 실제 랭킹 목록이 표시된다.
+- [ ] 랭킹 API 성공 시 실제 랭킹 목록, 내 순위, top %가 표시된다.
+- [ ] season best 섹션이 표시되지 않는다.
 - [ ] 랭킹 API 실패 시 부가 UI error만 표시된다.
 - [ ] 매칭 시작/수락/게임 진입 흐름에 영향이 없다.
 
@@ -672,7 +699,7 @@ Policy:
 4. [x] Section 2-1. 내 프로필 조회 API 계약
 5. [x] Section 2-2. 내 랭크 조회 API 계약
 6. [x] Section 2-3. MatchPage 내 프로필 / 랭크 실데이터 구현
-7. [ ] Section 2-4. 랭킹 조회 API 계약
+7. [x] Section 2-4. 랭킹 조회 API 계약
 8. [ ] Section 2-5. MatchPage 랭킹 실데이터 구현
 9. [ ] Section 3-1. 내 전적 목록 API 계약
 10. [ ] Section 3-2. 전적 페이지 구현
