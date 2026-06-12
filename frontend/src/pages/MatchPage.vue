@@ -1055,7 +1055,14 @@ function closeErrorModal() {
   background:
     linear-gradient(90deg, rgba(4, 8, 22, 0.54), rgba(4, 8, 22, 0.08) 58%),
     linear-gradient(0deg, rgba(4, 8, 22, 0.5), rgba(4, 8, 22, 0.04) 48%),
-    var(--match-background-image) center / cover no-repeat;
+    var(--match-background-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size:
+    100% 100%,
+    100% 100%,
+    contain;
+  background-color: #030610;
 }
 
 .match-page,

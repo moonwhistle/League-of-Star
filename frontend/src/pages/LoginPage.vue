@@ -162,8 +162,12 @@ async function handleSubmit() {
     linear-gradient(90deg, rgb(4 8 22 / 0.56), rgb(4 8 22 / 0.12) 58%),
     linear-gradient(0deg, rgb(4 8 22 / 0.48), rgb(4 8 22 / 0.08) 50%), var(--login-background-image);
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size:
+    100% 100%,
+    100% 100%,
+    contain;
   background-position: center;
+  background-color: #030610;
 }
 
 .login-card {

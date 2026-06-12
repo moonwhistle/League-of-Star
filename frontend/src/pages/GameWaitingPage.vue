@@ -701,7 +701,14 @@ function getLoadingStepLabel(key = '') {
   background:
     linear-gradient(180deg, rgba(5, 10, 24, 0.42), rgba(5, 10, 24, 0.6)),
     linear-gradient(90deg, rgba(4, 9, 23, 0.52), rgba(4, 9, 23, 0.12) 50%, rgba(4, 9, 23, 0.5)),
-    var(--game-waiting-background-image) center / cover no-repeat;
+    var(--game-waiting-background-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size:
+    100% 100%,
+    100% 100%,
+    contain;
+  background-color: #030610;
 }
 
 .game-waiting-page,

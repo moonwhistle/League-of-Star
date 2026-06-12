@@ -199,14 +199,14 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 로그인한 사용자의 현재 랭크/LP/승패 상태 source of truth API를 확정한다.
-- [ ] 게임 결과 Summary와 현재 최종 랭크 상태 조회 책임을 분리한다.
+- [x] 로그인한 사용자의 현재 랭크/LP/승패 상태 source of truth API를 확정한다.
+- [x] 게임 결과 Summary와 현재 최종 랭크 상태 조회 책임을 분리한다.
 
 Backend:
 
-- [ ] endpoint를 확정한다.
-  - 후보: `GET /api/v1/users/me/rank`
-- [ ] 최소 response shape를 확정한다.
+- [x] endpoint를 확정한다.
+  - `GET /api/v1/users/me/rank`
+- [x] response shape를 확정한다.
   - `userId`
   - `tier`
   - `division`
@@ -217,21 +217,30 @@ Backend:
   - `losses`
   - `draws`
   - `rankUpdatedAt`
-- [ ] 인증 실패, 사용자 없음, rank 미배정 ErrorResponse를 정리한다.
-- [ ] RestDocs를 작성한다.
+- [x] 인증 실패, 사용자 없음, rank 미배정 ErrorResponse를 정리한다.
+- [x] RestDocs를 작성한다.
+
+Backend field mapping:
+
+- [x] `wins`, `losses`, `draws`는 내부 `UserRankInfo.totalWins`, `totalLosses`, `totalDraws`를 외부 API 표시명으로 매핑한다.
+- [x] `rankUpdatedAt`은 별도 컬럼이 아니라 `UserRankInfo.updatedAt`을 사용한다.
+- [x] `rank`는 일반 랭크에서 `GOLD_IV` 같은 `TIER_DIVISION` 문자열로 반환하고, division이 없는 Apex rank는 `MASTER`처럼 tier만 반환한다.
+- [x] `RANK_NOT_FOUND`가 발생해도 rank row를 자동 생성하지 않는다.
 
 Policy:
 
-- [ ] 이 API는 rank/season/stat 도메인의 source of truth다.
-- [ ] Game Result Summary API는 “방금 끝난 게임의 변화량”의 source of truth다.
-- [ ] Rank API는 “현재 최종 상태”만 제공한다.
-- [ ] Profile API의 nickname/avatar 정보를 랭크 응답에 중복하지 않는다.
+- [x] 이 API는 rank/season/stat 도메인의 source of truth다.
+- [x] Game Result Summary API는 “방금 끝난 게임의 변화량”의 source of truth다.
+- [x] Rank API는 “현재 최종 상태”만 제공한다.
+- [x] Profile API의 nickname/avatar 정보를 랭크 응답에 중복하지 않는다.
+- [x] API 모듈은 `UserRankInfoRepository`를 직접 참조하지 않고 core `RankReadService`를 통해 조회한다.
+- [x] 단건 조회 API라 N+1은 발생하지 않는다. 후속 랭킹 리스트 API에서는 batch read service를 사용한다.
 
 Acceptance Criteria:
 
-- [ ] 프론트가 정적 rank/lp/승패 요약을 대체할 수 있는 payload가 확정된다.
-- [ ] Authorization header 기반 인증 계약이 문서화된다.
-- [ ] RestDocs와 ErrorResponse가 정리된다.
+- [x] 프론트가 정적 rank/lp/승패 요약을 대체할 수 있는 payload가 확정된다.
+- [x] Authorization header 기반 인증 계약이 문서화된다.
+- [x] RestDocs와 ErrorResponse가 정리된다.
 
 ### 2-3. [ ] MatchPage 내 프로필 / 랭크 실데이터 구현
 

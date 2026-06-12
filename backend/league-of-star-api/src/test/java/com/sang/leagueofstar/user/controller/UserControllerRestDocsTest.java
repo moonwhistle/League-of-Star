@@ -3,10 +3,14 @@ package com.sang.leagueofstar.user.controller;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.common.path.user.UserPath;
+import com.sang.leagueofstar.domain.rank.domain.vo.Division;
+import com.sang.leagueofstar.domain.rank.domain.vo.Tier;
 import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.global.restdocs.RestDocsSupport;
 import com.sang.leagueofstar.user.controller.response.UserProfileResponse;
+import com.sang.leagueofstar.user.controller.response.UserRankResponse;
 import com.sang.leagueofstar.user.service.UserProfileService;
+import com.sang.leagueofstar.user.service.UserRankService;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,12 +34,14 @@ class UserControllerRestDocsTest extends RestDocsSupport {
 
     private static final Long USER_ID = 1L;
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 6, 12, 10, 0);
+    private static final LocalDateTime RANK_UPDATED_AT = LocalDateTime.of(2026, 6, 12, 11, 0);
 
     private final UserProfileService userProfileService = mock(UserProfileService.class);
+    private final UserRankService userRankService = mock(UserRankService.class);
 
     @Override
     protected Object initController() {
-        return new UserController(userProfileService);
+        return new UserController(userProfileService, userRankService);
     }
 
     @Override
@@ -130,6 +136,137 @@ class UserControllerRestDocsTest extends RestDocsSupport {
                                         fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
                                         fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
                                         fieldWithPath("errors").type(JsonFieldType.NULL).description("필드 검증 에러 목록. 유저 없음 응답에서는 null")
+                                )
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("내 랭크 조회 API 문서화")
+    void getMyRank() {
+        // given
+        when(userRankService.getMyRank(USER_ID))
+                .thenReturn(new UserRankResponse(
+                        USER_ID,
+                        Tier.GOLD,
+                        Division.IV,
+                        "GOLD_IV",
+                        40,
+                        13,
+                        12,
+                        8,
+                        1,
+                        RANK_UPDATED_AT
+                ));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .get(UserPath.USER_BASE + UserPath.ME_RANK)
+                .then()
+                .statusCode(200)
+                .apply(document("user-rank",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("내 랭크 조회")
+                                .description("""
+                                        로그인한 사용자의 현재 최종 랭크 정보를 조회합니다.
+                                        
+                                        이 API는 rank/stat 도메인의 현재 상태만 반환합니다.
+                                        profile 정보와 Game Summary 변화량은 포함하지 않습니다.
+                                        """)
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .responseFields(
+                                        fieldWithPath("userId").type(JsonFieldType.NUMBER).description("사용자 ID"),
+                                        fieldWithPath("tier").type(JsonFieldType.STRING).description("현재 tier enum 문자열"),
+                                        fieldWithPath("division").type(JsonFieldType.VARIES).description("현재 division enum 문자열. Apex rank는 null 가능"),
+                                        fieldWithPath("rank").type(JsonFieldType.STRING).description("표시용 rank 문자열. 일반 rank는 TIER_DIVISION, Apex rank는 TIER"),
+                                        fieldWithPath("lp").type(JsonFieldType.NUMBER).description("현재 최종 LP"),
+                                        fieldWithPath("tierScore").type(JsonFieldType.NUMBER).description("현재 rank의 tier score"),
+                                        fieldWithPath("wins").type(JsonFieldType.NUMBER).description("누적 승리 수"),
+                                        fieldWithPath("losses").type(JsonFieldType.NUMBER).description("누적 패배 수"),
+                                        fieldWithPath("draws").type(JsonFieldType.NUMBER).description("누적 무승부 수"),
+                                        fieldWithPath("rankUpdatedAt").type(JsonFieldType.STRING).description("랭크 정보 최종 갱신 시각")
+                                )
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("내 랭크 조회 USER_NOT_FOUND 응답 문서화")
+    void getMyRankUserNotFound() {
+        // given
+        when(userRankService.getMyRank(USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.USER_NOT_FOUND));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .get(UserPath.USER_BASE + UserPath.ME_RANK)
+                .then()
+                .statusCode(404)
+                .apply(document("user-rank-user-not-found",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("내 랭크 조회 실패 - 유저 없음")
+                                .description("""
+                                        인증된 userId에 해당하는 User가 없으면 전역 `ErrorResponse` 형식으로 `USER_001`을 반환합니다.
+                                        
+                                        user 없음 판단은 API 모듈이 아니라 core `UserReadService.findById`가 담당합니다.
+                                        """)
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .responseFields(
+                                        fieldWithPath("timestamp").type(JsonFieldType.ARRAY).description("에러 발생 시각"),
+                                        fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
+                                        fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
+                                        fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
+                                        fieldWithPath("errors").type(JsonFieldType.NULL).description("필드 검증 에러 목록. 유저 없음 응답에서는 null")
+                                )
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("내 랭크 조회 RANK_NOT_FOUND 응답 문서화")
+    void getMyRankRankNotFound() {
+        // given
+        when(userRankService.getMyRank(USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.RANK_NOT_FOUND));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .get(UserPath.USER_BASE + UserPath.ME_RANK)
+                .then()
+                .statusCode(404)
+                .apply(document("user-rank-not-found",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("User")
+                                .summary("내 랭크 조회 실패 - 랭크 없음")
+                                .description("""
+                                        인증된 userId에 해당하는 rank row가 없으면 전역 `ErrorResponse` 형식으로 `RANK_001`을 반환합니다.
+                                        
+                                        rank 없음 판단은 API 모듈이 아니라 core `RankReadService.getUserRankInfo`가 담당합니다.
+                                        """)
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .responseFields(
+                                        fieldWithPath("timestamp").type(JsonFieldType.ARRAY).description("에러 발생 시각"),
+                                        fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
+                                        fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
+                                        fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
+                                        fieldWithPath("errors").type(JsonFieldType.NULL).description("필드 검증 에러 목록. 랭크 없음 응답에서는 null")
                                 )
                                 .build()
                         )

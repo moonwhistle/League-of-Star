@@ -151,8 +151,12 @@ async function handleSubmit() {
     linear-gradient(90deg, rgb(4 8 22 / 0.58), rgb(4 8 22 / 0.14) 58%),
     linear-gradient(0deg, rgb(4 8 22 / 0.5), rgb(4 8 22 / 0.1) 50%), var(--signup-background-image);
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size:
+    100% 100%,
+    100% 100%,
+    contain;
   background-position: center;
+  background-color: #030610;
 }
 
 .signup-card {
