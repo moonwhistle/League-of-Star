@@ -33,7 +33,7 @@ flowchart TD
 - 현재 구조의 N+1 위험은 JPA lazy loading이 아니라 row별 nickname 조회 반복에서 발생한다.
 - N+1 해결 방식은 학습/검증 과정을 문서화하고, 기본 구현은 rank page 조회 + users IN batch 조회로 진행한다.
 - 새 패키지를 추가하지 않는다.
-- 이번 작업은 자동 커밋하지 않고 사용자 확인 후 커밋한다.
+- 이번 작업은 사용자 요청 전까지 자동 커밋하지 않는다.
 
 ## Backend Contract
 
@@ -274,11 +274,11 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 2-4 정책 반영.
-- [ ] `docs/last-구현.md` Section 2-5에서 시즌 최고 UI 제거 필요성 반영.
-- [ ] issue-110 task 완료 상태 반영.
-- [ ] PR 섹션을 계약/정책/N+1 중심으로 보강.
-- [ ] 구현 완료 후 사용자 허락 전까지 커밋하지 않음.
+- [x] `docs/last-구현.md` Section 2-4 정책 반영.
+- [x] `docs/last-구현.md` Section 2-5에서 시즌 최고 UI 제거 필요성 반영.
+- [x] issue-110 task 완료 상태 반영.
+- [x] PR 섹션을 계약/정책/N+1 중심으로 보강.
+- [x] 구현 완료 후 사용자 허락 전까지 커밋하지 않음.
 
 ### 7. 검증
 
@@ -303,7 +303,7 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 - `default_batch_fetch_size`는 이미 100으로 설정되어 있으나, 이번 nickname 조회의 직접 해결책으로 취급하지 않는다.
 - rank row가 없을 때 자동 생성하지 않는다.
 - 새 패키지를 추가하지 않는다.
-- 이번 작업은 자동 커밋하지 않고 사용자 허락 후 커밋한다.
+- 이번 작업은 사용자 요청 전까지 자동 커밋하지 않는다.
 
 ## N+1 Study Guide
 
@@ -503,7 +503,7 @@ rank row별 nickname 조회를 반복할 때 생기는 애플리케이션 레벨
 - 프론트 연결은 후속 `2-5 MatchPage 랭킹 실데이터 구현`에서 진행한다.
 - 시즌 최고 UI 제거도 후속 프론트 이슈에서 진행한다.
 - 새 패키지를 추가하지 않는다.
-- 자동 커밋하지 않는다.
+- 사용자 요청 전까지 자동 커밋하지 않는다.
 
 -----
 
@@ -531,7 +531,7 @@ flowchart TD
 - 랭킹 row마다 user를 단건 조회하지 않는다.
 - 현재 구조의 N+1은 JPA lazy loading이 아니라 row별 nickname 조회 반복에서 발생한다.
 - 기본 구현은 rank page 조회 후 users IN batch 조회로 조립한다.
-- 자동 커밋하지 않고 사용자 확인 후 커밋한다.
+- 사용자 요청 전에는 자동 커밋하지 않는다.
 
 백엔드와의 구현 계약:
 
@@ -564,7 +564,8 @@ flowchart TD
 - 프론트 연결은 후속 `2-5 MatchPage 랭킹 실데이터 구현`에서 진행함.
 - 시즌 최고 UI 제거도 후속 프론트 이슈에서 진행함.
 - 새 패키지를 추가하지 않음.
-- 자동 커밋하지 않음.
+- 사용자 요청 전에는 자동 커밋하지 않음.
+- 구현 커밋은 사용자 요청 후 진행함.
 - N+1 해결 방법 정리:
   ```mermaid
   flowchart TD
