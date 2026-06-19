@@ -33,7 +33,12 @@
         {{ nextLocaleLabel }}
       </button>
       <nav class="match-actions" aria-label="Account actions">
-        <button class="icon-button" type="button" :aria-label="t('match.records')">
+        <button
+          class="icon-button"
+          type="button"
+          :aria-label="t('match.records')"
+          @click="navigateToRecords"
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 5h14" />
             <path d="M5 12h14" />
@@ -735,6 +740,10 @@ async function finalizeLogout() {
   }
 }
 
+function navigateToRecords() {
+  void router.push({ name: ROUTE_NAMES.records })
+}
+
 function startMatchmaking() {
   if (queueStatus.value !== 'ready') {
     return
@@ -1399,6 +1408,57 @@ function closeErrorModal() {
   border-radius: 6px;
 }
 
+.locale-toggle,
+.icon-button,
+.primary-match-button,
+.secondary-actions button,
+.match-found-actions button,
+.match-logout-actions button,
+.match-error-dialog button {
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    opacity 140ms ease;
+}
+
+.locale-toggle:hover:not(:disabled),
+.icon-button:hover:not(:disabled),
+.secondary-actions button:hover:not(:disabled),
+.match-logout-actions button:hover:not(:disabled),
+.match-error-dialog button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(99, 242, 232, 0.58);
+  background: rgba(19, 39, 66, 0.88);
+  box-shadow:
+    0 0 0 3px rgba(99, 242, 232, 0.1),
+    0 12px 30px rgba(0, 0, 0, 0.28);
+}
+
+.locale-toggle:focus-visible,
+.icon-button:focus-visible,
+.primary-match-button:focus-visible,
+.secondary-actions button:focus-visible,
+.match-found-actions button:focus-visible,
+.match-logout-actions button:focus-visible,
+.match-error-dialog button:focus-visible {
+  outline: 3px solid rgba(255, 216, 111, 0.74);
+  outline-offset: 3px;
+}
+
+.locale-toggle:active:not(:disabled),
+.icon-button:active:not(:disabled),
+.primary-match-button:active:not(:disabled),
+.secondary-actions button:active:not(:disabled),
+.match-found-actions button:active:not(:disabled),
+.match-logout-actions button:active:not(:disabled),
+.match-error-dialog button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 0 0 2px rgba(99, 242, 232, 0.1);
+}
+
 .icon-button svg {
   width: 20px;
   height: 20px;
@@ -1639,8 +1699,12 @@ function closeErrorModal() {
 }
 
 .primary-match-button:hover:not(:disabled) {
+  transform: translateY(-1px);
   background: #1b3854;
   border-color: rgba(99, 242, 232, 0.72);
+  box-shadow:
+    0 0 0 3px rgba(99, 242, 232, 0.12),
+    0 14px 32px rgba(0, 0, 0, 0.34);
 }
 
 .primary-match-button.is-waiting {
@@ -1868,6 +1932,13 @@ function closeErrorModal() {
   opacity: 0.58;
 }
 
+.match-found-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 3px rgba(99, 242, 232, 0.12),
+    0 14px 34px rgba(0, 0, 0, 0.34);
+}
+
 .match-found-actions button.is-pending,
 .match-found-actions button.is-submitted {
   opacity: 0.82;
@@ -1880,10 +1951,25 @@ function closeErrorModal() {
   box-shadow: 0 0 22px rgba(99, 242, 232, 0.22);
 }
 
+.match-found-accept:hover:not(:disabled),
+.match-logout-confirm:hover:not(:disabled),
+.match-error-dialog button:hover:not(:disabled) {
+  color: #04101c;
+  background: #b7fff7;
+  border-color: rgba(209, 255, 251, 0.92);
+}
+
 .match-found-decline {
   color: rgba(240, 249, 255, 0.82);
   background: rgba(4, 9, 22, 0.74);
   border: 1px solid rgba(206, 224, 255, 0.22);
+}
+
+.match-found-decline:hover:not(:disabled),
+.match-logout-cancel:hover:not(:disabled) {
+  color: #f7fbff;
+  background: rgba(31, 45, 74, 0.92);
+  border-color: rgba(206, 224, 255, 0.34);
 }
 
 .match-found-accept.is-submitted {

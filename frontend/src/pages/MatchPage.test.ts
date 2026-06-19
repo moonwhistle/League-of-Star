@@ -245,6 +245,15 @@ describe('MatchPage', () => {
     expect(wrapper.get('main').attributes('data-ranking-status')).toBe('success')
   })
 
+  it('moves to the records route from the records action', async () => {
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    await wrapper.get('[aria-label="전적 보기"]').trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.records })
+  })
+
   it('keeps matchmaking available when the profile request fails', async () => {
     getMyProfileMock.mockRejectedValueOnce(new Error('profile failed'))
     const wrapper = mount(MatchPage)

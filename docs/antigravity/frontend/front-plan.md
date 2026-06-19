@@ -443,6 +443,7 @@ Accept: text/event-stream
 - [x] 게임 결과 Summary 화면 구현.
 - [x] Token Refresh 구현.
 - [x] MatchPage 내 프로필 / 랭크 실데이터 구현.
+- [x] 전적 페이지 구현.
 - [x] 공통 UI, 테스트, 문서 정합성 정리.
 
 ## Assumptions
