@@ -170,15 +170,15 @@ interface GameRecordEntryResponse {
 
 ### 2. Game Records Service / Route 구현
 
-- [ ] `getMyGameRecords(page, signal?)` service 추가.
-- [ ] `requestJson` 기반으로 `GET /api/v1/users/me/game-records?page=${page}` 호출.
-- [ ] Authorization header와 token refresh는 `apiClient` 정책에 위임.
-- [ ] AbortSignal 전달 지원.
-- [ ] `/records` route path 추가.
-- [ ] `records` route name 추가.
-- [ ] `records` route에 `requiresAuth: true` 적용.
-- [ ] MatchPage 전적 아이콘 클릭 시 records route로 이동.
-- [ ] 새 패키지를 추가하지 않음.
+- [x] `getMyGameRecords(page, signal?)` service 추가.
+- [x] `requestJson` 기반으로 `GET /api/v1/users/me/game-records?page=${page}` 호출.
+- [x] Authorization header와 token refresh는 `apiClient` 정책에 위임.
+- [x] AbortSignal 전달 지원.
+- [x] `/records` route path 추가.
+- [x] `records` route name 추가.
+- [x] `records` route에 `requiresAuth: true` 적용.
+- [x] MatchPage 전적 아이콘 클릭 시 records route로 이동.
+- [x] 새 패키지를 추가하지 않음.
 
 ### 3. GameRecordsPage 구현
 
