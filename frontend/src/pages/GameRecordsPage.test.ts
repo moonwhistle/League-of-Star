@@ -109,6 +109,8 @@ describe('GameRecordsPage', () => {
     expect(text).toContain('승리')
     expect(text).toContain('패배')
     expect(text).toContain('GOLD_IV -> GOLD_III')
+    expect(text).toContain('현재 티어 / LP')
+    expect(text).toContain('GOLD_III · 105 LP')
     expect(text).toContain('SILVER_I')
     expect(text).not.toContain('SILVER_I -> SILVER_I')
     expect(text).toContain('80 -> 105')

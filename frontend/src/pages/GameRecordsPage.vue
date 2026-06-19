@@ -42,9 +42,15 @@
       </section>
 
       <section v-else class="records-content" :aria-label="t('records.sectionLabel')">
-        <div class="records-summary">
-          <span>{{ t('records.summaryLabel') }}</span>
-          <strong>{{ formatRecordCount(recordsResponse?.totalElements ?? 0) }}</strong>
+        <div class="records-overview">
+          <div class="records-summary">
+            <span>{{ t('records.summaryLabel') }}</span>
+            <strong>{{ formatRecordCount(recordsResponse?.totalElements ?? 0) }}</strong>
+          </div>
+          <div class="records-current-rank">
+            <span>{{ t('records.currentRank') }}</span>
+            <strong>{{ currentRankLabel }}</strong>
+          </div>
         </div>
 
         <ol class="records-list">
@@ -144,6 +150,14 @@ const canGoNext = computed(
     Boolean(recordsResponse.value?.hasNext) &&
     currentPage.value < MAX_PAGE,
 )
+const latestRecord = computed(() => recordsResponse.value?.records[0])
+const currentRankLabel = computed(() => {
+  const record = latestRecord.value
+
+  return record === undefined
+    ? t('records.currentRankUnavailable')
+    : `${record.rankAfter} · ${record.lpAfter} LP`
+})
 
 onMounted(() => {
   void fetchRecords(FIRST_PAGE)
@@ -416,16 +430,36 @@ function returnToMatch() {
   color: #ffb8bf;
 }
 
-.records-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.records-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr);
   gap: 12px;
-  color: rgba(248, 251, 255, 0.72);
 }
 
-.records-summary strong {
+.records-summary,
+.records-current-rank {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(142, 238, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(3, 6, 16, 0.36);
+}
+
+.records-summary span,
+.records-current-rank span {
+  color: rgba(248, 251, 255, 0.72);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.records-summary strong,
+.records-current-rank strong {
+  overflow: hidden;
   color: #f8fbff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .records-list {
@@ -448,20 +482,15 @@ function returnToMatch() {
   border: 1px solid rgba(142, 238, 255, 0.16);
   border-left: 4px solid #8eeeff;
   border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgba(142, 238, 255, 0.12), transparent 34%), rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .record-card[data-record-result='LOSS'] {
   border-left-color: #ff8f9d;
-  background:
-    linear-gradient(90deg, rgba(255, 143, 157, 0.13), transparent 34%), rgba(255, 255, 255, 0.055);
 }
 
 .record-card[data-record-result='DRAW'] {
   border-left-color: #d7deea;
-  background:
-    linear-gradient(90deg, rgba(215, 222, 234, 0.1), transparent 34%), rgba(255, 255, 255, 0.055);
 }
 
 .record-result {
@@ -588,6 +617,10 @@ function returnToMatch() {
   .records-state,
   .records-content {
     padding: 16px;
+  }
+
+  .records-overview {
+    grid-template-columns: 1fr;
   }
 
   .record-card {
