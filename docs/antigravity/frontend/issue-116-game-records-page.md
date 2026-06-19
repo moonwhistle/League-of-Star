@@ -322,6 +322,8 @@ flowchart TD
 
 - 전적 페이지의 source를 백엔드 전적 목록 API로 고정함.
   전적 목록은 누적 계정 기록이므로 방금 끝난 게임의 Summary payload나 WebSocket payload를 재사용하지 않는다. 이렇게 분리해야 결과 화면과 전적 목록 화면의 책임이 섞이지 않는다.
+- API 연동 책임을 얇은 service로 제한함.
+  `getMyGameRecords(page, signal?)`는 `GET /api/v1/users/me/game-records?page={page}`만 호출하고, 인증 header와 401 refresh/retry는 기존 `apiClient` 정책에 위임한다. `size` query는 보내지 않아 서버 고정 10개 계약을 깨지 않게 했다.
 - pagination 책임을 백엔드 metadata에 맞춤.
   최근 30경기 cap, page 수, 다음 page 여부는 서버가 확정한 응답을 기준으로 표시한다. 프론트는 표시 상태만 관리하고 total page를 임의로 재계산하지 않는다.
 - MatchPage의 기존 전적 아이콘을 route 진입점으로 사용함.
@@ -364,6 +366,8 @@ flowchart TD
   - `3d605e1 feat: 전적 페이지 버튼 hover 상태 구현`
   - `ea145ff feat: 매칭 페이지 버튼 hover 상태 구현`
   - `b625f14 feat: 전적 페이지 현재 랭크 표시 정리`
+  - `4a320ad docs: 전적 페이지 문서 정합성 반영`
+  - `1e4b56c docs: 전적 페이지 검증 결과 반영`
 
 ## 📌 Related Issue
 
