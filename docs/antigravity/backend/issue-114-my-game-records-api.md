@@ -231,11 +231,11 @@ interface GameRecordEntryResponse {
 
 ### 5. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 3-1 endpoint 후보를 확정 계약으로 변경.
-- [ ] `docs/last-구현.md` Section 3-1 query 정책을 page 1~3, size 10 고정으로 변경.
-- [ ] `docs/last-구현.md` Section 3-1 response shape에서 `reason` 제외를 반영.
-- [ ] Game Result Summary와 전적 목록 API 책임 분리 문구를 맞춤.
-- [ ] PR 섹션을 백엔드 계약/core-api 책임 분리/N+1 방지 정책 중심으로 보강.
+- [x] `docs/last-구현.md` Section 3-1 endpoint 후보를 확정 계약으로 변경.
+- [x] `docs/last-구현.md` Section 3-1 query 정책을 page 1~3, size 10 고정으로 변경.
+- [x] `docs/last-구현.md` Section 3-1 response shape에서 `reason` 제외를 반영.
+- [x] Game Result Summary와 전적 목록 API 책임 분리 문구를 맞춤.
+- [x] PR 섹션을 백엔드 계약/core-api 책임 분리/N+1 방지 정책 중심으로 보강.
 
 ### 6. 검증
 
@@ -319,6 +319,7 @@ flowchart TD
 - endpoint는 `GET /api/v1/users/me/game-records?page=1`임.
 - `page`는 1-based이며 `1~3`만 허용함.
 - `size`는 서버 고정 10으로 처리함.
+- `page` 검증은 controller 수동 if가 아니라 `@Valid @ModelAttribute` request DTO로 처리함.
 - response는 `page`, `size`, `totalPages`, `totalElements`, `hasNext`, `records` 구조임.
 - `playedAt`은 `GameRecord.createdAt`을 source로 사용함.
 - `reason`은 현재 전적 목록 계약에서 제외함.
@@ -329,6 +330,8 @@ flowchart TD
   core는 전적 도메인과 영속성 조회 책임만 갖고, HTTP response shape나 opponent nickname 조립을 알지 않게 유지함.
 - API service에서 전적 목록 response를 조립함.
   API 모듈은 외부 계약을 만드는 계층이므로 core read service 결과와 user read service 결과를 조합해 응답 DTO를 만든다.
+- query 검증을 request DTO로 분리함.
+  `page` 범위 검증을 controller 수동 분기에서 처리하지 않고 `UserGameRecordPageRequest`에 둬 HTTP request 검증 책임을 명확히 함.
 - opponent nickname 조회를 core batch 방식으로 처리함.
   전적 row마다 단건 user 조회를 반복하면 애플리케이션 레벨 N+1이 발생하므로 opponentId를 모아 `findAllByIdsOrThrow`로 한 번에 가져온다. opponent 누락 판단과 core 예외 생성은 API가 아니라 core read service가 담당한다.
 - `reason`을 제외함.
@@ -341,8 +344,16 @@ flowchart TD
 - Game Result Summary API는 변경하지 않음.
 - DB schema 변경 없음.
 - 새 패키지 추가 없음.
-- 자동 커밋하지 않음.
-- 검증 결과는 구현 후 갱신함.
+- 작업 단위 커밋은 사용자 요청 시 수행함.
+- 검증 결과:
+  - `./gradlew :league-of-star-core:test --tests '*GameRecordRepositoryTest' --tests '*GameRecordReadServiceTest'` 통과함.
+  - `./gradlew :league-of-star-api:test --tests '*UserControllerTest' --tests '*UserControllerRestDocsTest' --tests '*UserGameRecordServiceTest'` 통과함.
+  - `git diff --check` 통과함.
+- 구현 커밋:
+  - `86313b4 docs: 내 전적 목록 API 이슈 작성`
+  - `9bfb2ce feat: 내 전적 core 조회 구현`
+  - `eb3319e feat: 내 전적 API 구현`
+  - `828de72 feat: 내 전적 API 테스트 구현`
 
 ## 📌 Related Issue
 
