@@ -177,18 +177,18 @@ interface RankingEntryResponse {
 
 ### 3. MatchPage 랭킹 실데이터 연결
 
-- [ ] `rankingStatus` 상태 추가.
-- [ ] `ranking` response state 추가.
-- [ ] `rankingErrorMessage` 추가.
-- [ ] `rankingAbortController` 추가.
-- [ ] MatchPage mount 시 ranking API 조회.
-- [ ] MatchPage unmount 시 ranking request abort.
-- [ ] ranking success 시 summary/list 표시.
-- [ ] ranking loading 시 ranking 영역 loading 표시.
-- [ ] ranking error 시 ranking 영역 fallback 표시.
-- [ ] ranking empty 시 empty 표시.
-- [ ] ranking 실패 시 매칭 버튼 enabled 정책 유지.
-- [ ] queue/SSE/match response 상태와 ranking 상태를 섞지 않음.
+- [x] `rankingStatus` 상태 추가.
+- [x] `ranking` response state 추가.
+- [x] `rankingErrorMessage` 추가.
+- [x] `rankingAbortController` 추가.
+- [x] MatchPage mount 시 ranking API 조회.
+- [x] MatchPage unmount 시 ranking request abort.
+- [x] ranking success 시 summary/list 표시.
+- [x] ranking loading 시 ranking 영역 loading 표시.
+- [x] ranking error 시 ranking 영역 fallback 표시.
+- [x] ranking empty 시 empty 표시.
+- [x] ranking 실패 시 매칭 버튼 enabled 정책 유지.
+- [x] queue/SSE/match response 상태와 ranking 상태를 섞지 않음.
 
 ### 4. Ranking UI / Locale 구현
 
