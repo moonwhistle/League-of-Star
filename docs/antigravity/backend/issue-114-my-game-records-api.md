@@ -195,11 +195,11 @@ interface GameRecordEntryResponse {
 
 ### 2. Core GameRecord Read 구현
 
-- [ ] `GameRecordRepository`에 userId 기준 최신순 page 조회 메서드 추가.
-- [ ] `GameRecordRepository`에 userId 기준 count 메서드 추가.
-- [ ] `GameRecordReadService`에 최근 전적 page 조회 메서드 추가.
-- [ ] `GameRecordReadService`에 userId 기준 count 메서드 추가.
-- [ ] core는 nickname, HTTP response, pagination 표시 DTO를 알지 않게 유지.
+- [x] `GameRecordRepository`에 userId 기준 최신순 page 조회 메서드 추가.
+- [x] `GameRecordRepository`에 userId 기준 count 메서드 추가.
+- [x] `GameRecordReadService`에 최근 전적 page 조회 메서드 추가.
+- [x] `GameRecordReadService`에 userId 기준 count 메서드 추가.
+- [x] core는 nickname, HTTP response, pagination 표시 DTO를 알지 않게 유지.
 
 ### 3. User Game Record API 구현
 
