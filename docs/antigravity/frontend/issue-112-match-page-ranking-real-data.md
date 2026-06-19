@@ -226,14 +226,14 @@ interface RankingEntryResponse {
 
 ### 7. 검증
 
-- [ ] `npm run test -- rankingService` 검증.
-- [ ] `npm run test -- MatchPage` 검증.
-- [ ] `npm run test -- MatchPage rankingService` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
+- [x] `npm run test -- rankingService` 검증.
+- [x] `npm run test -- MatchPage` 검증.
+- [x] `npm run test -- MatchPage rankingService` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
 
 ## Implementation Policy
 
