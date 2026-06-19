@@ -239,11 +239,11 @@ interface GameRecordEntryResponse {
 
 ### 6. 검증
 
-- [ ] `./gradlew :league-of-star-core:test --tests '*GameRecordRepositoryTest'` 검증.
-- [ ] `./gradlew :league-of-star-core:test --tests '*GameRecordReadServiceTest'` 검증.
-- [ ] `./gradlew :league-of-star-api:test --tests '*UserController*' --tests '*UserGameRecord*'` 검증.
-- [ ] `./gradlew test` 검증.
-- [ ] `git diff --check` 검증.
+- [x] `./gradlew :league-of-star-core:test --tests '*GameRecordRepositoryTest'` 검증.
+- [x] `./gradlew :league-of-star-core:test --tests '*GameRecordReadServiceTest'` 검증.
+- [x] `./gradlew :league-of-star-api:test --tests '*UserController*' --tests '*UserGameRecord*'` 검증.
+- [x] `./gradlew test` 검증.
+- [x] `git diff --check` 검증.
 
 ## Implementation Policy
 
@@ -330,6 +330,8 @@ flowchart TD
   core는 전적 도메인과 영속성 조회 책임만 갖고, HTTP response shape나 opponent nickname 조립을 알지 않게 유지함.
 - API service에서 전적 목록 response를 조립함.
   API 모듈은 외부 계약을 만드는 계층이므로 core read service 결과와 user read service 결과를 조합해 응답 DTO를 만든다.
+- rank 표시 문자열을 core `Rank.name()`으로 응집화함.
+  `GOLD_IV`, `MASTER` 같은 rank code 표현은 여러 API 응답에서 공통으로 쓰이는 rank value object의 표현 규칙이므로 service별 private method로 중복하지 않게 함.
 - query 검증을 request DTO로 분리함.
   `page` 범위 검증을 controller 수동 분기에서 처리하지 않고 `UserGameRecordPageRequest`에 둬 HTTP request 검증 책임을 명확히 함.
 - opponent nickname 조회를 core batch 방식으로 처리함.
@@ -348,12 +350,14 @@ flowchart TD
 - 검증 결과:
   - `./gradlew :league-of-star-core:test --tests '*GameRecordRepositoryTest' --tests '*GameRecordReadServiceTest'` 통과함.
   - `./gradlew :league-of-star-api:test --tests '*UserControllerTest' --tests '*UserControllerRestDocsTest' --tests '*UserGameRecordServiceTest'` 통과함.
+  - `./gradlew test` 통과함.
   - `git diff --check` 통과함.
 - 구현 커밋:
   - `86313b4 docs: 내 전적 목록 API 이슈 작성`
   - `9bfb2ce feat: 내 전적 core 조회 구현`
   - `eb3319e feat: 내 전적 API 구현`
   - `828de72 feat: 내 전적 API 테스트 구현`
+  - `1baa987 docs: 내 전적 API 문서 정합성 반영`
 
 ## 📌 Related Issue
 
