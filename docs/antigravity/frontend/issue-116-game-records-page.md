@@ -229,11 +229,11 @@ interface GameRecordEntryResponse {
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 3-2 완료 상태 반영.
-- [ ] `docs/last-구현.md`에 전적 페이지 source of truth를 전적 목록 API로 명시.
-- [ ] `front-plan.md` 관련 항목과 정합성 확인.
-- [ ] issue-116 task 완료 상태 반영.
-- [ ] PR 섹션을 백엔드 계약/프론트 정책/검증 결과 중심으로 보강.
+- [x] `docs/last-구현.md` Section 3-2 완료 상태 반영.
+- [x] `docs/last-구현.md`에 전적 페이지 source of truth를 전적 목록 API로 명시.
+- [x] `front-plan.md` 관련 항목과 정합성 확인.
+- [x] issue-116 task 완료 상태 반영.
+- [x] PR 섹션을 백엔드 계약/프론트 정책/검증 결과 중심으로 보강.
 
 ### 7. 검증
 
@@ -328,6 +328,12 @@ flowchart TD
   이미 상단 account action 영역에 전적 버튼이 있으므로 새 CTA를 늘리지 않고 기존 UI 의미를 실제 기능과 연결한다.
 - rank/LP 변화 표시는 목록 화면에 필요한 최소 정보만 사용함.
   `reason`, game room 정보, 상세 result는 이번 목록 화면 책임 밖이므로 후속 상세 페이지로 분리한다.
+- 전적 row를 가로 바 대진 형태로 구성함.
+  한 경기 단위가 빠르게 스캔되도록 `결과 | 나 VS 상대 | 랭크/LP 변화` 흐름으로 배치했다. 결과별 과한 그라데이션은 제거하고 좌측 accent와 결과 배지로만 승/패/무를 구분한다.
+- 현재 티어/LP 표시를 전적 목록 응답 안에서 해결함.
+  전적 API는 최신순 정렬 계약을 가지므로 첫 번째 record의 `rankAfter`, `lpAfter`를 현재 표시값으로 사용한다. 이 화면에서 별도 rank API를 추가 호출하지 않아 전적 페이지의 source를 단순하게 유지한다.
+- 버튼 hover/focus/active 상태를 보강함.
+  전적 페이지와 MatchPage의 주요 버튼은 마우스 hover, 키보드 focus, active 상태에서 눌릴 수 있는 요소임이 드러나게 했다. disabled 상태는 hover 반응을 막아 현재 사용할 수 없다는 의미를 유지한다.
 
 ## 📝 Note
 
@@ -345,6 +351,17 @@ flowchart TD
   - `npm run test` 통과함.
   - `npm run build` 통과함.
   - desktop/mobile overflow 확인함.
+- 구현 커밋:
+  - `25882f9 docs: 전적 페이지 이슈 문서 작성`
+  - `f9e58f7 feat: 전적 목록 프론트 계약 정리`
+  - `5d30685 feat: 전적 조회 서비스와 라우트 구현`
+  - `f05a8b1 feat: 전적 페이지 화면 구현`
+  - `768dfef feat: 전적 페이지 바형 UI와 locale 구현`
+  - `796dda6 test: 전적 페이지 테스트 구현`
+  - `cb5b6b0 feat: 전적 페이지 헤더 로고 정리`
+  - `3d605e1 feat: 전적 페이지 버튼 hover 상태 구현`
+  - `ea145ff feat: 매칭 페이지 버튼 hover 상태 구현`
+  - `b625f14 feat: 전적 페이지 현재 랭크 표시 정리`
 
 ## 📌 Related Issue
 

@@ -423,7 +423,7 @@ Acceptance Criteria:
 - [x] 프론트가 최근 경기 목록과 pagination UI를 구현할 수 있는 payload가 확정된다.
 - [x] pagination 정책이 문서화된다.
 
-### 3-2. [ ] 전적 페이지 구현
+### 3-2. [x] 전적 페이지 구현
 
 담당: Frontend
 
@@ -431,29 +431,36 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage의 기록 버튼을 실제 전적 조회 화면으로 연결한다.
+- [x] MatchPage의 기록 버튼을 실제 전적 조회 화면으로 연결한다.
 
 Frontend:
 
-- [ ] `/records` route를 추가한다.
-- [ ] `RecordsPage`를 구현한다.
-- [ ] MatchPage 기록 버튼을 `/records`로 연결한다.
-- [ ] record service를 추가한다.
-- [ ] pagination 또는 더보기 UI를 구현한다.
-- [ ] loading/error/empty 상태를 구현한다.
+- [x] `/records` route를 추가한다.
+- [x] `GameRecordsPage`를 구현한다.
+- [x] MatchPage 기록 버튼을 `/records`로 연결한다.
+- [x] record service를 추가한다.
+- [x] 백엔드 `totalPages`, `hasNext`, `page` metadata 기반 pagination UI를 구현한다.
+- [x] loading/error/empty 상태를 구현한다.
+- [x] 한 경기당 가로 바 형태로 `나 VS 상대` 전적 row를 표시한다.
+- [x] 최신순 첫 전적의 `rankAfter`, `lpAfter`를 현재 티어/LP 표시로 사용한다.
+- [x] 전적 페이지와 MatchPage 주요 버튼 hover/focus/active 상태를 구현한다.
 
 Policy:
 
-- [ ] 전적 목록의 source of truth는 3-1 API다.
-- [ ] Game Result Summary sessionStorage를 전적 목록 source로 사용하지 않는다.
-- [ ] 새 패키지는 추가하지 않는다.
+- [x] 전적 목록의 source of truth는 3-1 API다.
+- [x] `GET /api/v1/users/me/game-records?page={page}`만 전적 목록 source로 사용한다.
+- [x] `size` query를 보내지 않고 서버 고정 10개 정책을 따른다.
+- [x] Game Result Summary sessionStorage를 전적 목록 source로 사용하지 않는다.
+- [x] Game Result WebSocket payload를 전적 목록 source로 사용하지 않는다.
+- [x] 새 패키지는 추가하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 기록 버튼 클릭 시 전적 페이지로 이동한다.
-- [ ] 전적 API 성공 시 최근 경기 목록이 표시된다.
-- [ ] 비어 있는 경우 empty 상태가 표시된다.
-- [ ] 조회 실패는 전적 화면 내부 error로 처리된다.
+- [x] 기록 버튼 클릭 시 전적 페이지로 이동한다.
+- [x] 전적 API 성공 시 최근 경기 목록이 표시된다.
+- [x] 비어 있는 경우 empty 상태가 표시된다.
+- [x] 조회 실패는 전적 화면 내부 error로 처리된다.
+- [x] 전적 페이지 route가 인증 route로 보호된다.
 
 ### 3-3. [ ] 프로필 상세 API 계약
 
@@ -712,7 +719,7 @@ Policy:
 7. [x] Section 2-4. 랭킹 조회 API 계약
 8. [x] Section 2-5. MatchPage 랭킹 실데이터 구현
 9. [x] Section 3-1. 내 전적 목록 API 계약
-10. [ ] Section 3-2. 전적 페이지 구현
+10. [x] Section 3-2. 전적 페이지 구현
 11. [ ] Section 3-3. 프로필 상세 API 계약
 12. [ ] Section 3-4. 프로필 페이지 구현
 13. [ ] Section 4-1/4-2. 연습 모드
@@ -726,6 +733,6 @@ Policy:
 - [x] “회원가입부터 매칭까지”라고 말하려면 Section 1-1이 필요하다.
 - [x] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1부터 2-3까지 필요하다.
 - [x] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1부터 2-5까지 필요하다.
-- [ ] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1과 3-2가 필요하다.
+- [x] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1과 3-2가 필요하다.
 - [ ] “내 프로필 상세를 볼 수 있다”고 말하려면 Section 3-3과 3-4가 필요하다.
 - [ ] “현재 화면의 모든 버튼이 기능한다”고 말하려면 Section 4까지 필요하다.
