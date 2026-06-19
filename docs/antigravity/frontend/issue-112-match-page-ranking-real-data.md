@@ -219,10 +219,10 @@ interface RankingEntryResponse {
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 2-5 완료 상태 반영.
-- [ ] Section 2-5에 season best UI 제거 완료 반영.
-- [ ] issue-112 task 완료 상태 반영.
-- [ ] PR 섹션을 백엔드 계약/프론트 정책/검증 결과 중심으로 보강.
+- [x] `docs/last-구현.md` Section 2-5 완료 상태 반영.
+- [x] Section 2-5에 season best UI 제거 완료 반영.
+- [x] issue-112 task 완료 상태 반영.
+- [x] PR 섹션을 백엔드 계약/프론트 정책/검증 결과 중심으로 보강.
 
 ### 7. 검증
 
@@ -330,7 +330,18 @@ flowchart TD
 
 - 이번 PR에서 pagination, ranking detail page, avatar 표시, season best 저장/정산은 제외함.
 - 새 패키지는 추가하지 않음.
-- 검증 결과를 작성함.
+- 검증 결과:
+  - `npm run test -- rankingService` 통과함.
+  - `npm run test -- MatchPage` 통과함.
+  - `npm run test -- MatchPage rankingService` 통과함.
+  - `npm run typecheck` 통과함.
+  - `npm run lint` 통과함.
+  - `npm run format` 통과함.
+- 구현 커밋:
+  - `90c65b9 feat: 랭킹 조회 프론트 서비스 구현`
+  - `cc313be feat: MatchPage 랭킹 실데이터 연결`
+  - `5e12f47 feat: MatchPage 랭킹 UI 로케일 정리`
+  - `e54b674 feat: MatchPage 랭킹 테스트 구현`
 
 ## 📌 Related Issue
 
