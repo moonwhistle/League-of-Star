@@ -16,6 +16,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
@@ -95,6 +96,52 @@ class UserReadServiceTest {
 
         // then
         assertThat(result).containsExactlyElementsOf(users);
+    }
+
+    @Test
+    @DisplayName("findAllByIdsOrThrow - userId 목록 기준 유저 목록을 반환한다")
+    void findAllByIdsOrThrow_ReturnUsers() {
+        // given
+        List<Long> userIds = List.of(1L, 2L);
+        List<User> users = List.of(
+                User.builder()
+                        .id(1L)
+                        .nickname("first")
+                        .email("first@example.com")
+                        .build(),
+                User.builder()
+                        .id(2L)
+                        .nickname("second")
+                        .email("second@example.com")
+                        .build()
+        );
+        given(userRepository.findAllById(anyCollection())).willReturn(users);
+
+        // when
+        List<User> result = userReadService.findAllByIdsOrThrow(userIds);
+
+        // then
+        assertThat(result).containsExactlyElementsOf(users);
+    }
+
+    @Test
+    @DisplayName("findAllByIdsOrThrow - 일부 유저가 없으면 USER_NOT_FOUND 예외를 던진다")
+    void findAllByIdsOrThrow_ThrowUserNotFound() {
+        // given
+        List<Long> userIds = List.of(1L, 2L);
+        List<User> users = List.of(
+                User.builder()
+                        .id(1L)
+                        .nickname("first")
+                        .email("first@example.com")
+                        .build()
+        );
+        given(userRepository.findAllById(anyCollection())).willReturn(users);
+
+        // when & then
+        assertThatThrownBy(() -> userReadService.findAllByIdsOrThrow(userIds))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.USER_NOT_FOUND));
     }
 
     @Test

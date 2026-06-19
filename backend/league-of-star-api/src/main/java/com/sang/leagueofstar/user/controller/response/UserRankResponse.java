@@ -29,7 +29,7 @@ public record UserRankResponse(
                 rankInfo.getUserId(),
                 rank.tier(),
                 rank.division(),
-                rankName(rank),
+                rank.name(),
                 rankInfo.getLp(),
                 rankInfo.getTierScore(),
                 rankInfo.getTotalWins(),
@@ -37,12 +37,5 @@ public record UserRankResponse(
                 rankInfo.getTotalDraws(),
                 rankInfo.getUpdatedAt()
         );
-    }
-
-    private static String rankName(Rank rank) {
-        if (rank.division() == null) {
-            return rank.tier().name();
-        }
-        return rank.tier().name() + "_" + rank.division().name();
     }
 }

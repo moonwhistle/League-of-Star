@@ -14,7 +14,7 @@ flowchart TD
     C -->|found| E["GameRecordReadService"]
     E --> F["최근 전적 page 조회<br/>createdAt desc, id desc"]
     F --> G["opponentId 목록 수집"]
-    G --> H["UserReadService.findByIds"]
+    G --> H["UserReadService.findAllByIdsOrThrow"]
     H --> I["GameRecordListResponse"]
 ```
 
@@ -30,7 +30,8 @@ flowchart TD
 - `reason`은 이번 응답에서 제외한다. 현재 `GameRecord`에 저장되지 않는 값이고, 포함하려면 GameRoom/result read model 확장이 필요하기 때문이다.
 - API 모듈은 core repository를 직접 참조하지 않는다.
 - API 모듈은 core read service를 조합해 외부 HTTP response를 만든다.
-- opponent nickname은 row별 `findById` 반복 호출이 아니라 `findByIds` batch 조회로 조립한다.
+- opponent nickname은 row별 `findById` 반복 호출이 아니라 `findAllByIdsOrThrow` batch 조회로 조립한다.
+- opponent user 누락 판단과 `USER_NOT_FOUND` 예외 생성은 core `UserReadService`가 담당한다.
 - 새 패키지와 DB schema를 추가하지 않는다.
 - 이번 작업은 자동 커밋하지 않는다.
 
@@ -203,17 +204,17 @@ interface GameRecordEntryResponse {
 
 ### 3. User Game Record API 구현
 
-- [ ] `UserPath.ME_GAME_RECORDS` 상수 추가.
-- [ ] `UserController`에 내 전적 목록 endpoint 추가.
-- [ ] `UserGameRecordService` 구현.
-- [ ] `GameRecordListResponse` 구현.
-- [ ] `GameRecordEntryResponse` 구현.
-- [ ] `UserReadService.findById(userId)`로 인증 user 존재 확인.
-- [ ] opponentId 목록을 `UserReadService.findByIds`로 batch 조회.
-- [ ] row별 opponent `findById` 반복 호출을 금지.
-- [ ] `rankBefore`, `rankAfter` 문자열 변환 구현.
-- [ ] `playedAt`은 `GameRecord.createdAt`으로 매핑.
-- [ ] empty response를 error가 아닌 정상 200으로 반환.
+- [x] `UserPath.ME_GAME_RECORDS` 상수 추가.
+- [x] `UserController`에 내 전적 목록 endpoint 추가.
+- [x] `UserGameRecordService` 구현.
+- [x] `GameRecordListResponse` 구현.
+- [x] `GameRecordEntryResponse` 구현.
+- [x] `UserReadService.findById(userId)`로 인증 user 존재 확인.
+- [x] opponentId 목록을 `UserReadService.findAllByIdsOrThrow`로 batch 조회.
+- [x] row별 opponent `findById` 반복 호출을 금지.
+- [x] `rankBefore`, `rankAfter` 문자열 변환 구현.
+- [x] `playedAt`은 `GameRecord.createdAt`으로 매핑.
+- [x] empty response를 error가 아닌 정상 200으로 반환.
 
 ### 4. Test 구현
 
@@ -254,7 +255,8 @@ interface GameRecordEntryResponse {
 - API path는 controller에 문자열로 직접 쓰지 않고 `UserPath` 상수를 사용한다.
 - 전적 목록 source of truth는 `GameRecord`다.
 - Game Result Summary sessionStorage payload를 전적 목록 source로 사용하지 않는다.
-- opponent nickname은 `UserReadService.findByIds`로 batch 조회한다.
+- opponent nickname은 `UserReadService.findAllByIdsOrThrow`로 batch 조회한다.
+- opponent user 누락 여부는 API 모듈에서 판단하지 않고 core `UserReadService`가 판단한다.
 - row별 `UserReadService.findById(opponentId)` 반복 호출을 금지한다.
 - `reason`은 이번 API에 포함하지 않는다.
 - `size` query parameter를 열지 않는다.
@@ -268,7 +270,7 @@ interface GameRecordEntryResponse {
 - 현재 `GameRecord`는 `User`와 직접 JPA 연관관계를 맺지 않고 `userId`, `opponentId`를 값으로 가진다.
 - 따라서 이번 이슈의 N+1 위험은 lazy loading이 아니라 API service에서 opponent nickname을 row별 단건 조회할 때 발생한다.
 - 나쁜 구조는 `records`를 순회하면서 `userReadService.findById(record.getOpponentId())`를 반복하는 방식이다.
-- 이번 구현은 opponentId를 모은 뒤 `UserReadService.findByIds(opponentIds)`로 한 번에 조회한다.
+- 이번 구현은 opponentId를 모은 뒤 `UserReadService.findAllByIdsOrThrow(opponentIds)`로 한 번에 조회한다.
 - 전적 목록은 최대 10개씩만 반환하더라도, 기본 정책은 row별 단건 조회를 허용하지 않는다.
 
 ## Acceptance Criteria
@@ -300,7 +302,7 @@ flowchart TD
     C --> D["GameRecordReadService"]
     D --> E["최근 30경기 중 page 조회"]
     E --> F["opponentId batch 수집"]
-    F --> G["UserReadService.findByIds"]
+    F --> G["UserReadService.findAllByIdsOrThrow"]
     G --> H["GameRecordListResponse"]
 ```
 
@@ -310,7 +312,7 @@ flowchart TD
 - Game Result Summary API는 방금 끝난 단일 게임 상세 책임으로 유지함.
 - 최근 30경기만 10개씩 3페이지로 조회함.
 - API 모듈은 core repository를 직접 참조하지 않음.
-- opponent nickname은 batch 조회로 조립해 row별 단건 조회를 피함.
+- opponent nickname은 core batch 조회로 조립해 row별 단건 조회를 피함.
 
 백엔드와의 구현 계약:
 
@@ -327,8 +329,8 @@ flowchart TD
   core는 전적 도메인과 영속성 조회 책임만 갖고, HTTP response shape나 opponent nickname 조립을 알지 않게 유지함.
 - API service에서 전적 목록 response를 조립함.
   API 모듈은 외부 계약을 만드는 계층이므로 core read service 결과와 user read service 결과를 조합해 응답 DTO를 만든다.
-- opponent nickname 조회를 batch 방식으로 처리함.
-  전적 row마다 단건 user 조회를 반복하면 애플리케이션 레벨 N+1이 발생하므로 opponentId를 모아 `findByIds`로 한 번에 가져온다.
+- opponent nickname 조회를 core batch 방식으로 처리함.
+  전적 row마다 단건 user 조회를 반복하면 애플리케이션 레벨 N+1이 발생하므로 opponentId를 모아 `findAllByIdsOrThrow`로 한 번에 가져온다. opponent 누락 판단과 core 예외 생성은 API가 아니라 core read service가 담당한다.
 - `reason`을 제외함.
   현재 `GameRecord`에 저장되지 않는 값을 전적 목록 v1에 포함하면 GameRoom read model 확장까지 필요해 최소 구현 범위를 넘어선다.
 

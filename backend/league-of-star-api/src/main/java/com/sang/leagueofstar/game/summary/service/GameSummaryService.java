@@ -171,10 +171,7 @@ public class GameSummaryService {
         if (rank == null || rank.tier() == null) {
             throwInvalidRecordState();
         }
-        if (rank.division() == null) {
-            return rank.tier().name();
-        }
-        return rank.tier().name() + "_" + rank.division().name();
+        return rank.name();
     }
 
     private static ApiException invalidRecordState() {

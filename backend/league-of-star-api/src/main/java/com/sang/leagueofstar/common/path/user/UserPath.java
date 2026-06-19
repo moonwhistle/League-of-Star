@@ -9,4 +9,5 @@ public final class UserPath {
     public static final String USER_BASE = "/api/v1/users";
     public static final String ME_PROFILE = "/me/profile";
     public static final String ME_RANK = "/me/rank";
+    public static final String ME_GAME_RECORDS = "/me/game-records";
 }

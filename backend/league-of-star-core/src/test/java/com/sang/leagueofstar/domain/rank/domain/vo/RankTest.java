@@ -97,4 +97,30 @@ class RankTest {
         assertThat(lowRank).isLessThan(highRank);
         assertThat(highRank).isGreaterThan(lowRank);
     }
+
+    @Test
+    @DisplayName("name - 일반 랭크는 TIER_DIVISION 형식으로 반환한다")
+    void name_ReturnTierDivision() {
+        // given
+        Rank rank = Rank.of(Tier.GOLD, Division.IV);
+
+        // when
+        String result = rank.name();
+
+        // then
+        assertThat(result).isEqualTo("GOLD_IV");
+    }
+
+    @Test
+    @DisplayName("name - division이 없는 랭크는 TIER 형식으로 반환한다")
+    void name_ReturnTierOnly() {
+        // given
+        Rank rank = Rank.of(Tier.MASTER, null);
+
+        // when
+        String result = rank.name();
+
+        // then
+        assertThat(result).isEqualTo("MASTER");
+    }
 }

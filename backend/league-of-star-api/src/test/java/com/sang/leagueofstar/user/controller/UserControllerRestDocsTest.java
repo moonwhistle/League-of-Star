@@ -9,6 +9,7 @@ import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.global.restdocs.RestDocsSupport;
 import com.sang.leagueofstar.user.controller.response.UserProfileResponse;
 import com.sang.leagueofstar.user.controller.response.UserRankResponse;
+import com.sang.leagueofstar.user.service.UserGameRecordService;
 import com.sang.leagueofstar.user.service.UserProfileService;
 import com.sang.leagueofstar.user.service.UserRankService;
 import io.restassured.http.ContentType;
@@ -38,10 +39,11 @@ class UserControllerRestDocsTest extends RestDocsSupport {
 
     private final UserProfileService userProfileService = mock(UserProfileService.class);
     private final UserRankService userRankService = mock(UserRankService.class);
+    private final UserGameRecordService userGameRecordService = mock(UserGameRecordService.class);
 
     @Override
     protected Object initController() {
-        return new UserController(userProfileService, userRankService);
+        return new UserController(userProfileService, userRankService, userGameRecordService);
     }
 
     @Override

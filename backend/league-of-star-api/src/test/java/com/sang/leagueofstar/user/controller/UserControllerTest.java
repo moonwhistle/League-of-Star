@@ -6,6 +6,7 @@ import com.sang.leagueofstar.domain.rank.domain.vo.Tier;
 import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.user.controller.response.UserProfileResponse;
 import com.sang.leagueofstar.user.controller.response.UserRankResponse;
+import com.sang.leagueofstar.user.service.UserGameRecordService;
 import com.sang.leagueofstar.user.service.UserProfileService;
 import com.sang.leagueofstar.user.service.UserRankService;
 import io.restassured.module.mockmvc.RestAssuredMockMvc;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -37,11 +39,17 @@ class UserControllerTest {
 
     private final UserProfileService userProfileService = mock(UserProfileService.class);
     private final UserRankService userRankService = mock(UserRankService.class);
+    private final UserGameRecordService userGameRecordService = mock(UserGameRecordService.class);
 
     @BeforeEach
     void setUp() {
-        RestAssuredMockMvc.mockMvc(MockMvcBuilders.standaloneSetup(new UserController(userProfileService, userRankService))
+        RestAssuredMockMvc.mockMvc(MockMvcBuilders.standaloneSetup(new UserController(
+                        userProfileService,
+                        userRankService,
+                        userGameRecordService
+                ))
                 .setCustomArgumentResolvers(authUserArgumentResolver())
+                .setValidator(validator())
                 .build());
     }
 
@@ -134,5 +142,11 @@ class UserControllerTest {
                 return USER_ID;
             }
         };
+    }
+
+    private LocalValidatorFactoryBean validator() {
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
+        return validator;
     }
 }
