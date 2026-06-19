@@ -1,7 +1,6 @@
 package com.sang.leagueofstar.notification.match.provider;
 
 import com.sang.leagueofstar.domain.rank.domain.UserRankInfo;
-import com.sang.leagueofstar.domain.rank.domain.vo.Rank;
 import com.sang.leagueofstar.domain.rank.service.RankReadService;
 import com.sang.leagueofstar.domain.user.domain.User;
 import com.sang.leagueofstar.domain.user.service.UserReadService;
@@ -41,7 +40,7 @@ public class MatchOpponentProfileProvider {
             return new MatchResponseResultNotification.Opponent(
                     opponentUserId,
                     nickname,
-                    tierName(rankInfo.getRank()),
+                    rankInfo.getRank().name(),
                     rankInfo.getTierScore()
             );
         } catch (Exception e) {
@@ -62,12 +61,5 @@ public class MatchOpponentProfileProvider {
             log.warn("Failed to lookup opponent user info for match response result: userId={}", userId, e);
             return UNKNOWN_NICKNAME;
         }
-    }
-
-    private String tierName(Rank rank) {
-        if (rank.division() == null) {
-            return rank.tier().name();
-        }
-        return rank.tier().name() + "_" + rank.division().name();
     }
 }

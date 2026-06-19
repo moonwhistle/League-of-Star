@@ -15,6 +15,7 @@ import com.sang.leagueofstar.domain.user.domain.User;
 import com.sang.leagueofstar.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -67,5 +68,70 @@ class GameRecordRepositoryTest {
         assertThat(foundRecord.getRankAfter().tier()).isEqualTo(Tier.BRONZE);
         assertThat(foundRecord.getSeriesType()).isEqualTo(GameRecordSeriesType.RANK);
         assertThat(foundRecord.getRankSeriesId()).isNull();
+    }
+
+    @Test
+    @DisplayName("userId 기준 최근 전적을 createdAt desc, id desc 순서로 조회한다")
+    void findByUserIdOrderByCreatedAtDescIdDesc_ReturnRecentRecords() {
+        // given
+        User user = userRepository.save(User.builder().email("record-user@test.com").nickname("record-user").build());
+        User opponent = userRepository.save(User.builder().email("record-opp@test.com").nickname("record-opp").build());
+        User otherUser = userRepository.save(User.builder().email("other@test.com").nickname("other").build());
+
+        GameRecord firstRecord = gameRecord(101L, user.getId(), opponent.getId(), GameRecordResult.WIN);
+        GameRecord secondRecord = gameRecord(102L, user.getId(), opponent.getId(), GameRecordResult.LOSS);
+        GameRecord thirdRecord = gameRecord(103L, user.getId(), opponent.getId(), GameRecordResult.DRAW);
+        GameRecord otherUserRecord = gameRecord(104L, otherUser.getId(), opponent.getId(), GameRecordResult.WIN);
+        gameRecordRepository.save(firstRecord);
+        gameRecordRepository.save(secondRecord);
+        gameRecordRepository.save(thirdRecord);
+        gameRecordRepository.save(otherUserRecord);
+        gameRecordRepository.flush();
+
+        // when
+        List<GameRecord> records = gameRecordRepository.findByUserIdOrderByCreatedAtDescIdDesc(
+                user.getId(),
+                PageRequest.of(0, 2)
+        );
+
+        // then
+        assertThat(records)
+                .extracting(GameRecord::getGameRoomId)
+                .containsExactly(103L, 102L);
+    }
+
+    @Test
+    @DisplayName("userId 기준 전적 수를 조회한다")
+    void countByUserId_ReturnCount() {
+        // given
+        User user = userRepository.save(User.builder().email("count-user@test.com").nickname("count-user").build());
+        User opponent = userRepository.save(User.builder().email("count-opp@test.com").nickname("count-opp").build());
+        User otherUser = userRepository.save(User.builder().email("count-other@test.com").nickname("count-other").build());
+
+        gameRecordRepository.save(gameRecord(201L, user.getId(), opponent.getId(), GameRecordResult.WIN));
+        gameRecordRepository.save(gameRecord(202L, user.getId(), opponent.getId(), GameRecordResult.LOSS));
+        gameRecordRepository.save(gameRecord(203L, otherUser.getId(), opponent.getId(), GameRecordResult.DRAW));
+        gameRecordRepository.flush();
+
+        // when
+        long count = gameRecordRepository.countByUserId(user.getId());
+
+        // then
+        assertThat(count).isEqualTo(2L);
+    }
+
+    private GameRecord gameRecord(Long gameRoomId, Long userId, Long opponentId, GameRecordResult result) {
+        return GameRecord.create(
+                gameRoomId,
+                userId,
+                opponentId,
+                null,
+                GameRecordSeriesType.RANK,
+                result,
+                80,
+                105,
+                Rank.of(Tier.GOLD, Division.IV),
+                Rank.of(Tier.GOLD, Division.III)
+        );
     }
 }

@@ -370,7 +370,7 @@ Acceptance Criteria:
 
 ## Section 3. Record / Profile Page
 
-### 3-1. [ ] 내 전적 목록 API 계약
+### 3-1. [x] 내 전적 목록 API 계약
 
 담당: Backend
 
@@ -378,40 +378,50 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 단일 게임 결과 Summary와 여러 게임 전적 목록의 API 책임을 분리한다.
+- [x] 단일 게임 결과 Summary와 여러 게임 전적 목록의 API 책임을 분리한다.
 
 Backend:
 
-- [ ] endpoint를 확정한다.
-  - 후보: `GET /api/v1/me/game-records`
-  - 후보: `GET /api/v1/games/me/summaries`
-- [ ] query 정책을 확정한다.
+- [x] endpoint를 확정한다.
+  - `GET /api/v1/users/me/game-records`
+- [x] query 정책을 확정한다.
+  - `page`: 1-based, 기본값 1, 허용 범위 1~3
+  - `size`: query로 받지 않고 서버 고정 10
+  - 최신순 정렬: `GameRecord.createdAt desc`, `id desc`
+  - 최근 30경기까지만 조회
+- [x] response shape를 확정한다.
   - `page`
   - `size`
-  - `cursor`
-  - 최신순 정렬
-- [ ] response shape를 확정한다.
+  - `totalPages`
+  - `totalElements`
+  - `hasNext`
+  - `records[]`
   - `gameId`
   - `result`
+  - `opponentUserId`
   - `opponentNickname`
   - `rankBefore`
   - `rankAfter`
+  - `lpBefore`
+  - `lpAfter`
   - `lpChange`
   - `playedAt`
-  - `reason`
-- [ ] 빈 목록, 인증 실패, pagination 오류 ErrorResponse를 정리한다.
-- [ ] RestDocs를 작성한다.
+- [x] `reason`은 현재 `GameRecord` source에 없으므로 이번 계약에서 제외한다.
+- [x] 빈 목록, 인증 실패, pagination 오류 ErrorResponse를 정리한다.
+- [x] RestDocs를 작성한다.
 
 Policy:
 
-- [ ] Game Result Summary는 결과 직후 상세 확인용이다.
-- [ ] 전적 목록 API는 계정의 누적 기록 조회용이다.
-- [ ] Summary payload를 sessionStorage에서 복원해 전적 목록처럼 사용하지 않는다.
+- [x] Game Result Summary는 결과 직후 상세 확인용이다.
+- [x] 전적 목록 API는 계정의 누적 기록 조회용이다.
+- [x] Summary payload를 sessionStorage에서 복원해 전적 목록처럼 사용하지 않는다.
+- [x] opponent nickname은 row별 단건 조회가 아니라 core `UserReadService.findAllByIdsOrThrow` batch 조회로 조립한다.
+- [x] API 모듈은 core repository를 직접 참조하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 프론트가 최근 경기 목록과 더보기 UI를 구현할 수 있는 payload가 확정된다.
-- [ ] pagination/cursor 정책이 문서화된다.
+- [x] 프론트가 최근 경기 목록과 pagination UI를 구현할 수 있는 payload가 확정된다.
+- [x] pagination 정책이 문서화된다.
 
 ### 3-2. [ ] 전적 페이지 구현
 
@@ -701,7 +711,7 @@ Policy:
 6. [x] Section 2-3. MatchPage 내 프로필 / 랭크 실데이터 구현
 7. [x] Section 2-4. 랭킹 조회 API 계약
 8. [x] Section 2-5. MatchPage 랭킹 실데이터 구현
-9. [ ] Section 3-1. 내 전적 목록 API 계약
+9. [x] Section 3-1. 내 전적 목록 API 계약
 10. [ ] Section 3-2. 전적 페이지 구현
 11. [ ] Section 3-3. 프로필 상세 API 계약
 12. [ ] Section 3-4. 프로필 페이지 구현

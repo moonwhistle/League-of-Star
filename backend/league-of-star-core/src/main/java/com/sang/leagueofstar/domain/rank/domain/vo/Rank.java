@@ -43,6 +43,13 @@ public record Rank(
         return Integer.compare(this.getTierScore(), other.getTierScore());
     }
 
+    public String name() {
+        if (division == null) {
+            return tier.name();
+        }
+        return tier.name() + "_" + division.name();
+    }
+
     /**
      * [정책 3.1] 승리 시 획득할 LP를 계산합니다.
      * <p>

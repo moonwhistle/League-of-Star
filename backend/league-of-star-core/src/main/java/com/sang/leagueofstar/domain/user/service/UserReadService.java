@@ -9,8 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +28,15 @@ public class UserReadService {
 
     public List<User> findByIds(Collection<Long> userIds) {
         return userRepository.findAllById(userIds);
+    }
+
+    public List<User> findAllByIdsOrThrow(Collection<Long> userIds) {
+        Set<Long> distinctUserIds = new LinkedHashSet<>(userIds);
+        List<User> users = userRepository.findAllById(distinctUserIds);
+        if (users.size() != distinctUserIds.size()) {
+            throw new CoreException(CoreErrorCode.USER_NOT_FOUND);
+        }
+        return users;
     }
 
     public Optional<User> findByEmail(String email) {
