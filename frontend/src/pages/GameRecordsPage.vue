@@ -10,11 +10,17 @@
     <section class="records-shell" aria-live="polite">
       <header class="records-header">
         <div>
-          <p class="records-eyebrow">{{ t('records.eyebrow') }}</p>
           <h1>{{ t('records.title') }}</h1>
         </div>
-        <button class="records-return-button" type="button" @click="returnToMatch">
-          {{ t('records.returnToMatch') }}
+        <button
+          class="records-home-button"
+          type="button"
+          :aria-label="t('records.returnToMatch')"
+          @click="returnToMatch"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3l2.4 5.4L20 10.7l-5.1 2.1L12 21l-2.9-8.2L4 10.7l5.6-2.3L12 3z" />
+          </svg>
         </button>
       </header>
 
@@ -300,20 +306,13 @@ function returnToMatch() {
   gap: 16px;
 }
 
-.records-eyebrow {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 900;
-  color: #8eeeff;
-}
-
 .records-header h1 {
   margin: 0;
   font-size: 42px;
   line-height: 1;
 }
 
-.records-return-button,
+.records-home-button,
 .records-state button,
 .records-pagination button {
   min-height: 42px;
@@ -323,9 +322,21 @@ function returnToMatch() {
   background: rgba(8, 19, 36, 0.78);
 }
 
-.records-return-button {
-  padding: 0 18px;
-  font-weight: 800;
+.records-home-button {
+  display: grid;
+  width: 46px;
+  min-height: 46px;
+  place-items: center;
+  padding: 0;
+}
+
+.records-home-button svg {
+  width: 23px;
+  height: 23px;
+  fill: rgba(255, 216, 111, 0.88);
+  stroke: #fff6c7;
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 10px rgba(255, 216, 111, 0.5));
 }
 
 .records-state,

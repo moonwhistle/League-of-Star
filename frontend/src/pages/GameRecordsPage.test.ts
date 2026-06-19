@@ -68,7 +68,9 @@ describe('GameRecordsPage', () => {
 
     expect(emptyWrapper.text()).toContain('아직 전적이 없습니다.')
 
-    await emptyWrapper.get('.records-return-button').trigger('click')
+    expect(emptyWrapper.get('h1').text()).toBe('최근 전적')
+
+    await emptyWrapper.get('.records-home-button').trigger('click')
     expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
