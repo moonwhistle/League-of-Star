@@ -192,16 +192,16 @@ interface RankingEntryResponse {
 
 ### 4. Ranking UI / Locale 구현
 
-- [ ] `season best` summary 칸 제거.
-- [ ] summary grid를 `내 순위`, `상위` 2칸 기준으로 정리.
-- [ ] top entries를 API `entries` 기반으로 렌더링.
-- [ ] current user가 top entries에 있으면 해당 row `is-current` 적용.
-- [ ] current user가 top entries에 없으면 목록 끝에 current row 추가.
-- [ ] LP는 기존 `formatNumber(value) + ' LP'` 포맷 사용.
-- [ ] rank position은 `#${rankPosition}` 포맷 사용.
-- [ ] 한국어 `rankingLoading`, `rankingUnavailable`, `rankingEmpty` 문구 추가.
-- [ ] 영어 `rankingLoading`, `rankingUnavailable`, `rankingEmpty` 문구 추가.
-- [ ] compact ranking panel에서 텍스트 overflow가 나지 않도록 기존 스타일 범위에서 조정.
+- [x] `season best` summary 칸 제거.
+- [x] summary grid를 `내 순위`, `상위` 2칸 기준으로 정리.
+- [x] top entries를 API `entries` 기반으로 렌더링.
+- [x] current user가 top entries에 있으면 해당 row `is-current` 적용.
+- [x] current user가 top entries에 없으면 목록 끝에 current row 추가.
+- [x] LP는 기존 `formatNumber(value) + ' LP'` 포맷 사용.
+- [x] rank position은 `#${rankPosition}` 포맷 사용.
+- [x] 한국어 `rankingLoading`, `rankingUnavailable`, `rankingEmpty` 문구 추가.
+- [x] 영어 `rankingLoading`, `rankingUnavailable`, `rankingEmpty` 문구 추가.
+- [x] compact ranking panel에서 텍스트 overflow가 나지 않도록 기존 스타일 범위에서 조정.
 
 ### 5. Test 구현
 
