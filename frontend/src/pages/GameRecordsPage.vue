@@ -16,6 +16,7 @@
           class="records-home-button"
           type="button"
           :aria-label="t('records.returnToMatch')"
+          :title="t('records.returnToMatch')"
           @click="returnToMatch"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -320,6 +321,37 @@ function returnToMatch() {
   border-radius: 8px;
   color: #f8fbff;
   background: rgba(8, 19, 36, 0.78);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+.records-home-button:hover,
+.records-state button:hover,
+.records-pagination button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(142, 238, 255, 0.86);
+  background: rgba(16, 42, 72, 0.92);
+  box-shadow:
+    0 0 0 3px rgba(142, 238, 255, 0.12),
+    0 12px 34px rgba(0, 0, 0, 0.34);
+}
+
+.records-home-button:focus-visible,
+.records-state button:focus-visible,
+.records-pagination button:focus-visible {
+  outline: 3px solid rgba(255, 216, 111, 0.76);
+  outline-offset: 3px;
+}
+
+.records-home-button:active,
+.records-state button:active,
+.records-pagination button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 0 0 2px rgba(142, 238, 255, 0.1);
 }
 
 .records-home-button {
@@ -337,6 +369,16 @@ function returnToMatch() {
   stroke: #fff6c7;
   stroke-width: 0.8;
   filter: drop-shadow(0 0 10px rgba(255, 216, 111, 0.5));
+  transition:
+    fill 140ms ease,
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.records-home-button:hover svg {
+  fill: #ffe88d;
+  filter: drop-shadow(0 0 14px rgba(255, 216, 111, 0.82));
+  transform: scale(1.08) rotate(4deg);
 }
 
 .records-state,
