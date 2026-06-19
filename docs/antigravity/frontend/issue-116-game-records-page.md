@@ -182,18 +182,18 @@ interface GameRecordEntryResponse {
 
 ### 3. GameRecordsPage 구현
 
-- [ ] `GameRecordsPage` 추가.
-- [ ] mount 시 page 1 전적 조회.
-- [ ] `recordsStatus` 상태 구현.
-- [ ] `recordsErrorMessage` 상태 구현.
-- [ ] `recordsResponse` 상태 구현.
-- [ ] loading 상태 표시.
-- [ ] error 상태와 재시도 버튼 표시.
-- [ ] empty 상태 표시.
-- [ ] success 상태에서 전적 목록 표시.
-- [ ] page 변경 시 기존 request abort 후 새 page 조회.
-- [ ] unmount 시 request abort.
-- [ ] `/match` 복귀 버튼 구현.
+- [x] `GameRecordsPage` 추가.
+- [x] mount 시 page 1 전적 조회.
+- [x] `recordsStatus` 상태 구현.
+- [x] `recordsErrorMessage` 상태 구현.
+- [x] `recordsResponse` 상태 구현.
+- [x] loading 상태 표시.
+- [x] error 상태와 재시도 버튼 표시.
+- [x] empty 상태 표시.
+- [x] success 상태에서 전적 목록 표시.
+- [x] page 변경 시 기존 request abort 후 새 page 조회.
+- [x] unmount 시 request abort.
+- [x] `/match` 복귀 버튼 구현.
 
 ### 4. Records UI / Locale 구현
 
