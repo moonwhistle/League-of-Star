@@ -518,6 +518,10 @@ const displayRankingEntries = computed(() => {
     return []
   }
 
+  if (ranking.value.entries.length === 0) {
+    return []
+  }
+
   const currentUser = ranking.value.currentUser
 
   if (ranking.value.entries.some((entry) => isCurrentRankingEntry(entry, currentUser))) {

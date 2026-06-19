@@ -205,17 +205,17 @@ interface RankingEntryResponse {
 
 ### 5. Test 구현
 
-- [ ] ranking service endpoint/method/signal 테스트.
-- [ ] MatchPage mount 시 `getRankings(signal, 5)` 호출 테스트.
-- [ ] ranking success 시 내 순위 표시 테스트.
-- [ ] ranking success 시 top % 표시 테스트.
-- [ ] ranking success 시 top entries 표시 테스트.
-- [ ] `season best` 문구가 렌더링되지 않는지 테스트.
-- [ ] current user가 entries 안에 있으면 해당 row highlight 테스트.
-- [ ] current user가 entries 밖에 있으면 currentUser row 추가 표시 테스트.
-- [ ] ranking 실패 시 fallback 표시와 매칭 버튼 유지 테스트.
-- [ ] ranking empty 시 empty 문구 표시 테스트.
-- [ ] 기존 profile/rank/match/logout 테스트 유지.
+- [x] ranking service endpoint/method/signal 테스트.
+- [x] MatchPage mount 시 `getRankings(signal, 5)` 호출 테스트.
+- [x] ranking success 시 내 순위 표시 테스트.
+- [x] ranking success 시 top % 표시 테스트.
+- [x] ranking success 시 top entries 표시 테스트.
+- [x] `season best` 문구가 렌더링되지 않는지 테스트.
+- [x] current user가 entries 안에 있으면 해당 row highlight 테스트.
+- [x] current user가 entries 밖에 있으면 currentUser row 추가 표시 테스트.
+- [x] ranking 실패 시 fallback 표시와 매칭 버튼 유지 테스트.
+- [x] ranking empty 시 empty 문구 표시 테스트.
+- [x] 기존 profile/rank/match/logout 테스트 유지.
 
 ### 6. 문서 정합성 구현
 

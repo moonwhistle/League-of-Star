@@ -286,6 +286,97 @@ describe('MatchPage', () => {
     expect(getStartButton(wrapper).attributes('disabled')).toBeUndefined()
   })
 
+  it('highlights the current user entry without appending a duplicate row when it is in top entries', async () => {
+    getRankingsMock.mockResolvedValueOnce({
+      summary: {
+        myRankPosition: 2,
+        topPercent: 1,
+        totalRankers: 1840,
+      },
+      entries: [
+        {
+          rankPosition: 1,
+          userId: 10,
+          nickname: 'Legendary Star',
+          tier: 'CHALLENGER',
+          division: null,
+          rank: 'CHALLENGER',
+          lp: 3492,
+          tierScore: 40,
+          wins: 122,
+          losses: 44,
+          draws: 3,
+          isCurrentUser: false,
+        },
+        {
+          rankPosition: 2,
+          userId: 1,
+          nickname: 'MoonStar',
+          tier: 'GOLD',
+          division: 'IV',
+          rank: 'GOLD_IV',
+          lp: 40,
+          tierScore: 13,
+          wins: 12,
+          losses: 8,
+          draws: 1,
+          isCurrentUser: true,
+        },
+      ],
+      currentUser: {
+        rankPosition: 2,
+        userId: 1,
+        nickname: 'MoonStar',
+        tier: 'GOLD',
+        division: 'IV',
+        rank: 'GOLD_IV',
+        lp: 40,
+        tierScore: 13,
+        wins: 12,
+        losses: 8,
+        draws: 1,
+        isCurrentUser: true,
+      },
+    })
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    const currentRows = wrapper.findAll('.ranking-list .is-current')
+
+    expect(currentRows).toHaveLength(1)
+    expect(currentRows[0]?.text()).toContain('MoonStar')
+    expect(currentRows[0]?.text()).toContain('#2')
+  })
+
+  it('renders an empty ranking state when there are no entries and no current user row to append', async () => {
+    getRankingsMock.mockResolvedValueOnce({
+      summary: {
+        myRankPosition: 0,
+        topPercent: 0,
+        totalRankers: 0,
+      },
+      entries: [],
+      currentUser: {
+        rankPosition: 0,
+        userId: 0,
+        nickname: '',
+        tier: '',
+        division: null,
+        rank: '',
+        lp: 0,
+        tierScore: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        isCurrentUser: false,
+      },
+    })
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    expect(wrapper.get('[aria-label="Top ranking"]').text()).toContain('랭킹 정보 없음')
+  })
+
   it('toggles match page copy between Korean and English', async () => {
     const wrapper = mount(MatchPage)
 
