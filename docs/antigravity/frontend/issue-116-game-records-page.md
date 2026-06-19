@@ -237,18 +237,18 @@ interface GameRecordEntryResponse {
 
 ### 7. 검증
 
-- [ ] `npm run test -- gameRecordService` 검증.
-- [ ] `npm run test -- GameRecordsPage` 검증.
-- [ ] `npm run test -- MatchPage` 검증.
-- [ ] `npm run test -- router` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] desktop `1440x900` overflow 검증.
-- [ ] mobile `390x844` overflow 검증.
-- [ ] `git diff --check` 검증.
+- [x] `npm run test -- gameRecordService` 검증.
+- [x] `npm run test -- GameRecordsPage` 검증.
+- [x] `npm run test -- MatchPage` 검증.
+- [x] `npm run test -- router` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] desktop `1440x900` overflow 검증.
+- [x] mobile `390x844` overflow 검증.
+- [x] `git diff --check` 검증.
 
 ## Implementation Policy
 
@@ -350,7 +350,9 @@ flowchart TD
   - `npm run typecheck` 통과함.
   - `npm run test` 통과함.
   - `npm run build` 통과함.
-  - desktop/mobile overflow 확인함.
+  - desktop `1440x900` `/records` success 및 horizontal overflow 없음 확인함.
+  - mobile `390x844` `/records` success 및 horizontal overflow 없음 확인함.
+  - desktop/mobile text overflow 후보 없음 확인함.
 - 구현 커밋:
   - `25882f9 docs: 전적 페이지 이슈 문서 작성`
   - `f9e58f7 feat: 전적 목록 프론트 계약 정리`
