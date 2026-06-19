@@ -8,6 +8,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -41,6 +43,19 @@ class GameRecordReadServiceTest {
     }
 
     @Test
+    @DisplayName("countByUserId - userId 기준 record 수를 반환한다")
+    void countByUserId() {
+        // given
+        given(gameRecordRepository.countByUserId(FIRST_USER_ID)).willReturn(3L);
+
+        // when
+        long result = gameRecordReadService.countByUserId(FIRST_USER_ID);
+
+        // then
+        assertThat(result).isEqualTo(3L);
+    }
+
+    @Test
     @DisplayName("findByGameRoomId - gameRoomId 기준 record 목록을 반환한다")
     void findByGameRoomId() {
         // given
@@ -60,6 +75,28 @@ class GameRecordReadServiceTest {
 
         // when
         List<GameRecord> result = gameRecordReadService.findByGameRoomId(GAME_ROOM_ID);
+
+        // then
+        assertThat(result).containsExactlyElementsOf(records);
+    }
+
+    @Test
+    @DisplayName("findRecentByUserId - userId 기준 최신 record 목록을 반환한다")
+    void findRecentByUserId() {
+        // given
+        Pageable pageable = PageRequest.of(0, 10);
+        List<GameRecord> records = List.of(
+                GameRecord.builder()
+                        .gameRoomId(GAME_ROOM_ID)
+                        .userId(FIRST_USER_ID)
+                        .opponentId(SECOND_USER_ID)
+                        .build()
+        );
+        given(gameRecordRepository.findByUserIdOrderByCreatedAtDescIdDesc(FIRST_USER_ID, pageable))
+                .willReturn(records);
+
+        // when
+        List<GameRecord> result = gameRecordReadService.findRecentByUserId(FIRST_USER_ID, pageable);
 
         // then
         assertThat(result).containsExactlyElementsOf(records);

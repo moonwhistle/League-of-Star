@@ -218,16 +218,16 @@ interface GameRecordEntryResponse {
 
 ### 4. Test 구현
 
-- [ ] `UserController` API test는 `RestAssuredMockMvc`로 구현.
-- [ ] `UserGameRecordService`는 core read service와 user read service를 mock 처리하는 unit test로 구현.
-- [ ] `GameRecordRepository`는 `@DataJpaTest` 기반 실 데이터 접근 테스트로 최신순 조회를 검증.
-- [ ] `GameRecordReadService`는 repository 위임 unit test로 검증.
-- [ ] RestDocs 성공 응답 구현.
-- [ ] RestDocs empty 응답 구현.
-- [ ] RestDocs invalid page 응답 구현.
-- [ ] RestDocs `USER_NOT_FOUND` 응답 구현.
-- [ ] opponent nickname batch 조회를 검증.
-- [ ] 30경기 cap 기반 metadata 계산을 검증.
+- [x] `UserController` API test는 `RestAssuredMockMvc`로 구현.
+- [x] `UserGameRecordService`는 core read service와 user read service를 mock 처리하는 unit test로 구현.
+- [x] `GameRecordRepository`는 `@DataJpaTest` 기반 실 데이터 접근 테스트로 최신순 조회를 검증.
+- [x] `GameRecordReadService`는 repository 위임 unit test로 검증.
+- [x] RestDocs 성공 응답 구현.
+- [x] RestDocs empty 응답 구현.
+- [x] RestDocs invalid page 응답 구현.
+- [x] RestDocs `USER_NOT_FOUND` 응답 구현.
+- [x] opponent nickname batch 조회를 검증.
+- [x] 30경기 cap 기반 metadata 계산을 검증.
 
 ### 5. 문서 정합성 구현
 

@@ -3,7 +3,11 @@ package com.sang.leagueofstar.user.controller;
 import com.sang.leagueofstar.common.path.user.UserPath;
 import com.sang.leagueofstar.domain.rank.domain.vo.Division;
 import com.sang.leagueofstar.domain.rank.domain.vo.Tier;
+import com.sang.leagueofstar.domain.record.domain.vo.GameRecordResult;
+import com.sang.leagueofstar.global.exception.GlobalExceptionHandler;
 import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
+import com.sang.leagueofstar.user.controller.response.UserGameRecordEntryResponse;
+import com.sang.leagueofstar.user.controller.response.UserGameRecordListResponse;
 import com.sang.leagueofstar.user.controller.response.UserProfileResponse;
 import com.sang.leagueofstar.user.controller.response.UserRankResponse;
 import com.sang.leagueofstar.user.service.UserGameRecordService;
@@ -23,12 +27,14 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class UserControllerTest {
@@ -48,6 +54,7 @@ class UserControllerTest {
                         userRankService,
                         userGameRecordService
                 ))
+                .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(authUserArgumentResolver())
                 .setValidator(validator())
                 .build());
@@ -125,6 +132,75 @@ class UserControllerTest {
         verify(userRankService).getMyRank(USER_ID);
     }
 
+    @Test
+    @DisplayName("내 전적 목록 조회 요청을 서비스에 위임한다")
+    void getMyGameRecords() {
+        // given
+        when(userGameRecordService.getMyGameRecords(USER_ID, 2))
+                .thenReturn(gameRecordListResponse(2, true));
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .queryParam("page", 2)
+                .when()
+                .get(UserPath.USER_BASE + UserPath.ME_GAME_RECORDS)
+                .then()
+                .statusCode(200)
+                .body("page", equalTo(2))
+                .body("size", equalTo(10))
+                .body("totalPages", equalTo(3))
+                .body("totalElements", equalTo(30))
+                .body("hasNext", equalTo(true))
+                .body("records[0].gameId", equalTo(100))
+                .body("records[0].result", equalTo("WIN"))
+                .body("records[0].opponentUserId", equalTo(2))
+                .body("records[0].opponentNickname", equalTo("ShadowWalker"))
+                .body("records[0].rankBefore", equalTo("GOLD_IV"))
+                .body("records[0].rankAfter", equalTo("GOLD_III"))
+                .body("records[0].lpBefore", equalTo(80))
+                .body("records[0].lpAfter", equalTo(105))
+                .body("records[0].lpChange", equalTo(25))
+                .body("records[0].playedAt", equalTo("2026-06-19T10:30:00"));
+
+        verify(userGameRecordService).getMyGameRecords(USER_ID, 2);
+    }
+
+    @Test
+    @DisplayName("내 전적 목록 조회 page 기본값은 1로 service에 위임한다")
+    void getMyGameRecords_DefaultPage() {
+        // given
+        when(userGameRecordService.getMyGameRecords(USER_ID, 1))
+                .thenReturn(gameRecordListResponse(1, true));
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .get(UserPath.USER_BASE + UserPath.ME_GAME_RECORDS)
+                .then()
+                .statusCode(200)
+                .body("page", equalTo(1));
+
+        verify(userGameRecordService).getMyGameRecords(USER_ID, 1);
+    }
+
+    @Test
+    @DisplayName("내 전적 목록 조회 page가 범위를 벗어나면 INVALID_INPUT으로 처리한다")
+    void getMyGameRecords_InvalidPage() {
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .queryParam("page", 4)
+                .when()
+                .get(UserPath.USER_BASE + UserPath.ME_GAME_RECORDS)
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("COMMON_003"));
+
+        verifyNoInteractions(userGameRecordService);
+    }
+
     private HandlerMethodArgumentResolver authUserArgumentResolver() {
         return new HandlerMethodArgumentResolver() {
             @Override
@@ -148,5 +224,27 @@ class UserControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         return validator;
+    }
+
+    private UserGameRecordListResponse gameRecordListResponse(int page, boolean hasNext) {
+        return new UserGameRecordListResponse(
+                page,
+                10,
+                3,
+                30,
+                hasNext,
+                List.of(new UserGameRecordEntryResponse(
+                        100L,
+                        GameRecordResult.WIN,
+                        2L,
+                        "ShadowWalker",
+                        "GOLD_IV",
+                        "GOLD_III",
+                        80,
+                        105,
+                        25,
+                        LocalDateTime.of(2026, 6, 19, 10, 30)
+                ))
+        );
     }
 }
