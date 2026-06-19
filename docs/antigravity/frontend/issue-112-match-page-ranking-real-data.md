@@ -342,6 +342,7 @@ flowchart TD
   - `cc313be feat: MatchPage 랭킹 실데이터 연결`
   - `5e12f47 feat: MatchPage 랭킹 UI 로케일 정리`
   - `e54b674 feat: MatchPage 랭킹 테스트 구현`
+  - `1d108f7 docs: MatchPage 랭킹 실데이터 문서 정합성 반영`
 
 ## 📌 Related Issue
 
