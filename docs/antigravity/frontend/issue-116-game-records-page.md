@@ -213,19 +213,19 @@ interface GameRecordEntryResponse {
 
 ### 5. Test 구현
 
-- [ ] game record service endpoint/method/signal 테스트.
-- [ ] service가 `size` query를 보내지 않는지 테스트.
-- [ ] router protected route 테스트에 records 추가.
-- [ ] MatchPage 전적 아이콘 클릭 시 records route 이동 테스트.
-- [ ] GameRecordsPage mount 시 page 1 조회 테스트.
-- [ ] loading 상태 테스트.
-- [ ] error 상태와 재시도 테스트.
-- [ ] empty 상태 테스트.
-- [ ] success 목록 표시 테스트.
-- [ ] pagination page 이동 테스트.
-- [ ] rank 변화 표시 테스트.
-- [ ] rank 변화 없음 표시 테스트.
-- [ ] LP 변화 표시 테스트.
+- [x] game record service endpoint/method/signal 테스트.
+- [x] service가 `size` query를 보내지 않는지 테스트.
+- [x] router protected route 테스트에 records 추가.
+- [x] MatchPage 전적 아이콘 클릭 시 records route 이동 테스트.
+- [x] GameRecordsPage mount 시 page 1 조회 테스트.
+- [x] loading 상태 테스트.
+- [x] error 상태와 재시도 테스트.
+- [x] empty 상태 테스트.
+- [x] success 목록 표시 테스트.
+- [x] pagination page 이동 테스트.
+- [x] rank 변화 표시 테스트.
+- [x] rank 변화 없음 표시 테스트.
+- [x] LP 변화 표시 테스트.
 
 ### 6. 문서 정합성 구현
 
