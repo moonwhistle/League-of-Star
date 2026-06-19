@@ -169,11 +169,11 @@ interface RankingEntryResponse {
 
 ### 2. Ranking Service 구현
 
-- [ ] `getRankings(signal?: AbortSignal, limit = 5)` 추가.
-- [ ] `requestJson` 기반으로 `GET /api/v1/rankings?limit=5` 호출.
-- [ ] Authorization header와 token refresh는 `apiClient` 정책에 위임.
-- [ ] AbortSignal 전달 지원.
-- [ ] 새 패키지를 추가하지 않음.
+- [x] `getRankings(signal?: AbortSignal, limit = 5)` 추가.
+- [x] `requestJson` 기반으로 `GET /api/v1/rankings?limit=5` 호출.
+- [x] Authorization header와 token refresh는 `apiClient` 정책에 위임.
+- [x] AbortSignal 전달 지원.
+- [x] 새 패키지를 추가하지 않음.
 
 ### 3. MatchPage 랭킹 실데이터 연결
 
