@@ -340,7 +340,7 @@ flowchart TD
 ## 📝 Note
 
 - 이번 PR에서 전적 상세 페이지, row click 이동, result reason 표시는 제외함.
-- 30경기 초과 조회와 cursor pagination은 후속 이슈로 둠.
+- 30경기 초과 조회는 제품 정책상 지원하지 않음. cursor pagination은 후속 논의 전까지 제외함.
 - 새 패키지 추가 없음.
 - 검증 결과:
   - `npm run test -- gameRecordService` 통과함.
