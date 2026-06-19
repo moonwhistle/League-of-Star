@@ -10,32 +10,34 @@
     <section class="records-shell" aria-live="polite">
       <header class="records-header">
         <div>
-          <p class="records-eyebrow">RECORDS</p>
-          <h1>전적</h1>
+          <p class="records-eyebrow">{{ t('records.eyebrow') }}</p>
+          <h1>{{ t('records.title') }}</h1>
         </div>
-        <button class="records-return-button" type="button" @click="returnToMatch">매칭으로</button>
+        <button class="records-return-button" type="button" @click="returnToMatch">
+          {{ t('records.returnToMatch') }}
+        </button>
       </header>
 
       <section v-if="recordsStatus === 'loading'" class="records-state">
-        <strong>전적을 불러오는 중</strong>
-        <span>최근 경기 기록을 확인하고 있습니다.</span>
+        <strong>{{ t('records.loadingTitle') }}</strong>
+        <span>{{ t('records.loadingDetail') }}</span>
       </section>
 
       <section v-else-if="recordsStatus === 'error'" class="records-state records-state--error">
-        <strong>전적을 불러오지 못했습니다.</strong>
+        <strong>{{ t('records.errorTitle') }}</strong>
         <span>{{ recordsErrorMessage }}</span>
-        <button type="button" @click="retryRecords">다시 시도</button>
+        <button type="button" @click="retryRecords">{{ t('records.retry') }}</button>
       </section>
 
       <section v-else-if="isRecordsEmpty" class="records-state">
-        <strong>아직 전적이 없습니다.</strong>
-        <span>매칭을 완료하면 최근 전적이 이곳에 표시됩니다.</span>
+        <strong>{{ t('records.emptyTitle') }}</strong>
+        <span>{{ t('records.emptyDetail') }}</span>
       </section>
 
-      <section v-else class="records-content" aria-label="최근 전적">
+      <section v-else class="records-content" :aria-label="t('records.sectionLabel')">
         <div class="records-summary">
-          <span>최근 전적</span>
-          <strong>{{ recordsResponse?.totalElements ?? 0 }} 경기</strong>
+          <span>{{ t('records.summaryLabel') }}</span>
+          <strong>{{ formatRecordCount(recordsResponse?.totalElements ?? 0) }}</strong>
         </div>
 
         <ol class="records-list">
@@ -49,9 +51,15 @@
               {{ formatResult(record.result) }}
             </div>
 
-            <div class="record-main">
-              <strong>{{ record.opponentNickname }}</strong>
-              <span>{{ formatPlayedAt(record.playedAt) }}</span>
+            <div class="record-matchup">
+              <div class="record-player record-player--me">
+                <strong>{{ t('records.me') }}</strong>
+              </div>
+              <span class="record-versus">{{ t('records.versus') }}</span>
+              <div class="record-player record-player--opponent">
+                <strong>{{ record.opponentNickname }}</strong>
+                <span>{{ formatPlayedAt(record.playedAt) }}</span>
+              </div>
             </div>
 
             <div class="record-rank">
@@ -64,8 +72,10 @@
           </li>
         </ol>
 
-        <nav class="records-pagination" aria-label="전적 페이지">
-          <button type="button" :disabled="!canGoPrevious" @click="goToPreviousPage">이전</button>
+        <nav class="records-pagination" :aria-label="t('records.paginationLabel')">
+          <button type="button" :disabled="!canGoPrevious" @click="goToPreviousPage">
+            {{ t('records.previous') }}
+          </button>
           <button
             v-for="pageNumber in pageNumbers"
             :key="pageNumber"
@@ -76,7 +86,9 @@
           >
             {{ pageNumber }}
           </button>
-          <button type="button" :disabled="!canGoNext" @click="goToNextPage">다음</button>
+          <button type="button" :disabled="!canGoNext" @click="goToNextPage">
+            {{ t('records.next') }}
+          </button>
         </nav>
       </section>
     </section>
@@ -87,9 +99,11 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
 import { getMyGameRecords } from '@/services/gameRecordService'
+import type { GameRecordResult } from '@/types/game'
 import type { GameRecordListResponse } from '@/types/gameRecord'
 
 const FIRST_PAGE = 1
@@ -98,6 +112,7 @@ const MAX_PAGE = 3
 type RecordsStatus = 'idle' | 'loading' | 'success' | 'error'
 
 const router = useRouter()
+const { locale, t } = useLocale()
 const recordsStatus = ref<RecordsStatus>('idle')
 const recordsErrorMessage = ref('')
 const requestedPage = ref(FIRST_PAGE)
@@ -161,7 +176,7 @@ async function fetchRecords(page: number) {
 
     recordsStatus.value = 'error'
     recordsErrorMessage.value =
-      error instanceof ApiClientError ? error.message : '전적 조회에 실패했습니다.'
+      error instanceof ApiClientError ? error.message : t('records.errorFallback')
   } finally {
     if (recordsAbortController.value === controller) {
       recordsAbortController.value = undefined
@@ -216,14 +231,14 @@ function normalizePage(page: number) {
   return Math.min(MAX_PAGE, Math.max(FIRST_PAGE, Math.trunc(page)))
 }
 
-function formatResult(result: string) {
+function formatResult(result: GameRecordResult) {
   switch (result) {
     case 'DRAW':
-      return '무승부'
+      return t('records.draw')
     case 'LOSS':
-      return '패배'
+      return t('records.loss')
     case 'WIN':
-      return '승리'
+      return t('records.win')
     default:
       return result
   }
@@ -244,12 +259,16 @@ function formatPlayedAt(playedAt: string) {
     return playedAt
   }
 
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
   }).format(date)
+}
+
+function formatRecordCount(totalElements: number) {
+  return `${totalElements} ${t('records.countUnit')}`
 }
 
 function returnToMatch() {
@@ -358,27 +377,43 @@ function returnToMatch() {
 
 .records-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
 .record-card {
+  position: relative;
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) minmax(220px, auto);
-  gap: 16px;
+  grid-template-columns: 86px minmax(280px, 1fr) minmax(230px, 0.78fr);
+  gap: 14px;
   align-items: center;
-  min-height: 82px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 76px;
+  padding: 10px 14px;
+  overflow: hidden;
+  border: 1px solid rgba(142, 238, 255, 0.16);
+  border-left: 4px solid #8eeeff;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(90deg, rgba(142, 238, 255, 0.12), transparent 34%), rgba(255, 255, 255, 0.055);
+}
+
+.record-card[data-record-result='LOSS'] {
+  border-left-color: #ff8f9d;
+  background:
+    linear-gradient(90deg, rgba(255, 143, 157, 0.13), transparent 34%), rgba(255, 255, 255, 0.055);
+}
+
+.record-card[data-record-result='DRAW'] {
+  border-left-color: #d7deea;
+  background:
+    linear-gradient(90deg, rgba(215, 222, 234, 0.1), transparent 34%), rgba(255, 255, 255, 0.055);
 }
 
 .record-result {
   display: grid;
-  min-height: 48px;
+  min-height: 44px;
   place-items: center;
   border-radius: 8px;
   font-weight: 900;
@@ -394,14 +429,48 @@ function returnToMatch() {
   background: #d7deea;
 }
 
-.record-main,
+.record-matchup,
 .record-rank {
-  display: grid;
-  gap: 6px;
   min-width: 0;
 }
 
-.record-main strong,
+.record-matchup {
+  display: grid;
+  grid-template-columns: minmax(76px, 0.58fr) 44px minmax(0, 1fr);
+  align-items: center;
+}
+
+.record-player {
+  display: grid;
+  min-width: 0;
+  min-height: 48px;
+  align-content: center;
+  padding: 0 14px;
+  border: 1px solid rgba(142, 238, 255, 0.14);
+  background: rgba(3, 6, 16, 0.38);
+}
+
+.record-player--me {
+  border-radius: 8px 0 0 8px;
+}
+
+.record-player--opponent {
+  border-radius: 0 8px 8px 0;
+}
+
+.record-versus {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 950;
+  color: #8eeeff;
+  background:
+    linear-gradient(90deg, rgba(142, 238, 255, 0.34), rgba(142, 238, 255, 0.08)),
+    rgba(3, 6, 16, 0.54);
+}
+
+.record-player strong,
 .record-rank span,
 .record-rank strong {
   overflow: hidden;
@@ -409,12 +478,14 @@ function returnToMatch() {
   white-space: nowrap;
 }
 
-.record-main span,
+.record-player span,
 .record-rank span {
   color: rgba(248, 251, 255, 0.66);
 }
 
 .record-rank {
+  display: grid;
+  gap: 6px;
   text-align: right;
 }
 
@@ -467,14 +538,29 @@ function returnToMatch() {
   }
 
   .record-card {
-    grid-template-columns: 1fr;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 10px;
   }
 
   .record-result {
-    width: 84px;
+    min-height: 64px;
+  }
+
+  .record-matchup {
+    grid-template-columns: minmax(58px, 0.54fr) 36px minmax(0, 1fr);
+  }
+
+  .record-player {
+    min-height: 44px;
+    padding: 0 10px;
+  }
+
+  .record-versus {
+    min-height: 44px;
   }
 
   .record-rank {
+    grid-column: 1 / -1;
     text-align: left;
   }
 }

@@ -197,19 +197,19 @@ interface GameRecordEntryResponse {
 
 ### 4. Records UI / Locale 구현
 
-- [ ] 승/패/무 표시 구현.
-- [ ] 상대 닉네임 표시 구현.
-- [ ] `rankBefore !== rankAfter`이면 `GOLD_IV -> GOLD_III` 형태로 표시.
-- [ ] rank 변화가 없으면 `GOLD_IV` 단일 값으로 표시.
-- [ ] `lpBefore -> lpAfter` 표시 구현.
-- [ ] `lpChange`를 `+25`, `-10`, `0` 형태로 표시.
-- [ ] `playedAt`을 사용자에게 읽기 좋은 날짜/시간으로 표시.
-- [ ] `totalElements` 기반 최근 전적 개수 표시.
-- [ ] `totalPages` 기반 page button 생성.
-- [ ] `hasNext` 기반 다음 버튼 활성화.
-- [ ] mobile/desktop에서 horizontal overflow가 없도록 스타일 구현.
-- [ ] 한국어 records locale 추가.
-- [ ] 영어 records locale 추가.
+- [x] 승/패/무 표시 구현.
+- [x] 상대 닉네임 표시 구현.
+- [x] `rankBefore !== rankAfter`이면 `GOLD_IV -> GOLD_III` 형태로 표시.
+- [x] rank 변화가 없으면 `GOLD_IV` 단일 값으로 표시.
+- [x] `lpBefore -> lpAfter` 표시 구현.
+- [x] `lpChange`를 `+25`, `-10`, `0` 형태로 표시.
+- [x] `playedAt`을 사용자에게 읽기 좋은 날짜/시간으로 표시.
+- [x] `totalElements` 기반 최근 전적 개수 표시.
+- [x] `totalPages` 기반 page button 생성.
+- [x] `hasNext` 기반 다음 버튼 활성화.
+- [x] mobile/desktop에서 horizontal overflow가 없도록 스타일 구현.
+- [x] 한국어 records locale 추가.
+- [x] 영어 records locale 추가.
 
 ### 5. Test 구현
 
