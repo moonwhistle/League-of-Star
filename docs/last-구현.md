@@ -338,7 +338,7 @@ Acceptance Criteria:
 - [x] MatchPage 랭킹 UI가 하드코딩 없이 그릴 수 있는 payload가 확정된다.
 - [x] pagination/limit 정책이 문서화된다.
 
-### 2-5. [ ] MatchPage 랭킹 실데이터 구현
+### 2-5. [x] MatchPage 랭킹 실데이터 구현
 
 담당: Frontend
 
@@ -346,27 +346,27 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage 왼쪽 랭킹 리스트와 요약 정보를 2-4 API 실데이터로 전환한다.
+- [x] MatchPage 왼쪽 랭킹 리스트와 요약 정보를 2-4 API 실데이터로 전환한다.
 
 Frontend:
 
-- [ ] ranking service를 추가한다.
-- [ ] MatchPage 랭킹 리스트 하드코딩을 제거한다.
-- [ ] 내 순위, top % 표시 정책을 API 계약에 맞춘다.
-- [ ] season best UI를 제거한다.
-- [ ] loading/error/empty 상태를 추가한다.
+- [x] ranking service를 추가한다.
+- [x] MatchPage 랭킹 리스트 하드코딩을 제거한다.
+- [x] 내 순위, top % 표시 정책을 API 계약에 맞춘다.
+- [x] season best UI를 제거한다.
+- [x] loading/error/empty 상태를 추가한다.
 
 Policy:
 
-- [ ] 랭킹 조회 실패는 매칭 시작/취소/SSE 흐름을 막지 않는다.
-- [ ] MatchPage의 매칭 코어 상태와 랭킹 조회 상태를 섞지 않는다.
+- [x] 랭킹 조회 실패는 매칭 시작/취소/SSE 흐름을 막지 않는다.
+- [x] MatchPage의 매칭 코어 상태와 랭킹 조회 상태를 섞지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 랭킹 API 성공 시 실제 랭킹 목록, 내 순위, top %가 표시된다.
-- [ ] season best 섹션이 표시되지 않는다.
-- [ ] 랭킹 API 실패 시 부가 UI error만 표시된다.
-- [ ] 매칭 시작/수락/게임 진입 흐름에 영향이 없다.
+- [x] 랭킹 API 성공 시 실제 랭킹 목록, 내 순위, top %가 표시된다.
+- [x] season best 섹션이 표시되지 않는다.
+- [x] 랭킹 API 실패 시 부가 UI error만 표시된다.
+- [x] 매칭 시작/수락/게임 진입 흐름에 영향이 없다.
 
 ## Section 3. Record / Profile Page
 
@@ -700,7 +700,7 @@ Policy:
 5. [x] Section 2-2. 내 랭크 조회 API 계약
 6. [x] Section 2-3. MatchPage 내 프로필 / 랭크 실데이터 구현
 7. [x] Section 2-4. 랭킹 조회 API 계약
-8. [ ] Section 2-5. MatchPage 랭킹 실데이터 구현
+8. [x] Section 2-5. MatchPage 랭킹 실데이터 구현
 9. [ ] Section 3-1. 내 전적 목록 API 계약
 10. [ ] Section 3-2. 전적 페이지 구현
 11. [ ] Section 3-3. 프로필 상세 API 계약
@@ -715,7 +715,7 @@ Policy:
 - [x] “로그인부터 게임 결과까지”는 현재 MVP Core로 구현되어 있다.
 - [x] “회원가입부터 매칭까지”라고 말하려면 Section 1-1이 필요하다.
 - [x] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1부터 2-3까지 필요하다.
-- [ ] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1부터 2-5까지 필요하다.
+- [x] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1부터 2-5까지 필요하다.
 - [ ] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1과 3-2가 필요하다.
 - [ ] “내 프로필 상세를 볼 수 있다”고 말하려면 Section 3-3과 3-4가 필요하다.
 - [ ] “현재 화면의 모든 버튼이 기능한다”고 말하려면 Section 4까지 필요하다.

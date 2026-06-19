@@ -24,6 +24,8 @@
     :data-profile-error-message="profileErrorMessage"
     :data-rank-status="rankStatus"
     :data-rank-error-message="rankErrorMessage"
+    :data-ranking-status="rankingStatus"
+    :data-ranking-error-message="rankingErrorMessage"
   >
     <header class="match-app-bar" aria-label="Match navigation">
       <h1>LEAGUE OF STAR</h1>
@@ -70,45 +72,42 @@
           <div class="summary-grid">
             <div>
               <span>{{ t('match.myRank') }}</span>
-              <strong>#128</strong>
+              <strong>{{ displayMyRankingPosition }}</strong>
             </div>
             <div>
               <span>{{ t('match.top') }}</span>
-              <strong>7%</strong>
-            </div>
-            <div>
-              <span>{{ t('match.seasonBest') }}</span>
-              <strong>#94</strong>
+              <strong>{{ displayTopPercent }}</strong>
             </div>
           </div>
         </section>
 
         <ol class="ranking-list" aria-label="Top ranking">
-          <li>
-            <span>1</span>
-            <strong>Legendary Star</strong>
-            <em>3,492 LP</em>
-          </li>
-          <li>
-            <span>2</span>
-            <strong>ShadowWalker</strong>
-            <em>3,218 LP</em>
-          </li>
-          <li>
-            <span>3</span>
-            <strong>K-God Z</strong>
-            <em>3,105 LP</em>
-          </li>
-          <li class="is-current">
+          <li v-if="rankingStatus === 'loading'" class="ranking-state">
             <span>-</span>
-            <strong>{{ displayNickname }}</strong>
-            <em>{{ displayLp }}</em>
+            <strong>{{ t('match.rankingLoading') }}</strong>
+            <em />
           </li>
-          <li>
-            <span>129</span>
-            <strong>SoloQueueKing</strong>
-            <em>1,240 LP</em>
+          <li v-else-if="rankingStatus === 'error'" class="ranking-state">
+            <span>-</span>
+            <strong>{{ rankingErrorMessage }}</strong>
+            <em />
           </li>
+          <li v-else-if="displayRankingEntries.length === 0" class="ranking-state">
+            <span>-</span>
+            <strong>{{ t('match.rankingEmpty') }}</strong>
+            <em />
+          </li>
+          <template v-else>
+            <li
+              v-for="entry in displayRankingEntries"
+              :key="rankingEntryKey(entry)"
+              :class="{ 'is-current': isCurrentRankingEntry(entry) }"
+            >
+              <span>{{ formatRankPosition(entry.rankPosition) }}</span>
+              <strong>{{ entry.nickname }}</strong>
+              <em>{{ formatRankingLp(entry.lp) }}</em>
+            </li>
+          </template>
         </ol>
       </aside>
 
@@ -271,7 +270,9 @@ import { saveGameWaitingPayloadFromMatchResult } from '@/services/gameWaitingPay
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
 import { getMyProfile } from '@/services/profileService'
 import { getMyRank } from '@/services/rankService'
+import { getRankings } from '@/services/rankingService'
 import { connectMatchEventSource } from '@/services/realtime/matchEventSource'
+import type { RankingEntryResponse, RankingResponse } from '@/types/ranking'
 import type { UserProfileResponse, UserRankResponse } from '@/types/user'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
@@ -292,10 +293,13 @@ const isLoggingOut = ref(false)
 const isLogoutConfirmOpen = ref(false)
 const profileStatus = ref('idle')
 const rankStatus = ref('idle')
+const rankingStatus = ref('idle')
 const profile = shallowRef<UserProfileResponse>()
 const rank = shallowRef<UserRankResponse>()
+const ranking = shallowRef<RankingResponse>()
 const profileErrorMessage = ref('')
 const rankErrorMessage = ref('')
+const rankingErrorMessage = ref('')
 const isMatchFoundModalOpen = ref(false)
 const matchFoundCountdownSeconds = ref(0)
 const matchResponseCommandStatus = ref('idle')
@@ -487,6 +491,45 @@ const rankProgressWidth = computed(() => {
 
   return `${clamp(rank.value.lp, 0, 100)}%`
 })
+const displayMyRankingPosition = computed(() => {
+  if (ranking.value !== undefined) {
+    return formatRankPosition(ranking.value.summary.myRankPosition)
+  }
+
+  if (rankingStatus.value === 'loading') {
+    return t('match.rankingLoading')
+  }
+
+  return '-'
+})
+const displayTopPercent = computed(() => {
+  if (ranking.value !== undefined) {
+    return `${formatNumber(ranking.value.summary.topPercent)}%`
+  }
+
+  if (rankingStatus.value === 'loading') {
+    return t('match.rankingLoading')
+  }
+
+  return '-'
+})
+const displayRankingEntries = computed(() => {
+  if (ranking.value === undefined) {
+    return []
+  }
+
+  if (ranking.value.entries.length === 0) {
+    return []
+  }
+
+  const currentUser = ranking.value.currentUser
+
+  if (ranking.value.entries.some((entry) => isCurrentRankingEntry(entry, currentUser))) {
+    return ranking.value.entries
+  }
+
+  return [...ranking.value.entries, currentUser]
+})
 
 const MATCH_STREAM_ERROR_MESSAGE = 'Match event stream is currently unavailable.'
 const MATCH_QUEUE_ERROR_MESSAGE = 'Match queue request failed. Please try again.'
@@ -507,6 +550,7 @@ let matchResponseAbortController = new AbortController()
 let logoutAbortController = new AbortController()
 let profileAbortController = new AbortController()
 let rankAbortController = new AbortController()
+let rankingAbortController = new AbortController()
 
 onMounted(() => {
   isActive = true
@@ -523,6 +567,7 @@ onUnmounted(() => {
   abortLogoutRequest()
   abortProfileRequest()
   abortRankRequest()
+  abortRankingRequest()
   stopMatchWaitingTimer()
   stopMatchFoundCountdown()
   closeMatchStream()
@@ -531,15 +576,20 @@ onUnmounted(() => {
 function loadAccountPanels() {
   abortProfileRequest()
   abortRankRequest()
+  abortRankingRequest()
   profileAbortController = new AbortController()
   rankAbortController = new AbortController()
+  rankingAbortController = new AbortController()
   profileStatus.value = 'loading'
   rankStatus.value = 'loading'
+  rankingStatus.value = 'loading'
   profileErrorMessage.value = ''
   rankErrorMessage.value = ''
+  rankingErrorMessage.value = ''
 
   void loadProfile(profileAbortController.signal)
   void loadRank(rankAbortController.signal)
+  void loadRanking(rankingAbortController.signal)
 }
 
 async function loadProfile(signal: AbortSignal) {
@@ -583,6 +633,28 @@ async function loadRank(signal: AbortSignal) {
     rank.value = undefined
     rankStatus.value = 'error'
     rankErrorMessage.value = getAccountPanelErrorMessage(error, t('match.rankUnavailable'))
+  }
+}
+
+async function loadRanking(signal: AbortSignal) {
+  try {
+    const response = await getRankings(signal, 5)
+
+    if (!isActive || signal.aborted) {
+      return
+    }
+
+    ranking.value = response
+    rankingStatus.value = 'success'
+    rankingErrorMessage.value = ''
+  } catch (error) {
+    if (!isActive || isAbortError(error)) {
+      return
+    }
+
+    ranking.value = undefined
+    rankingStatus.value = 'error'
+    rankingErrorMessage.value = getAccountPanelErrorMessage(error, t('match.rankingUnavailable'))
   }
 }
 
@@ -1123,6 +1195,10 @@ function abortRankRequest() {
   rankAbortController.abort()
 }
 
+function abortRankingRequest() {
+  rankingAbortController.abort()
+}
+
 function resetLocalLogoutState() {
   resetMatchFoundModalState()
   queueStatus.value = 'ready'
@@ -1169,6 +1245,25 @@ function clamp(value: number, min: number, max: number) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat().format(value)
+}
+
+function formatRankPosition(rankPosition: number) {
+  return `#${formatNumber(rankPosition)}`
+}
+
+function formatRankingLp(lp: number) {
+  return `${formatNumber(lp)} LP`
+}
+
+function rankingEntryKey(entry: RankingEntryResponse) {
+  return `${entry.userId}:${entry.rankPosition}`
+}
+
+function isCurrentRankingEntry(
+  entry: RankingEntryResponse,
+  currentUser = ranking.value?.currentUser,
+) {
+  return entry.isCurrentUser || (currentUser !== undefined && entry.userId === currentUser.userId)
 }
 
 function resetMatchResponseCommandState() {
@@ -1419,12 +1514,10 @@ function closeErrorModal() {
   min-height: 72px;
   padding: 16px 18px;
   border-right: 1px solid rgba(206, 224, 255, 0.08);
-  border-bottom: 1px solid rgba(206, 224, 255, 0.08);
 }
 
 .summary-grid div:last-child {
-  grid-column: 1 / -1;
-  border-bottom: 0;
+  border-right: 0;
 }
 
 .summary-grid strong {
@@ -1474,6 +1567,10 @@ function closeErrorModal() {
 
 .ranking-list .is-current em {
   color: var(--match-accent);
+}
+
+.ranking-state strong {
+  color: var(--match-muted);
 }
 
 .match-cta-panel {
