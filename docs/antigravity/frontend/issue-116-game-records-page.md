@@ -161,12 +161,12 @@ interface GameRecordEntryResponse {
 
 ### 1. Frontend Game Records Contract 정리
 
-- [ ] issue-114의 `GET /api/v1/users/me/game-records?page=1` 계약 확인.
-- [ ] `GameRecordListResponse`, `GameRecordEntryResponse` type 정의.
-- [ ] `page`만 query로 보내고 `size`는 보내지 않는 정책 문서화.
-- [ ] `totalPages`, `hasNext`, `page`를 pagination source로 사용하는 정책 문서화.
-- [ ] Game Result Summary와 전적 목록 API 책임 분리 문서화.
-- [ ] sessionStorage payload를 전적 목록 source로 사용하지 않는 정책 문서화.
+- [x] issue-114의 `GET /api/v1/users/me/game-records?page=1` 계약 확인.
+- [x] `GameRecordListResponse`, `GameRecordEntryResponse` type 정의.
+- [x] `page`만 query로 보내고 `size`는 보내지 않는 정책 문서화.
+- [x] `totalPages`, `hasNext`, `page`를 pagination source로 사용하는 정책 문서화.
+- [x] Game Result Summary와 전적 목록 API 책임 분리 문서화.
+- [x] sessionStorage payload를 전적 목록 source로 사용하지 않는 정책 문서화.
 
 ### 2. Game Records Service / Route 구현
 
