@@ -144,6 +144,9 @@ class GameEndSettlementServiceTest {
         org.assertj.core.api.Assertions.assertThat(payload.result()).isEqualTo(GameResult.DRAW);
         org.assertj.core.api.Assertions.assertThat(payload.reason()).isEqualTo("PRACTICE_TIMEOUT");
         org.assertj.core.api.Assertions.assertThat(payload.practiceResult()).isEqualTo(PracticeResult.FAILED);
+        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(
+                org.mockito.ArgumentMatchers.any(GameRoom.class)
+        );
     }
 
     @Test

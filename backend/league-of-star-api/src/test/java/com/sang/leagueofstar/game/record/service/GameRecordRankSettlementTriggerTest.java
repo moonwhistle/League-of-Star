@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.game.record.service;
 
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.record.service.GameRecordRankSettlementService;
 import org.junit.jupiter.api.AfterEach;
@@ -93,10 +94,33 @@ class GameRecordRankSettlementTriggerTest {
         verify(finishedGameMatchStatusCleanupService, never()).cleanupIfSettled(GAME_ROOM_ID);
     }
 
+    @Test
+    @DisplayName("settleFinishedGameRoomAfterCommit - PRACTICE gameRoom이면 정산을 등록하지 않는다")
+    void settleFinishedGameRoomAfterCommit_PracticeRoom_NoOp() {
+        // given
+        GameRoom gameRoom = finishedPracticeGameRoom();
+
+        // when
+        trigger.settleFinishedGameRoomAfterCommit(gameRoom);
+
+        // then
+        verifyNoInteractions(gameRecordRankSettlementService, finishedGameMatchStatusCleanupService);
+    }
+
     private GameRoom finishedGameRoom() {
         GameRoom gameRoom = GameRoom.builder()
                 .id(GAME_ROOM_ID)
                 .build();
+        gameRoom.finish(GameResult.PLAYER1_WIN, WINNER_ID);
+        return gameRoom;
+    }
+
+    private GameRoom finishedPracticeGameRoom() {
+        GameRoom gameRoom = GameRoom.builder()
+                .id(GAME_ROOM_ID)
+                .gameMode(GameMode.PRACTICE)
+                .build();
+        gameRoom.addParticipant(WINNER_ID);
         gameRoom.finish(GameResult.PLAYER1_WIN, WINNER_ID);
         return gameRoom;
     }

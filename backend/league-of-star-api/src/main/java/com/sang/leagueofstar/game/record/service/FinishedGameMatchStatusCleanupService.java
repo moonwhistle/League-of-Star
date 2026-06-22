@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.game.record.service;
 
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.service.GameRoomReadService;
 import com.sang.leagueofstar.domain.record.service.GameRecordRankSettlementService;
 import com.sang.leagueofstar.game.record.common.constant.GameRecordConstants;
@@ -29,6 +30,11 @@ public class FinishedGameMatchStatusCleanupService {
     }
 
     private void cleanup(Long gameRoomId) {
+        GameMode gameMode = gameRoomReadService.getMode(gameRoomId);
+        if (gameMode.isPractice()) {
+            return;
+        }
+
         GameStatus status = gameRoomReadService.getStatus(gameRoomId);
         if (!status.isFinished()) {
             log.warn("Skipped match status cleanup because gameRoom is not FINISHED: gameRoomId={}, status={}",

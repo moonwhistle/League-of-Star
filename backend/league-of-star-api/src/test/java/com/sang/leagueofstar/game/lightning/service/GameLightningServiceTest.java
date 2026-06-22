@@ -117,6 +117,7 @@ class GameLightningServiceTest {
         when(gameActionCommandService.save(action)).thenReturn(GameActionSaveResult.saved(action));
         when(gameRoomCommandService.finishInProgressRoomByLightningKill(GAME_ROOM_ID, USER_ID))
                 .thenReturn(Optional.of(finishedRoom));
+        when(finishedRoom.isMatchMode()).thenReturn(true);
         when(finishedRoom.getResult()).thenReturn(GameResult.PLAYER1_WIN);
         when(finishedRoom.getWinnerId()).thenReturn(USER_ID);
 
@@ -158,6 +159,7 @@ class GameLightningServiceTest {
         assertThat(result.get().gameResult().gameMode()).isEqualTo(GameMode.PRACTICE);
         assertThat(result.get().gameResult().reason()).isEqualTo("PRACTICE_LIGHTNING_KILL");
         assertThat(result.get().gameResult().practiceResult()).isEqualTo(PracticeResult.SUCCESS);
+        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
     }
 
     @Test
@@ -167,6 +169,7 @@ class GameLightningServiceTest {
         GameAction action = GameAction.lightning(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 2_200, 1_000);
         when(gameRoomCommandService.lockLightningResultRoom(GAME_ROOM_ID, USER_ID)).thenReturn(finishedRoom);
         when(finishedRoom.getStatus()).thenReturn(GameStatus.FINISHED);
+        when(finishedRoom.getGameMode()).thenReturn(GameMode.MATCH);
         when(finishedRoom.getResult()).thenReturn(GameResult.PLAYER1_WIN);
         when(finishedRoom.getWinnerId()).thenReturn(USER_ID);
         when(gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))

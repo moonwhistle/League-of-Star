@@ -29,7 +29,8 @@ public enum ApiErrorCode implements BaseErrorCode {
 
     // Game Summary (GAME_SUMMARY_001 ~ )
     GAME_SUMMARY_NOT_FINISHED(409, "GAME_SUMMARY_001", "종료된 게임의 결과만 조회할 수 있습니다."),
-    GAME_SUMMARY_INVALID_RECORD_STATE(409, "GAME_SUMMARY_002", "게임 결과 기록 상태가 올바르지 않습니다.");
+    GAME_SUMMARY_INVALID_RECORD_STATE(409, "GAME_SUMMARY_002", "게임 결과 기록 상태가 올바르지 않습니다."),
+    GAME_SUMMARY_UNSUPPORTED_PRACTICE(409, "GAME_SUMMARY_003", "연습 게임은 summary 조회를 지원하지 않습니다.");
 
     private final int httpStatus;
     private final String customCode;

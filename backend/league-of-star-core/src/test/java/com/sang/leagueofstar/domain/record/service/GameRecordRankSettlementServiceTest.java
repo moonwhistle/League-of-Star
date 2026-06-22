@@ -3,6 +3,7 @@ package com.sang.leagueofstar.domain.record.service;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
@@ -218,6 +219,22 @@ class GameRecordRankSettlementServiceTest {
     }
 
     @Test
+    @DisplayName("settleFinishedGameRoom - PRACTICE gameRoom이면 record/rank 정산을 하지 않는다")
+    void settleFinishedGameRoom_PracticeRoom_NoOp() {
+        // given
+        GameRoom gameRoom = createFinishedPracticeGameRoom(GameResult.PLAYER1_WIN, FIRST_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when
+        gameRecordRankSettlementService.settleFinishedGameRoom(GAME_ROOM_ID);
+
+        // then
+        verify(gameRecordRepository, never()).countByGameRoomId(GAME_ROOM_ID);
+        verify(gameRecordRepository, never()).saveAll(anyList());
+        verify(rankCommandService, never()).applyRecordResults(anyList());
+    }
+
+    @Test
     @DisplayName("settleFinishedGameRoom - record가 1행이면 불완전 정산 상태로 보고 예외를 던진다")
     void settleFinishedGameRoom_PartiallySettled_ThrowException() {
         // given
@@ -270,8 +287,9 @@ class GameRecordRankSettlementServiceTest {
     void findUnsettledFinishedGameRoomIds() {
         // given
         int limit = 100;
-        given(gameRoomRepository.findGameRoomIdsByStatusAndRecordCountNot(
+        given(gameRoomRepository.findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
                 GameStatus.FINISHED,
+                GameMode.MATCH,
                 GameRoom.MAX_PARTICIPANTS,
                 PageRequest.of(0, limit)
         )).willReturn(List.of(GAME_ROOM_ID));
@@ -285,6 +303,15 @@ class GameRecordRankSettlementServiceTest {
 
     private GameRoom createFinishedGameRoom(GameResult result, Long winnerId) {
         GameRoom gameRoom = createReadyGameRoom();
+        gameRoom.finish(result, winnerId);
+        return gameRoom;
+    }
+
+    private GameRoom createFinishedPracticeGameRoom(GameResult result, Long winnerId) {
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.PRACTICE)
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.finish(result, winnerId);
         return gameRoom;
     }

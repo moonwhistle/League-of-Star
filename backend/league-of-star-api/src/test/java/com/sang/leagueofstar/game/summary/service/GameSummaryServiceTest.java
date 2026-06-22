@@ -4,6 +4,7 @@ import com.sang.leagueofstar.common.exception.ApiErrorCode;
 import com.sang.leagueofstar.common.exception.ApiException;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.service.GameRoomReadService;
@@ -257,6 +258,7 @@ class GameSummaryServiceTest {
         // given
         given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(new GameRoomSummaryReadModel(
                 GAME_ID,
+                GameMode.MATCH,
                 GameStatus.READY,
                 null,
                 null,
@@ -277,6 +279,7 @@ class GameSummaryServiceTest {
         // given
         given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(new GameRoomSummaryReadModel(
                 GAME_ID,
+                GameMode.MATCH,
                 GameStatus.IN_PROGRESS,
                 null,
                 null,
@@ -297,6 +300,7 @@ class GameSummaryServiceTest {
         // given
         given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(new GameRoomSummaryReadModel(
                 GAME_ID,
+                GameMode.MATCH,
                 GameStatus.ABORTED,
                 null,
                 null,
@@ -325,6 +329,28 @@ class GameSummaryServiceTest {
         assertThatThrownBy(() -> gameSummaryService.getSummary(GAME_ID, FIRST_USER_ID))
                 .isInstanceOfSatisfying(ApiException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ApiErrorCode.GAME_SUMMARY_INVALID_RECORD_STATE));
+    }
+
+    @Test
+    @DisplayName("getSummary - PRACTICE gameRoom이면 summary 조회를 거부한다")
+    void getSummary_PracticeRoom_ThrowUnsupportedPractice() {
+        // given
+        given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(new GameRoomSummaryReadModel(
+                GAME_ID,
+                GameMode.PRACTICE,
+                GameStatus.FINISHED,
+                GameResult.PLAYER1_WIN,
+                FIRST_USER_ID,
+                FINISHED_AT,
+                List.of(FIRST_USER_ID)
+        ));
+
+        // when & then
+        assertThatThrownBy(() -> gameSummaryService.getSummary(GAME_ID, FIRST_USER_ID))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ApiErrorCode.GAME_SUMMARY_UNSUPPORTED_PRACTICE));
+        verify(gameRecordReadService, never()).countByGameRoomId(GAME_ID);
     }
 
     @Test
@@ -386,6 +412,7 @@ class GameSummaryServiceTest {
     private GameRoomSummaryReadModel finishedRoom(GameResult result, Long winnerId) {
         return new GameRoomSummaryReadModel(
                 GAME_ID,
+                GameMode.MATCH,
                 GameStatus.FINISHED,
                 result,
                 winnerId,

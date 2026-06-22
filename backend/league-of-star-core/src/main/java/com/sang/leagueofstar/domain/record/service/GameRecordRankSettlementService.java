@@ -3,6 +3,7 @@ package com.sang.leagueofstar.domain.record.service;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameParticipantResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
@@ -44,6 +45,9 @@ public class GameRecordRankSettlementService {
     public void settleFinishedGameRoom(Long gameRoomId) {
         GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+        if (gameRoom.isPracticeMode()) {
+            return;
+        }
         long recordCount = gameRecordRepository.countByGameRoomId(gameRoomId);
         if (recordCount == SETTLED_RECORD_COUNT) {
             return;
@@ -85,8 +89,9 @@ public class GameRecordRankSettlementService {
      */
     @Transactional(readOnly = true)
     public List<Long> findUnsettledFinishedGameRoomIds(int limit) {
-        return gameRoomRepository.findGameRoomIdsByStatusAndRecordCountNot(
+        return gameRoomRepository.findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
                 GameStatus.FINISHED,
+                GameMode.MATCH,
                 SETTLED_RECORD_COUNT,
                 PageRequest.of(0, limit)
         );

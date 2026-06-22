@@ -254,12 +254,12 @@ WebSocket access token 전달 방식도 기존 Game WebSocket 정책을 그대�
 
 ### 5. Settlement 차단 구현
 
-- [ ] `GameLightningService`에서 practice kill 시 settlement trigger를 호출하지 않음.
-- [ ] `GameEndSettlementService`에서 practice timeout 시 settlement trigger를 호출하지 않음.
-- [ ] `GameRecordRankSettlementService`에서 practice room이면 no-op 처리.
-- [ ] 미정산 FINISHED room recovery 조회에서 practice room 제외.
-- [ ] `FinishedGameMatchStatusCleanupService`가 practice room을 cleanup 대상으로 보지 않게 방어.
-- [ ] `GameSummaryService`에서 practice room summary 요청을 거부.
+- [x] `GameLightningService`에서 practice kill 시 settlement trigger를 호출하지 않음.
+- [x] `GameEndSettlementService`에서 practice timeout 시 settlement trigger를 호출하지 않음.
+- [x] `GameRecordRankSettlementService`에서 practice room이면 no-op 처리.
+- [x] 미정산 FINISHED room recovery 조회에서 practice room 제외.
+- [x] `FinishedGameMatchStatusCleanupService`가 practice room을 cleanup 대상으로 보지 않게 방어.
+- [x] `GameSummaryService`에서 practice room summary 요청을 거부.
 
 ### 6. Test 구현
 

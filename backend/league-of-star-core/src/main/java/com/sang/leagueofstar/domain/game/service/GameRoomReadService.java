@@ -4,6 +4,7 @@ import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.game.domain.GameParticipant;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
@@ -74,6 +75,12 @@ public class GameRoomReadService {
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
     }
 
+    public GameMode getMode(Long gameRoomId) {
+        return gameRoomRepository.findById(gameRoomId)
+                .map(GameRoom::getGameMode)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+    }
+
     public List<Long> getParticipantUserIds(Long gameRoomId) {
         GameRoom gameRoom = gameRoomRepository.findById(gameRoomId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
@@ -99,6 +106,7 @@ public class GameRoomReadService {
 
         return new GameRoomSummaryReadModel(
                 gameRoom.getId(),
+                gameRoom.getGameMode(),
                 gameRoom.getStatus(),
                 gameRoom.getResult(),
                 gameRoom.getWinnerId(),

@@ -22,6 +22,9 @@ public class GameRecordRankSettlementTrigger {
      * <p>정산 실패는 종료 결과와 GAME_RESULT 전송 흐름에 전파하지 않습니다.</p>
      */
     public void settleFinishedGameRoomAfterCommit(GameRoom gameRoom) {
+        if (gameRoom.isPracticeMode()) {
+            return;
+        }
         GameRecordRankSettlementCommand command = GameRecordRankSettlementCommand.from(gameRoom);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

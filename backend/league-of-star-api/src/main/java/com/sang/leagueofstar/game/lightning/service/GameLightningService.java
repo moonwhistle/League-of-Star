@@ -74,7 +74,9 @@ public class GameLightningService {
                 saveResult.action().getUserId()
         );
         return finishedGameRoom.map(finishedRoom -> {
-            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
+            if (finishedRoom.isMatchMode()) {
+                gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
+            }
             return GameLightningHandleResponse.appliedAndBroadcastResult(
                     lightningApplied,
                     lightningKillGameResult(gameRoomId, finishedRoom)
