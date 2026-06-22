@@ -2,6 +2,7 @@
   <!-- eslint-disable vue/html-closing-bracket-newline, vue/html-indent, vue/max-attributes-per-line, vue/singleline-html-element-content-newline -->
   <main
     class="profile-page"
+    :style="{ '--profile-background-image': `url(${backgroundImageUrl})` }"
     :aria-label="t('profile.pageLabel')"
     :data-profile-status="profileStatus"
     :data-profile-error-message="profileErrorMessage"
@@ -131,6 +132,8 @@ import { getMyRank } from '@/services/rankService'
 import type { GameRecordResult } from '@/types/game'
 import type { GameRecordEntryResponse, GameRecordListResponse } from '@/types/gameRecord'
 import type { UserProfileResponse, UserRankResponse } from '@/types/user'
+
+import backgroundImageUrl from '../../img/background-new-sharp.png'
 
 const PROFILE_FIRST_RECORDS_PAGE = 1
 const PROFILE_MAX_RECORD_PAGES = 3
@@ -401,16 +404,27 @@ function returnToMatch() {
 
 <style scoped>
 .profile-page {
+  position: relative;
   min-height: 100vh;
   padding: 32px;
   color: #f8fbff;
   background:
-    radial-gradient(circle at 78% 22%, rgba(255, 216, 111, 0.2), transparent 28%),
-    radial-gradient(circle at 18% 74%, rgba(103, 232, 249, 0.14), transparent 34%),
-    linear-gradient(145deg, #030610 0%, #07101f 46%, #030610 100%);
+    linear-gradient(90deg, rgba(4, 8, 22, 0.64), rgba(4, 8, 22, 0.18) 58%),
+    linear-gradient(0deg, rgba(4, 8, 22, 0.62), rgba(4, 8, 22, 0.08) 48%),
+    var(--profile-background-image);
+  background-color: #030610;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-position: center top;
+  background-size:
+    100% 100%,
+    100% 100%,
+    contain;
 }
 
 .profile-shell {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 22px;
   width: min(1080px, 100%);
