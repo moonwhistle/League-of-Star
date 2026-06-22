@@ -7,7 +7,6 @@ import { router } from './index'
 const protectedRouteNames = [
   ROUTE_NAMES.match,
   ROUTE_NAMES.profile,
-  ROUTE_NAMES.records,
   ROUTE_NAMES.gameWaiting,
   ROUTE_NAMES.gamePlay,
   ROUTE_NAMES.gameResult,

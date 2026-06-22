@@ -39,20 +39,6 @@
         <button
           class="icon-button"
           type="button"
-          :aria-label="t('match.records')"
-          @click="navigateToRecords"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 5h14" />
-            <path d="M5 12h14" />
-            <path d="M5 19h14" />
-            <path d="M8 5v14" />
-            <path d="M16 5v14" />
-          </svg>
-        </button>
-        <button
-          class="icon-button"
-          type="button"
           :aria-label="t('match.logout')"
           :disabled="!canLogout"
           @click="openLogoutConfirm"
@@ -746,10 +732,6 @@ async function finalizeLogout() {
 
     await router.push({ name: ROUTE_NAMES.login })
   }
-}
-
-function navigateToRecords() {
-  void router.push({ name: ROUTE_NAMES.records })
 }
 
 function navigateToProfile() {

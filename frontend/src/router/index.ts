@@ -47,14 +47,6 @@ export const router = createRouter({
       },
     },
     {
-      path: ROUTE_PATHS.records,
-      name: ROUTE_NAMES.records,
-      component: () => import('@/pages/GameRecordsPage.vue'),
-      meta: {
-        requiresAuth: true,
-      },
-    },
-    {
       path: ROUTE_PATHS.gameWaiting,
       name: ROUTE_NAMES.gameWaiting,
       component: () => import('@/pages/GameWaitingPage.vue'),

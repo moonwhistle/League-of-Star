@@ -214,9 +214,8 @@ describe('MatchPage', () => {
     await flushPromises()
 
     expect(wrapper.get('h1').text()).toBe('LEAGUE OF STAR')
-    expect(wrapper.findAll('.match-actions .icon-button')).toHaveLength(2)
+    expect(wrapper.findAll('.match-actions .icon-button')).toHaveLength(1)
     expect(wrapper.find('.match-action-button').text()).toBe('내 정보')
-    expect(wrapper.find('[aria-label="전적 보기"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="로그아웃"]').exists()).toBe(true)
     expect(getMyProfileMock).toHaveBeenCalledWith(expect.any(AbortSignal))
     expect(getMyRankMock).toHaveBeenCalledWith(expect.any(AbortSignal))
@@ -244,15 +243,6 @@ describe('MatchPage', () => {
     expect(wrapper.get('main').attributes('data-profile-status')).toBe('success')
     expect(wrapper.get('main').attributes('data-rank-status')).toBe('success')
     expect(wrapper.get('main').attributes('data-ranking-status')).toBe('success')
-  })
-
-  it('moves to the records route from the records action', async () => {
-    const wrapper = mount(MatchPage)
-    await flushPromises()
-
-    await wrapper.get('[aria-label="전적 보기"]').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.records })
   })
 
   it('moves to the profile route from the profile panel', async () => {
@@ -415,7 +405,7 @@ describe('MatchPage', () => {
     expect(wrapper.get('[aria-label="Ranking summary"]').text()).toContain('Ranking')
     expect(wrapper.get('[aria-label="Current rank"]').text()).toContain('Current Rank')
     expect(wrapper.get('[data-testid="match-start-button"]').text()).toContain('Start Matching')
-    expect(wrapper.find('[aria-label="Records"]').exists()).toBe(true)
+    expect(wrapper.find('.match-action-button').text()).toBe('My Info')
     expect(wrapper.find('[aria-label="Logout"]').exists()).toBe(true)
   })
 
