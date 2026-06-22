@@ -263,21 +263,21 @@ WebSocket access token 전달 방식도 기존 Game WebSocket 정책을 그대�
 
 ### 6. Test 구현
 
-- [ ] core service unit test 구현.
-- [ ] core JPA test로 `gameMode` 저장/조회 검증.
-- [ ] practice room participant 1명 생성 검증.
-- [ ] practice room start 검증.
-- [ ] practice lightning kill 종료 검증.
-- [ ] practice timeout 종료 검증.
-- [ ] practice room settlement no-op 검증.
-- [ ] recovery query가 practice room을 제외하는지 검증.
-- [ ] controller API test는 `RestAssuredMockMvc`로 구현.
-- [ ] service orchestration은 unit test로 구현.
-- [ ] WebSocket handshake practice 허용 테스트 구현.
-- [ ] `GameLightningService` practice 결과 테스트 구현.
-- [ ] `GameEndSettlementService` practice timeout 테스트 구현.
-- [ ] Summary API practice 차단 테스트 구현.
-- [ ] RestDocs 성공/실패 문서화.
+- [x] core service unit test 구현.
+- [x] core JPA test로 `gameMode` 저장/조회 검증.
+- [x] practice room participant 1명 생성 검증.
+- [x] practice room start 검증.
+- [x] practice lightning kill 종료 검증.
+- [x] practice timeout 종료 검증.
+- [x] practice room settlement no-op 검증.
+- [x] recovery query가 practice room을 제외하는지 검증.
+- [x] controller API test는 `RestAssuredMockMvc`로 구현.
+- [x] service orchestration은 unit test로 구현.
+- [x] WebSocket handshake practice 허용 테스트 구현.
+- [x] `GameLightningService` practice 결과 테스트 구현.
+- [x] `GameEndSettlementService` practice timeout 테스트 구현.
+- [x] Summary API practice 차단 테스트 구현.
+- [x] RestDocs 성공/실패 문서화.
 
 ### 7. 문서 정합성 구현
 
