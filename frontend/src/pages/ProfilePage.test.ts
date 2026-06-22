@@ -139,4 +139,56 @@ describe('ProfilePage', () => {
     expect(wrapper.text()).toContain('GOLD_IV')
     expect(wrapper.text()).toContain('Opponent22')
   })
+
+  it('renders an empty records state without blocking profile and rank', async () => {
+    getMyGameRecordsMock.mockResolvedValueOnce({
+      page: 1,
+      size: 10,
+      totalPages: 0,
+      totalElements: 0,
+      hasNext: false,
+      records: [],
+    })
+
+    const wrapper = mount(ProfilePage)
+    await flushPromises()
+
+    expect(getMyGameRecordsMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('main').attributes('data-profile-status')).toBe('success')
+    expect(wrapper.get('main').attributes('data-rank-status')).toBe('success')
+    expect(wrapper.get('main').attributes('data-records-status')).toBe('success')
+    expect(wrapper.get('main').attributes('data-records-count')).toBe('0')
+    expect(wrapper.text()).toContain('MoonStar')
+    expect(wrapper.text()).toContain('GOLD_IV')
+    expect(wrapper.text()).toContain('최근 전적 없음')
+  })
+
+  it('keeps profile and records visible when rank loading fails', async () => {
+    getMyRankMock.mockRejectedValueOnce(new Error('rank failed'))
+
+    const wrapper = mount(ProfilePage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-profile-status')).toBe('success')
+    expect(wrapper.get('main').attributes('data-rank-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-records-status')).toBe('success')
+    expect(wrapper.text()).toContain('MoonStar')
+    expect(wrapper.text()).toContain('rank failed')
+    expect(wrapper.text()).toContain('Opponent22')
+  })
+
+  it('keeps profile and rank visible when records loading fails', async () => {
+    getMyGameRecordsMock.mockRejectedValueOnce(new Error('records failed'))
+
+    const wrapper = mount(ProfilePage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-profile-status')).toBe('success')
+    expect(wrapper.get('main').attributes('data-rank-status')).toBe('success')
+    expect(wrapper.get('main').attributes('data-records-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-records-count')).toBe('0')
+    expect(wrapper.text()).toContain('MoonStar')
+    expect(wrapper.text()).toContain('GOLD_IV')
+    expect(wrapper.text()).toContain('records failed')
+  })
 })

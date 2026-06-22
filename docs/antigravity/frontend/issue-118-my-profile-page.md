@@ -281,18 +281,18 @@ interface GameRecordEntryResponse {
 
 ### 5. Test 구현
 
-- [ ] ProfilePage mount 시 3개 API를 호출하는지 테스트.
-- [ ] profile 성공 표시 테스트.
-- [ ] rank 성공 표시 테스트.
-- [ ] records 성공 표시 테스트.
-- [ ] records empty 상태 테스트.
-- [ ] profile 실패가 rank/records 표시를 막지 않는지 테스트.
-- [ ] rank 실패가 profile/records 표시를 막지 않는지 테스트.
-- [ ] records 실패가 profile/rank 표시를 막지 않는지 테스트.
-- [ ] MatchPage 상단 내 정보 버튼 이동 테스트.
-- [ ] `/match` 복귀 이동 테스트.
-- [ ] router protected route 테스트에 profile 추가.
-- [ ] MatchPage 프로필 영역 클릭 시 profile route 이동 테스트.
+- [x] ProfilePage mount 시 3개 API를 호출하는지 테스트.
+- [x] profile 성공 표시 테스트.
+- [x] rank 성공 표시 테스트.
+- [x] records 성공 표시 테스트.
+- [x] records empty 상태 테스트.
+- [x] profile 실패가 rank/records 표시를 막지 않는지 테스트.
+- [x] rank 실패가 profile/records 표시를 막지 않는지 테스트.
+- [x] records 실패가 profile/rank 표시를 막지 않는지 테스트.
+- [x] MatchPage 상단 내 정보 버튼 이동 테스트.
+- [x] `/match` 복귀 이동 테스트.
+- [x] router protected route 테스트에 profile 추가.
+- [x] MatchPage 프로필 영역 클릭 시 profile route 이동 테스트.
 
 ### 6. 문서 정합성 구현
 
