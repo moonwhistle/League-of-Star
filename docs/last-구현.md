@@ -431,13 +431,13 @@ Acceptance Criteria:
 
 목표:
 
-- [x] 내 정보 화면에서 최근 전적 최대 30경기를 한 번에 확인할 수 있게 한다.
+- [x] 내 정보 화면에서 최근 전적 최대 30경기를 10개 단위 페이지로 확인할 수 있게 한다.
 
 Frontend:
 
 - [x] record service를 추가한다.
-- [x] ProfilePage에서 백엔드 `totalPages` 기준 page 1~3을 조회한다.
-- [x] ProfilePage에서 최신 30경기까지 한 화면에 표시한다.
+- [x] ProfilePage에서 최초 page 1을 조회한다.
+- [x] ProfilePage에서 page 1/2/3 버튼으로 선택한 전적 page만 조회한다.
 - [x] loading/error/empty 상태를 구현한다.
 - [x] 한 경기당 가로 바 형태로 `나 VS 상대` 전적 row를 표시한다.
 - [x] MatchPage 상단 내 정보 버튼을 `/profile`로 연결한다.
@@ -455,7 +455,7 @@ Policy:
 Acceptance Criteria:
 
 - [x] 내 정보 버튼 클릭 시 `/profile`로 이동한다.
-- [x] 전적 API 성공 시 ProfilePage에 최근 경기 최대 30개가 표시된다.
+- [x] 전적 API 성공 시 ProfilePage에 현재 선택한 최근 전적 page가 표시된다.
 - [x] 비어 있는 경우 empty 상태가 표시된다.
 - [x] 조회 실패는 ProfilePage 전적 섹션 내부 error로 처리된다.
 - [x] 별도 `/records` route는 제공하지 않는다.
@@ -476,7 +476,7 @@ Backend:
 - [x] 2-2 rank API를 재사용한다.
 - [x] 3-1 game records API를 재사용한다.
 - [x] 별도 profile detail endpoint를 만들지 않는다.
-- [x] 최근 전적은 profile response에 포함하지 않고 3-1 record API page 1~3으로 조회한다.
+- [x] 최근 전적은 profile response에 포함하지 않고 3-1 record API page 1/2/3으로 조회한다.
 - [x] 기존 RestDocs와 ErrorResponse 계약을 그대로 사용한다.
 
 Policy:
@@ -489,7 +489,7 @@ Policy:
 Acceptance Criteria:
 
 - [x] ProfilePage가 필요한 사용자 정보와 랭크 payload가 확정된다.
-- [x] 최근 전적은 Game Records API page 1~3에서 가져온다고 문서화된다.
+- [x] 최근 전적은 Game Records API page 1/2/3에서 가져온다고 문서화된다.
 
 ### 3-4. [x] 프로필 페이지 구현
 
@@ -499,14 +499,14 @@ Acceptance Criteria:
 
 목표:
 
-- [x] 사용자 프로필과 랭크/승패/최근 전적 최대 30경기를 별도 화면에서 확인할 수 있게 한다.
+- [x] 사용자 프로필과 랭크/승패/최근 전적 최대 30경기를 10개 단위 페이지로 확인할 수 있게 한다.
 
 Frontend:
 
 - [x] `/profile` route를 추가한다.
 - [x] `ProfilePage`를 구현한다.
 - [x] MatchPage 상단 내 정보 버튼과 프로필 영역에서 이동할 수 있게 한다.
-- [x] 내 랭크, 승패, 최근 전적 최대 30경기를 표시한다.
+- [x] 내 랭크, 승패, 최근 전적 page 1/2/3을 표시한다.
 - [x] 기존 profile/rank/game records API를 계약에 맞게 조합한다.
 - [x] 별도 `/records` route와 `GameRecordsPage`는 제거한다.
 
@@ -519,7 +519,7 @@ Policy:
 Acceptance Criteria:
 
 - [x] 프로필 화면에서 사용자 정보와 랭크 요약을 확인할 수 있다.
-- [x] 프로필 화면에서 최근 전적 최대 30경기를 확인할 수 있다.
+- [x] 프로필 화면에서 최근 전적 최대 30경기를 10개 단위 페이지로 확인할 수 있다.
 - [x] MatchPage와 동일한 source of truth 정책을 따른다.
 - [x] 기록 조회 실패가 프로필 기본 정보 표시를 막지 않는다.
 

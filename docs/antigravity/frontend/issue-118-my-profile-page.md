@@ -2,7 +2,7 @@
 
 ## Feature Description
 
-로그인한 사용자가 자신의 계정 정보, 현재 랭크 상태, 최근 전적 최대 30경기를 한 화면에서 확인할 수 있는 내 정보 화면을 구현한다.
+로그인한 사용자가 자신의 계정 정보, 현재 랭크 상태, 최근 전적 최대 30경기를 10개 단위 페이지로 확인할 수 있는 내 정보 화면을 구현한다.
 
 이번 이슈는 신규 profile detail API를 만들지 않고, 이미 확정된 기존 3개 API를 프론트에서 조합하는 방식으로 진행한다. Profile API는 계정 기본 정보, Rank API는 현재 랭크 상태, Game Records API는 최근 전적 목록의 source of truth로 유지한다.
 
@@ -11,10 +11,10 @@ flowchart TD
     A["MatchPage 프로필 영역 클릭"] --> B["/profile 이동"]
     B --> C["GET /api/v1/users/me/profile"]
     B --> D["GET /api/v1/users/me/rank"]
-    B --> E["GET /api/v1/users/me/game-records?page=1~3"]
+    B --> E["GET /api/v1/users/me/game-records?page={1|2|3}"]
     C --> F["email / nickname / createdAt 표시"]
     D --> G["rank / LP / wins / losses / draws 표시"]
-    E --> H["최근 전적 최대 30경기 표시"]
+    E --> H["최근 전적 10개 단위 표시"]
     F --> I["내 정보 화면"]
     G --> I
     H --> I
@@ -29,7 +29,7 @@ flowchart TD
 - MatchPage 프로필 영역을 `/profile` 진입점으로 연결.
 - 기존 profile/rank/game-records service 재사용.
 - 내 정보 화면 loading/error/empty/success 상태 구현.
-- 사용자 기본 정보, 현재 랭크, 승패무, 최근 전적 최대 30경기 표시.
+- 사용자 기본 정보, 현재 랭크, 승패무, 최근 전적 최대 30경기 1/2/3 페이지 표시.
 - `/match` 복귀 구현.
 - MatchPage 상단 내 정보 버튼 연결.
 - locale, test, 문서 정합성 반영.
@@ -44,7 +44,6 @@ flowchart TD
 - avatar/profile image 추가.
 - 프로필 이미지 업로드.
 - 전적 상세 페이지.
-- ProfilePage 내부 전적 pagination UI.
 - 상대 프로필 이동.
 - 백엔드 API 변경.
 - 새 패키지 추가.
@@ -146,11 +145,12 @@ interface GameRecordEntryResponse {
 
 프론트 사용 기준:
 
-- ProfilePage에서는 `page=1`부터 백엔드 `totalPages` 기준 최대 `page=3`까지 조회한다.
-- `records`는 최근 전적 최대 30경기 표시 source로 사용한다.
+- ProfilePage 최초 진입 시 `page=1`을 조회한다.
+- ProfilePage 페이지 버튼 클릭 시 선택한 `page=1|2|3`만 조회한다.
+- `records`는 현재 선택한 최근 전적 페이지 표시 source로 사용한다.
 - `totalElements`는 최근 전적 보유 개수 표시 source로 사용한다.
-- `totalPages`, `hasNext`는 ProfilePage에서 pagination UI로 사용하지 않는다.
-- ProfilePage는 pagination UI 없이 한 화면에 최신 30경기까지 표시한다.
+- `totalPages`는 ProfilePage 전적 pagination UI 표시 기준으로 사용하되 프론트는 최대 3페이지까지만 노출한다.
+- ProfilePage는 한 화면에 전체 30경기를 합쳐 표시하지 않고, 서버 고정 size 10개 단위로 표시한다.
 - `size` query를 보내지 않는다.
 
 ### Source Of Truth Policy
@@ -252,7 +252,8 @@ interface GameRecordEntryResponse {
 ### 3. ProfilePage Data 구현
 
 - [x] `ProfilePage` 추가.
-- [x] mount 시 profile/rank/game-records page 1~3 조회.
+- [x] mount 시 profile/rank/game-records page 1 조회.
+- [x] 전적 페이지 버튼 클릭 시 선택한 page만 조회.
 - [x] `AbortController`로 요청 취소 처리.
 - [x] profile 상태를 `idle/loading/success/error`로 관리.
 - [x] rank 상태를 `idle/loading/success/error`로 관리.
@@ -270,7 +271,7 @@ interface GameRecordEntryResponse {
 - [x] 현재 LP 표시.
 - [x] wins/losses/draws 표시.
 - [x] rank 갱신 시각 표시.
-- [x] 최근 전적 최대 30경기 표시.
+- [x] 최근 전적 최대 30경기를 10개 단위 1/2/3 페이지로 표시.
 - [x] 최근 전적이 없으면 empty 상태 표시.
 - [x] 최근 전적 조회 실패 시 records 섹션 내부 error 표시.
 - [x] `/match` 복귀 버튼 구현.
@@ -324,8 +325,8 @@ interface GameRecordEntryResponse {
 - Profile API는 계정 기본 정보 source of truth다.
 - Rank API는 현재 랭크/LP/승패 source of truth다.
 - Game Records API는 최근 전적 source of truth다.
-- ProfilePage에서는 Game Records API `page=1~3`을 조회해 최신 30경기까지 표시한다.
-- ProfilePage는 pagination UI 없이 한 화면에 전적을 표시한다.
+- ProfilePage에서는 Game Records API `page=1|2|3` 중 현재 선택한 page만 조회한다.
+- ProfilePage는 pagination UI로 최근 전적을 10개 단위로 표시한다.
 - Game Result Summary payload를 내 정보 source로 사용하지 않는다.
 - Game Result WebSocket payload를 내 정보 source로 사용하지 않는다.
 - sessionStorage payload를 내 정보 source로 사용하지 않는다.
@@ -344,7 +345,7 @@ interface GameRecordEntryResponse {
 - MatchPage 프로필 영역 클릭 시 `/profile`로 이동한다.
 - Profile API 성공 시 nickname, email, createdAt이 표시된다.
 - Rank API 성공 시 rank, LP, wins, losses, draws가 표시된다.
-- Game Records API 성공 시 최근 전적 최대 30경기가 표시된다.
+- Game Records API 성공 시 현재 선택한 최근 전적 페이지가 표시된다.
 - 최근 전적이 없으면 empty 상태가 표시된다.
 - profile/rank/records 중 하나가 실패해도 나머지 성공 섹션은 표시된다.
 - MatchPage 상단 내 정보 버튼 클릭 시 `/profile`로 이동한다.
@@ -369,10 +370,10 @@ PR 섹션은 아래 형식 고정:
 flowchart TD
     A["/profile 진입"] --> B["Profile API"]
     A --> C["Rank API"]
-    A --> D["Game Records API page=1~3"]
+    A --> D["Game Records API page={selected}"]
     B --> E["계정 기본 정보 표시"]
     C --> F["현재 랭크 상태 표시"]
-    D --> G["최근 전적 최대 30경기 표시"]
+    D --> G["최근 전적 10개 단위 표시"]
     E --> H["내 정보 화면"]
     F --> H
     G --> H
@@ -382,14 +383,14 @@ flowchart TD
 
 - 신규 profile detail API를 만들지 않고 기존 3개 API를 조합함.
 - Profile API, Rank API, Game Records API의 source of truth 책임을 분리함.
-- ProfilePage에서는 최근 전적 page 1~3을 조회해 최신 30경기까지 한 화면에 표시함.
+- ProfilePage에서는 최근 전적 현재 page만 조회하고 1/2/3 버튼으로 10개 단위 전환함.
 - 백엔드 영속성 접근은 core module service 책임으로 유지하고, api module은 repository를 직접 참조하지 않음.
 
 백엔드와의 구현 계약:
 
 - `GET /api/v1/users/me/profile`은 nickname, email, createdAt의 source of truth임.
 - `GET /api/v1/users/me/rank`는 rank, LP, wins, losses, draws의 source of truth임.
-- `GET /api/v1/users/me/game-records?page=1~3`은 최근 전적 최대 30경기 source of truth임.
+- `GET /api/v1/users/me/game-records?page=1|2|3`은 최근 전적 최대 30경기 source of truth임.
 - HTTP API 인증과 401 refresh/retry는 기존 `apiClient` 정책을 따름.
 - Game Result Summary, WebSocket payload, sessionStorage payload는 내 정보 화면 source로 사용하지 않음.
 
@@ -397,8 +398,8 @@ flowchart TD
 
 - 내 정보 화면을 통합 API 없이 구현함.
   계정 정보, 랭크 상태, 전적 목록은 도메인 책임과 변경 주기가 다르므로 하나의 profile detail 응답으로 합치지 않음. 기존 API 계약을 유지하면 백엔드 core/api 책임 분리도 깨지지 않고, 각 화면이 필요한 source만 명확히 사용할 수 있음.
-- ProfilePage의 전적 표시를 최신 30경기 전체로 확장함.
-  사용자가 내 정보 화면에서 계정 정보, 랭크, 최근 전적을 한 번에 확인할 수 있어야 하므로 page 1~3을 조회해 한 화면에 합쳐 표시함. pagination UI는 만들지 않고 백엔드의 최신 30경기 cap 정책을 그대로 따른다.
+- ProfilePage의 전적 표시를 10개 단위 pagination으로 정리함.
+  백엔드는 최근 30경기를 `page=1~3`, 서버 고정 size 10으로 제공한다. 프론트가 page 1~3을 한 번에 합치면 백엔드 pagination 계약이 화면에서 흐려지므로, 현재 선택한 page만 조회하고 1/2/3 버튼으로 전환하게 함.
 - 조회 실패를 섹션 단위로 분리함.
   profile, rank, records 중 하나가 실패해도 다른 성공 섹션은 표시되게 하여 부가 정보 조회 실패가 전체 내 정보 화면을 막지 않게 함.
 - 백엔드 테스트 정책을 문서에 명시함.
@@ -411,7 +412,7 @@ flowchart TD
 - 프로필 수정, avatar, 전적 상세, 상대 프로필 이동은 후속 이슈로 제외함.
 - 새 패키지는 추가하지 않음.
 - 검증 결과:
-  - `npm run test -- ProfilePage` 통과함. `1 file / 6 passed`
+  - `npm run test -- ProfilePage` 통과함. `1 file / 7 passed`
   - `npm run test -- MatchPage` 통과함. `1 file / 49 passed`
   - `npm run test -- router` 통과함. `2 files / 18 passed`
   - `npm run test -- ProfilePage MatchPage router` 통과함. `4 files / 73 passed`
@@ -422,9 +423,9 @@ flowchart TD
   - `npm run build` 통과함.
   - `git diff --check` 통과함.
   - desktop `1440x900` `/profile` 검증 통과함.
-    Profile API, Rank API, Game Records API page 1~3 모두 success이며 전적 30개 표시, horizontal overflow 없음, text overflow 후보 없음.
+    Profile API, Rank API, Game Records API success이며 전적 pagination 표시, horizontal overflow 없음, text overflow 후보 없음.
   - mobile `390x844` `/profile` 검증 통과함.
-    Profile API, Rank API, Game Records API page 1~3 모두 success이며 전적 30개 표시, horizontal overflow 없음, text overflow 후보 없음.
+    Profile API, Rank API, Game Records API success이며 전적 pagination 표시, horizontal overflow 없음, text overflow 후보 없음.
 
 ## 📌 Related Issue
 

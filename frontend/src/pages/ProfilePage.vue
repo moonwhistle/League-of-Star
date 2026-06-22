@@ -11,6 +11,8 @@
     :data-records-status="recordsStatus"
     :data-records-error-message="recordsErrorMessage"
     :data-records-count="profileRecords.length"
+    :data-records-page="currentRecordsPage"
+    :data-records-total-pages="recordsPageCount"
   >
     <section class="profile-shell" aria-live="polite">
       <header class="profile-header">
@@ -113,6 +115,24 @@
               <time>{{ formatDateTime(record.playedAt) }}</time>
             </li>
           </ol>
+
+          <nav
+            v-if="shouldShowRecordsPagination"
+            class="profile-record-pagination"
+            :aria-label="t('records.paginationLabel')"
+          >
+            <button
+              v-for="page in recordsPageNumbers"
+              :key="page"
+              type="button"
+              :class="{ 'is-active': currentRecordsPage === page }"
+              :aria-current="currentRecordsPage === page ? 'page' : undefined"
+              :disabled="recordsStatus === 'loading'"
+              @click="changeRecordsPage(page)"
+            >
+              {{ page }}
+            </button>
+          </nav>
         </section>
       </section>
     </section>
@@ -152,6 +172,7 @@ const profile = shallowRef<UserProfileResponse>()
 const rank = shallowRef<UserRankResponse>()
 const recordsResponse = shallowRef<GameRecordListResponse>()
 const profileRecords = shallowRef<GameRecordEntryResponse[]>([])
+const currentRecordsPage = ref(PROFILE_FIRST_RECORDS_PAGE)
 const profileAbortController = shallowRef<AbortController>()
 const rankAbortController = shallowRef<AbortController>()
 const recordsAbortController = shallowRef<AbortController>()
@@ -172,20 +193,35 @@ const displayRank = computed(() => {
 
   return rank.value?.rank ?? t('profile.rankUnavailable')
 })
+const recordsPageCount = computed(() =>
+  Math.min(
+    PROFILE_MAX_RECORD_PAGES,
+    Math.max(
+      PROFILE_FIRST_RECORDS_PAGE,
+      recordsResponse.value?.totalPages ?? PROFILE_FIRST_RECORDS_PAGE,
+    ),
+  ),
+)
+const recordsPageNumbers = computed(() =>
+  Array.from({ length: recordsPageCount.value }, (_, index) => PROFILE_FIRST_RECORDS_PAGE + index),
+)
+const shouldShowRecordsPagination = computed(
+  () => recordsResponse.value !== undefined && recordsResponse.value.totalElements > 0,
+)
 const recordCountLabel = computed(() => {
   if (recordsStatus.value === 'loading') {
     return t('profile.recordsLoading')
   }
 
-  return `${profileRecords.value.length}/${recordsResponse.value?.totalElements ?? 0} ${t(
-    'records.countUnit',
-  )}`
+  return `${currentRecordsPage.value}/${recordsPageCount.value} · ${profileRecords.value.length}/${
+    recordsResponse.value?.totalElements ?? 0
+  } ${t('records.countUnit')}`
 })
 
 onMounted(() => {
   void loadProfile()
   void loadRank()
-  void loadRecords()
+  void loadRecords(PROFILE_FIRST_RECORDS_PAGE)
 })
 
 onUnmounted(() => {
@@ -258,16 +294,17 @@ async function loadRank() {
   }
 }
 
-async function loadRecords() {
+async function loadRecords(page: number) {
   abortRecordsRequest()
   recordsStatus.value = 'loading'
   recordsErrorMessage.value = ''
+  currentRecordsPage.value = page
 
   const controller = new AbortController()
   recordsAbortController.value = controller
 
   try {
-    const response = await loadProfileRecords(controller.signal)
+    const response = await getMyGameRecords(page, controller.signal)
 
     if (recordsAbortController.value !== controller) {
       return
@@ -292,28 +329,12 @@ async function loadRecords() {
   }
 }
 
-async function loadProfileRecords(signal: AbortSignal): Promise<GameRecordListResponse> {
-  const firstResponse = await getMyGameRecords(PROFILE_FIRST_RECORDS_PAGE, signal)
-  const lastPage = Math.min(
-    PROFILE_MAX_RECORD_PAGES,
-    Math.max(PROFILE_FIRST_RECORDS_PAGE, firstResponse.totalPages),
-  )
-
-  if (lastPage === PROFILE_FIRST_RECORDS_PAGE) {
-    return firstResponse
+function changeRecordsPage(page: number) {
+  if (page === currentRecordsPage.value || recordsStatus.value === 'loading') {
+    return
   }
 
-  const restResponses = await Promise.all(
-    Array.from({ length: lastPage - PROFILE_FIRST_RECORDS_PAGE }, (_, index) =>
-      getMyGameRecords(PROFILE_FIRST_RECORDS_PAGE + index + 1, signal),
-    ),
-  )
-  const records = [firstResponse, ...restResponses].flatMap((response) => response.records)
-
-  return {
-    ...firstResponse,
-    records,
-  }
+  void loadRecords(page)
 }
 
 function shouldIgnoreRequestError(
@@ -654,6 +675,49 @@ function returnToMatch() {
 
 .profile-record-list li[data-result='DRAW'] strong {
   color: #d7deea;
+}
+
+.profile-record-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.profile-record-pagination button {
+  min-width: 38px;
+  min-height: 36px;
+  border: 1px solid rgba(142, 238, 255, 0.24);
+  border-radius: 8px;
+  color: rgba(248, 251, 255, 0.78);
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 900;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.profile-record-pagination button:hover:not(:disabled),
+.profile-record-pagination button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(142, 238, 255, 0.72);
+  color: #f8fbff;
+  background: rgba(142, 238, 255, 0.14);
+  outline: none;
+}
+
+.profile-record-pagination button.is-active {
+  border-color: rgba(255, 216, 111, 0.78);
+  color: #07111f;
+  background: #ffd86f;
+}
+
+.profile-record-pagination button:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 @media (max-width: 760px) {
