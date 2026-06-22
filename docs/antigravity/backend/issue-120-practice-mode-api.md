@@ -434,18 +434,18 @@ flowchart TD
 
 ## 📚 Changes
 
-- practice room을 일반 match room과 같은 테이블에 저장하되 `gameMode`로 명확히 구분함.
-  기존 GameRoom, GameAction, Scenario 판정 로직을 재사용하면서도 정산 복구 스케줄러가 연습 room을 record/rank 대상으로 오인하지 않게 하기 위함임.
-- 연습 시작 API를 WebSocket 대기 흐름 없이 바로 play 가능한 계약으로 설계함.
-  연습 모드는 상대 준비, RTT 측정, 매칭 수락이 필요 없으므로 HTTP ack가 아니라 scenario handoff 응답으로 동작함.
-- 연습 결과는 WebSocket으로만 확정함.
-  일반 게임의 Summary API는 record/rank 정산 완료 상태를 조회하는 API이므로, 정산하지 않는 연습 모드와 섞지 않음.
-- settlement 차단을 trigger, service, recovery query에 모두 둠.
-  단일 분기 누락이 전적 오염으로 이어질 수 있으므로 `gameMode=PRACTICE`를 기준으로 다중 방어함.
-- recovery query를 `MATCH` room만 대상으로 제한함.
-  practice room은 `FINISHED` 상태여도 record count가 0인 것이 정상 상태이므로 미정산 복구 후보로 보면 안 됨.
-- Summary read model에 `gameMode`를 포함함.
-  API 모듈이 repository를 직접 보지 않고 core read service 결과로 practice summary 요청을 거부하기 위함임.
+- 사용자가 연습 모드를 누르면 바로 게임 화면으로 갈 수 있게 함.
+  일반 매칭은 상대를 찾고, 수락을 기다리고, 두 사람이 준비됐는지 확인해야 한다. 연습 모드는 혼자 하는 게임이기 때문에 이 과정을 거치지 않고 `POST /api/v1/games/practice` 응답에 게임방 번호, WebSocket 주소, 시나리오를 바로 내려주도록 함.
+- 연습 게임방도 기존 게임방 구조를 같이 쓰게 함.
+  연습 모드도 별의 HP, LIGHTNING 입력, 시나리오 시간 계산은 일반 게임과 거의 같다. 그래서 완전히 새 구조를 만들지 않고 기존 GameRoom/GameAction/Scenario 흐름을 재사용함. 대신 `gameMode=PRACTICE`를 저장해서 일반 매칭 게임과 헷갈리지 않게 구분함.
+- 연습 모드는 결과를 WebSocket으로 바로 알려주게 함.
+  사용자가 LIGHTNING으로 별을 잡으면 즉시 `GAME_RESULT`가 내려가고, 제한 시간 안에 잡지 못하면 실패 결과가 내려감. 연습 모드는 전적이나 랭크를 저장하지 않으므로, 일반 게임처럼 Summary API를 다시 조회하지 않게 함.
+- 연습 결과가 전적과 랭크에 섞이지 않게 막음.
+  연습 모드는 성공해도 LP가 오르지 않고, 실패해도 LP가 떨어지지 않는다. 그래서 결과 처리, 정산 처리, 복구 처리 모두에서 `gameMode=PRACTICE`인 경우 전적 생성과 랭크 변경을 하지 않도록 막음.
+- 서버가 나중에 미정산 게임을 복구할 때도 연습 게임은 건드리지 않게 함.
+  일반 게임은 끝났는데 전적이 없으면 문제가 될 수 있지만, 연습 게임은 끝나도 전적이 없는 것이 정상이다. 그래서 복구 대상은 `MATCH` 게임만 찾도록 제한함.
+- 연습 게임에 Summary API를 호출하면 거부하게 함.
+  Summary API는 전적과 랭크 정산이 끝난 일반 게임 결과를 보는 용도다. 연습 게임은 저장되는 결과가 없으므로 Summary API 대상이 아니며, 잘못 호출하면 명확히 에러를 반환하게 함.
 
 ```mermaid
 flowchart TD
