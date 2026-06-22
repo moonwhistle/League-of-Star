@@ -244,12 +244,33 @@ describe('GamePlayPage', () => {
 
     expect(wrapper.get('main').attributes('data-game-started')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('3')
+    expect(wrapper.get('[data-testid="countdown-overlay"]').text()).toBe('3')
     expect(wrapper.get('main').attributes('data-game-elapsed-ms')).toBe('0')
     expect(wrapper.get('main').attributes('data-game-current-hp')).toBe('10000')
     expect(wrapper.find('[data-testid="three-scene"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
     expect(wrapper.find('[data-testid="lightning-hud"]').exists()).toBe(true)
+  })
+
+  it('shows the countdown overlay for practice starts and updates before combat begins', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:05.000Z'))
+    saveValidPracticePayload({
+      startAt: Date.now() + 2800,
+    })
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-mode')).toBe('PRACTICE')
+    expect(wrapper.get('[data-testid="countdown-overlay"]').text()).toBe('3')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+
+    vi.advanceTimersByTime(1000)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="countdown-overlay"]').text()).toBe('2')
   })
 
   it('uses a handed off game websocket before reconnecting from storage', async () => {
@@ -388,6 +409,30 @@ describe('GamePlayPage', () => {
         gameRoomId: '100',
       },
     })
+  })
+
+  it('does not confirm route leave after a practice result is received', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    saveValidPracticePayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: createPracticeGameResultPayload('SUCCESS'),
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(getLatestRouteLeaveGuard()({ name: ROUTE_NAMES.match })).toBe(true)
+    expect(confirmSpy).not.toHaveBeenCalled()
+
+    await wrapper.get('.practice-result-actions button:last-child').trigger('click')
+
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
   it('shows the practice failed overlay without calling the summary result route', async () => {

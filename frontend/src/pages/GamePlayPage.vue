@@ -41,6 +41,14 @@
       />
       <div class="space-vignette" aria-hidden="true" />
       <div
+        v-if="isCountdownOverlayVisible"
+        class="countdown-overlay"
+        data-testid="countdown-overlay"
+        aria-live="polite"
+      >
+        <span :key="countdownSeconds">{{ countdownSeconds }}</span>
+      </div>
+      <div
         v-if="lightningImpactId > 0"
         :key="lightningImpactId"
         class="lightning-impact"
@@ -346,6 +354,9 @@ const practiceResultTitle = computed(() =>
     ? t('gamePlay.practiceSuccessTitle')
     : t('gamePlay.practiceFailedTitle'),
 )
+const isCountdownOverlayVisible = computed(
+  () => playState.value !== null && !hasGameStarted.value && countdownSeconds.value > 0,
+)
 const myLightningCooldownStyle = computed(() => ({
   '--lightning-cooldown-progress': `${Math.min(
     100,
@@ -463,7 +474,7 @@ function handlePointerMove() {
 }
 
 function shouldWarnBeforeLeaving() {
-  return playState.value !== null
+  return playState.value !== null && !gameResultReceived.value
 }
 
 function returnToMatch() {
@@ -912,6 +923,34 @@ function disposeThreeScene() {
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 44%, rgba(3, 4, 12, 0.32));
 }
 
+.countdown-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(95, 224, 255, 0.16), transparent 30%),
+    rgba(1, 4, 13, 0.26);
+}
+
+.countdown-overlay span {
+  display: grid;
+  width: min(34vw, 220px);
+  aspect-ratio: 1;
+  place-items: center;
+  font-size: clamp(5rem, 20vw, 12rem);
+  font-weight: 900;
+  line-height: 1;
+  color: #f8fdff;
+  text-shadow:
+    0 0 22px rgba(91, 222, 255, 0.76),
+    0 0 52px rgba(165, 107, 255, 0.42),
+    0 6px 18px rgba(0, 0, 0, 0.72);
+  animation: countdown-pop 820ms ease-out both;
+}
+
 .lightning-impact {
   position: absolute;
   inset: 0;
@@ -1010,6 +1049,23 @@ function disposeThreeScene() {
 .lightning-hud--mine {
   left: 50%;
   transform: translateX(-50%);
+}
+
+@keyframes countdown-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  18% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
 }
 
 @keyframes lightning-impact-ring {
