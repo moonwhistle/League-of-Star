@@ -90,8 +90,8 @@
         >
           <div class="profile-panel-heading">
             <span>{{ t('profile.recentRecords') }}</span>
-            <strong>{{ recordCountLabel }}</strong>
           </div>
+          <p class="profile-record-notice">{{ t('profile.recordsLimitNotice') }}</p>
 
           <div v-if="recordsStatus === 'loading'" class="profile-state">
             {{ t('profile.recordsLoading') }}
@@ -208,16 +208,6 @@ const recordsPageNumbers = computed(() =>
 const shouldShowRecordsPagination = computed(
   () => recordsResponse.value !== undefined && recordsResponse.value.totalElements > 0,
 )
-const recordCountLabel = computed(() => {
-  if (recordsStatus.value === 'loading') {
-    return t('profile.recordsLoading')
-  }
-
-  return `${currentRecordsPage.value}/${recordsPageCount.value} · ${profileRecords.value.length}/${
-    recordsResponse.value?.totalElements ?? 0
-  } ${t('records.countUnit')}`
-})
-
 onMounted(() => {
   void loadProfile()
   void loadRank()
@@ -631,6 +621,13 @@ function returnToMatch() {
   padding: 0;
   margin: 0;
   list-style: none;
+}
+
+.profile-record-notice {
+  margin: -8px 0 16px;
+  color: rgba(248, 251, 255, 0.62);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .profile-record-list li {
