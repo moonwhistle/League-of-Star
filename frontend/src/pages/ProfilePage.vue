@@ -26,7 +26,7 @@
             @click="returnToMatch"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3l2.4 5.4L20 10.7l-5.1 2.1L12 21l-2.9-8.2L4 10.7l5.6-2.3L12 3z" />
+              <path d="M15 6l-6 6 6 6" />
             </svg>
           </button>
         </nav>
@@ -503,9 +503,11 @@ function returnToMatch() {
 .profile-icon-button svg {
   width: 23px;
   height: 23px;
-  fill: rgba(255, 216, 111, 0.88);
+  fill: none;
   stroke: #fff6c7;
-  stroke-width: 0.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.6;
   filter: drop-shadow(0 0 10px rgba(255, 216, 111, 0.5));
 }
 
