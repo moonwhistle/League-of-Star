@@ -252,14 +252,14 @@ interface GameRecordEntryResponse {
 
 ### 3. ProfilePage Data 구현
 
-- [ ] `ProfilePage` 추가.
-- [ ] mount 시 profile/rank/game-records page 1 병렬 조회.
-- [ ] `AbortController`로 요청 취소 처리.
-- [ ] profile 상태를 `idle/loading/success/error`로 관리.
-- [ ] rank 상태를 `idle/loading/success/error`로 관리.
-- [ ] records 상태를 `idle/loading/success/error`로 관리.
-- [ ] 한 API 실패가 다른 섹션 표시를 막지 않게 구현.
-- [ ] token refresh/retry는 `apiClient`에 위임.
+- [x] `ProfilePage` 추가.
+- [x] mount 시 profile/rank/game-records page 1 병렬 조회.
+- [x] `AbortController`로 요청 취소 처리.
+- [x] profile 상태를 `idle/loading/success/error`로 관리.
+- [x] rank 상태를 `idle/loading/success/error`로 관리.
+- [x] records 상태를 `idle/loading/success/error`로 관리.
+- [x] 한 API 실패가 다른 섹션 표시를 막지 않게 구현.
+- [x] token refresh/retry는 `apiClient`에 위임.
 
 ### 4. Profile UI / Locale 구현
 
