@@ -444,6 +444,7 @@ Accept: text/event-stream
 - [x] Token Refresh 구현.
 - [x] MatchPage 내 프로필 / 랭크 실데이터 구현.
 - [x] 전적 조회 UI를 내 정보 화면으로 통합.
+- [x] 내 정보 화면 구현.
 - [x] 공통 UI, 테스트, 문서 정합성 정리.
 
 ## Assumptions

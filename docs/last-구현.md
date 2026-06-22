@@ -460,35 +460,7 @@ Acceptance Criteria:
 - [x] 조회 실패는 ProfilePage 전적 섹션 내부 error로 처리된다.
 - [x] 별도 `/records` route는 제공하지 않는다.
 
-### 3-3. [ ] 프로필 상세 API 계약
-
-담당: Backend
-
-우선순위: P3
-
-목표:
-
-- [ ] ProfilePage가 필요한 데이터가 2-1 API로 충분한지 판단하고, 부족하면 상세 API 계약을 확정한다.
-
-Backend:
-
-- [ ] 2-1 profile/rank API 재사용 가능 여부를 결정한다.
-- [ ] 부족하면 profile detail endpoint를 확정한다.
-- [ ] 최근 전적 일부를 profile response에 포함할지 3-1 record API로 조회할지 결정한다.
-- [ ] rank summary, win/loss summary, recent record summary response shape를 정리한다.
-- [ ] RestDocs와 ErrorResponse를 정리한다.
-
-Policy:
-
-- [ ] Profile API는 계정 상태 상세 source of truth다.
-- [ ] 최근 전적은 profile response에 포함하더라도 3-1 전적 목록의 축약본으로만 취급한다.
-
-Acceptance Criteria:
-
-- [ ] ProfilePage가 필요한 사용자 정보와 랭크 요약 payload가 확정된다.
-- [ ] 최근 기록 요약을 어떤 API에서 가져올지 문서화된다.
-
-### 3-4. [ ] 프로필 페이지 구현
+### 3-3. [x] 프로필 상세 API 계약
 
 담당: Frontend
 
@@ -496,27 +468,60 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 사용자 프로필과 랭크/승패/최근 기록 요약을 별도 화면에서 확인할 수 있게 한다.
+- [x] ProfilePage가 필요한 데이터는 신규 통합 API 없이 기존 3개 API 조합으로 충분하다고 확정한다.
 
-Frontend:
+Backend:
 
-- [ ] `/profile` route를 추가한다.
-- [ ] `ProfilePage`를 구현한다.
-- [ ] 프로필 버튼 또는 avatar 영역에서 이동할 수 있게 한다.
-- [ ] 내 랭크, 승패, 최근 기록 요약을 표시한다.
-- [ ] profile detail API와 record summary API를 계약에 맞게 조합한다.
+- [x] 2-1 profile API를 재사용한다.
+- [x] 2-2 rank API를 재사용한다.
+- [x] 3-1 game records API를 재사용한다.
+- [x] 별도 profile detail endpoint를 만들지 않는다.
+- [x] 최근 전적은 profile response에 포함하지 않고 3-1 record API page 1~3으로 조회한다.
+- [x] 기존 RestDocs와 ErrorResponse 계약을 그대로 사용한다.
 
 Policy:
 
-- [ ] MatchPage는 매칭 시작 화면이다.
-- [ ] ProfilePage는 계정 상태 상세 화면이다.
-- [ ] 두 화면이 같은 API를 쓰더라도 UI state는 각 page local state로 관리한다.
+- [x] Profile API는 계정 기본 정보 source of truth다.
+- [x] Rank API는 현재 랭크/LP/승패 source of truth다.
+- [x] Game Records API는 최근 전적 최대 30경기 source of truth다.
+- [x] 프론트는 세 API 응답을 화면 local state에서만 조합한다.
 
 Acceptance Criteria:
 
-- [ ] 프로필 화면에서 사용자 정보와 랭크 요약을 확인할 수 있다.
-- [ ] MatchPage와 동일한 source of truth 정책을 따른다.
-- [ ] 기록 요약 실패가 프로필 기본 정보 표시를 막지 않는다.
+- [x] ProfilePage가 필요한 사용자 정보와 랭크 payload가 확정된다.
+- [x] 최근 전적은 Game Records API page 1~3에서 가져온다고 문서화된다.
+
+### 3-4. [x] 프로필 페이지 구현
+
+담당: Frontend
+
+우선순위: P3
+
+목표:
+
+- [x] 사용자 프로필과 랭크/승패/최근 전적 최대 30경기를 별도 화면에서 확인할 수 있게 한다.
+
+Frontend:
+
+- [x] `/profile` route를 추가한다.
+- [x] `ProfilePage`를 구현한다.
+- [x] MatchPage 상단 내 정보 버튼과 프로필 영역에서 이동할 수 있게 한다.
+- [x] 내 랭크, 승패, 최근 전적 최대 30경기를 표시한다.
+- [x] 기존 profile/rank/game records API를 계약에 맞게 조합한다.
+- [x] 별도 `/records` route와 `GameRecordsPage`는 제거한다.
+
+Policy:
+
+- [x] MatchPage는 매칭 시작 화면이다.
+- [x] ProfilePage는 계정 상태 상세 화면이다.
+- [x] 두 화면이 같은 API를 쓰더라도 UI state는 각 page local state로 관리한다.
+
+Acceptance Criteria:
+
+- [x] 프로필 화면에서 사용자 정보와 랭크 요약을 확인할 수 있다.
+- [x] 프로필 화면에서 최근 전적 최대 30경기를 확인할 수 있다.
+- [x] MatchPage와 동일한 source of truth 정책을 따른다.
+- [x] 기록 조회 실패가 프로필 기본 정보 표시를 막지 않는다.
 
 ## Section 4. Optional Game Modes
 
@@ -718,8 +723,8 @@ Policy:
 8. [x] Section 2-5. MatchPage 랭킹 실데이터 구현
 9. [x] Section 3-1. 내 전적 목록 API 계약
 10. [x] Section 3-2. 전적 조회 UI 통합
-11. [ ] Section 3-3. 프로필 상세 API 계약
-12. [ ] Section 3-4. 프로필 페이지 구현
+11. [x] Section 3-3. 프로필 상세 API 계약
+12. [x] Section 3-4. 프로필 페이지 구현
 13. [ ] Section 4-1/4-2. 연습 모드
 14. [ ] Section 4-3/4-4. 사용자 지정 게임
 15. [ ] Section 5-1/5-2. 비밀번호 찾기
@@ -732,5 +737,5 @@ Policy:
 - [x] “MatchPage가 실제 계정 상태를 보여준다”고 말하려면 Section 2-1부터 2-3까지 필요하다.
 - [x] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1부터 2-5까지 필요하다.
 - [x] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1과 3-2가 필요하다.
-- [ ] “내 프로필 상세를 볼 수 있다”고 말하려면 Section 3-3과 3-4가 필요하다.
+- [x] “내 프로필 상세를 볼 수 있다”고 말하려면 Section 3-3과 3-4가 필요하다.
 - [ ] “현재 화면의 모든 버튼이 기능한다”고 말하려면 Section 4까지 필요하다.

@@ -296,11 +296,11 @@ interface GameRecordEntryResponse {
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 3-3을 기존 API 조합 계약 확정으로 갱신.
-- [ ] `docs/last-구현.md` Section 3-4를 내 정보 화면 구현으로 갱신.
-- [ ] `front-plan.md`에 ProfilePage 조합 정책 반영.
-- [ ] issue-118 task 완료 상태 반영.
-- [ ] PR 섹션을 백엔드 계약/프론트 정책/검증 결과 중심으로 보강.
+- [x] `docs/last-구현.md` Section 3-3을 기존 API 조합 계약 확정으로 갱신.
+- [x] `docs/last-구현.md` Section 3-4를 내 정보 화면 구현으로 갱신.
+- [x] `front-plan.md`에 ProfilePage 조합 정책 반영.
+- [x] issue-118 task 완료 상태 반영.
+- [x] PR 섹션을 백엔드 계약/프론트 정책/검증 결과 중심으로 보강.
 
 ### 7. 검증
 
