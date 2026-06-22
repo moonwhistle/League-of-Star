@@ -1,5 +1,9 @@
 # Issue 116. 전적 페이지 구현
 
+> Superseded by Issue 118.
+>
+> 이 문서는 `/records` 독립 전적 페이지를 구현했던 이력 문서다. 현재 제품 정책은 내 정보 화면(`/profile`)에서 Profile API, Rank API, Game Records API를 조합하고, 최근 전적 최대 30경기를 한 화면에 표시하는 구조다. 따라서 `/records` route와 `GameRecordsPage`는 제거되었고, 전적 목록 API/service/type은 ProfilePage의 source of truth로 유지한다.
+
 ## Feature Description
 
 로그인한 사용자가 최근 전적을 확인할 수 있는 전적 페이지를 구현한다.

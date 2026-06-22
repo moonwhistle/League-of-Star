@@ -33,19 +33,8 @@
         {{ nextLocaleLabel }}
       </button>
       <nav class="match-actions" aria-label="Account actions">
-        <button
-          class="icon-button"
-          type="button"
-          :aria-label="t('match.records')"
-          @click="navigateToRecords"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 5h14" />
-            <path d="M5 12h14" />
-            <path d="M5 19h14" />
-            <path d="M8 5v14" />
-            <path d="M16 5v14" />
-          </svg>
+        <button class="match-action-button" type="button" @click="navigateToProfile">
+          {{ t('match.profile') }}
         </button>
         <button
           class="icon-button"
@@ -65,12 +54,17 @@
 
     <section class="match-layout" aria-label="Match lobby">
       <aside class="ranking-panel" aria-label="Ranking overview">
-        <section class="profile-panel" aria-label="Player profile">
+        <button
+          class="profile-panel"
+          type="button"
+          aria-label="Player profile"
+          @click="navigateToProfile"
+        >
           <div class="avatar-frame" aria-hidden="true">{{ avatarInitial }}</div>
           <div class="profile-copy">
             <strong>{{ displayNickname }}</strong>
           </div>
-        </section>
+        </button>
 
         <section class="ranking-summary" aria-label="Ranking summary">
           <h2>{{ t('match.ranking') }}</h2>
@@ -740,8 +734,8 @@ async function finalizeLogout() {
   }
 }
 
-function navigateToRecords() {
-  void router.push({ name: ROUTE_NAMES.records })
+function navigateToProfile() {
+  void router.push({ name: ROUTE_NAMES.profile })
 }
 
 function startMatchmaking() {
@@ -1408,7 +1402,20 @@ function closeErrorModal() {
   border-radius: 6px;
 }
 
+.match-action-button {
+  min-width: 76px;
+  height: 36px;
+  padding: 0 12px;
+  color: var(--match-muted);
+  background: rgba(8, 15, 34, 0.7);
+  border: 1px solid rgba(206, 224, 255, 0.18);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
 .locale-toggle,
+.match-action-button,
 .icon-button,
 .primary-match-button,
 .secondary-actions button,
@@ -1425,6 +1432,7 @@ function closeErrorModal() {
 }
 
 .locale-toggle:hover:not(:disabled),
+.match-action-button:hover:not(:disabled),
 .icon-button:hover:not(:disabled),
 .secondary-actions button:hover:not(:disabled),
 .match-logout-actions button:hover:not(:disabled),
@@ -1438,6 +1446,7 @@ function closeErrorModal() {
 }
 
 .locale-toggle:focus-visible,
+.match-action-button:focus-visible,
 .icon-button:focus-visible,
 .primary-match-button:focus-visible,
 .secondary-actions button:focus-visible,
@@ -1497,12 +1506,35 @@ function closeErrorModal() {
   display: flex;
   gap: 14px;
   align-items: center;
+  width: 100%;
   min-height: 86px;
   padding: 16px 18px;
   margin: 0 0 14px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
   border-left: 3px solid var(--match-accent-strong);
+  border-top: 0;
+  border-right: 0;
   border-bottom: 1px solid rgba(206, 224, 255, 0.1);
   background: linear-gradient(90deg, rgba(118, 74, 202, 0.28), transparent);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.profile-panel:hover,
+.profile-panel:focus-visible {
+  border-left-color: var(--match-accent);
+  background: linear-gradient(90deg, rgba(99, 242, 232, 0.22), rgba(118, 74, 202, 0.12));
+  box-shadow: inset 0 0 0 1px rgba(99, 242, 232, 0.22);
+}
+
+.profile-panel:active {
+  transform: translateY(1px);
 }
 
 .profile-panel::after {

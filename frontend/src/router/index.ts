@@ -39,9 +39,9 @@ export const router = createRouter({
       },
     },
     {
-      path: ROUTE_PATHS.records,
-      name: ROUTE_NAMES.records,
-      component: () => import('@/pages/GameRecordsPage.vue'),
+      path: ROUTE_PATHS.profile,
+      name: ROUTE_NAMES.profile,
+      component: () => import('@/pages/ProfilePage.vue'),
       meta: {
         requiresAuth: true,
       },
