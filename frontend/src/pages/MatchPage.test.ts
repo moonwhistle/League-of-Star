@@ -215,6 +215,7 @@ describe('MatchPage', () => {
 
     expect(wrapper.get('h1').text()).toBe('LEAGUE OF STAR')
     expect(wrapper.findAll('.match-actions .icon-button')).toHaveLength(2)
+    expect(wrapper.find('.match-action-button').text()).toBe('내 정보')
     expect(wrapper.find('[aria-label="전적 보기"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="로그아웃"]').exists()).toBe(true)
     expect(getMyProfileMock).toHaveBeenCalledWith(expect.any(AbortSignal))
@@ -259,6 +260,15 @@ describe('MatchPage', () => {
     await flushPromises()
 
     await wrapper.get('[aria-label="Player profile"]').trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.profile })
+  })
+
+  it('moves to the profile route from the profile action', async () => {
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    await wrapper.get('.match-action-button').trigger('click')
 
     expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.profile })
   })

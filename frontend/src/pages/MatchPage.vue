@@ -33,6 +33,9 @@
         {{ nextLocaleLabel }}
       </button>
       <nav class="match-actions" aria-label="Account actions">
+        <button class="match-action-button" type="button" @click="navigateToProfile">
+          {{ t('match.profile') }}
+        </button>
         <button
           class="icon-button"
           type="button"
@@ -1417,7 +1420,20 @@ function closeErrorModal() {
   border-radius: 6px;
 }
 
+.match-action-button {
+  min-width: 76px;
+  height: 36px;
+  padding: 0 12px;
+  color: var(--match-muted);
+  background: rgba(8, 15, 34, 0.7);
+  border: 1px solid rgba(206, 224, 255, 0.18);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
 .locale-toggle,
+.match-action-button,
 .icon-button,
 .primary-match-button,
 .secondary-actions button,
@@ -1434,6 +1450,7 @@ function closeErrorModal() {
 }
 
 .locale-toggle:hover:not(:disabled),
+.match-action-button:hover:not(:disabled),
 .icon-button:hover:not(:disabled),
 .secondary-actions button:hover:not(:disabled),
 .match-logout-actions button:hover:not(:disabled),
@@ -1447,6 +1464,7 @@ function closeErrorModal() {
 }
 
 .locale-toggle:focus-visible,
+.match-action-button:focus-visible,
 .icon-button:focus-visible,
 .primary-match-button:focus-visible,
 .secondary-actions button:focus-visible,

@@ -9,7 +9,7 @@
     :data-rank-error-message="rankErrorMessage"
     :data-records-status="recordsStatus"
     :data-records-error-message="recordsErrorMessage"
-    :data-records-count="recordsResponse?.records.length ?? 0"
+    :data-records-count="profileRecords.length"
   >
     <section class="profile-shell" aria-live="polite">
       <header class="profile-header">
@@ -28,9 +28,6 @@
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 3l2.4 5.4L20 10.7l-5.1 2.1L12 21l-2.9-8.2L4 10.7l5.6-2.3L12 3z" />
             </svg>
-          </button>
-          <button class="profile-records-button" type="button" @click="goToRecords">
-            {{ t('profile.viewAllRecords') }}
           </button>
         </nav>
       </header>
@@ -100,11 +97,11 @@
           <div v-else-if="recordsStatus === 'error'" class="profile-state profile-state--error">
             {{ recordsErrorMessage }}
           </div>
-          <div v-else-if="recentRecords.length === 0" class="profile-state">
+          <div v-else-if="profileRecords.length === 0" class="profile-state">
             {{ t('profile.recordsEmpty') }}
           </div>
           <ol v-else class="profile-record-list">
-            <li v-for="record in recentRecords" :key="record.gameId" :data-result="record.result">
+            <li v-for="record in profileRecords" :key="record.gameId" :data-result="record.result">
               <strong>{{ formatResult(record.result) }}</strong>
               <span
                 >{{ t('records.me') }} {{ t('records.versus') }} {{ record.opponentNickname }}</span
@@ -133,11 +130,11 @@ import { getMyGameRecords } from '@/services/gameRecordService'
 import { getMyProfile } from '@/services/profileService'
 import { getMyRank } from '@/services/rankService'
 import type { GameRecordResult } from '@/types/game'
-import type { GameRecordListResponse } from '@/types/gameRecord'
+import type { GameRecordEntryResponse, GameRecordListResponse } from '@/types/gameRecord'
 import type { UserProfileResponse, UserRankResponse } from '@/types/user'
 
-const PROFILE_RECORDS_PAGE = 1
-const RECENT_RECORD_LIMIT = 5
+const PROFILE_FIRST_RECORDS_PAGE = 1
+const PROFILE_MAX_RECORD_PAGES = 3
 
 type LoadStatus = 'idle' | 'loading' | 'success' | 'error'
 
@@ -152,6 +149,7 @@ const recordsErrorMessage = ref('')
 const profile = shallowRef<UserProfileResponse>()
 const rank = shallowRef<UserRankResponse>()
 const recordsResponse = shallowRef<GameRecordListResponse>()
+const profileRecords = shallowRef<GameRecordEntryResponse[]>([])
 const profileAbortController = shallowRef<AbortController>()
 const rankAbortController = shallowRef<AbortController>()
 const recordsAbortController = shallowRef<AbortController>()
@@ -172,15 +170,14 @@ const displayRank = computed(() => {
 
   return rank.value?.rank ?? t('profile.rankUnavailable')
 })
-const recentRecords = computed(
-  () => recordsResponse.value?.records.slice(0, RECENT_RECORD_LIMIT) ?? [],
-)
 const recordCountLabel = computed(() => {
   if (recordsStatus.value === 'loading') {
     return t('profile.recordsLoading')
   }
 
-  return `${recordsResponse.value?.totalElements ?? 0} ${t('records.countUnit')}`
+  return `${profileRecords.value.length}/${recordsResponse.value?.totalElements ?? 0} ${t(
+    'records.countUnit',
+  )}`
 })
 
 onMounted(() => {
@@ -268,13 +265,14 @@ async function loadRecords() {
   recordsAbortController.value = controller
 
   try {
-    const response = await getMyGameRecords(PROFILE_RECORDS_PAGE, controller.signal)
+    const response = await loadProfileRecords(controller.signal)
 
     if (recordsAbortController.value !== controller) {
       return
     }
 
     recordsResponse.value = response
+    profileRecords.value = response.records
     recordsStatus.value = 'success'
   } catch (error) {
     if (shouldIgnoreRequestError(error, recordsAbortController.value, controller)) {
@@ -282,12 +280,37 @@ async function loadRecords() {
     }
 
     recordsResponse.value = undefined
+    profileRecords.value = []
     recordsStatus.value = 'error'
     recordsErrorMessage.value = getRequestErrorMessage(error, '최근 전적을 불러올 수 없습니다.')
   } finally {
     if (recordsAbortController.value === controller) {
       recordsAbortController.value = undefined
     }
+  }
+}
+
+async function loadProfileRecords(signal: AbortSignal): Promise<GameRecordListResponse> {
+  const firstResponse = await getMyGameRecords(PROFILE_FIRST_RECORDS_PAGE, signal)
+  const lastPage = Math.min(
+    PROFILE_MAX_RECORD_PAGES,
+    Math.max(PROFILE_FIRST_RECORDS_PAGE, firstResponse.totalPages),
+  )
+
+  if (lastPage === PROFILE_FIRST_RECORDS_PAGE) {
+    return firstResponse
+  }
+
+  const restResponses = await Promise.all(
+    Array.from({ length: lastPage - PROFILE_FIRST_RECORDS_PAGE }, (_, index) =>
+      getMyGameRecords(PROFILE_FIRST_RECORDS_PAGE + index + 1, signal),
+    ),
+  )
+  const records = [firstResponse, ...restResponses].flatMap((response) => response.records)
+
+  return {
+    ...firstResponse,
+    records,
   }
 }
 
@@ -375,10 +398,6 @@ function formatDateTime(value: string) {
 function returnToMatch() {
   void router.push({ name: ROUTE_NAMES.match })
 }
-
-function goToRecords() {
-  void router.push({ name: ROUTE_NAMES.records })
-}
 </script>
 
 <style scoped>
@@ -433,8 +452,7 @@ function goToRecords() {
   justify-content: flex-end;
 }
 
-.profile-icon-button,
-.profile-records-button {
+.profile-icon-button {
   min-height: 44px;
   border: 1px solid rgba(142, 238, 255, 0.42);
   border-radius: 8px;
@@ -448,9 +466,7 @@ function goToRecords() {
 }
 
 .profile-icon-button:hover,
-.profile-records-button:hover,
-.profile-icon-button:focus-visible,
-.profile-records-button:focus-visible {
+.profile-icon-button:focus-visible {
   transform: translateY(-1px);
   border-color: rgba(142, 238, 255, 0.86);
   background: rgba(16, 42, 72, 0.92);
@@ -460,8 +476,7 @@ function goToRecords() {
   outline: none;
 }
 
-.profile-icon-button:active,
-.profile-records-button:active {
+.profile-icon-button:active {
   transform: translateY(0);
 }
 
@@ -479,11 +494,6 @@ function goToRecords() {
   stroke: #fff6c7;
   stroke-width: 0.8;
   filter: drop-shadow(0 0 10px rgba(255, 216, 111, 0.5));
-}
-
-.profile-records-button {
-  padding: 0 18px;
-  font-weight: 900;
 }
 
 .profile-grid {
@@ -644,15 +654,6 @@ function goToRecords() {
 
   .profile-header h1 {
     font-size: 34px;
-  }
-
-  .profile-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .profile-records-button {
-    flex: 1;
   }
 
   .profile-grid,
