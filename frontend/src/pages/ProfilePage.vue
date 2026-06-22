@@ -90,8 +90,8 @@
         >
           <div class="profile-panel-heading">
             <span>{{ t('profile.recentRecords') }}</span>
+            <small class="profile-record-notice">{{ t('profile.recordsLimitNotice') }}</small>
           </div>
-          <p class="profile-record-notice">{{ t('profile.recordsLimitNotice') }}</p>
 
           <div v-if="recordsStatus === 'loading'" class="profile-state">
             {{ t('profile.recordsLoading') }}
@@ -624,10 +624,11 @@ function returnToMatch() {
 }
 
 .profile-record-notice {
-  margin: -8px 0 16px;
+  margin: 0;
   color: rgba(248, 251, 255, 0.62);
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.35;
 }
 
 .profile-record-list li {
