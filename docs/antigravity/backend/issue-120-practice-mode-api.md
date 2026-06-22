@@ -377,34 +377,60 @@ alter table game_rooms add column game_mode varchar(20) not null default 'MATCH'
 
 ## 📌 Summary
 
-연습 모드 시작 API와 WebSocket 결과 계약을 추가함.
+연습 모드 시작 API, WebSocket 결과 계약, 정산 차단 정책을 추가함.
+
+연습 모드는 일반 ranked match처럼 매칭 큐, 수락/거절, waiting WebSocket, RTT 측정을 거치지 않는다. 인증 사용자가 `POST /api/v1/games/practice`를 호출하면 백엔드는 `gameMode=PRACTICE` room을 생성하고 바로 `IN_PROGRESS`로 전환한 뒤, GamePlayPage가 필요한 `webSocketUrl`과 `scenario`를 반환한다. 이후 최종 성공/실패는 Summary HTTP API가 아니라 WebSocket `GAME_RESULT` payload로만 확정한다.
 
 ```mermaid
 flowchart TD
-    A["POST /api/v1/games/practice"] --> B["PRACTICE GameRoom 생성"]
-    B --> C["scenario + webSocketUrl 반환"]
-    C --> D["GamePlayPage WebSocket 연결"]
-    D --> E["LIGHTNING"]
-    E --> F{"kill?"}
-    F -->|YES| G["GAME_RESULT SUCCESS"]
-    F -->|NO| H["deadline"]
-    H --> I["GAME_RESULT FAILED"]
+    A["User clicks Practice"] --> B["POST /api/v1/games/practice"]
+    B --> C["@AuthUser userId"]
+    C --> D["active gameRoom validation"]
+    D --> E["GameRoomCommandService.createPracticeRoom"]
+    E --> F["gameMode=PRACTICE<br/>participant=1<br/>scenario 저장"]
+    F --> G["IN_PROGRESS 전환"]
+    G --> H["end deadline 등록"]
+    H --> I["PracticeGameStartResponse"]
+    I --> J["GamePlayPage handoff<br/>gameRoomId + webSocketUrl + scenario"]
+    J --> K["/ws/game/{gameRoomId}?token=..."]
+    K --> L["LIGHTNING"]
+    L --> M{"kill?"}
+    M -->|YES| N["GAME_RESULT<br/>PRACTICE_LIGHTNING_KILL<br/>practiceResult=SUCCESS"]
+    M -->|NO| O["LIGHTNING_APPLIED"]
+    O --> P["deadline 도달"]
+    P --> Q["GAME_RESULT<br/>PRACTICE_TIMEOUT<br/>practiceResult=FAILED"]
 ```
 
 핵심 정책:
 
 - 연습 모드는 혼자 플레이하며 상대 유저와 match session이 없음.
+- 연습 시작 HTTP 응답은 command ack가 아니라 play 화면 진입 handoff 계약임.
 - 연습 결과는 `GAME_RESULT` WebSocket payload를 최종 source로 사용함.
-- 연습 모드는 Summary HTTP API를 호출하지 않음.
+- 연습 모드는 Summary HTTP API를 호출하지 않고, Summary API도 practice room 조회를 거부함.
 - 연습 모드는 `gameMode=PRACTICE`로 저장하고 record/rank settlement에서 제외함.
 - 일반 match game의 결과/정산/summary 계약은 변경하지 않음.
+- 새 외부 패키지를 추가하지 않음.
 
 백엔드와의 구현 계약:
 
 - `POST /api/v1/games/practice`는 `gameRoomId`, `serverTime`, `startAt`, `webSocketUrl`, `scenario`를 반환함.
+- WebSocket URL은 기존 Game WebSocket과 동일하게 `/ws/game/{gameRoomId}`를 사용하며 token은 프론트가 query parameter로 붙임.
+- 일반 match WebSocket handshake는 기존처럼 `READY` participant만 허용함.
+- practice WebSocket handshake는 시작 API 직후 room이 `IN_PROGRESS`가 되므로 `READY/IN_PROGRESS` participant를 허용함.
 - `LIGHTNING` 처치 성공 시 `reason=PRACTICE_LIGHTNING_KILL`, `practiceResult=SUCCESS`를 반환함.
 - 미처치 상태로 시나리오가 끝나면 `reason=PRACTICE_TIMEOUT`, `practiceResult=FAILED`를 반환함.
 - `game_records`, rank, LP는 연습 결과로 생성/변경하지 않음.
+
+```mermaid
+flowchart TD
+    A["WebSocket handshake"] --> B{"gameMode"}
+    B -->|MATCH| C{"status == READY?"}
+    C -->|YES| D["connect allowed"]
+    C -->|NO| E["connect rejected"]
+    B -->|PRACTICE| F{"status == READY or IN_PROGRESS?"}
+    F -->|YES| D
+    F -->|NO| E
+```
 
 ## 📚 Changes
 
@@ -416,13 +442,49 @@ flowchart TD
   일반 게임의 Summary API는 record/rank 정산 완료 상태를 조회하는 API이므로, 정산하지 않는 연습 모드와 섞지 않음.
 - settlement 차단을 trigger, service, recovery query에 모두 둠.
   단일 분기 누락이 전적 오염으로 이어질 수 있으므로 `gameMode=PRACTICE`를 기준으로 다중 방어함.
+- recovery query를 `MATCH` room만 대상으로 제한함.
+  practice room은 `FINISHED` 상태여도 record count가 0인 것이 정상 상태이므로 미정산 복구 후보로 보면 안 됨.
+- Summary read model에 `gameMode`를 포함함.
+  API 모듈이 repository를 직접 보지 않고 core read service 결과로 practice summary 요청을 거부하기 위함임.
+
+```mermaid
+flowchart TD
+    A["PRACTICE room FINISHED"] --> B["GAME_RESULT WebSocket"]
+    A --> C["Settlement Trigger"]
+    C --> D{"gameMode=PRACTICE?"}
+    D -->|YES| E["no-op"]
+    D -->|NO| F["record/rank settlement"]
+    A --> G["Recovery Query"]
+    G --> H["MATCH only"]
+    H --> I["practice excluded"]
+    A --> J["Summary API"]
+    J --> K["GAME_SUMMARY_UNSUPPORTED_PRACTICE"]
+```
 
 ## 📝 Note
 
 - 프론트 연습 모드 진입과 결과 오버레이는 후속 이슈에서 진행함.
 - 연습 결과 history 저장은 이번 PR에서 제외함.
 - 새 외부 패키지를 추가하지 않음.
+- `game_rooms.game_mode` 컬럼이 추가됨.
+- Java 기본값은 `MATCH`이며, 운영/공유 DB의 기존 row는 `MATCH` backfill이 필요함.
+- 사용자 흐름 대입 검증 결과:
+  - 사용자가 연습 모드를 누르면 인증된 userId로 practice room이 생성됨.
+  - 이미 진행 중인 active room이 있으면 새 practice room 생성을 차단함.
+  - practice room은 상대 없이 participant 1명으로 바로 `IN_PROGRESS`가 됨.
+  - 프론트는 응답의 `webSocketUrl`과 `scenario`만으로 play 화면에 진입할 수 있음.
+  - WebSocket 연결 후 LIGHTNING으로 처치하면 `practiceResult=SUCCESS`가 내려감.
+  - 처치하지 못하고 deadline에 도달하면 `practiceResult=FAILED`가 내려감.
+  - 두 경우 모두 record/rank/LP 정산과 Summary HTTP polling으로 이어지지 않음.
 - 검증 결과 `./gradlew test` 전체 통과함.
+- 검증 결과 `./gradlew test --rerun-tasks` 전체 통과함.
+- 핵심 선별 검증 통과함.
+  - `./gradlew :league-of-star-core:test --tests '*GameRoom*'`
+  - `./gradlew :league-of-star-core:test --tests '*GameRecordRankSettlement*'`
+  - `./gradlew :league-of-star-api:test --tests '*Practice*'`
+  - `./gradlew :league-of-star-api:test --tests '*GameLightning*'`
+  - `./gradlew :league-of-star-api:test --tests '*GameEndSettlement*'`
+  - `./gradlew :league-of-star-api:test --tests '*GameSummary*'`
 - `git diff --check` 통과함.
 
 ## 📌 Related Issue
