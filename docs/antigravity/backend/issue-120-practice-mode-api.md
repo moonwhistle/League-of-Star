@@ -243,14 +243,14 @@ WebSocket access token 전달 방식도 기존 Game WebSocket 정책을 그대�
 
 ### 4. Practice WebSocket / Result 구현
 
-- [ ] WebSocket handshake에서 practice `IN_PROGRESS` participant 연결 허용.
-- [ ] 일반 match waiting 연결은 기존 READY 정책 유지.
-- [ ] `GameResultPayload`에 `gameMode`, `practiceResult` 필드 추가.
-- [ ] `GameResultReason`에 `PRACTICE_LIGHTNING_KILL`, `PRACTICE_TIMEOUT` 추가.
-- [ ] practice lightning kill 시 `GAME_RESULT` WebSocket 전송.
-- [ ] practice timeout 시 `GAME_RESULT` WebSocket 전송.
-- [ ] practice result는 session-only 또는 room broadcast 중 기존 sender 정책에 맞게 전송.
-- [ ] finished practice room에 다시 LIGHTNING이 들어오면 현재 practice result를 재전송.
+- [x] WebSocket handshake에서 practice `IN_PROGRESS` participant 연결 허용.
+- [x] 일반 match waiting 연결은 기존 READY 정책 유지.
+- [x] `GameResultPayload`에 `gameMode`, `practiceResult` 필드 추가.
+- [x] `GameResultReason`에 `PRACTICE_LIGHTNING_KILL`, `PRACTICE_TIMEOUT` 추가.
+- [x] practice lightning kill 시 `GAME_RESULT` WebSocket 전송.
+- [x] practice timeout 시 `GAME_RESULT` WebSocket 전송.
+- [x] practice result는 session-only 또는 room broadcast 중 기존 sender 정책에 맞게 전송.
+- [x] finished practice room에 다시 LIGHTNING이 들어오면 현재 practice result를 재전송.
 
 ### 5. Settlement 차단 구현
 

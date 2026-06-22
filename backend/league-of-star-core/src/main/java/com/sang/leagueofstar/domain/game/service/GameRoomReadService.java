@@ -38,6 +38,18 @@ public class GameRoomReadService {
         }
     }
 
+    public void validateGameAccessParticipant(Long gameRoomId, Long userId) {
+        GameRoom gameRoom = gameRoomRepository.findById(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+
+        if (!canAccessGame(gameRoom)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+        if (!gameRoom.hasParticipant(userId)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
+    }
+
     public void validateActiveParticipant(Long gameRoomId, Long userId) {
         GameRoom gameRoom = gameRoomRepository.findById(gameRoomId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
@@ -72,6 +84,13 @@ public class GameRoomReadService {
 
     public boolean existsActiveGameRoomByUserId(Long userId) {
         return gameRoomRepository.existsByParticipantUserIdAndStatusIn(userId, ACTIVE_GAME_ROOM_STATUSES);
+    }
+
+    private boolean canAccessGame(GameRoom gameRoom) {
+        if (gameRoom.isPracticeMode()) {
+            return gameRoom.getStatus().isReady() || gameRoom.getStatus().isInProgress();
+        }
+        return gameRoom.getStatus().isReady();
     }
 
     public GameRoomSummaryReadModel getSummaryReadModel(Long gameRoomId) {

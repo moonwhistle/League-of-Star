@@ -3,6 +3,7 @@ package com.sang.leagueofstar.game.lightning.service;
 import com.sang.leagueofstar.domain.game.domain.GameAction;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
 import com.sang.leagueofstar.domain.game.domain.GameRules;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.service.GameActionCommandService;
@@ -13,6 +14,7 @@ import com.sang.leagueofstar.domain.game.service.dto.GameActionSaveResult;
 import com.sang.leagueofstar.game.end.service.GameEndDeadlineAdvanceService;
 import com.sang.leagueofstar.game.lightning.domain.GameLightningCommand;
 import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger;
+import com.sang.leagueofstar.game.result.domain.PracticeResult;
 import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -131,6 +133,34 @@ class GameLightningServiceTest {
     }
 
     @Test
+    @DisplayName("handleLightning - PRACTICE 처치이면 practice SUCCESS GAME_RESULT를 반환한다")
+    void handleLightning_PracticeKill_ReturnPracticeSuccessGameResult() {
+        GameRoom lockedRoom = mockInProgressRoom();
+        GameRoom finishedRoom = mock(GameRoom.class);
+        GameAction action = GameAction.lightning(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 2_200, 1_000);
+        when(gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))
+                .thenReturn(List.of())
+                .thenReturn(List.of(action));
+        when(gameLightningJudgementService.judge(lockedRoom, USER_ID, SERVER_RECEIVE_TIME_MS, List.of()))
+                .thenReturn(Optional.of(action));
+        when(gameActionCommandService.save(action)).thenReturn(GameActionSaveResult.saved(action));
+        when(gameRoomCommandService.finishInProgressRoomByLightningKill(GAME_ROOM_ID, USER_ID))
+                .thenReturn(Optional.of(finishedRoom));
+        when(finishedRoom.isPracticeMode()).thenReturn(true);
+        when(finishedRoom.getGameMode()).thenReturn(GameMode.PRACTICE);
+        when(finishedRoom.getResult()).thenReturn(GameResult.PLAYER1_WIN);
+        when(finishedRoom.getWinnerId()).thenReturn(USER_ID);
+
+        var result = service.handleLightning(new GameLightningCommand(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().gameResult()).isNotNull();
+        assertThat(result.get().gameResult().gameMode()).isEqualTo(GameMode.PRACTICE);
+        assertThat(result.get().gameResult().reason()).isEqualTo("PRACTICE_LIGHTNING_KILL");
+        assertThat(result.get().gameResult().practiceResult()).isEqualTo(PracticeResult.SUCCESS);
+    }
+
+    @Test
     @DisplayName("handleLightning - 이미 FINISHED인 gameRoom이면 action 저장 없이 현재 session용 GAME_RESULT만 반환한다")
     void handleLightning_AlreadyFinished_ReturnCurrentGameResultOnly() {
         GameRoom finishedRoom = mock(GameRoom.class);
@@ -150,6 +180,30 @@ class GameLightningServiceTest {
         assertThat(result.get().gameResultBroadcast()).isFalse();
         assertThat(result.get().gameResult().reason()).isEqualTo("LIGHTNING_KILL");
         verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
+    }
+
+    @Test
+    @DisplayName("handleLightning - 이미 FINISHED인 PRACTICE gameRoom이면 현재 practice GAME_RESULT를 반환한다")
+    void handleLightning_AlreadyFinishedPractice_ReturnCurrentPracticeGameResultOnly() {
+        GameRoom finishedRoom = mock(GameRoom.class);
+        GameAction action = GameAction.lightning(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 2_200, 1_000);
+        when(gameRoomCommandService.lockLightningResultRoom(GAME_ROOM_ID, USER_ID)).thenReturn(finishedRoom);
+        when(finishedRoom.getStatus()).thenReturn(GameStatus.FINISHED);
+        when(finishedRoom.isPracticeMode()).thenReturn(true);
+        when(finishedRoom.getGameMode()).thenReturn(GameMode.PRACTICE);
+        when(finishedRoom.getResult()).thenReturn(GameResult.PLAYER1_WIN);
+        when(finishedRoom.getWinnerId()).thenReturn(USER_ID);
+        when(gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))
+                .thenReturn(List.of(action));
+
+        var result = service.handleLightning(new GameLightningCommand(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().lightningApplied()).isNull();
+        assertThat(result.get().gameResultBroadcast()).isFalse();
+        assertThat(result.get().gameResult().gameMode()).isEqualTo(GameMode.PRACTICE);
+        assertThat(result.get().gameResult().reason()).isEqualTo("PRACTICE_LIGHTNING_KILL");
+        assertThat(result.get().gameResult().practiceResult()).isEqualTo(PracticeResult.SUCCESS);
     }
 
     @Test

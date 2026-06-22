@@ -2,12 +2,14 @@ package com.sang.leagueofstar.game.end.service;
 
 import com.sang.leagueofstar.domain.game.domain.GameAction;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.service.GameNaturalDeathSettlementService;
 import com.sang.leagueofstar.domain.game.service.dto.GameNaturalDeathSettlementResult;
 import com.sang.leagueofstar.game.end.common.constant.GameEndConstants;
 import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
+import com.sang.leagueofstar.game.result.domain.PracticeResult;
 import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
 import com.sang.leagueofstar.game.result.service.GameResultWebSocketSender;
 import org.junit.jupiter.api.DisplayName;
@@ -118,6 +120,33 @@ class GameEndSettlementServiceTest {
     }
 
     @Test
+    @DisplayName("processDueEndDeadlines - PRACTICE 자연사 종료이면 practice FAILED GAME_RESULT를 broadcast한다")
+    void processDueEndDeadlines_PracticeTimeout_BroadcastPracticeFailedResult() throws Exception {
+        // given
+        when(gameEndScheduleService.findDueEndDeadlines(
+                NOW.toEpochMilli(),
+                GameEndConstants.END_DEADLINE_CANDIDATE_BATCH_SIZE
+        )).thenReturn(List.of(FIRST_GAME_ROOM_ID));
+        when(gameNaturalDeathSettlementService.settle(FIRST_GAME_ROOM_ID, NOW.toEpochMilli()))
+                .thenReturn(finishedPracticeNaturalDeathResult(FIRST_GAME_ROOM_ID));
+
+        // when
+        service.processDueEndDeadlines();
+
+        // then
+        ArgumentCaptor<GameResultPayload> payloadCaptor = ArgumentCaptor.forClass(GameResultPayload.class);
+        verify(gameResultWebSocketSender).broadcastGameResult(
+                org.mockito.ArgumentMatchers.eq(FIRST_GAME_ROOM_ID),
+                payloadCaptor.capture()
+        );
+        GameResultPayload payload = payloadCaptor.getValue();
+        org.assertj.core.api.Assertions.assertThat(payload.gameMode()).isEqualTo(GameMode.PRACTICE);
+        org.assertj.core.api.Assertions.assertThat(payload.result()).isEqualTo(GameResult.DRAW);
+        org.assertj.core.api.Assertions.assertThat(payload.reason()).isEqualTo("PRACTICE_TIMEOUT");
+        org.assertj.core.api.Assertions.assertThat(payload.practiceResult()).isEqualTo(PracticeResult.FAILED);
+    }
+
+    @Test
     @DisplayName("processDueEndDeadlines - 특정 gameRoom 정산이 실패해도 다음 gameRoom 처리를 계속한다")
     void processDueEndDeadlines_Exception_ContinueNext() throws Exception {
         // given
@@ -176,6 +205,16 @@ class GameEndSettlementServiceTest {
     private GameNaturalDeathSettlementResult finishedNaturalDeathResult(Long gameRoomId) {
         GameRoom gameRoom = GameRoom.builder()
                 .id(gameRoomId)
+                .build();
+        gameRoom.finish(GameResult.DRAW, null);
+        GameAction action = GameAction.lightning(gameRoomId, 1L, NOW.toEpochMilli() - 100L, 900, 1_000);
+        return GameNaturalDeathSettlementResult.finished(gameRoom, List.of(action));
+    }
+
+    private GameNaturalDeathSettlementResult finishedPracticeNaturalDeathResult(Long gameRoomId) {
+        GameRoom gameRoom = GameRoom.builder()
+                .id(gameRoomId)
+                .gameMode(GameMode.PRACTICE)
                 .build();
         gameRoom.finish(GameResult.DRAW, null);
         GameAction action = GameAction.lightning(gameRoomId, 1L, NOW.toEpochMilli() - 100L, 900, 1_000);

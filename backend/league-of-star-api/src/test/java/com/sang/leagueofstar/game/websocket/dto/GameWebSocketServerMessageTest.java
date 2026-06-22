@@ -2,6 +2,7 @@ package com.sang.leagueofstar.game.websocket.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.game.start.dto.GameStartScenarioPayload;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
@@ -124,9 +125,11 @@ class GameWebSocketServerMessageTest {
     void gameResult() {
         GameResultPayload payload = new GameResultPayload(
                 100L,
+                GameMode.MATCH,
                 GameResult.PLAYER1_WIN,
                 USER_ID,
                 "LIGHTNING_KILL",
+                null,
                 20_000L,
                 List.of(new GameResultPayload.ActionSummary(
                         USER_ID,
