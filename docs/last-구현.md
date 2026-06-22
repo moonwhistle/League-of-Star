@@ -525,7 +525,7 @@ Acceptance Criteria:
 
 ## Section 4. Optional Game Modes
 
-### 4-1. [ ] 연습 모드 API / Scenario 계약
+### 4-1. [x] 연습 모드 API / Scenario 계약
 
 담당: Backend
 
@@ -533,27 +533,48 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 실제 상대 없이 LIGHTNING/게임 플레이를 테스트할 수 있는 연습 game room 계약을 확정한다.
+- [x] 실제 상대 없이 LIGHTNING/게임 플레이를 테스트할 수 있는 연습 game room 계약을 확정한다.
 
 Backend:
 
-- [ ] 연습 게임 room 생성 API가 필요한지 결정한다.
-- [ ] endpoint를 확정한다.
-  - 후보: `POST /api/v1/games/practice`
-- [ ] scenario 생성 정책을 확정한다.
-  - 서버가 동일한 GAME_START payload shape를 내려준다.
-  - 상대 user 없이도 GamePlayPage가 동작하도록 opponent nullable 정책을 정한다.
-- [ ] 연습 결과를 랭크/LP/전적에 반영하지 않는 서버 정책을 문서화한다.
+- [x] 연습 게임 room 생성 API를 구현한다.
+- [x] endpoint를 확정한다.
+  - `POST /api/v1/games/practice`
+- [x] request body 없음과 `@AuthUser Long userId` 인증 사용자 식별 정책을 확정한다.
+- [x] response shape를 확정한다.
+  - `gameRoomId`
+  - `serverTime`
+  - `startAt`
+  - `webSocketUrl`
+  - `scenario`
+- [x] scenario 생성 정책을 확정한다.
+  - 서버가 기존 `GameStartScenarioPayload`와 같은 shape의 `scenario`를 내려준다.
+  - 연습 모드는 `opponent`, `matchId`를 내려주지 않는다.
+- [x] 연습 room은 `gameMode=PRACTICE`로 저장한다.
+- [x] 연습 room은 participant 1명으로 생성/시작한다.
+- [x] WebSocket은 기존 `/ws/game/{gameRoomId}`를 재사용한다.
+- [x] LIGHTNING kill 결과를 `GAME_RESULT`로 반환한다.
+  - `reason=PRACTICE_LIGHTNING_KILL`
+  - `practiceResult=SUCCESS`
+- [x] 시나리오 종료까지 kill이 없으면 timeout 결과를 `GAME_RESULT`로 반환한다.
+  - `reason=PRACTICE_TIMEOUT`
+  - `practiceResult=FAILED`
+- [x] 연습 결과를 랭크/LP/전적에 반영하지 않는 서버 정책을 구현/문서화한다.
 
 Policy:
 
-- [ ] 연습 모드는 랭크/LP/전적 정산에 반영하지 않는다.
-- [ ] 기존 ranked match WebSocket 계약과 섞지 않는다.
+- [x] 연습 모드는 랭크/LP/전적 정산에 반영하지 않는다.
+- [x] practice 결과는 Summary HTTP API가 아니라 `GAME_RESULT` WebSocket payload를 최종 source로 삼는다.
+- [x] 일반 ranked match의 `GAME_RESULT -> Summary HTTP polling` 계약은 유지한다.
+- [x] practice room은 settlement trigger, core settlement, recovery query, summary API에서 제외한다.
+- [x] 기존 ranked match WebSocket 계약과 섞지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 프론트가 기존 handoff 구조로 연습 게임에 진입할 수 있는 payload가 확정된다.
-- [ ] 연습 결과 미정산 정책이 문서화된다.
+- [x] 프론트가 기존 handoff 구조로 연습 게임에 진입할 수 있는 payload가 확정된다.
+- [x] 연습 결과 미정산 정책이 문서화된다.
+- [x] RestDocs와 테스트가 작성된다.
+- [x] 전체 백엔드 테스트가 통과한다.
 
 ### 4-2. [ ] 연습 모드 프론트 진입 구현
 

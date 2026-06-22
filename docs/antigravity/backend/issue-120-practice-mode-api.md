@@ -281,23 +281,23 @@ WebSocket access token 전달 방식도 기존 Game WebSocket 정책을 그대�
 
 ### 7. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 4-1과 실제 계약 정합성 반영.
-- [ ] 일반 게임 결과 정책과 연습 게임 결과 정책 차이를 문서화.
-- [ ] 일반 게임은 `GAME_RESULT -> Summary HTTP polling`임을 유지.
-- [ ] 연습 게임은 `GAME_RESULT -> 결과 오버레이`임을 문서화.
-- [ ] rank/LP/record 미반영 정책을 문서화.
-- [ ] DB 컬럼 추가 영향을 문서화.
-- [ ] PR 섹션을 계약/정책 중심으로 보강.
+- [x] `docs/last-구현.md` Section 4-1과 실제 계약 정합성 반영.
+- [x] 일반 게임 결과 정책과 연습 게임 결과 정책 차이를 문서화.
+- [x] 일반 게임은 `GAME_RESULT -> Summary HTTP polling`임을 유지.
+- [x] 연습 게임은 `GAME_RESULT -> 결과 오버레이`임을 문서화.
+- [x] rank/LP/record 미반영 정책을 문서화.
+- [x] DB 컬럼 추가 영향을 문서화.
+- [x] PR 섹션을 계약/정책 중심으로 보강.
 
 ### 8. 검증
 
-- [ ] `./gradlew :league-of-star-core:test --tests '*GameRoom*'`
-- [ ] `./gradlew :league-of-star-core:test --tests '*GameRecordRankSettlement*'`
-- [ ] `./gradlew :league-of-star-api:test --tests '*Practice*'`
-- [ ] `./gradlew :league-of-star-api:test --tests '*GameLightning*'`
-- [ ] `./gradlew :league-of-star-api:test --tests '*GameEndSettlement*'`
-- [ ] `./gradlew :league-of-star-api:test --tests '*GameSummary*'`
-- [ ] `./gradlew test`
+- [x] `./gradlew :league-of-star-core:test --tests '*GameRoom*'`
+- [x] `./gradlew :league-of-star-core:test --tests '*GameRecordRankSettlement*'`
+- [x] `./gradlew :league-of-star-api:test --tests '*Practice*'`
+- [x] `./gradlew :league-of-star-api:test --tests '*GameLightning*'`
+- [x] `./gradlew :league-of-star-api:test --tests '*GameEndSettlement*'`
+- [x] `./gradlew :league-of-star-api:test --tests '*GameSummary*'`
+- [x] `./gradlew test`
 
 ## Implementation Policy
 
@@ -340,7 +340,8 @@ alter table game_rooms add column game_mode varchar(20) not null default 'MATCH'
 ## Test Policy
 
 - controller 테스트는 `RestAssuredMockMvc`로 작성한다.
-- RestDocs는 성공 응답, 인증/사용자 없음, active game room 차단, deadline 등록 실패 보상 정책을 문서화한다.
+- RestDocs는 성공 응답과 active game room 차단 응답을 문서화한다.
+- deadline 등록 실패 보상 정책은 `GamePracticeServiceTest`에서 unit test로 검증한다.
 - 영속성 계층 변경은 `@DataJpaTest` 기반 실 데이터 접근 테스트로 검증한다.
 - service 계층은 mock 기반 unit test로 orchestration과 settlement 차단 정책을 검증한다.
 - WebSocket handshake/service는 기존 테스트 스타일을 따라 unit test로 검증한다.
@@ -367,6 +368,8 @@ alter table game_rooms add column game_mode varchar(20) not null default 'MATCH'
 - 프론트의 연습 모드 버튼, GamePlayPage 진입, 결과 오버레이, 다시 하기/메인으로 UI는 후속 프론트 이슈에서 진행한다.
 - 연습 결과를 저장/조회하는 별도 history 기능은 이번 이슈에서 제외한다.
 - practice result는 WebSocket payload로만 표시하고 Summary HTTP polling을 하지 않는다.
+- 검증 결과 `./gradlew test` 전체 통과함.
+- `git diff --check` 통과함.
 
 -----
 
@@ -419,7 +422,8 @@ flowchart TD
 - 프론트 연습 모드 진입과 결과 오버레이는 후속 이슈에서 진행함.
 - 연습 결과 history 저장은 이번 PR에서 제외함.
 - 새 외부 패키지를 추가하지 않음.
-- 검증 결과는 구현 후 작성함.
+- 검증 결과 `./gradlew test` 전체 통과함.
+- `git diff --check` 통과함.
 
 ## 📌 Related Issue
 
