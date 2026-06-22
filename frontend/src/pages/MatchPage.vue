@@ -26,6 +26,8 @@
     :data-rank-error-message="rankErrorMessage"
     :data-ranking-status="rankingStatus"
     :data-ranking-error-message="rankingErrorMessage"
+    :data-practice-status="practiceStatus"
+    :data-practice-error-message="practiceErrorMessage"
   >
     <header class="match-app-bar" aria-label="Match navigation">
       <h1>LEAGUE OF STAR</h1>
@@ -138,7 +140,14 @@
         </button>
 
         <div class="secondary-actions">
-          <button type="button">{{ t('match.practice') }}</button>
+          <button
+            type="button"
+            data-testid="practice-start-button"
+            :disabled="!canStartPractice"
+            @click="startPracticeMode"
+          >
+            {{ practiceActionLabel }}
+          </button>
           <button type="button">{{ t('match.custom') }}</button>
         </div>
       </section>
@@ -267,6 +276,8 @@ import { logout } from '@/services/authService'
 import { clearAuthTokens, getRefreshToken } from '@/services/authToken'
 import { saveGameWaitingPayloadFromMatchResult } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
+import { savePracticeGameStartPayloadFromResponse } from '@/services/practiceGameStartPayload'
+import { startPractice } from '@/services/practiceService'
 import { getMyProfile } from '@/services/profileService'
 import { getMyRank } from '@/services/rankService'
 import { getRankings } from '@/services/rankingService'
@@ -293,12 +304,14 @@ const isLogoutConfirmOpen = ref(false)
 const profileStatus = ref('idle')
 const rankStatus = ref('idle')
 const rankingStatus = ref('idle')
+const practiceStatus = ref('idle')
 const profile = shallowRef<UserProfileResponse>()
 const rank = shallowRef<UserRankResponse>()
 const ranking = shallowRef<RankingResponse>()
 const profileErrorMessage = ref('')
 const rankErrorMessage = ref('')
 const rankingErrorMessage = ref('')
+const practiceErrorMessage = ref('')
 const isMatchFoundModalOpen = ref(false)
 const matchFoundCountdownSeconds = ref(0)
 const matchResponseCommandStatus = ref('idle')
@@ -405,9 +418,21 @@ const canUsePrimaryMatchAction = computed(() => {
 const canLogout = computed(
   () =>
     !isLoggingOut.value &&
+    practiceStatus.value !== 'loading' &&
     !hasActiveMatchFoundResponse.value &&
     !isMatchResponseCommandPending.value &&
     !hasSubmittedMatchResponseCommand.value,
+)
+const canStartPractice = computed(
+  () =>
+    practiceStatus.value !== 'loading' &&
+    queueStatus.value === 'ready' &&
+    !hasActiveMatchFoundResponse.value &&
+    !isMatchResponseCommandPending.value &&
+    !hasSubmittedMatchResponseCommand.value,
+)
+const practiceActionLabel = computed(() =>
+  practiceStatus.value === 'loading' ? t('match.practiceStarting') : t('match.practice'),
 )
 const primaryMatchActionLabel = computed(() => {
   if (streamStatus.value === 'connecting' && queueStatus.value === 'ready') {
@@ -550,6 +575,7 @@ let logoutAbortController = new AbortController()
 let profileAbortController = new AbortController()
 let rankAbortController = new AbortController()
 let rankingAbortController = new AbortController()
+let practiceAbortController = new AbortController()
 
 onMounted(() => {
   isActive = true
@@ -567,6 +593,7 @@ onUnmounted(() => {
   abortProfileRequest()
   abortRankRequest()
   abortRankingRequest()
+  abortPracticeRequest()
   stopMatchWaitingTimer()
   stopMatchFoundCountdown()
   closeMatchStream()
@@ -736,6 +763,54 @@ async function finalizeLogout() {
 
 function navigateToProfile() {
   void router.push({ name: ROUTE_NAMES.profile })
+}
+
+async function startPracticeMode() {
+  if (!canStartPractice.value) {
+    return
+  }
+
+  abortPracticeRequest()
+  practiceAbortController = new AbortController()
+  const activePracticeAbortController = practiceAbortController
+  practiceStatus.value = 'loading'
+  practiceErrorMessage.value = ''
+  errorModalMessage.value = ''
+
+  try {
+    const response = await startPractice(activePracticeAbortController.signal)
+
+    if (!isActive || activePracticeAbortController.signal.aborted) {
+      return
+    }
+
+    const payload = savePracticeGameStartPayloadFromResponse(response)
+
+    if (payload === null) {
+      failPracticeStart(t('match.practiceStartFailed'))
+      return
+    }
+
+    practiceStatus.value = 'success'
+    practiceErrorMessage.value = ''
+
+    await router.push({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: String(payload.gameRoomId),
+      },
+    })
+  } catch (error) {
+    if (!isActive || isAbortError(error)) {
+      return
+    }
+
+    const message =
+      error instanceof Error && error.message.trim() !== ''
+        ? error.message
+        : t('match.practiceStartFailed')
+    failPracticeStart(message)
+  }
 }
 
 function startMatchmaking() {
@@ -1202,6 +1277,10 @@ function abortRankingRequest() {
   rankingAbortController.abort()
 }
 
+function abortPracticeRequest() {
+  practiceAbortController.abort()
+}
+
 function resetLocalLogoutState() {
   resetMatchFoundModalState()
   queueStatus.value = 'ready'
@@ -1278,6 +1357,12 @@ function failMatchmaking(message = '', nextQueueErrorMessage = '', nextStreamErr
   resetMatchmakingState()
   queueErrorMessage.value = nextQueueErrorMessage
   streamErrorMessage.value = nextStreamErrorMessage
+  showErrorModal(message)
+}
+
+function failPracticeStart(message = '') {
+  practiceStatus.value = 'error'
+  practiceErrorMessage.value = message
   showErrorModal(message)
 }
 
