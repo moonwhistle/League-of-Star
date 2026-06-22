@@ -399,25 +399,34 @@ interface GameResultPayload {
 
 ## 📌 Summary
 
-연습 모드 프론트 진입과 GamePlayPage 내부 결과 오버레이를 구현함.
+사용자가 매칭을 기다리지 않고 혼자 바로 플레이할 수 있는 연습 모드 프론트 흐름을 구현함.
+
+연습 모드는 일반 랭크 게임처럼 상대를 찾고, 수락하고, 대기방에서 준비할 필요가 없다. 사용자가 MatchPage에서 `연습 모드`를 누르면 백엔드가 바로 practice game room과 scenario를 내려주고, 프론트는 그 응답을 GamePlayPage 진입에 필요한 시작 정보로 사용한다.
+
+결과도 일반 게임과 분리함. 일반 게임은 랭크/LP/전적 정산이 필요하므로 `GAME_RESULT -> GameResultPage -> Summary API` 흐름을 유지한다. 반면 연습 모드는 정산하지 않는 모드이므로 WebSocket `GAME_RESULT.practiceResult`를 받아 GamePlayPage 내부에서 성공/실패만 보여준다.
 
 ```mermaid
 flowchart TD
     A["MatchPage 연습 모드 클릭"] --> B["POST /api/v1/games/practice"]
-    B --> C["practice payload 저장"]
-    C --> D["/game/:gameRoomId/play 이동"]
-    D --> E["GamePlayPage WebSocket 연결"]
-    E --> F["LIGHTNING 플레이"]
-    F --> G["GAME_RESULT 수신"]
-    G --> H["GamePlayPage 결과 오버레이"]
+    B --> C["백엔드가 gameRoomId, startAt, webSocketUrl, scenario 응답"]
+    C --> D["practice payload를 sessionStorage에 저장"]
+    D --> E["/game/:gameRoomId/play 이동"]
+    E --> F["3 / 2 / 1 카운트다운"]
+    F --> G["Game WebSocket 연결 후 LIGHTNING 플레이"]
+    G --> H["GAME_RESULT 수신"]
+    H --> I{"gameMode"}
+    I -->|PRACTICE| J["GamePlayPage 성공/실패 오버레이"]
+    I -->|일반 게임| K["GameResultPage 이동 후 Summary API"]
 ```
 
 핵심 정책:
 
 - 연습 모드는 match queue, match response, GameWaitingPage를 거치지 않음.
-- 연습 시작 API 응답은 GamePlayPage 진입 handoff source로 사용함.
-- 연습 결과는 WebSocket `GAME_RESULT.practiceResult`를 최종 source로 사용함.
+- 연습 시작 API 응답은 단순 요청 접수 ack가 아니라 GamePlayPage 진입 handoff payload로 사용함.
+- 연습 시작 시각은 백엔드가 내려준 `startAt`을 기준으로 하며, 프론트는 이 대기 구간을 `3 / 2 / 1` 오버레이로 표시함.
+- 연습 결과는 WebSocket `GAME_RESULT.practiceResult`를 최종 source of truth로 사용함.
 - 연습 모드는 GameResultPage와 Summary API를 사용하지 않음.
+- 연습 결과 확정 후에는 게임 진행 중 이탈 경고를 띄우지 않음.
 - 일반 ranked match의 결과 route/Summary API 흐름은 유지함.
 
 백엔드와의 구현 계약:
@@ -430,14 +439,47 @@ flowchart TD
 
 ## 📚 Changes
 
-- 사용자가 연습 모드를 누르면 바로 게임 화면으로 갈 수 있게 함.
-  일반 매칭은 상대를 찾고 수락을 기다려야 하지만, 연습 모드는 혼자 하는 모드라서 Practice Start API 응답만 있으면 바로 플레이할 수 있음.
-- 연습 모드 전용 payload 저장 흐름을 추가함.
-  기존 waiting payload는 상대와 matchId가 필요하므로 연습 모드에 맞지 않는다. 그래서 practice start 응답만 저장하고 GamePlayPage가 이 값을 읽어 시작하게 함.
-- GamePlayPage에서 일반 게임과 연습 모드 결과 처리를 분리함.
-  일반 게임은 결과 route와 Summary API를 유지하고, 연습 모드는 play 화면 안에서 성공/실패만 보여줌.
+- 연습 모드 버튼을 실제 플레이 진입으로 연결함.
+  사용자가 `연습 모드`를 누르면 프론트는 매칭 큐에 들어가지 않고 `POST /api/v1/games/practice`만 호출한다. 연습 모드는 상대가 없기 때문에 match join, match SSE, accept/reject, GameWaitingPage가 필요 없다. 그래서 백엔드가 내려준 practice response만 저장하고 바로 play route로 이동하게 함.
+
+```mermaid
+flowchart LR
+    A["일반 게임"] --> B["매칭 큐"]
+    B --> C["상대 수락"]
+    C --> D["GameWaitingPage"]
+    D --> E["GamePlayPage"]
+
+    F["연습 모드"] --> G["Practice Start API"]
+    G --> H["GamePlayPage"]
+```
+
+- practice start response를 연습 모드 전용 handoff payload로 저장함.
+  기존 waiting payload는 `matchId`, `opponent`, `game.webSocketUrl`처럼 상대가 있는 매칭을 전제로 한다. 연습 모드에 억지로 이 구조를 맞추면 없는 상대 정보를 가짜로 만들어야 한다. 그래서 `gameRoomId`, `startAt`, `webSocketUrl`, `scenario`만 담는 practice payload를 별도로 두고, GamePlayPage가 route의 `gameRoomId`와 저장 payload가 일치할 때만 시작하게 함.
+
+- GamePlayPage 시작 대기 구간을 `3 / 2 / 1`로 보여줌.
+  백엔드는 바로 play 가능한 응답을 주지만, 실제 시작 기준은 응답 안의 `startAt`이다. 사용자가 화면에 들어왔는데 잠깐 멈춘 것처럼 보이지 않게, 이 시간을 시작 카운트다운으로 표현함. 다시하기도 새 practice start response를 받기 때문에 같은 방식으로 새 `startAt` 기준 카운트다운을 보여줌.
+
+- 일반 게임 결과와 연습 모드 결과를 분리함.
+  일반 게임은 랭크와 전적 정산이 있으므로 결과 페이지에서 Summary API를 조회해야 한다. 연습 모드는 정산하지 않기 때문에 그 화면으로 보내면 사용자는 없는 LP 변화나 전적 결과를 기대하게 된다. 그래서 `GAME_RESULT.gameMode=PRACTICE`인 경우에는 GamePlayPage 안에서 성공/실패 오버레이만 보여주게 함.
+
+```mermaid
+flowchart TD
+    A["GAME_RESULT 수신"] --> B{"연습 모드인가?"}
+    B -->|아니오| C["결과 payload 저장"]
+    C --> D["GameResultPage 이동"]
+    D --> E["Summary API로 랭크/LP/전적 정산 조회"]
+    B -->|예| F{"practiceResult"}
+    F -->|SUCCESS| G["성공 오버레이"]
+    F -->|FAILED| H["실패 오버레이"]
+    G --> I["다시 하기 또는 메인으로"]
+    H --> I
+```
+
+- 결과 이후 이동 경고 정책을 정리함.
+  게임 중에는 실수로 화면을 벗어나지 않도록 이탈 경고가 필요하다. 하지만 WebSocket `GAME_RESULT`를 받은 뒤에는 이미 게임이 끝난 상태이므로 `메인으로 돌아가기`에서 다시 “게임 진행 중” 경고가 뜨면 정책과 사용자 경험이 어긋난다. 그래서 leave guard는 `playState`뿐 아니라 `gameResultReceived`까지 보고, 결과 확정 뒤에는 경고하지 않게 함.
+
 - 연습 결과가 랭크/전적처럼 보이지 않게 함.
-  연습 모드는 LP나 전적에 반영되지 않으므로 결과 오버레이에도 정산 정보나 상대 정보를 표시하지 않음.
+  연습 모드는 LP, 랭크, 전적을 바꾸지 않는다. 따라서 결과 오버레이에는 성공/실패와 다시하기/메인 이동만 노출하고, 상대 정보나 정산 정보는 표시하지 않음.
 
 ## 📝 Note
 
@@ -445,6 +487,7 @@ flowchart TD
 - 백엔드 Practice API 변경은 없음.
 - 새 패키지 추가 없음.
 - 검증 결과:
+  - `npm run test -- GamePlayPage` 통과함.
   - `npm run test -- practiceService practiceGameStartPayload` 통과함.
   - `npm run test -- MatchPage` 통과함.
   - `npm run test -- GamePlayPage gameResultPayload` 통과함.
