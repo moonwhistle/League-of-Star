@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.domain.game.repository;
 
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
@@ -71,8 +72,8 @@ class GameRoomRepositoryTest {
     }
 
     @Test
-    @DisplayName("findGameRoomIdsByStatusAndRecordCountNot - FINISHED 중 record 2행이 아닌 gameRoom만 조회한다")
-    void findGameRoomIdsByStatusAndRecordCountNot() {
+    @DisplayName("findGameRoomIdsByStatusAndGameModeAndRecordCountNot - MATCH FINISHED 중 record 2행이 아닌 gameRoom만 조회한다")
+    void findGameRoomIdsByStatusAndGameModeAndRecordCountNot() {
         // given
         User p1 = userRepository.save(User.builder().email("p1-count@test.com").nickname("p1c").build());
         User p2 = userRepository.save(User.builder().email("p2-count@test.com").nickname("p2c").build());
@@ -80,26 +81,39 @@ class GameRoomRepositoryTest {
         GameRoom oneRecordRoom = saveFinishedRoom(p1.getId(), p2.getId());
         GameRoom settledRoom = saveFinishedRoom(p1.getId(), p2.getId());
         GameRoom inProgressRoom = saveRoom(GameStatus.IN_PROGRESS, p1.getId(), p2.getId());
+        GameRoom practiceRoom = saveFinishedPracticeRoom(p1.getId());
         saveRecord(oneRecordRoom.getId(), p1.getId(), p2.getId(), GameRecordResult.WIN);
         saveRecord(settledRoom.getId(), p1.getId(), p2.getId(), GameRecordResult.WIN);
         saveRecord(settledRoom.getId(), p2.getId(), p1.getId(), GameRecordResult.LOSS);
         gameRecordRepository.flush();
 
         // when
-        List<Long> result = gameRoomRepository.findGameRoomIdsByStatusAndRecordCountNot(
+        List<Long> result = gameRoomRepository.findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
                 GameStatus.FINISHED,
+                GameMode.MATCH,
                 GameRoom.MAX_PARTICIPANTS,
                 PageRequest.of(0, 10)
         );
 
         // then
         assertThat(result).containsExactly(noRecordRoom.getId(), oneRecordRoom.getId());
-        assertThat(result).doesNotContain(settledRoom.getId(), inProgressRoom.getId());
+        assertThat(result).doesNotContain(settledRoom.getId(), inProgressRoom.getId(), practiceRoom.getId());
     }
 
     private GameRoom saveFinishedRoom(Long firstUserId, Long secondUserId) {
         GameRoom gameRoom = saveRoom(GameStatus.READY, firstUserId, secondUserId);
         gameRoom.finish(GameResult.PLAYER1_WIN, firstUserId);
+        return gameRoomRepository.save(gameRoom);
+    }
+
+    private GameRoom saveFinishedPracticeRoom(Long userId) {
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.PRACTICE)
+                .durationSeconds(60)
+                .scenarioData(GameScenario.of(List.of(new HpStep(0, 10000))))
+                .build();
+        gameRoom.addParticipant(userId);
+        gameRoom.finish(GameResult.PLAYER1_WIN, userId);
         return gameRoomRepository.save(gameRoom);
     }
 

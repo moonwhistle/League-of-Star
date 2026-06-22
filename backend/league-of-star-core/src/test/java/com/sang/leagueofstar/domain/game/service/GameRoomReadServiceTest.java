@@ -3,6 +3,7 @@ package com.sang.leagueofstar.domain.game.service;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
@@ -89,6 +90,111 @@ class GameRoomReadServiceTest {
         assertThatThrownBy(() -> gameRoomReadService.validateReadyParticipant(GAME_ROOM_ID, UNKNOWN_USER_ID))
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
+    @DisplayName("validateActiveParticipant - READY 게임룸 참가자이면 통과한다")
+    void validateActiveParticipant_ReadyParticipant() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatCode(() -> gameRoomReadService.validateActiveParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateActiveParticipant - IN_PROGRESS 게임룸 참가자이면 통과한다")
+    void validateActiveParticipant_InProgressParticipant() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatCode(() -> gameRoomReadService.validateActiveParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateActiveParticipant - FINISHED 게임룸이면 예외를 던진다")
+    void validateActiveParticipant_Finished_ThrowException() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        gameRoom.finish(GameResult.PLAYER1_WIN, FIRST_USER_ID);
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.validateActiveParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
+    }
+
+    @Test
+    @DisplayName("validateActiveParticipant - 참가자가 아니면 예외를 던진다")
+    void validateActiveParticipant_NotParticipant_ThrowException() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.validateActiveParticipant(GAME_ROOM_ID, UNKNOWN_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
+    @DisplayName("validateGameAccessParticipant - MATCH READY 참가자이면 통과한다")
+    void validateGameAccessParticipant_MatchReadyParticipant() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatCode(() -> gameRoomReadService.validateGameAccessParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateGameAccessParticipant - MATCH IN_PROGRESS이면 예외를 던진다")
+    void validateGameAccessParticipant_MatchInProgress_ThrowException() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.validateGameAccessParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
+    }
+
+    @Test
+    @DisplayName("validateGameAccessParticipant - PRACTICE IN_PROGRESS 참가자이면 통과한다")
+    void validateGameAccessParticipant_PracticeInProgressParticipant() {
+        // given
+        GameRoom gameRoom = createReadyPracticeRoom();
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatCode(() -> gameRoomReadService.validateGameAccessParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateGameAccessParticipant - PRACTICE FINISHED이면 예외를 던진다")
+    void validateGameAccessParticipant_PracticeFinished_ThrowException() {
+        // given
+        GameRoom gameRoom = createReadyPracticeRoom();
+        gameRoom.finish(GameResult.PLAYER1_WIN, FIRST_USER_ID);
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.validateGameAccessParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
     }
 
     @Test
@@ -240,6 +346,14 @@ class GameRoomReadServiceTest {
                         .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
+        return gameRoom;
+    }
+
+    private GameRoom createReadyPracticeRoom() {
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.PRACTICE)
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
         return gameRoom;
     }
 }

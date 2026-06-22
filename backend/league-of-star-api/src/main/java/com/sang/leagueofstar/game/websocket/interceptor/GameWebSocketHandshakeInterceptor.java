@@ -39,7 +39,7 @@ public class GameWebSocketHandshakeInterceptor implements HandshakeInterceptor {
 
             Long userId = jwtTokenProvider.getUserId(token);
             Long gameRoomId = gameWebSocketPathResolver.resolveGameRoomId(request.getURI());
-            gameRoomReadService.validateReadyParticipant(gameRoomId, userId);
+            gameRoomReadService.validateGameAccessParticipant(gameRoomId, userId);
 
             attributes.put(GameWebSocketSessionAttribute.GAME_ROOM_ID, gameRoomId);
             attributes.put(GameWebSocketSessionAttribute.USER_ID, userId);

@@ -55,7 +55,9 @@ public class GameEndSettlementService {
         }
         if (result.status().isFinished()) {
             broadcastNaturalDeathResult(gameRoomId, nowMillis, result);
-            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(result.finishedGameRoom());
+            if (result.finishedGameRoom().isMatchMode()) {
+                gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(result.finishedGameRoom());
+            }
         }
         if (result.shouldCleanupEndDeadline()) {
             cleanupEndDeadline(gameRoomId);
@@ -66,17 +68,32 @@ public class GameEndSettlementService {
                                              long finishedAtMillis,
                                              GameNaturalDeathSettlementResult result) {
         try {
-            GameResultPayload payload = gameResultPayloadFactory.naturalDeathDraw(
+            GameResultPayload payload = createNaturalDeathResultPayload(gameRoomId, finishedAtMillis, result);
+            gameResultWebSocketSender.broadcastGameResult(gameRoomId, payload);
+        } catch (IOException e) {
+            log.warn("Failed to broadcast natural death GAME_RESULT: gameRoomId={}", gameRoomId, e);
+        }
+    }
+
+    private GameResultPayload createNaturalDeathResultPayload(Long gameRoomId,
+                                                              long finishedAtMillis,
+                                                              GameNaturalDeathSettlementResult result) {
+        if (result.finishedGameRoom().isPracticeMode()) {
+            return gameResultPayloadFactory.practiceTimeout(
                     gameRoomId,
                     result.finishedGameRoom().getResult(),
                     result.finishedGameRoom().getWinnerId(),
                     finishedAtMillis,
                     result.actions()
             );
-            gameResultWebSocketSender.broadcastGameResult(gameRoomId, payload);
-        } catch (IOException e) {
-            log.warn("Failed to broadcast natural death GAME_RESULT: gameRoomId={}", gameRoomId, e);
         }
+        return gameResultPayloadFactory.naturalDeathDraw(
+                gameRoomId,
+                result.finishedGameRoom().getResult(),
+                result.finishedGameRoom().getWinnerId(),
+                finishedAtMillis,
+                result.actions()
+        );
     }
 
     private void updateEndDeadlineIfDue(Long gameRoomId, long nowMillis, long naturalDeathAtMillis) {

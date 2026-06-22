@@ -42,6 +42,7 @@ public class GameSummaryService {
 
     public GameSummaryResponse getSummary(Long gameId, Long requestUserId) {
         GameRoomSummaryReadModel gameRoom = gameRoomReadService.getSummaryReadModel(gameId);
+        validateSupportedGameMode(gameRoom);
         validateParticipant(gameRoom, requestUserId);
         validateFinished(gameRoom);
 
@@ -58,6 +59,12 @@ public class GameSummaryService {
         }
 
         return done(gameRoom, requestUserId);
+    }
+
+    private void validateSupportedGameMode(GameRoomSummaryReadModel gameRoom) {
+        if (gameRoom.isPracticeMode()) {
+            throw new ApiException(ApiErrorCode.GAME_SUMMARY_UNSUPPORTED_PRACTICE);
+        }
     }
 
     private void validateParticipant(GameRoomSummaryReadModel gameRoom, Long requestUserId) {

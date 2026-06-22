@@ -4,6 +4,7 @@ import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.game.domain.GameParticipant;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
@@ -37,6 +38,21 @@ public class GameRoomCommandService {
 
         gameRoom.addParticipant(firstUserId);
         gameRoom.addParticipant(secondUserId);
+
+        return gameRoomRepository.save(gameRoom);
+    }
+
+    public GameRoom createPracticeRoom(Long userId) {
+        validatePracticeParticipant(userId);
+
+        int durationSeconds = createGameDurationSeconds();
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.PRACTICE)
+                .durationSeconds(durationSeconds)
+                .scenarioData(createScenario(durationSeconds))
+                .build();
+
+        gameRoom.addParticipant(userId);
 
         return gameRoomRepository.save(gameRoom);
     }
@@ -113,7 +129,7 @@ public class GameRoomCommandService {
         return gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .filter(gameRoom -> gameRoom.getStatus().isInProgress())
                 .map(gameRoom -> {
-                    validateCompleteParticipants(gameRoom);
+                    validateCompleteMatchParticipants(gameRoom);
                     gameRoom.finish(GameResult.DRAW, null);
                     return gameRoom;
                 });
@@ -123,7 +139,7 @@ public class GameRoomCommandService {
         return gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .filter(gameRoom -> gameRoom.getStatus().isInProgress())
                 .map(gameRoom -> {
-                    validateCompleteParticipants(gameRoom);
+                    validateExpectedParticipants(gameRoom);
                     gameRoom.finish(GameResult.DRAW, null);
                     return gameRoom;
                 });
@@ -157,6 +173,12 @@ public class GameRoomCommandService {
         }
     }
 
+    private void validatePracticeParticipant(Long userId) {
+        if (userId == null) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
+    }
+
     private int createGameDurationSeconds() {
         return ThreadLocalRandom.current().nextInt(MIN_GAME_DURATION_SECONDS, MAX_GAME_DURATION_SECONDS + 1);
     }
@@ -166,7 +188,7 @@ public class GameRoomCommandService {
     }
 
     private GameResult resolveWinResult(GameRoom gameRoom, Long winnerUserId) {
-        validateCompleteParticipants(gameRoom);
+        validateExpectedParticipants(gameRoom);
         if (!gameRoom.hasParticipant(winnerUserId)) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
         }
@@ -177,8 +199,18 @@ public class GameRoomCommandService {
         return firstParticipantUserId.equals(winnerUserId) ? GameResult.PLAYER1_WIN : GameResult.PLAYER2_WIN;
     }
 
-    private void validateCompleteParticipants(GameRoom gameRoom) {
-        if (gameRoom.getParticipants().size() != GameRoom.MAX_PARTICIPANTS) {
+    private void validateCompleteMatchParticipants(GameRoom gameRoom) {
+        if (!gameRoom.isMatchMode()) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
+        validateExpectedParticipants(gameRoom);
+    }
+
+    private void validateExpectedParticipants(GameRoom gameRoom) {
+        int expectedParticipantCount = gameRoom.isPracticeMode()
+                ? GameRoom.PRACTICE_PARTICIPANTS
+                : GameRoom.MAX_PARTICIPANTS;
+        if (gameRoom.getParticipants().size() != expectedParticipantCount) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
         }
     }

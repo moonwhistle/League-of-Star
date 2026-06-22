@@ -74,7 +74,9 @@ public class GameLightningService {
                 saveResult.action().getUserId()
         );
         return finishedGameRoom.map(finishedRoom -> {
-            gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
+            if (finishedRoom.isMatchMode()) {
+                gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
+            }
             return GameLightningHandleResponse.appliedAndBroadcastResult(
                     lightningApplied,
                     lightningKillGameResult(gameRoomId, finishedRoom)
@@ -96,14 +98,22 @@ public class GameLightningService {
     private GameLightningHandleResponse currentGameResult(Long gameRoomId, GameRoom gameRoom) {
         return GameLightningHandleResponse.currentSessionOnly(gameResultPayloadFactory.currentResult(
                 gameRoomId,
-                gameRoom.getResult(),
-                gameRoom.getWinnerId(),
+                gameRoom,
                 Instant.now(clock).toEpochMilli(),
                 gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(gameRoomId)
         ));
     }
 
     private GameResultPayload lightningKillGameResult(Long gameRoomId, GameRoom gameRoom) {
+        if (gameRoom.isPracticeMode()) {
+            return gameResultPayloadFactory.practiceLightningKill(
+                    gameRoomId,
+                    gameRoom.getResult(),
+                    gameRoom.getWinnerId(),
+                    Instant.now(clock).toEpochMilli(),
+                    gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(gameRoomId)
+            );
+        }
         return gameResultPayloadFactory.lightningKill(
                 gameRoomId,
                 gameRoom.getResult(),

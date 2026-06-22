@@ -2,6 +2,7 @@ package com.sang.leagueofstar.game.result.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
 import com.sang.leagueofstar.game.websocket.dto.GameWebSocketMessageType;
@@ -43,9 +44,11 @@ class GameResultWebSocketSenderTest {
         WebSocketSession session = session();
         GameResultPayload payload = new GameResultPayload(
                 GAME_ROOM_ID,
+                GameMode.MATCH,
                 GameResult.PLAYER1_WIN,
                 USER_ID,
                 "LIGHTNING_KILL",
+                null,
                 20_000L,
                 List.of()
         );
@@ -68,9 +71,11 @@ class GameResultWebSocketSenderTest {
         sessionRegistry.register(GAME_ROOM_ID, USER_ID, session);
         GameResultPayload payload = new GameResultPayload(
                 GAME_ROOM_ID,
+                GameMode.MATCH,
                 GameResult.PLAYER1_WIN,
                 USER_ID,
                 "LIGHTNING_KILL",
+                null,
                 20_000L,
                 List.of()
         );
@@ -93,9 +98,11 @@ class GameResultWebSocketSenderTest {
         sessionRegistry.register(GAME_ROOM_ID, USER_ID, session);
         GameResultPayload payload = new GameResultPayload(
                 GAME_ROOM_ID,
+                GameMode.MATCH,
                 GameResult.PLAYER1_WIN,
                 USER_ID,
                 "LIGHTNING_KILL",
+                null,
                 20_000L,
                 List.of()
         );
@@ -121,9 +128,11 @@ class GameResultWebSocketSenderTest {
         WebSocketSession session = session();
         GameResultPayload payload = new GameResultPayload(
                 GAME_ROOM_ID,
+                GameMode.MATCH,
                 GameResult.DRAW,
                 null,
                 "NATURAL_DEATH_DRAW",
+                null,
                 20_000L,
                 List.of()
         );

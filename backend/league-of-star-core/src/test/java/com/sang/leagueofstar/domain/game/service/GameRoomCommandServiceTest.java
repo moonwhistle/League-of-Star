@@ -4,6 +4,7 @@ import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.game.domain.GameParticipant;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
@@ -69,6 +70,7 @@ class GameRoomCommandServiceTest {
 
         GameRoom capturedGameRoom = gameRoomCaptor.getValue();
         assertThat(result).isSameAs(capturedGameRoom);
+        assertThat(capturedGameRoom.getGameMode()).isEqualTo(GameMode.MATCH);
         assertThat(capturedGameRoom.getStatus()).isEqualTo(GameStatus.READY);
         assertThat(capturedGameRoom.getParticipants()).hasSize(GameRoom.MAX_PARTICIPANTS);
         assertThat(capturedGameRoom.getParticipants())
@@ -77,6 +79,42 @@ class GameRoomCommandServiceTest {
         assertThat(capturedGameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsExactly(ParticipantStatus.READY, ParticipantStatus.READY);
+    }
+
+    @Test
+    @DisplayName("createPracticeRoom - PRACTICE 상태의 게임룸과 참가자 1명을 저장한다")
+    void createPracticeRoom_Success() {
+        // given
+        given(gameScenarioGenerator.generate(anyInt())).willReturn(SCENARIO);
+        given(gameRoomRepository.save(any(GameRoom.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        GameRoom result = gameRoomCommandService.createPracticeRoom(FIRST_USER_ID);
+
+        // then
+        ArgumentCaptor<GameRoom> gameRoomCaptor = ArgumentCaptor.forClass(GameRoom.class);
+        verify(gameRoomRepository, times(1)).save(gameRoomCaptor.capture());
+
+        GameRoom capturedGameRoom = gameRoomCaptor.getValue();
+        assertThat(result).isSameAs(capturedGameRoom);
+        assertThat(capturedGameRoom.getGameMode()).isEqualTo(GameMode.PRACTICE);
+        assertThat(capturedGameRoom.getStatus()).isEqualTo(GameStatus.READY);
+        assertThat(capturedGameRoom.getParticipants()).hasSize(GameRoom.PRACTICE_PARTICIPANTS);
+        assertThat(capturedGameRoom.getParticipants())
+                .extracting(GameParticipant::getUserId)
+                .containsExactly(FIRST_USER_ID);
+        assertThat(capturedGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsExactly(ParticipantStatus.READY);
+    }
+
+    @Test
+    @DisplayName("createPracticeRoom - 유저 ID가 null이면 게임룸을 생성할 수 없다")
+    void createPracticeRoom_NullUser_ThrowException() {
+        assertThatThrownBy(() -> gameRoomCommandService.createPracticeRoom(null))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
     }
 
     @Test
@@ -215,6 +253,30 @@ class GameRoomCommandServiceTest {
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        boolean started = gameRoomCommandService.startReadyRoomIfReady(100L, startTime);
+
+        // then
+        assertThat(started).isTrue();
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.IN_PROGRESS);
+        assertThat(gameRoom.getGameStartTime()).isEqualTo(startTime);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.PLAYING);
+    }
+
+    @Test
+    @DisplayName("startReadyRoomIfReady - PRACTICE 게임룸은 참가자 1명으로 IN_PROGRESS 전환한다")
+    void startReadyRoomIfReady_Practice() {
+        // given
+        LocalDateTime startTime = LocalDateTime.of(2026, 5, 20, 12, 0);
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.PRACTICE)
+                .scenarioData(SCENARIO)
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 
         // when
@@ -440,6 +502,30 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
+    @DisplayName("finishInProgressRoomByLightningKill - PRACTICE 참가자가 처치하면 PLAYER1_WIN으로 종료한다")
+    void finishInProgressRoomByLightningKill_PracticeParticipant() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.PRACTICE)
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByLightningKill(100L, FIRST_USER_ID);
+
+        // then
+        assertThat(result).contains(gameRoom);
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(gameRoom.getResult()).isEqualTo(GameResult.PLAYER1_WIN);
+        assertThat(gameRoom.getWinnerId()).isEqualTo(FIRST_USER_ID);
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.FINISHED);
+    }
+
+    @Test
     @DisplayName("finishInProgressRoomByLightningKill - IN_PROGRESS가 아니면 종료하지 않고 empty를 반환한다")
     void finishInProgressRoomByLightningKill_NotInProgress() {
         // given
@@ -507,6 +593,30 @@ class GameRoomCommandServiceTest {
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
+
+        // when
+        Optional<GameRoom> result = gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(100L);
+
+        // then
+        assertThat(result).contains(gameRoom);
+        assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(gameRoom.getResult()).isEqualTo(GameResult.DRAW);
+        assertThat(gameRoom.getWinnerId()).isNull();
+        assertThat(gameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomByNaturalDeathDraw - PRACTICE 게임룸을 DRAW로 종료한다")
+    void finishInProgressRoomByNaturalDeathDraw_Practice() {
+        // given
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.PRACTICE)
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.start(LocalDateTime.now());
         given(gameRoomRepository.findByIdForUpdate(100L)).willReturn(Optional.of(gameRoom));
 

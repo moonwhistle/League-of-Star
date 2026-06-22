@@ -23,9 +23,14 @@ public enum ApiErrorCode implements BaseErrorCode {
     AUTH_INVALID_REFRESH_TOKEN(401, "AUTH_009", "유효하지 않은 리프레시 토큰입니다."),
     AUTH_EXPIRED_REFRESH_TOKEN(401, "AUTH_010", "만료된 리프레시 토큰입니다."),
 
+    // Game Practice (GAME_PRACTICE_001 ~ )
+    GAME_ACTIVE_ROOM_EXISTS(409, "GAME_PRACTICE_001", "이미 진행 중인 게임이 있습니다."),
+    GAME_PRACTICE_START_FAILED(409, "GAME_PRACTICE_002", "연습 게임을 시작할 수 없습니다."),
+
     // Game Summary (GAME_SUMMARY_001 ~ )
     GAME_SUMMARY_NOT_FINISHED(409, "GAME_SUMMARY_001", "종료된 게임의 결과만 조회할 수 있습니다."),
-    GAME_SUMMARY_INVALID_RECORD_STATE(409, "GAME_SUMMARY_002", "게임 결과 기록 상태가 올바르지 않습니다.");
+    GAME_SUMMARY_INVALID_RECORD_STATE(409, "GAME_SUMMARY_002", "게임 결과 기록 상태가 올바르지 않습니다."),
+    GAME_SUMMARY_UNSUPPORTED_PRACTICE(409, "GAME_SUMMARY_003", "연습 게임은 summary 조회를 지원하지 않습니다.");
 
     private final int httpStatus;
     private final String customCode;

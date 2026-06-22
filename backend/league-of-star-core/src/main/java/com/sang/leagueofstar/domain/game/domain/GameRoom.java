@@ -3,6 +3,7 @@ package com.sang.leagueofstar.domain.game.domain;
 import com.sang.leagueofstar.common.domain.BaseEntity;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
@@ -40,6 +41,7 @@ import java.util.Objects;
 public class GameRoom extends BaseEntity {
 
     public static final int MAX_PARTICIPANTS = 2;
+    public static final int PRACTICE_PARTICIPANTS = 1;
     public static final int DEFAULT_STAR_CORE_MAX_HP = GameRules.STAR_CORE_INITIAL_HP;
 
     @Id
@@ -59,6 +61,11 @@ public class GameRoom extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private GameResult result;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private GameMode gameMode = GameMode.MATCH;
 
     @Column(name = "winner_id")
     private Long winnerId;
@@ -96,6 +103,14 @@ public class GameRoom extends BaseEntity {
                 .anyMatch(participant -> Objects.equals(participant.getUserId(), userId));
     }
 
+    public boolean isPracticeMode() {
+        return this.gameMode.isPractice();
+    }
+
+    public boolean isMatchMode() {
+        return this.gameMode.isMatch();
+    }
+
     public void start(LocalDateTime startTime) {
         validateStart();
         this.gameStartTime = startTime;
@@ -107,7 +122,7 @@ public class GameRoom extends BaseEntity {
         if (this.status != GameStatus.READY) {
             throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
         }
-        if (this.participants.size() != MAX_PARTICIPANTS) {
+        if (this.participants.size() != expectedParticipantCount()) {
             throw new CoreException(CoreErrorCode.INCOMPLETE_PARTICIPANTS);
         }
         boolean allReady = this.participants.stream()
@@ -162,5 +177,9 @@ public class GameRoom extends BaseEntity {
         this.finishedAt = LocalDateTime.now();
         this.participants.forEach(p -> p.updateStatus(ParticipantStatus.ABORTED));
         return true;
+    }
+
+    private int expectedParticipantCount() {
+        return this.gameMode.isPractice() ? PRACTICE_PARTICIPANTS : MAX_PARTICIPANTS;
     }
 }

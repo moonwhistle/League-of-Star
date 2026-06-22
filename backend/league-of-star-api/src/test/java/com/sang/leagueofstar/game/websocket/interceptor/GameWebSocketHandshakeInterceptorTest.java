@@ -78,7 +78,7 @@ class GameWebSocketHandshakeInterceptorTest {
         assertThat(attributes)
                 .containsEntry(GameWebSocketSessionAttribute.GAME_ROOM_ID, GAME_ROOM_ID)
                 .containsEntry(GameWebSocketSessionAttribute.USER_ID, USER_ID);
-        verify(gameRoomReadService).validateReadyParticipant(GAME_ROOM_ID, USER_ID);
+        verify(gameRoomReadService).validateGameAccessParticipant(GAME_ROOM_ID, USER_ID);
     }
 
     @Test
@@ -141,7 +141,7 @@ class GameWebSocketHandshakeInterceptorTest {
         assertThat(result).isFalse();
         assertThat(attributes).isEmpty();
         verify(response).setStatusCode(HttpStatus.BAD_REQUEST);
-        verify(gameRoomReadService, never()).validateReadyParticipant(GAME_ROOM_ID, USER_ID);
+        verify(gameRoomReadService, never()).validateGameAccessParticipant(GAME_ROOM_ID, USER_ID);
     }
 
     @Test
@@ -157,7 +157,7 @@ class GameWebSocketHandshakeInterceptorTest {
         given(gameWebSocketPathResolver.resolveGameRoomId(uri)).willReturn(GAME_ROOM_ID);
         willThrow(new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS))
                 .given(gameRoomReadService)
-                .validateReadyParticipant(GAME_ROOM_ID, USER_ID);
+                .validateGameAccessParticipant(GAME_ROOM_ID, USER_ID);
 
         // when
         boolean result = interceptor.beforeHandshake(request, response, webSocketHandler, attributes);
@@ -169,7 +169,7 @@ class GameWebSocketHandshakeInterceptorTest {
     }
 
     @Test
-    @DisplayName("beforeHandshake - late handshake 시 gameRoom이 ABORTED라 READY 검증에 실패하면 거부한다")
+    @DisplayName("beforeHandshake - late handshake 시 gameRoom 접근 검증에 실패하면 거부한다")
     void beforeHandshake_AbortedGameRoom_Reject() {
         // given
         URI uri = URI.create("http://localhost/ws/game/100?token=" + TOKEN);
@@ -181,7 +181,7 @@ class GameWebSocketHandshakeInterceptorTest {
         given(gameWebSocketPathResolver.resolveGameRoomId(uri)).willReturn(GAME_ROOM_ID);
         willThrow(new CoreException(CoreErrorCode.INVALID_GAME_STATE))
                 .given(gameRoomReadService)
-                .validateReadyParticipant(GAME_ROOM_ID, USER_ID);
+                .validateGameAccessParticipant(GAME_ROOM_ID, USER_ID);
 
         // when
         boolean result = interceptor.beforeHandshake(request, response, webSocketHandler, attributes);

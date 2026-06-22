@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.domain.game.repository;
 
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,7 @@ public interface GameRoomRepository extends JpaRepository<GameRoom, Long> {
             select g.id
             from GameRoom g
             where g.status = :status
+              and g.gameMode = :gameMode
               and (
                     select count(r)
                     from GameRecord r
@@ -30,8 +32,9 @@ public interface GameRoomRepository extends JpaRepository<GameRoom, Long> {
                   ) <> :expectedRecordCount
             order by g.id asc
             """)
-    List<Long> findGameRoomIdsByStatusAndRecordCountNot(
+    List<Long> findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
             @Param("status") GameStatus status,
+            @Param("gameMode") GameMode gameMode,
             @Param("expectedRecordCount") long expectedRecordCount,
             Pageable pageable
     );

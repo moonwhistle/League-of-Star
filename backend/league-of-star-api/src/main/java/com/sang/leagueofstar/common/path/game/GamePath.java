@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 public final class GamePath {
 
     public static final String GAME_BASE = "/api/v1/games";
+    public static final String PRACTICE = "/practice";
     public static final String SUMMARY = "/{gameId}/summary";
     public static final String GAME_ID = "gameId";
 }

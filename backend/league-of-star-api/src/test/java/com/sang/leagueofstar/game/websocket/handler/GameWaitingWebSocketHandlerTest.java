@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.game.end.service.GameEndScheduleService;
 import com.sang.leagueofstar.game.rtt.domain.GameRttPongResult;
@@ -340,9 +341,11 @@ class GameWaitingWebSocketHandlerTest {
         );
         GameResultPayload gameResult = new GameResultPayload(
                 GAME_ROOM_ID,
+                GameMode.MATCH,
                 GameResult.PLAYER1_WIN,
                 FIRST_USER_ID,
                 "LIGHTNING_KILL",
+                null,
                 SERVER_RECEIVE_TIME.toEpochMilli(),
                 List.of()
         );
@@ -377,9 +380,11 @@ class GameWaitingWebSocketHandlerTest {
         WebSocketSession session = session(FIRST_SESSION_ID, FIRST_USER_ID);
         GameResultPayload gameResult = new GameResultPayload(
                 GAME_ROOM_ID,
+                GameMode.MATCH,
                 GameResult.PLAYER1_WIN,
                 FIRST_USER_ID,
                 "LIGHTNING_KILL",
+                null,
                 SERVER_RECEIVE_TIME.toEpochMilli(),
                 List.of()
         );
