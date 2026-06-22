@@ -254,6 +254,15 @@ describe('MatchPage', () => {
     expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.records })
   })
 
+  it('moves to the profile route from the profile panel', async () => {
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Player profile"]').trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.profile })
+  })
+
   it('keeps matchmaking available when the profile request fails', async () => {
     getMyProfileMock.mockRejectedValueOnce(new Error('profile failed'))
     const wrapper = mount(MatchPage)

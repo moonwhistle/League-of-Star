@@ -65,12 +65,17 @@
 
     <section class="match-layout" aria-label="Match lobby">
       <aside class="ranking-panel" aria-label="Ranking overview">
-        <section class="profile-panel" aria-label="Player profile">
+        <button
+          class="profile-panel"
+          type="button"
+          aria-label="Player profile"
+          @click="navigateToProfile"
+        >
           <div class="avatar-frame" aria-hidden="true">{{ avatarInitial }}</div>
           <div class="profile-copy">
             <strong>{{ displayNickname }}</strong>
           </div>
-        </section>
+        </button>
 
         <section class="ranking-summary" aria-label="Ranking summary">
           <h2>{{ t('match.ranking') }}</h2>
@@ -742,6 +747,10 @@ async function finalizeLogout() {
 
 function navigateToRecords() {
   void router.push({ name: ROUTE_NAMES.records })
+}
+
+function navigateToProfile() {
+  void router.push({ name: ROUTE_NAMES.profile })
 }
 
 function startMatchmaking() {
@@ -1497,12 +1506,35 @@ function closeErrorModal() {
   display: flex;
   gap: 14px;
   align-items: center;
+  width: 100%;
   min-height: 86px;
   padding: 16px 18px;
   margin: 0 0 14px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
   border-left: 3px solid var(--match-accent-strong);
+  border-top: 0;
+  border-right: 0;
   border-bottom: 1px solid rgba(206, 224, 255, 0.1);
   background: linear-gradient(90deg, rgba(118, 74, 202, 0.28), transparent);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.profile-panel:hover,
+.profile-panel:focus-visible {
+  border-left-color: var(--match-accent);
+  background: linear-gradient(90deg, rgba(99, 242, 232, 0.22), rgba(118, 74, 202, 0.12));
+  box-shadow: inset 0 0 0 1px rgba(99, 242, 232, 0.22);
+}
+
+.profile-panel:active {
+  transform: translateY(1px);
 }
 
 .profile-panel::after {

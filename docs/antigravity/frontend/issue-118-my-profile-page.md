@@ -242,13 +242,13 @@ interface GameRecordEntryResponse {
 
 ### 2. Profile Route / Navigation 구현
 
-- [ ] `ROUTE_PATHS.profile` 추가.
-- [ ] `ROUTE_NAMES.profile` 추가.
-- [ ] `/profile` route 추가.
-- [ ] `/profile` route에 `requiresAuth: true` 적용.
-- [ ] MatchPage 프로필 영역을 button 또는 link 역할로 정리.
-- [ ] MatchPage 프로필 영역 클릭 시 `/profile`로 이동.
-- [ ] 기존 전적/로그아웃/매칭 버튼 동작을 유지.
+- [x] `ROUTE_PATHS.profile` 추가.
+- [x] `ROUTE_NAMES.profile` 추가.
+- [x] `/profile` route 추가.
+- [x] `/profile` route에 `requiresAuth: true` 적용.
+- [x] MatchPage 프로필 영역을 button 또는 link 역할로 정리.
+- [x] MatchPage 프로필 영역 클릭 시 `/profile`로 이동.
+- [x] 기존 전적/로그아웃/매칭 버튼 동작을 유지.
 
 ### 3. ProfilePage Data 구현
 
