@@ -229,17 +229,17 @@ WebSocket access token 전달 방식도 기존 Game WebSocket 정책을 그대�
 
 ### 3. Practice Start API 구현
 
-- [ ] `GamePath.PRACTICE` 상수 추가.
-- [ ] practice controller endpoint 추가.
-- [ ] `GamePracticeService` 구현.
-- [ ] `@AuthUser Long userId` 기반으로 practice room 생성.
-- [ ] active game room 존재 시 시작 차단.
-- [ ] `serverTime`, `startAt` 계산.
-- [ ] practice room을 `IN_PROGRESS`로 전환.
-- [ ] end deadline 등록.
-- [ ] end deadline 등록 실패 시 practice room abort 보상 처리.
-- [ ] `webSocketUrl=/ws/game/{gameRoomId}` 반환.
-- [ ] `GameStartScenarioPayload`를 재사용해 scenario 반환.
+- [x] `GamePath.PRACTICE` 상수 추가.
+- [x] practice controller endpoint 추가.
+- [x] `GamePracticeService` 구현.
+- [x] `@AuthUser Long userId` 기반으로 practice room 생성.
+- [x] active game room 존재 시 시작 차단.
+- [x] `serverTime`, `startAt` 계산.
+- [x] practice room을 `IN_PROGRESS`로 전환.
+- [x] end deadline 등록.
+- [x] end deadline 등록 실패 시 practice room abort 보상 처리.
+- [x] `webSocketUrl=/ws/game/{gameRoomId}` 반환.
+- [x] `GameStartScenarioPayload`를 재사용해 scenario 반환.
 
 ### 4. Practice WebSocket / Result 구현
 
