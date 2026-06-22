@@ -8,6 +8,8 @@ import { logout } from '@/services/authService'
 import { clearAuthTokens, getRefreshToken } from '@/services/authToken'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { acceptMatch, joinMatchQueue, leaveMatchQueue, rejectMatch } from '@/services/matchService'
+import { readPracticeGameStartPayload } from '@/services/practiceGameStartPayload'
+import { startPractice } from '@/services/practiceService'
 import { getMyProfile } from '@/services/profileService'
 import { getMyRank } from '@/services/rankService'
 import { getRankings } from '@/services/rankingService'
@@ -35,6 +37,10 @@ vi.mock('@/services/matchService', () => ({
   joinMatchQueue: vi.fn(),
   leaveMatchQueue: vi.fn(),
   rejectMatch: vi.fn(),
+}))
+
+vi.mock('@/services/practiceService', () => ({
+  startPractice: vi.fn(),
 }))
 
 vi.mock('@/services/profileService', () => ({
@@ -66,6 +72,7 @@ const acceptMatchMock = vi.mocked(acceptMatch)
 const joinMatchQueueMock = vi.mocked(joinMatchQueue)
 const leaveMatchQueueMock = vi.mocked(leaveMatchQueue)
 const rejectMatchMock = vi.mocked(rejectMatch)
+const startPracticeMock = vi.mocked(startPractice)
 const getMyProfileMock = vi.mocked(getMyProfile)
 const getMyRankMock = vi.mocked(getMyRank)
 const getRankingsMock = vi.mocked(getRankings)
@@ -88,6 +95,10 @@ function getStartButton(wrapper: VueWrapper) {
 
 function getLogoutButton(wrapper: VueWrapper) {
   return wrapper.get('[aria-label="로그아웃"]')
+}
+
+function getPracticeButton(wrapper: VueWrapper) {
+  return wrapper.get('[data-testid="practice-start-button"]')
 }
 
 async function openLogoutConfirm(wrapper: VueWrapper) {
@@ -115,6 +126,17 @@ describe('MatchPage', () => {
     joinMatchQueueMock.mockResolvedValue(undefined)
     leaveMatchQueueMock.mockResolvedValue(undefined)
     rejectMatchMock.mockResolvedValue(undefined)
+    startPracticeMock.mockResolvedValue({
+      gameRoomId: 300,
+      serverTime: 1716192000000,
+      startAt: 1716192004000,
+      webSocketUrl: '/ws/game/300',
+      scenario: {
+        starCoreMaxHp: 10000,
+        durationMs: 15000,
+        hpTimeline: [{ timeMs: 0, hp: 10000 }],
+      },
+    })
     getMyProfileMock.mockResolvedValue({
       userId: 1,
       email: 'moon@example.com',
@@ -237,12 +259,80 @@ describe('MatchPage', () => {
     expect(wrapper.text()).not.toContain('RP')
     expect(wrapper.get('[data-testid="match-start-button"]').text()).toContain('매칭 시작')
     expect(wrapper.text()).toContain('연습 모드')
+    expect(getPracticeButton(wrapper).attributes('disabled')).toBeUndefined()
     expect(wrapper.text()).toContain('사용자 지정')
     expect(wrapper.get('main').attributes('data-stream-status')).toBe('idle')
     expect(wrapper.get('main').attributes('data-queue-status')).toBe('ready')
     expect(wrapper.get('main').attributes('data-profile-status')).toBe('success')
     expect(wrapper.get('main').attributes('data-rank-status')).toBe('success')
     expect(wrapper.get('main').attributes('data-ranking-status')).toBe('success')
+  })
+
+  it('starts practice without entering the match queue and moves directly to play', async () => {
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    await getPracticeButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(startPracticeMock).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(connectMatchEventSourceMock).not.toHaveBeenCalled()
+    expect(joinMatchQueueMock).not.toHaveBeenCalled()
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+    expect(readGameWaitingPayload(300)).toBeNull()
+    expect(readPracticeGameStartPayload(300)?.webSocketUrl).toBe('/ws/game/300')
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: '300',
+      },
+    })
+  })
+
+  it('shows the practice error modal when practice start fails', async () => {
+    startPracticeMock.mockRejectedValueOnce(new Error('practice blocked'))
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    await getPracticeButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-practice-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-practice-error-message')).toBe('practice blocked')
+    expect(wrapper.get('.match-error-dialog').text()).toContain('practice blocked')
+    expect(routerPushMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: ROUTE_NAMES.gamePlay }),
+    )
+  })
+
+  it('prevents duplicate practice start clicks while the request is pending', async () => {
+    let resolvePractice: (value: Awaited<ReturnType<typeof startPractice>>) => void = () => {}
+    startPracticeMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePractice = resolve
+      }),
+    )
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    await getPracticeButton(wrapper).trigger('click')
+    await getPracticeButton(wrapper).trigger('click')
+
+    expect(startPracticeMock).toHaveBeenCalledTimes(1)
+    expect(getPracticeButton(wrapper).attributes('disabled')).toBeDefined()
+
+    resolvePractice({
+      gameRoomId: 300,
+      serverTime: 1716192000000,
+      startAt: 1716192004000,
+      webSocketUrl: '/ws/game/300',
+      scenario: {
+        starCoreMaxHp: 10000,
+        durationMs: 15000,
+        hpTimeline: [{ timeMs: 0, hp: 10000 }],
+      },
+    })
+    await flushPromises()
   })
 
   it('moves to the profile route from the profile panel', async () => {

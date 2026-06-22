@@ -6,6 +6,11 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { readGameResultPayload } from '@/services/gameResultPayload'
 import { buildGameStartPayloadKey, saveGameStartPayload } from '@/services/gameStartPayload'
 import { buildGameWaitingPayloadKey, saveGameWaitingPayload } from '@/services/gameWaitingPayload'
+import {
+  readPracticeGameStartPayload,
+  savePracticeGameStartPayload,
+} from '@/services/practiceGameStartPayload'
+import { startPractice } from '@/services/practiceService'
 
 import GamePlayPage from './GamePlayPage.vue'
 
@@ -78,6 +83,10 @@ vi.mock('@/services/realtime/gameWebSocketHandoff', () => ({
   takeGameWebSocketHandoff: gameWebSocketHandoffMock.takeGameWebSocketHandoff,
 }))
 
+vi.mock('@/services/practiceService', () => ({
+  startPractice: vi.fn(),
+}))
+
 vi.mock('@/game/threeGalaxyBackgroundScene', () => ({
   createNoopThreeGalaxyBackgroundSceneController: () => ({
     dispose: vi.fn(),
@@ -88,6 +97,7 @@ vi.mock('@/game/threeGalaxyBackgroundScene', () => ({
 }))
 
 const { setLocale } = useLocale()
+const startPracticeMock = vi.mocked(startPractice)
 
 enableAutoUnmount(afterEach)
 
@@ -142,6 +152,18 @@ describe('GamePlayPage', () => {
     gameWebSocketMock.connect.mockClear()
     gameWebSocketMock.state.connection.setHandlers.mockClear()
     gameWebSocketMock.state.connection.close.mockClear()
+    startPracticeMock.mockReset()
+    startPracticeMock.mockResolvedValue({
+      gameRoomId: 101,
+      serverTime: 1716192000000,
+      startAt: 1716192004000,
+      webSocketUrl: '/ws/game/101',
+      scenario: {
+        starCoreMaxHp: 10000,
+        durationMs: 15000,
+        hpTimeline: [{ timeMs: 0, hp: 10000 }],
+      },
+    })
     gameWebSocketHandoffMock.takeGameWebSocketHandoff.mockReset()
     threeSceneMock.state.callbacks = undefined
     threeSceneMock.controller.dispose.mockClear()
@@ -191,6 +213,25 @@ describe('GamePlayPage', () => {
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
+  it('reads the stored practice payload without a game waiting payload', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:05.000Z'))
+    saveValidPracticePayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-start-payload-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-waiting-payload-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-practice-payload-ready')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-mode')).toBe('PRACTICE')
+    expect(wrapper.get('main').attributes('data-game-play-state-ready')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-room-id')).toBe('100')
+    expect(wrapper.get('main').attributes('data-game-websocket-url')).toBe('/ws/game/100')
+    expect(gameWebSocketMock.connect).toHaveBeenCalledWith('/ws/game/100', expect.any(Object))
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
   it('keeps the galaxy background only before the server startAt', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-01T00:00:05.000Z'))
@@ -203,12 +244,33 @@ describe('GamePlayPage', () => {
 
     expect(wrapper.get('main').attributes('data-game-started')).toBe('false')
     expect(wrapper.get('main').attributes('data-game-countdown-seconds')).toBe('3')
+    expect(wrapper.get('[data-testid="countdown-overlay"]').text()).toBe('3')
     expect(wrapper.get('main').attributes('data-game-elapsed-ms')).toBe('0')
     expect(wrapper.get('main').attributes('data-game-current-hp')).toBe('10000')
     expect(wrapper.find('[data-testid="three-scene"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="lightning-button"]').exists()).toBe(false)
     expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
     expect(wrapper.find('[data-testid="lightning-hud"]').exists()).toBe(true)
+  })
+
+  it('shows the countdown overlay for practice starts and updates before combat begins', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:05.000Z'))
+    saveValidPracticePayload({
+      startAt: Date.now() + 2800,
+    })
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-mode')).toBe('PRACTICE')
+    expect(wrapper.get('[data-testid="countdown-overlay"]').text()).toBe('3')
+    expect(wrapper.get('main').attributes('data-game-lightning-ready')).toBe('false')
+
+    vi.advanceTimersByTime(1000)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="countdown-overlay"]').text()).toBe('2')
   })
 
   it('uses a handed off game websocket before reconnecting from storage', async () => {
@@ -314,6 +376,170 @@ describe('GamePlayPage', () => {
         gameRoomId: '100',
       },
     })
+  })
+
+  it('shows the practice success overlay without moving to the result route', async () => {
+    saveValidPracticePayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onOpen?.(new Event('open'))
+    handlers.onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: createPracticeGameResultPayload('SUCCESS'),
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('resultReceived')
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-practice-result-visible')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-practice-result')).toBe('SUCCESS')
+    expect(wrapper.get('[data-testid="practice-result-overlay"]').text()).toContain(
+      'PRACTICE COMPLETE',
+    )
+    expect(readGameResultPayload(100)).toBeNull()
+    expect(routerReplaceMock).not.toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gameResult,
+      params: {
+        gameRoomId: '100',
+      },
+    })
+  })
+
+  it('accepts practice GAME_RESULT without gameMode when the current play state is practice', async () => {
+    saveValidPracticePayload()
+
+    const payload = createPracticeGameResultPayload('SUCCESS')
+    Reflect.deleteProperty(payload, 'gameMode')
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload,
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('resultReceived')
+    expect(wrapper.get('main').attributes('data-game-practice-result-visible')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-practice-result')).toBe('SUCCESS')
+    expect(readGameResultPayload(100)).toBeNull()
+    expect(routerReplaceMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: ROUTE_NAMES.gameResult }),
+    )
+  })
+
+  it('rejects practice GAME_RESULT when the payload explicitly says MATCH', async () => {
+    saveValidPracticePayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: {
+          ...createPracticeGameResultPayload('SUCCESS'),
+          gameMode: 'MATCH',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-practice-result-visible')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      '게임 결과 정보가 올바르지 않습니다.',
+    )
+  })
+
+  it('does not confirm route leave after a practice result is received', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    saveValidPracticePayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: createPracticeGameResultPayload('SUCCESS'),
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(getLatestRouteLeaveGuard()({ name: ROUTE_NAMES.match })).toBe(true)
+    expect(confirmSpy).not.toHaveBeenCalled()
+
+    await wrapper.get('.practice-result-actions button:last-child').trigger('click')
+
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
+  it('shows the practice failed overlay without calling the summary result route', async () => {
+    saveValidPracticePayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: createPracticeGameResultPayload('FAILED'),
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-practice-result-visible')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-practice-result')).toBe('FAILED')
+    expect(wrapper.get('[data-testid="practice-result-overlay"]').text()).toContain(
+      'PRACTICE FAILED',
+    )
+    expect(routerReplaceMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: ROUTE_NAMES.gameResult }),
+    )
+  })
+
+  it('restarts practice from the practice result overlay', async () => {
+    saveValidPracticePayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: createPracticeGameResultPayload('SUCCESS'),
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    await wrapper.get('.practice-result-actions button').trigger('click')
+    await flushPromises()
+
+    expect(startPracticeMock).toHaveBeenCalled()
+    expect(readPracticeGameStartPayload(101)?.webSocketUrl).toBe('/ws/game/101')
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: '101',
+      },
+    })
+    expect(gameWebSocketMock.connect).toHaveBeenLastCalledWith('/ws/game/101', expect.any(Object))
   })
 
   it('moves to result only once when duplicate GAME_RESULT messages are received', async () => {
@@ -1071,6 +1297,32 @@ function createGameResultPayload(
   }
 }
 
+function createPracticeGameResultPayload(practiceResult: 'SUCCESS' | 'FAILED') {
+  return {
+    gameRoomId: 100,
+    gameMode: 'PRACTICE',
+    result: practiceResult === 'SUCCESS' ? 'PLAYER1_WIN' : 'DRAW',
+    winnerUserId: practiceResult === 'SUCCESS' ? 1 : null,
+    reason: practiceResult === 'SUCCESS' ? 'PRACTICE_LIGHTNING_KILL' : 'PRACTICE_TIMEOUT',
+    practiceResult,
+    finishedAt: Date.now(),
+    actions:
+      practiceResult === 'SUCCESS'
+        ? [
+            {
+              userId: 1,
+              serverReceiveTime: Date.now(),
+              lightningTimeMs: 2000,
+              starCoreHpAtLightning: 1000,
+              damage: 1200,
+              afterHp: 0,
+              isKill: true,
+            },
+          ]
+        : [],
+  }
+}
+
 function saveValidPlayPayloads(options: { startAt?: number } = {}): void {
   const startAt = options.startAt ?? Date.now() - 2000
 
@@ -1105,6 +1357,32 @@ function saveValidPlayPayloads(options: { startAt?: number } = {}): void {
     game: {
       gameRoomId: 100,
       webSocketUrl: '/ws/game/100',
+    },
+    receivedAt: '2026-06-01T00:00:00.000Z',
+  })
+}
+
+function saveValidPracticePayload(options: { startAt?: number } = {}): void {
+  const startAt = options.startAt ?? Date.now() - 2000
+
+  savePracticeGameStartPayload({
+    gameRoomId: 100,
+    serverTime: Date.now() - 5000,
+    startAt,
+    webSocketUrl: '/ws/game/100',
+    scenario: {
+      starCoreMaxHp: 10000,
+      durationMs: 15000,
+      hpTimeline: [
+        {
+          timeMs: 0,
+          hp: 10000,
+        },
+        {
+          timeMs: 15000,
+          hp: 0,
+        },
+      ],
     },
     receivedAt: '2026-06-01T00:00:00.000Z',
   })

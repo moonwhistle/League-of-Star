@@ -10,6 +10,10 @@ export type GameRecordResult = 'WIN' | 'LOSS' | 'DRAW'
 
 export type GameRecordSeriesType = 'RANK' | 'PLACEMENT' | 'PROMOTION'
 
+export type GameMode = 'MATCH' | 'PRACTICE'
+
+export type PracticeResult = 'SUCCESS' | 'FAILED'
+
 export interface GameSummaryPlayer {
   userId: number
   nickname: string
@@ -136,6 +140,10 @@ export interface GameStartPayload {
   scenario: GameStartScenario
 }
 
+export interface PracticeGameStartResponse extends GameStartPayload {
+  webSocketUrl: string
+}
+
 export interface GameStartScenario {
   starCoreMaxHp: number
   durationMs: number
@@ -149,9 +157,11 @@ export interface HpTimelineStep {
 
 export interface GameResultPayload {
   gameRoomId: GameRoomId
+  gameMode?: GameMode
   result: GameResult
   winnerUserId: number | null
   reason: string
+  practiceResult?: PracticeResult | null
   finishedAt: number
   actions: GameActionSummary[]
 }

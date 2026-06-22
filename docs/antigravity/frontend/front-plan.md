@@ -309,9 +309,11 @@ interface GameStartPayload {
 ```ts
 interface GameResultPayload {
   gameRoomId: number;
+  gameMode?: "MATCH" | "PRACTICE";
   result: "PLAYER1_WIN" | "PLAYER2_WIN" | "DRAW";
   winnerUserId: number | null;
   reason: string;
+  practiceResult?: "SUCCESS" | "FAILED" | null;
   finishedAt: number;
   actions: {
     userId: number;
@@ -329,6 +331,7 @@ interface GameResultPayload {
 - WebSocket result payload는 즉시 전환/임시 표시용으로만 사용.
 - 최종 결과 source of truth는 summary API로 처리.
 - `YOU WIN`/`YOU LOSE`/`DRAW` 최소 표시는 저장된 `GAME_RESULT.winnerUserId`와 waiting payload의 opponent 기준으로 해석.
+- 단, `gameMode=PRACTICE` 결과는 `/result` route와 summary API를 사용하지 않고 GamePlayPage 내부 결과 오버레이에서 `practiceResult=SUCCESS|FAILED`만 표시.
 
 ### 13. [x] 게임 결과 Summary 화면 구현
 

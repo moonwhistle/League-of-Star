@@ -1,4 +1,11 @@
-import type { GameActionSummary, GameResult, GameResultPayload, GameRoomId } from '@/types/game'
+import type {
+  GameActionSummary,
+  GameMode,
+  GameResult,
+  GameResultPayload,
+  GameRoomId,
+  PracticeResult,
+} from '@/types/game'
 
 const GAME_RESULT_PAYLOAD_KEY_PREFIX = 'league-of-star.gameResultPayload:'
 
@@ -9,23 +16,35 @@ export interface StoredGameResultPayload extends GameResultPayload {
 export function saveGameResultPayloadFromMessage(
   messagePayload: unknown,
 ): StoredGameResultPayload | null {
-  if (!isGameResultPayload(messagePayload)) {
-    return null
-  }
+  const payload = createGameResultPayloadFromMessage(messagePayload)
 
-  const payload: StoredGameResultPayload = {
-    gameRoomId: messagePayload.gameRoomId,
-    result: messagePayload.result,
-    winnerUserId: messagePayload.winnerUserId,
-    reason: messagePayload.reason,
-    finishedAt: messagePayload.finishedAt,
-    actions: messagePayload.actions,
-    receivedAt: new Date().toISOString(),
+  if (payload === null) {
+    return null
   }
 
   saveGameResultPayload(payload)
 
   return payload
+}
+
+export function createGameResultPayloadFromMessage(
+  messagePayload: unknown,
+): StoredGameResultPayload | null {
+  if (!isGameResultPayload(messagePayload)) {
+    return null
+  }
+
+  return {
+    gameRoomId: messagePayload.gameRoomId,
+    gameMode: messagePayload.gameMode,
+    result: messagePayload.result,
+    winnerUserId: messagePayload.winnerUserId,
+    reason: messagePayload.reason,
+    practiceResult: messagePayload.practiceResult,
+    finishedAt: messagePayload.finishedAt,
+    actions: messagePayload.actions,
+    receivedAt: new Date().toISOString(),
+  }
 }
 
 export function saveGameResultPayload(payload: StoredGameResultPayload): void {
@@ -89,10 +108,12 @@ function isGameResultPayload(payload: unknown): payload is GameResultPayload {
 
   return (
     isGameRoomId(payload.gameRoomId) &&
+    isOptionalGameMode(payload.gameMode) &&
     isGameResult(payload.result) &&
     isWinnerUserId(payload.winnerUserId) &&
     typeof payload.reason === 'string' &&
     payload.reason.trim() !== '' &&
+    isOptionalPracticeResult(payload.practiceResult) &&
     Number.isFinite(payload.finishedAt) &&
     Array.isArray(payload.actions) &&
     payload.actions.every(isGameActionSummary)
@@ -117,6 +138,14 @@ function isGameActionSummary(action: unknown): action is GameActionSummary {
 
 function isGameResult(value: unknown): value is GameResult {
   return value === 'PLAYER1_WIN' || value === 'PLAYER2_WIN' || value === 'DRAW'
+}
+
+function isOptionalGameMode(value: unknown): value is GameMode | undefined {
+  return value === undefined || value === 'MATCH' || value === 'PRACTICE'
+}
+
+function isOptionalPracticeResult(value: unknown): value is PracticeResult | null | undefined {
+  return value === undefined || value === null || value === 'SUCCESS' || value === 'FAILED'
 }
 
 function isWinnerUserId(value: unknown): value is number | null {

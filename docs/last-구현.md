@@ -576,7 +576,7 @@ Acceptance Criteria:
 - [x] RestDocs와 테스트가 작성된다.
 - [x] 전체 백엔드 테스트가 통과한다.
 
-### 4-2. [ ] 연습 모드 프론트 진입 구현
+### 4-2. [x] 연습 모드 프론트 진입 구현
 
 담당: Frontend
 
@@ -584,25 +584,25 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage 연습 모드 버튼으로 실제 연습 게임 화면에 진입한다.
+- [x] MatchPage 연습 모드 버튼으로 실제 연습 게임 화면에 진입한다.
 
 Frontend:
 
-- [ ] MatchPage 연습 모드 버튼을 4-1 API와 연결한다.
-- [ ] practice 생성 응답을 기존 GameWaiting/GamePlay handoff 구조에 맞춘다.
-- [ ] waiting page를 생략할지 유지할지 백엔드 payload 계약에 맞춰 구현한다.
-- [ ] 연습 모드임을 UI에서 랭크 매칭과 구분한다.
+- [x] MatchPage 연습 모드 버튼을 4-1 API와 연결한다.
+- [x] practice 생성 응답을 GamePlayPage handoff payload로 저장한다.
+- [x] waiting page는 백엔드 payload 계약에 맞춰 생략한다.
+- [x] 연습 모드 결과는 GamePlayPage 내부 오버레이로 랭크 매칭과 구분한다.
 
 Policy:
 
-- [ ] 연습 모드 진입은 일반 match queue와 독립이다.
-- [ ] LIGHTNING 입력 테스트는 가능하지만 랭크/전적 결과와 섞지 않는다.
+- [x] 연습 모드 진입은 일반 match queue와 독립이다.
+- [x] LIGHTNING 입력 테스트는 가능하지만 랭크/전적 결과와 섞지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 연습 모드 버튼으로 게임 화면에 진입할 수 있다.
-- [ ] LIGHTNING 입력을 테스트할 수 있다.
-- [ ] 연습 결과가 랭크/전적에 반영되지 않는다.
+- [x] 연습 모드 버튼으로 게임 화면에 진입할 수 있다.
+- [x] LIGHTNING 입력을 테스트할 수 있다.
+- [x] 연습 결과가 랭크/전적에 반영되지 않는다.
 
 ### 4-3. [ ] 사용자 지정 게임 API / Room 계약
 
@@ -746,7 +746,7 @@ Policy:
 10. [x] Section 3-2. 전적 조회 UI 통합
 11. [x] Section 3-3. 프로필 상세 API 계약
 12. [x] Section 3-4. 프로필 페이지 구현
-13. [ ] Section 4-1/4-2. 연습 모드
+13. [x] Section 4-1/4-2. 연습 모드
 14. [ ] Section 4-3/4-4. 사용자 지정 게임
 15. [ ] Section 5-1/5-2. 비밀번호 찾기
 16. [ ] Section 5-3/5-4. OAuth 로그인
