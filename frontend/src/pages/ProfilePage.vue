@@ -414,8 +414,7 @@ function returnToMatch() {
     var(--profile-background-image);
   background-color: #030610;
   background-repeat: no-repeat;
-  background-attachment: fixed;
-  background-position: center top;
+  background-position: center;
   background-size:
     100% 100%,
     100% 100%,
