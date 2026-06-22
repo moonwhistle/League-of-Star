@@ -14,7 +14,6 @@
     <section class="profile-shell" aria-live="polite">
       <header class="profile-header">
         <div>
-          <span>{{ t('profile.eyebrow') }}</span>
           <h1>{{ t('profile.title') }}</h1>
         </div>
         <nav class="profile-actions" :aria-label="t('profile.navigation')">
