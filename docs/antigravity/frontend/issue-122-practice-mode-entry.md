@@ -251,115 +251,115 @@ interface GameResultPayload {
 
 ### 1. Frontend Practice Contract 정리
 
-- [ ] issue-120 Practice Start API 계약 재확인.
-- [ ] practice response shape를 프론트 type으로 문서화.
-- [ ] `gameMode`, `practiceResult`가 GameResultPayload에 필요함을 문서화.
-- [ ] 연습 모드는 GameWaitingPage를 생략함을 문서화.
-- [ ] 연습 모드는 GameResultPage/Summary API를 사용하지 않음을 문서화.
-- [ ] 일반 ranked match의 result route/Summary API 흐름은 유지함을 문서화.
-- [ ] 연습 결과 미저장/미정산 정책 문서화.
+- [x] issue-120 Practice Start API 계약 재확인.
+- [x] practice response shape를 프론트 type으로 문서화.
+- [x] `gameMode`, `practiceResult`가 GameResultPayload에 필요함을 문서화.
+- [x] 연습 모드는 GameWaitingPage를 생략함을 문서화.
+- [x] 연습 모드는 GameResultPage/Summary API를 사용하지 않음을 문서화.
+- [x] 일반 ranked match의 result route/Summary API 흐름은 유지함을 문서화.
+- [x] 연습 결과 미저장/미정산 정책 문서화.
 
 ### 2. Practice Service / Storage 구현
 
-- [ ] `practiceService.startPractice(signal?)` 구현.
-- [ ] `POST /api/v1/games/practice` path와 method 고정.
-- [ ] request body를 보내지 않음.
-- [ ] `PracticeGameStartResponse` type 추가.
-- [ ] response validator 구현.
-- [ ] invalid response는 route 이동하지 않게 처리.
-- [ ] `practiceGameStartPayload` storage service 추가.
-- [ ] 저장 payload에 `receivedAt` 포함.
-- [ ] broken JSON, invalid payload, route id mismatch는 `null` 반환.
+- [x] `practiceService.startPractice(signal?)` 구현.
+- [x] `POST /api/v1/games/practice` path와 method 고정.
+- [x] request body를 보내지 않음.
+- [x] `PracticeGameStartResponse` type 추가.
+- [x] response validator 구현.
+- [x] invalid response는 route 이동하지 않게 처리.
+- [x] `practiceGameStartPayload` storage service 추가.
+- [x] 저장 payload에 `receivedAt` 포함.
+- [x] broken JSON, invalid payload, route id mismatch는 `null` 반환.
 
 ### 3. MatchPage Practice Entry 구현
 
-- [ ] 연습 모드 버튼에 클릭 handler 연결.
-- [ ] 연습 모드 버튼에 `data-testid` 추가.
-- [ ] practice pending 상태 추가.
-- [ ] practice pending 중 중복 클릭 방지.
-- [ ] practice pending 중 match start/custom/logout 등 충돌 가능 동작을 최소한으로 방어.
-- [ ] API 성공 시 practice payload 저장.
-- [ ] 저장 성공 시 `/game/:gameRoomId/play`로 이동.
-- [ ] API 실패 시 기존 error modal 패턴으로 표시.
-- [ ] practice 시작 중 match queue join/leave, match SSE, accept/reject API를 호출하지 않음.
+- [x] 연습 모드 버튼에 클릭 handler 연결.
+- [x] 연습 모드 버튼에 `data-testid` 추가.
+- [x] practice pending 상태 추가.
+- [x] practice pending 중 중복 클릭 방지.
+- [x] practice pending 중 match start/custom/logout 등 충돌 가능 동작을 최소한으로 방어.
+- [x] API 성공 시 practice payload 저장.
+- [x] 저장 성공 시 `/game/:gameRoomId/play`로 이동.
+- [x] API 실패 시 기존 error modal 패턴으로 표시.
+- [x] practice 시작 중 match queue join/leave, match SSE, accept/reject API를 호출하지 않음.
 
 ### 4. GamePlayPage Practice Source 구현
 
-- [ ] route `gameRoomId` 기준 practice payload 조회.
-- [ ] 일반 게임 payload가 있으면 기존 `gameStartPayload + gameWaitingPayload` 흐름 유지.
-- [ ] practice payload가 있으면 waiting payload 없이 playState 생성.
-- [ ] practice playState의 `webSocketUrl`은 practice response를 사용.
-- [ ] practice playState의 `scenario`, `startAt`, `durationMs`는 practice response를 사용.
-- [ ] practice mode data attribute 추가.
-- [ ] practice mode에서 상대 userId가 없어도 LIGHTNING/HP/Three.js 로직이 동작하게 처리.
-- [ ] payload가 없거나 mismatch면 `/match` 복귀.
+- [x] route `gameRoomId` 기준 practice payload 조회.
+- [x] 일반 게임 payload가 있으면 기존 `gameStartPayload + gameWaitingPayload` 흐름 유지.
+- [x] practice payload가 있으면 waiting payload 없이 playState 생성.
+- [x] practice playState의 `webSocketUrl`은 practice response를 사용.
+- [x] practice playState의 `scenario`, `startAt`, `durationMs`는 practice response를 사용.
+- [x] practice mode data attribute 추가.
+- [x] practice mode에서 상대 userId가 없어도 LIGHTNING/HP/Three.js 로직이 동작하게 처리.
+- [x] payload가 없거나 mismatch면 `/match` 복귀.
 
 ### 5. Practice GAME_RESULT / Overlay 구현
 
-- [ ] `GameResultPayload` type에 `gameMode`, `practiceResult` 추가.
-- [ ] `gameResultPayload` validator가 `gameMode`, `practiceResult`를 허용하게 수정.
-- [ ] `GAME_RESULT.gameMode === 'PRACTICE'` 분기 추가.
-- [ ] practice `GAME_RESULT` 수신 시 `/result` route로 이동하지 않음.
-- [ ] `practiceResult=SUCCESS`면 성공 오버레이 표시.
-- [ ] `practiceResult=FAILED`면 실패 오버레이 표시.
-- [ ] invalid practice result는 socket error 상태로 표시.
-- [ ] practice result 수신 후 LIGHTNING 입력 비활성화.
-- [ ] result 이후 WebSocket close/error가 overlay 상태를 덮지 않게 유지.
-- [ ] `다시 하기` 클릭 시 새 practice start API 호출 후 새 room으로 `router.replace`.
-- [ ] `메인으로` 클릭 시 `/match` 이동.
+- [x] `GameResultPayload` type에 `gameMode`, `practiceResult` 추가.
+- [x] `gameResultPayload` validator가 `gameMode`, `practiceResult`를 허용하게 수정.
+- [x] `GAME_RESULT.gameMode === 'PRACTICE'` 분기 추가.
+- [x] practice `GAME_RESULT` 수신 시 `/result` route로 이동하지 않음.
+- [x] `practiceResult=SUCCESS`면 성공 오버레이 표시.
+- [x] `practiceResult=FAILED`면 실패 오버레이 표시.
+- [x] invalid practice result는 socket error 상태로 표시.
+- [x] practice result 수신 후 LIGHTNING 입력 비활성화.
+- [x] result 이후 WebSocket close/error가 overlay 상태를 덮지 않게 유지.
+- [x] `다시 하기` 클릭 시 새 practice start API 호출 후 새 room으로 `router.replace`.
+- [x] `메인으로` 클릭 시 `/match` 이동.
 
 ### 6. UI / Locale 구현
 
-- [ ] MatchPage practice loading label 추가.
-- [ ] MatchPage practice error fallback 문구 추가.
-- [ ] GamePlayPage practice result overlay UI 추가.
-- [ ] 성공 문구 추가.
-- [ ] 실패 문구 추가.
-- [ ] 다시 하기 버튼 문구 추가.
-- [ ] 메인으로 버튼 문구 추가.
-- [ ] practice result overlay에서 LP/rank/record/상대 정보 표시하지 않음.
-- [ ] 한국어/영어 locale 정합성 반영.
+- [x] MatchPage practice loading label 추가.
+- [x] MatchPage practice error fallback 문구 추가.
+- [x] GamePlayPage practice result overlay UI 추가.
+- [x] 성공 문구 추가.
+- [x] 실패 문구 추가.
+- [x] 다시 하기 버튼 문구 추가.
+- [x] 메인으로 버튼 문구 추가.
+- [x] practice result overlay에서 LP/rank/record/상대 정보 표시하지 않음.
+- [x] 한국어/영어 locale 정합성 반영.
 
 ### 7. Test 구현
 
-- [ ] `practiceService` path/method/body 없음 검증.
-- [ ] `practiceGameStartPayload` 저장/조회/invalid/mismatch 테스트.
-- [ ] MatchPage 연습 모드 클릭 성공 시 service 호출, payload 저장, play route 이동 검증.
-- [ ] MatchPage 연습 모드 pending 중 중복 클릭 방지 검증.
-- [ ] MatchPage 연습 모드 실패 시 error modal 표시 검증.
-- [ ] 연습 모드 시작이 match queue/SSE를 호출하지 않는지 검증.
-- [ ] GamePlayPage가 practice payload만으로 playState를 구성하는지 검증.
-- [ ] GamePlayPage practice mode에서 WebSocket 연결 URL을 practice response에서 사용하는지 검증.
-- [ ] practice `GAME_RESULT SUCCESS` 수신 시 route 이동 없이 성공 오버레이 표시 검증.
-- [ ] practice `GAME_RESULT FAILED` 수신 시 route 이동 없이 실패 오버레이 표시 검증.
-- [ ] 일반 match `GAME_RESULT`는 기존처럼 result route로 이동하는지 회귀 검증.
-- [ ] 다시 하기 / 메인으로 버튼 동작 검증.
+- [x] `practiceService` path/method/body 없음 검증.
+- [x] `practiceGameStartPayload` 저장/조회/invalid/mismatch 테스트.
+- [x] MatchPage 연습 모드 클릭 성공 시 service 호출, payload 저장, play route 이동 검증.
+- [x] MatchPage 연습 모드 pending 중 중복 클릭 방지 검증.
+- [x] MatchPage 연습 모드 실패 시 error modal 표시 검증.
+- [x] 연습 모드 시작이 match queue/SSE를 호출하지 않는지 검증.
+- [x] GamePlayPage가 practice payload만으로 playState를 구성하는지 검증.
+- [x] GamePlayPage practice mode에서 WebSocket 연결 URL을 practice response에서 사용하는지 검증.
+- [x] practice `GAME_RESULT SUCCESS` 수신 시 route 이동 없이 성공 오버레이 표시 검증.
+- [x] practice `GAME_RESULT FAILED` 수신 시 route 이동 없이 실패 오버레이 표시 검증.
+- [x] 일반 match `GAME_RESULT`는 기존처럼 result route로 이동하는지 회귀 검증.
+- [x] 다시 하기 / 메인으로 버튼 동작 검증.
 
 ### 8. 문서 정합성 구현
 
-- [ ] `front-plan.md` GameResultPayload에 `gameMode`, `practiceResult` 확장 반영.
-- [ ] `front-plan.md` 일반 game result 흐름과 practice result 흐름 분리 설명 반영.
-- [ ] `docs/last-구현.md` Section 4-2 완료 상태 반영.
-- [ ] issue-120 백엔드 계약과 response/source of truth 정합성 확인.
-- [ ] issue-92 LIGHTNING 입력 정책과 충돌 없는지 확인.
-- [ ] issue-94 GAME_RESULT route 이동 정책이 일반 game 기준임을 보강.
-- [ ] issue-122 PR 섹션 보강.
+- [x] `front-plan.md` GameResultPayload에 `gameMode`, `practiceResult` 확장 반영.
+- [x] `front-plan.md` 일반 game result 흐름과 practice result 흐름 분리 설명 반영.
+- [x] `docs/last-구현.md` Section 4-2 완료 상태 반영.
+- [x] issue-120 백엔드 계약과 response/source of truth 정합성 확인.
+- [x] issue-92 LIGHTNING 입력 정책과 충돌 없는지 확인.
+- [x] issue-94 GAME_RESULT route 이동 정책이 일반 game 기준임을 보강.
+- [x] issue-122 PR 섹션 보강.
 
 ### 9. 검증
 
-- [ ] `npm run test -- practice`
-- [ ] `npm run test -- MatchPage`
-- [ ] `npm run test -- GamePlayPage`
-- [ ] `npm run test -- gameResultPayload`
-- [ ] `npm run format`
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
-- [ ] `npm run test`
-- [ ] `npm run build`
-- [ ] 브라우저에서 연습 모드 클릭 후 GamePlayPage 진입 확인.
-- [ ] mock WebSocket으로 practice `GAME_RESULT SUCCESS` 오버레이 확인.
-- [ ] mock WebSocket으로 practice `GAME_RESULT FAILED` 오버레이 확인.
-- [ ] 일반 매칭 게임 result route 이동 회귀 확인.
+- [x] `npm run test -- practice`
+- [x] `npm run test -- MatchPage`
+- [x] `npm run test -- GamePlayPage`
+- [x] `npm run test -- gameResultPayload`
+- [x] `npm run format`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run test`
+- [x] `npm run build`
+- [x] 자동화 테스트에서 연습 모드 클릭 후 GamePlayPage 진입 확인.
+- [x] 자동화 테스트에서 mock WebSocket practice `GAME_RESULT SUCCESS` 오버레이 확인.
+- [x] 자동화 테스트에서 mock WebSocket practice `GAME_RESULT FAILED` 오버레이 확인.
+- [x] 자동화 테스트에서 일반 매칭 게임 result route 이동 회귀 확인.
 
 ## Implementation Policy
 
@@ -444,7 +444,16 @@ flowchart TD
 - 연습 결과 저장/히스토리/통계는 이번 PR에서 제외함.
 - 백엔드 Practice API 변경은 없음.
 - 새 패키지 추가 없음.
-- 검증 결과를 기입함.
+- 검증 결과:
+  - `npm run test -- practiceService practiceGameStartPayload` 통과함.
+  - `npm run test -- MatchPage` 통과함.
+  - `npm run test -- GamePlayPage gameResultPayload` 통과함.
+  - `npm run format` 통과함.
+  - `npm run lint` 통과함.
+  - `npm run typecheck` 통과함.
+  - `npm run test` 전체 28 files / 240 tests 통과함.
+  - `npm run build` 통과함.
+  - `git diff --check` 통과함.
 
 ## 📌 Related Issue
 
