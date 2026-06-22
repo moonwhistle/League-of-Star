@@ -1,8 +1,8 @@
 <template>
-  <!-- eslint-disable vue/max-attributes-per-line -->
+  <!-- eslint-disable vue/html-closing-bracket-newline, vue/html-indent, vue/max-attributes-per-line, vue/singleline-html-element-content-newline -->
   <main
     class="profile-page"
-    aria-label="My profile"
+    :aria-label="t('profile.pageLabel')"
     :data-profile-status="profileStatus"
     :data-profile-error-message="profileErrorMessage"
     :data-rank-status="rankStatus"
@@ -11,56 +11,138 @@
     :data-records-error-message="recordsErrorMessage"
     :data-records-count="recordsResponse?.records.length ?? 0"
   >
-    <h1>내 정보</h1>
+    <section class="profile-shell" aria-live="polite">
+      <header class="profile-header">
+        <div>
+          <span>{{ t('profile.eyebrow') }}</span>
+          <h1>{{ t('profile.title') }}</h1>
+        </div>
+        <nav class="profile-actions" :aria-label="t('profile.navigation')">
+          <button
+            class="profile-icon-button"
+            type="button"
+            :aria-label="t('profile.returnToMatch')"
+            :title="t('profile.returnToMatch')"
+            @click="returnToMatch"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3l2.4 5.4L20 10.7l-5.1 2.1L12 21l-2.9-8.2L4 10.7l5.6-2.3L12 3z" />
+            </svg>
+          </button>
+          <button class="profile-records-button" type="button" @click="goToRecords">
+            {{ t('profile.viewAllRecords') }}
+          </button>
+        </nav>
+      </header>
 
-    <section aria-label="Account profile">
-      <strong v-if="profileStatus === 'loading'">프로필 불러오는 중</strong>
-      <strong v-else-if="profileStatus === 'error'">{{ profileErrorMessage }}</strong>
-      <template v-else-if="profile !== undefined">
-        <strong>{{ profile.nickname }}</strong>
-        <span>{{ profile.email }}</span>
-        <span>{{ profile.createdAt }}</span>
-      </template>
-    </section>
+      <section class="profile-grid">
+        <section class="profile-panel profile-panel--account" :aria-label="t('profile.account')">
+          <div class="profile-panel-heading">
+            <span>{{ t('profile.account') }}</span>
+            <strong>{{ displayNickname }}</strong>
+          </div>
 
-    <section aria-label="Current rank">
-      <strong v-if="rankStatus === 'loading'">랭크 불러오는 중</strong>
-      <strong v-else-if="rankStatus === 'error'">{{ rankErrorMessage }}</strong>
-      <template v-else-if="rank !== undefined">
-        <strong>{{ rank.rank }}</strong>
-        <span>{{ rank.lp }} LP</span>
-        <span>{{ rank.wins }}승 {{ rank.losses }}패 {{ rank.draws }}무</span>
-        <span>{{ rank.rankUpdatedAt }}</span>
-      </template>
-    </section>
+          <div class="profile-account-body">
+            <div class="profile-avatar" aria-hidden="true">{{ avatarInitial }}</div>
+            <div class="profile-account-copy">
+              <strong v-if="profileStatus === 'loading'">{{ t('profile.profileLoading') }}</strong>
+              <strong v-else-if="profileStatus === 'error'">{{ profileErrorMessage }}</strong>
+              <template v-else-if="profile !== undefined">
+                <span>{{ t('profile.email') }}</span>
+                <strong>{{ profile.email }}</strong>
+                <span>{{ t('profile.joinedAt') }}</span>
+                <strong>{{ formatDateTime(profile.createdAt) }}</strong>
+              </template>
+            </div>
+          </div>
+        </section>
 
-    <section aria-label="Recent records">
-      <strong v-if="recordsStatus === 'loading'">최근 전적 불러오는 중</strong>
-      <strong v-else-if="recordsStatus === 'error'">{{ recordsErrorMessage }}</strong>
-      <strong v-else-if="recordsResponse?.records.length === 0">최근 전적 없음</strong>
-      <ol v-else-if="recordsResponse !== undefined">
-        <li v-for="record in recordsResponse.records" :key="record.gameId">
-          {{ record.result }} {{ record.opponentNickname }} {{ record.rankAfter }}
-        </li>
-      </ol>
+        <section class="profile-panel profile-panel--rank" :aria-label="t('profile.rank')">
+          <div class="profile-panel-heading">
+            <span>{{ t('profile.rank') }}</span>
+            <strong>{{ displayRank }}</strong>
+          </div>
+
+          <div v-if="rankStatus === 'loading'" class="profile-state">
+            {{ t('profile.rankLoading') }}
+          </div>
+          <div v-else-if="rankStatus === 'error'" class="profile-state profile-state--error">
+            {{ rankErrorMessage }}
+          </div>
+          <div v-else-if="rank !== undefined" class="profile-rank-grid">
+            <div>
+              <span>{{ t('profile.lp') }}</span>
+              <strong>{{ formatLp(rank.lp) }}</strong>
+            </div>
+            <div>
+              <span>{{ t('profile.recordSummary') }}</span>
+              <strong>{{ formatWinLossDraw(rank.wins, rank.losses, rank.draws) }}</strong>
+            </div>
+            <div>
+              <span>{{ t('profile.rankUpdatedAt') }}</span>
+              <strong>{{ formatDateTime(rank.rankUpdatedAt) }}</strong>
+            </div>
+          </div>
+        </section>
+
+        <section
+          class="profile-panel profile-panel--records"
+          :aria-label="t('profile.recentRecords')"
+        >
+          <div class="profile-panel-heading">
+            <span>{{ t('profile.recentRecords') }}</span>
+            <strong>{{ recordCountLabel }}</strong>
+          </div>
+
+          <div v-if="recordsStatus === 'loading'" class="profile-state">
+            {{ t('profile.recordsLoading') }}
+          </div>
+          <div v-else-if="recordsStatus === 'error'" class="profile-state profile-state--error">
+            {{ recordsErrorMessage }}
+          </div>
+          <div v-else-if="recentRecords.length === 0" class="profile-state">
+            {{ t('profile.recordsEmpty') }}
+          </div>
+          <ol v-else class="profile-record-list">
+            <li v-for="record in recentRecords" :key="record.gameId" :data-result="record.result">
+              <strong>{{ formatResult(record.result) }}</strong>
+              <span
+                >{{ t('records.me') }} {{ t('records.versus') }} {{ record.opponentNickname }}</span
+              >
+              <em
+                >{{ formatRankChange(record.rankBefore, record.rankAfter) }} ·
+                {{ formatLpChange(record.lpChange) }}</em
+              >
+              <time>{{ formatDateTime(record.playedAt) }}</time>
+            </li>
+          </ol>
+        </section>
+      </section>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { useRouter } from 'vue-router'
 
+import { useLocale } from '@/composables/useLocale'
+import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
 import { getMyGameRecords } from '@/services/gameRecordService'
 import { getMyProfile } from '@/services/profileService'
 import { getMyRank } from '@/services/rankService'
+import type { GameRecordResult } from '@/types/game'
 import type { GameRecordListResponse } from '@/types/gameRecord'
 import type { UserProfileResponse, UserRankResponse } from '@/types/user'
 
 const PROFILE_RECORDS_PAGE = 1
+const RECENT_RECORD_LIMIT = 5
 
 type LoadStatus = 'idle' | 'loading' | 'success' | 'error'
 
+const router = useRouter()
+const { locale, t } = useLocale()
 const profileStatus = ref<LoadStatus>('idle')
 const rankStatus = ref<LoadStatus>('idle')
 const recordsStatus = ref<LoadStatus>('idle')
@@ -73,6 +155,33 @@ const recordsResponse = shallowRef<GameRecordListResponse>()
 const profileAbortController = shallowRef<AbortController>()
 const rankAbortController = shallowRef<AbortController>()
 const recordsAbortController = shallowRef<AbortController>()
+const displayNickname = computed(() => {
+  if (profileStatus.value === 'loading') {
+    return t('profile.profileLoading')
+  }
+
+  const nickname = profile.value?.nickname.trim()
+
+  return nickname === undefined || nickname === '' ? t('profile.profileUnavailable') : nickname
+})
+const avatarInitial = computed(() => displayNickname.value.trim().charAt(0).toUpperCase() || 'S')
+const displayRank = computed(() => {
+  if (rankStatus.value === 'loading') {
+    return t('profile.rankLoading')
+  }
+
+  return rank.value?.rank ?? t('profile.rankUnavailable')
+})
+const recentRecords = computed(
+  () => recordsResponse.value?.records.slice(0, RECENT_RECORD_LIMIT) ?? [],
+)
+const recordCountLabel = computed(() => {
+  if (recordsStatus.value === 'loading') {
+    return t('profile.recordsLoading')
+  }
+
+  return `${recordsResponse.value?.totalElements ?? 0} ${t('records.countUnit')}`
+})
 
 onMounted(() => {
   void loadProfile()
@@ -215,4 +324,351 @@ function abortRecordsRequest() {
   recordsAbortController.value?.abort()
   recordsAbortController.value = undefined
 }
+
+function formatResult(result: GameRecordResult) {
+  switch (result) {
+    case 'DRAW':
+      return t('records.draw')
+    case 'LOSS':
+      return t('records.loss')
+    case 'WIN':
+      return t('records.win')
+    default:
+      return result
+  }
+}
+
+function formatRankChange(rankBefore: string, rankAfter: string) {
+  return rankBefore === rankAfter ? rankAfter : `${rankBefore} -> ${rankAfter}`
+}
+
+function formatLp(lp: number) {
+  return `${lp.toLocaleString(locale.value === 'ko' ? 'ko-KR' : 'en-US')} LP`
+}
+
+function formatLpChange(lpChange: number) {
+  const prefix = lpChange > 0 ? '+' : ''
+
+  return `${prefix}${lpChange} LP`
+}
+
+function formatWinLossDraw(wins: number, losses: number, draws: number) {
+  return `${wins}${t('match.wins')} ${losses}${t('match.losses')} ${draws}${t('match.draws')}`
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+function returnToMatch() {
+  void router.push({ name: ROUTE_NAMES.match })
+}
+
+function goToRecords() {
+  void router.push({ name: ROUTE_NAMES.records })
+}
 </script>
+
+<style scoped>
+.profile-page {
+  min-height: 100vh;
+  padding: 32px;
+  color: #f8fbff;
+  background:
+    radial-gradient(circle at 78% 22%, rgba(255, 216, 111, 0.2), transparent 28%),
+    radial-gradient(circle at 18% 74%, rgba(103, 232, 249, 0.14), transparent 34%),
+    linear-gradient(145deg, #030610 0%, #07101f 46%, #030610 100%);
+}
+
+.profile-shell {
+  display: grid;
+  gap: 22px;
+  width: min(1080px, 100%);
+  margin: 0 auto;
+}
+
+.profile-header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-header > div {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-header span,
+.profile-panel-heading span,
+.profile-account-copy span,
+.profile-rank-grid span {
+  color: rgba(248, 251, 255, 0.68);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.profile-header h1 {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1.16;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.profile-icon-button,
+.profile-records-button {
+  min-height: 44px;
+  border: 1px solid rgba(142, 238, 255, 0.42);
+  border-radius: 8px;
+  color: #f8fbff;
+  background: rgba(8, 19, 36, 0.78);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.profile-icon-button:hover,
+.profile-records-button:hover,
+.profile-icon-button:focus-visible,
+.profile-records-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(142, 238, 255, 0.86);
+  background: rgba(16, 42, 72, 0.92);
+  box-shadow:
+    0 0 0 3px rgba(142, 238, 255, 0.12),
+    0 12px 34px rgba(0, 0, 0, 0.34);
+  outline: none;
+}
+
+.profile-icon-button:active,
+.profile-records-button:active {
+  transform: translateY(0);
+}
+
+.profile-icon-button {
+  display: grid;
+  width: 46px;
+  padding: 0;
+  place-items: center;
+}
+
+.profile-icon-button svg {
+  width: 23px;
+  height: 23px;
+  fill: rgba(255, 216, 111, 0.88);
+  stroke: #fff6c7;
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 10px rgba(255, 216, 111, 0.5));
+}
+
+.profile-records-button {
+  padding: 0 18px;
+  font-weight: 900;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+  gap: 16px;
+}
+
+.profile-panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid rgba(142, 238, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(5, 12, 24, 0.72);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.32);
+}
+
+.profile-panel--records {
+  grid-column: 1 / -1;
+}
+
+.profile-panel-heading {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.profile-panel-heading strong {
+  overflow: hidden;
+  font-size: 26px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-account-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.profile-avatar {
+  display: grid;
+  width: 78px;
+  height: 78px;
+  place-items: center;
+  border: 2px solid rgba(255, 216, 111, 0.76);
+  border-radius: 50%;
+  color: #07111f;
+  background: #ffd86f;
+  box-shadow: 0 0 28px rgba(255, 216, 111, 0.34);
+  font-size: 30px;
+  font-weight: 950;
+}
+
+.profile-account-copy,
+.profile-rank-grid {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.profile-account-copy strong,
+.profile-rank-grid strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-rank-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.profile-rank-grid div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(142, 238, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.profile-state {
+  display: grid;
+  min-height: 110px;
+  place-items: center;
+  color: rgba(248, 251, 255, 0.72);
+  text-align: center;
+}
+
+.profile-state--error {
+  color: #ffb8bf;
+}
+
+.profile-record-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.profile-record-list li {
+  display: grid;
+  grid-template-columns: 82px minmax(180px, 1fr) minmax(180px, 0.8fr) minmax(150px, 0.7fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(142, 238, 255, 0.16);
+  border-left: 4px solid #8eeeff;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.profile-record-list li[data-result='LOSS'] {
+  border-left-color: #ff8f9d;
+}
+
+.profile-record-list li[data-result='DRAW'] {
+  border-left-color: #d7deea;
+}
+
+.profile-record-list span,
+.profile-record-list em,
+.profile-record-list time {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(248, 251, 255, 0.72);
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-record-list strong {
+  color: #8eeeff;
+}
+
+.profile-record-list li[data-result='LOSS'] strong {
+  color: #ff8f9d;
+}
+
+.profile-record-list li[data-result='DRAW'] strong {
+  color: #d7deea;
+}
+
+@media (max-width: 760px) {
+  .profile-page {
+    padding: 22px 16px;
+  }
+
+  .profile-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .profile-header h1 {
+    font-size: 34px;
+  }
+
+  .profile-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .profile-records-button {
+    flex: 1;
+  }
+
+  .profile-grid,
+  .profile-rank-grid,
+  .profile-record-list li {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-account-body {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 25px;
+  }
+}
+</style>

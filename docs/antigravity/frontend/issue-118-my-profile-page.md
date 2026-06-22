@@ -263,22 +263,22 @@ interface GameRecordEntryResponse {
 
 ### 4. Profile UI / Locale 구현
 
-- [ ] 내 정보 제목 표시.
-- [ ] nickname 표시.
-- [ ] email 표시.
-- [ ] 가입일 표시.
-- [ ] 현재 rank 표시.
-- [ ] 현재 LP 표시.
-- [ ] wins/losses/draws 표시.
-- [ ] rank 갱신 시각 표시.
-- [ ] 최근 전적 요약 표시.
-- [ ] 최근 전적이 없으면 empty 상태 표시.
-- [ ] 최근 전적 조회 실패 시 records 섹션 내부 error 표시.
-- [ ] `/match` 복귀 버튼 구현.
-- [ ] `/records` 전체 전적 보기 버튼 구현.
-- [ ] 한국어 locale 추가.
-- [ ] 영어 locale 추가.
-- [ ] desktop/mobile horizontal overflow가 없도록 스타일 구현.
+- [x] 내 정보 제목 표시.
+- [x] nickname 표시.
+- [x] email 표시.
+- [x] 가입일 표시.
+- [x] 현재 rank 표시.
+- [x] 현재 LP 표시.
+- [x] wins/losses/draws 표시.
+- [x] rank 갱신 시각 표시.
+- [x] 최근 전적 요약 표시.
+- [x] 최근 전적이 없으면 empty 상태 표시.
+- [x] 최근 전적 조회 실패 시 records 섹션 내부 error 표시.
+- [x] `/match` 복귀 버튼 구현.
+- [x] `/records` 전체 전적 보기 버튼 구현.
+- [x] 한국어 locale 추가.
+- [x] 영어 locale 추가.
+- [x] desktop/mobile horizontal overflow가 없도록 스타일 구현.
 
 ### 5. Test 구현
 
