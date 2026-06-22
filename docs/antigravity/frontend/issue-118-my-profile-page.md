@@ -304,18 +304,18 @@ interface GameRecordEntryResponse {
 
 ### 7. 검증
 
-- [ ] `npm run test -- ProfilePage` 검증.
-- [ ] `npm run test -- MatchPage` 검증.
-- [ ] `npm run test -- router` 검증.
-- [ ] `npm run test -- ProfilePage MatchPage router` 검증.
-- [ ] `npm run format` 검증.
-- [ ] `npm run lint` 검증.
-- [ ] `npm run typecheck` 검증.
-- [ ] `npm run test` 검증.
-- [ ] `npm run build` 검증.
-- [ ] desktop `1440x900` overflow 검증.
-- [ ] mobile `390x844` overflow 검증.
-- [ ] `git diff --check` 검증.
+- [x] `npm run test -- ProfilePage` 검증.
+- [x] `npm run test -- MatchPage` 검증.
+- [x] `npm run test -- router` 검증.
+- [x] `npm run test -- ProfilePage MatchPage router` 검증.
+- [x] `npm run format` 검증.
+- [x] `npm run lint` 검증.
+- [x] `npm run typecheck` 검증.
+- [x] `npm run test` 검증.
+- [x] `npm run build` 검증.
+- [x] desktop `1440x900` overflow 검증.
+- [x] mobile `390x844` overflow 검증.
+- [x] `git diff --check` 검증.
 
 ## Implementation Policy
 
@@ -411,13 +411,20 @@ flowchart TD
 - 프로필 수정, avatar, 전적 상세, 상대 프로필 이동은 후속 이슈로 제외함.
 - 새 패키지는 추가하지 않음.
 - 검증 결과:
-  - `npm run test -- ProfilePage MatchPage router` 통과함.
+  - `npm run test -- ProfilePage` 통과함. `1 file / 6 passed`
+  - `npm run test -- MatchPage` 통과함. `1 file / 49 passed`
+  - `npm run test -- router` 통과함. `2 files / 18 passed`
+  - `npm run test -- ProfilePage MatchPage router` 통과함. `4 files / 73 passed`
   - `npm run format` 통과함.
   - `npm run lint` 통과함.
   - `npm run typecheck` 통과함.
-  - `npm run test` 통과함.
+  - `npm run test` 통과함. `26 files / 224 passed`
   - `npm run build` 통과함.
-  - desktop/mobile overflow 검증 통과함.
+  - `git diff --check` 통과함.
+  - desktop `1440x900` `/profile` 검증 통과함.
+    Profile API, Rank API, Game Records API page 1~3 모두 success이며 전적 30개 표시, horizontal overflow 없음, text overflow 후보 없음.
+  - mobile `390x844` `/profile` 검증 통과함.
+    Profile API, Rank API, Game Records API page 1~3 모두 success이며 전적 30개 표시, horizontal overflow 없음, text overflow 후보 없음.
 
 ## 📌 Related Issue
 
