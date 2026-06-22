@@ -189,7 +189,7 @@ interface GameResultPayload {
 }
 ```
 
-`gameMode`를 optional로 둔다. 기존 일반 게임 테스트/저장 payload가 `gameMode` 없이도 동작할 수 있게 하되, 백엔드 최신 payload가 `gameMode=MATCH|PRACTICE`를 내려주면 그대로 저장/판별한다.
+`gameMode`를 optional로 둔다. 기존 일반 게임 테스트/저장 payload가 `gameMode` 없이도 동작할 수 있게 하되, 백엔드 최신 payload가 `gameMode=MATCH|PRACTICE`를 내려주면 그대로 저장/판별한다. GamePlayPage가 이미 practice mode로 시작된 상태라면 `gameMode`가 누락되어도 `practiceResult=SUCCESS|FAILED`를 연습 결과로 허용한다. 단, `gameMode=MATCH`처럼 명시적으로 충돌하는 payload는 invalid로 처리한다.
 
 ### Source Of Truth Policy
 
@@ -434,7 +434,8 @@ flowchart TD
 - `POST /api/v1/games/practice`는 request body 없이 호출함.
 - 응답의 `gameRoomId`, `serverTime`, `startAt`, `webSocketUrl`, `scenario`를 저장하고 play 화면 source로 사용함.
 - WebSocket은 기존 `/ws/game/{gameRoomId}`와 token query parameter 정책을 재사용함.
-- practice 성공/실패는 `GAME_RESULT.gameMode=PRACTICE`, `practiceResult=SUCCESS|FAILED`로 판단함.
+- practice 성공/실패는 기본적으로 `GAME_RESULT.gameMode=PRACTICE`, `practiceResult=SUCCESS|FAILED`로 판단함.
+- 프론트가 이미 practice play state인 경우에는 기존 호환을 위해 `gameMode` 누락 payload도 `practiceResult=SUCCESS|FAILED`이면 허용하되, `gameMode=MATCH`는 거부함.
 - rank/LP/record는 practice 결과에 표시하거나 저장하지 않음.
 
 ## 📚 Changes

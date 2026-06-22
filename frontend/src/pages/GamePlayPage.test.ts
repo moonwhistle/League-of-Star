@@ -411,6 +411,59 @@ describe('GamePlayPage', () => {
     })
   })
 
+  it('accepts practice GAME_RESULT without gameMode when the current play state is practice', async () => {
+    saveValidPracticePayload()
+
+    const payload = createPracticeGameResultPayload('SUCCESS')
+    Reflect.deleteProperty(payload, 'gameMode')
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload,
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('resultReceived')
+    expect(wrapper.get('main').attributes('data-game-practice-result-visible')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-practice-result')).toBe('SUCCESS')
+    expect(readGameResultPayload(100)).toBeNull()
+    expect(routerReplaceMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: ROUTE_NAMES.gameResult }),
+    )
+  })
+
+  it('rejects practice GAME_RESULT when the payload explicitly says MATCH', async () => {
+    saveValidPracticePayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: {
+          ...createPracticeGameResultPayload('SUCCESS'),
+          gameMode: 'MATCH',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('error')
+    expect(wrapper.get('main').attributes('data-game-result-received')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-practice-result-visible')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-socket-error-message')).toBe(
+      '게임 결과 정보가 올바르지 않습니다.',
+    )
+  })
+
   it('does not confirm route leave after a practice result is received', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm')
     saveValidPracticePayload()

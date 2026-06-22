@@ -748,12 +748,15 @@ function isPracticePlayResult(storedPayload = {}) {
 }
 
 function isValidPracticeResultPayload(storedPayload = {}) {
+  const gameMode = Reflect.get(Object(storedPayload), 'gameMode')
   const practiceResult = Reflect.get(Object(storedPayload), 'practiceResult')
+  const hasValidPracticeResult = practiceResult === 'SUCCESS' || practiceResult === 'FAILED'
 
-  return (
-    Reflect.get(Object(storedPayload), 'gameMode') === 'PRACTICE' &&
-    (practiceResult === 'SUCCESS' || practiceResult === 'FAILED')
-  )
+  if (!hasValidPracticeResult || gameMode === 'MATCH') {
+    return false
+  }
+
+  return gameMode === 'PRACTICE' || (gameMode === undefined && playState.value?.mode === 'PRACTICE')
 }
 
 function handleLightningApplied(payload = {}) {
