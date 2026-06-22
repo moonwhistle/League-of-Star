@@ -38,6 +38,18 @@ public class GameRoomReadService {
         }
     }
 
+    public void validateActiveParticipant(Long gameRoomId, Long userId) {
+        GameRoom gameRoom = gameRoomRepository.findById(gameRoomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
+
+        if (!gameRoom.getStatus().isReady() && !gameRoom.getStatus().isInProgress()) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_STATE);
+        }
+        if (!gameRoom.hasParticipant(userId)) {
+            throw new CoreException(CoreErrorCode.INVALID_GAME_PARTICIPANTS);
+        }
+    }
+
     public GameStatus getStatus(Long gameRoomId) {
         return gameRoomRepository.findById(gameRoomId)
                 .map(GameRoom::getStatus)

@@ -216,16 +216,16 @@ WebSocket access token 전달 방식도 기존 Game WebSocket 정책을 그대�
 
 ### 2. Core Practice GameRoom 구현
 
-- [ ] `GameMode` enum 추가.
-- [ ] `GameRoom`에 `gameMode` 필드 추가.
-- [ ] 기존 match room 기본값을 `MATCH`로 유지.
-- [ ] practice room 생성 메서드 추가.
-- [ ] practice room은 participant 1명으로 저장.
-- [ ] practice room도 기존 `GameScenarioGenerator`를 사용.
-- [ ] `GameRoom.start()` 검증을 mode별 참가자 수 기준으로 분기.
-- [ ] practice room lightning kill 종료를 `PLAYER1_WIN`으로 확정.
-- [ ] practice room timeout 종료를 `DRAW`로 확정.
-- [ ] `GameRoomReadService`에 practice WebSocket 연결 검증에 필요한 read method 추가.
+- [x] `GameMode` enum 추가.
+- [x] `GameRoom`에 `gameMode` 필드 추가.
+- [x] 기존 match room 기본값을 `MATCH`로 유지.
+- [x] practice room 생성 메서드 추가.
+- [x] practice room은 participant 1명으로 저장.
+- [x] practice room도 기존 `GameScenarioGenerator`를 사용.
+- [x] `GameRoom.start()` 검증을 mode별 참가자 수 기준으로 분기.
+- [x] practice room lightning kill 종료를 `PLAYER1_WIN`으로 확정.
+- [x] practice room timeout 종료를 `DRAW`로 확정.
+- [x] `GameRoomReadService`에 practice WebSocket 연결 검증에 필요한 read method 추가.
 
 ### 3. Practice Start API 구현
 

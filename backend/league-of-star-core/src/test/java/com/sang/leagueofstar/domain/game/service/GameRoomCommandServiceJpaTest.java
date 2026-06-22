@@ -2,6 +2,7 @@ package com.sang.leagueofstar.domain.game.service;
 
 import com.sang.leagueofstar.domain.game.domain.GameParticipant;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.domain.vo.ParticipantStatus;
@@ -59,6 +60,7 @@ class GameRoomCommandServiceJpaTest {
 
         // then
         GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(foundGameRoom.getGameMode()).isEqualTo(GameMode.MATCH);
         assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.READY);
         assertThat(foundGameRoom.getDurationSeconds()).isBetween(MIN_GAME_DURATION_SECONDS, MAX_GAME_DURATION_SECONDS);
         assertThat(foundGameRoom.getParticipants()).hasSize(GameRoom.MAX_PARTICIPANTS);
@@ -74,6 +76,29 @@ class GameRoomCommandServiceJpaTest {
         assertThat(foundGameRoom.getScenarioData().steps().get(lastStepIndex).timeMs())
                 .isEqualTo(foundGameRoom.getDurationSeconds() * 1000L);
         assertThat(foundGameRoom.getScenarioData().steps().get(lastStepIndex).hp()).isZero();
+    }
+
+    @Test
+    @DisplayName("createPracticeRoom - PRACTICE 게임룸, 참가자, 시나리오를 DB에 저장한다")
+    void createPracticeRoom_SavePracticeGameRoomParticipantAndScenario() {
+        // when
+        GameRoom savedGameRoom = gameRoomCommandService.createPracticeRoom(FIRST_USER_ID);
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(foundGameRoom.getGameMode()).isEqualTo(GameMode.PRACTICE);
+        assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.READY);
+        assertThat(foundGameRoom.getDurationSeconds()).isBetween(MIN_GAME_DURATION_SECONDS, MAX_GAME_DURATION_SECONDS);
+        assertThat(foundGameRoom.getParticipants()).hasSize(GameRoom.PRACTICE_PARTICIPANTS);
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getUserId)
+                .containsExactly(FIRST_USER_ID);
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.READY);
+        assertThat(foundGameRoom.getScenarioData().steps().get(0).hp()).isEqualTo(GameRoom.DEFAULT_STAR_CORE_MAX_HP);
     }
 
     @Test
@@ -190,6 +215,36 @@ class GameRoomCommandServiceJpaTest {
         // then
         GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
         assertThat(finished).isTrue();
+        assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(foundGameRoom.getResult()).isEqualTo(GameResult.DRAW);
+        assertThat(foundGameRoom.getWinnerId()).isNull();
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("finishInProgressRoomByNaturalDeathDraw - PRACTICE 자연사 DRAW 종료 상태를 DB에 저장한다")
+    void finishInProgressRoomByNaturalDeathDraw_PracticeSaveFinishedDrawStatus() {
+        // given
+        GameRoom savedGameRoom = gameRoomCommandService.createPracticeRoom(FIRST_USER_ID);
+        gameRoomCommandService.startReadyRoomIfReady(
+                savedGameRoom.getId(),
+                LocalDateTime.of(2026, 5, 20, 12, 0)
+        );
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // when
+        boolean finished = gameRoomCommandService.finishInProgressRoomByNaturalDeathDraw(savedGameRoom.getId())
+                .isPresent();
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(finished).isTrue();
+        assertThat(foundGameRoom.getGameMode()).isEqualTo(GameMode.PRACTICE);
         assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
         assertThat(foundGameRoom.getResult()).isEqualTo(GameResult.DRAW);
         assertThat(foundGameRoom.getWinnerId()).isNull();

@@ -92,6 +92,58 @@ class GameRoomReadServiceTest {
     }
 
     @Test
+    @DisplayName("validateActiveParticipant - READY 게임룸 참가자이면 통과한다")
+    void validateActiveParticipant_ReadyParticipant() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatCode(() -> gameRoomReadService.validateActiveParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateActiveParticipant - IN_PROGRESS 게임룸 참가자이면 통과한다")
+    void validateActiveParticipant_InProgressParticipant() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatCode(() -> gameRoomReadService.validateActiveParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateActiveParticipant - FINISHED 게임룸이면 예외를 던진다")
+    void validateActiveParticipant_Finished_ThrowException() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        gameRoom.finish(GameResult.PLAYER1_WIN, FIRST_USER_ID);
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.validateActiveParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_STATE));
+    }
+
+    @Test
+    @DisplayName("validateActiveParticipant - 참가자가 아니면 예외를 던진다")
+    void validateActiveParticipant_NotParticipant_ThrowException() {
+        // given
+        GameRoom gameRoom = createReadyGameRoom();
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> gameRoomReadService.validateActiveParticipant(GAME_ROOM_ID, UNKNOWN_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
     @DisplayName("getStatus - gameRoom 상태를 반환한다")
     void getStatus() {
         // given
