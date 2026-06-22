@@ -4,9 +4,11 @@
     class="game-play-page"
     :data-game-start-payload-ready="gameStartPayload !== null"
     :data-game-waiting-payload-ready="gameWaitingPayload !== null"
+    :data-game-practice-payload-ready="practiceGameStartPayload !== null"
     :data-game-play-state-ready="playState !== null"
-    :data-game-room-id="gameStartPayload?.gameRoomId ?? ''"
-    :data-game-start-at="gameStartPayload?.startAt ?? ''"
+    :data-game-mode="playState?.mode ?? ''"
+    :data-game-room-id="playState?.gameRoomId ?? ''"
+    :data-game-start-at="playState?.startAt ?? ''"
     :data-game-duration-ms="playState?.durationMs ?? ''"
     :data-game-elapsed-ms="elapsedMs"
     :data-game-current-hp="currentHp"
@@ -26,6 +28,9 @@
     :data-game-lightning-sent="appliedLightningActions.length > 0"
     :data-game-my-lightning-cooldown-ms="myLightningCooldownRemainingMs"
     :data-game-three-ready="isThreeSceneReady"
+    :data-game-practice-result-visible="isPracticeResultVisible"
+    :data-game-practice-result="practiceResultOutcome"
+    :data-game-practice-restart-status="practiceRestartStatus"
   >
     <section v-if="playState !== null" class="game-arena" aria-label="Game play arena">
       <canvas
@@ -75,6 +80,36 @@
           </div>
         </div>
       </div>
+      <section
+        v-if="isPracticeResultVisible"
+        class="practice-result-overlay"
+        data-testid="practice-result-overlay"
+        aria-live="polite"
+      >
+        <div class="practice-result-panel">
+          <p>{{ t('gamePlay.practiceResultEyebrow') }}</p>
+          <h1>{{ practiceResultTitle }}</h1>
+          <div class="practice-result-actions">
+            <button
+              type="button"
+              :disabled="practiceRestartStatus === 'loading'"
+              @click="restartPractice"
+            >
+              {{
+                practiceRestartStatus === 'loading'
+                  ? t('gamePlay.practiceRestarting')
+                  : t('gamePlay.practiceRestart')
+              }}
+            </button>
+            <button type="button" @click="returnToMatch">
+              {{ t('gamePlay.practiceReturnToMatch') }}
+            </button>
+          </div>
+          <p v-if="practiceRestartErrorMessage !== ''" class="practice-result-error" role="alert">
+            {{ practiceRestartErrorMessage }}
+          </p>
+        </div>
+      </section>
     </section>
 
     <p v-else class="payload-error" role="alert">
@@ -94,9 +129,17 @@ import {
   createNoopThreeGalaxyBackgroundSceneController,
   createThreeGalaxyBackgroundScene,
 } from '@/game/threeGalaxyBackgroundScene'
-import { saveGameResultPayloadFromMessage } from '@/services/gameResultPayload'
+import {
+  createGameResultPayloadFromMessage,
+  saveGameResultPayload,
+} from '@/services/gameResultPayload'
 import { readGameStartPayload } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
+import {
+  readPracticeGameStartPayload,
+  savePracticeGameStartPayloadFromResponse,
+} from '@/services/practiceGameStartPayload'
+import { startPractice } from '@/services/practiceService'
 import { connectGameWebSocket } from '@/services/realtime/gameWebSocket'
 import { takeGameWebSocketHandoff } from '@/services/realtime/gameWebSocketHandoff'
 
@@ -107,6 +150,7 @@ const lightningSpellImageUrl = new URL('../../img/lightning-spell.png', import.m
 const threeCanvas = shallowRef(null)
 const gameStartPayload = shallowRef(readGameStartPayload('__missing__'))
 const gameWaitingPayload = shallowRef(readGameWaitingPayload('__missing__'))
+const practiceGameStartPayload = shallowRef(readPracticeGameStartPayload('__missing__'))
 const nowMs = shallowRef(Date.now())
 const gameSocketStatus = shallowRef('idle')
 const gameSocketLastEvent = shallowRef('')
@@ -115,6 +159,8 @@ const gameResultReceived = shallowRef(false)
 const gameResultPayload = shallowRef()
 const isResultRouteTransitioning = shallowRef(false)
 const playGameWebSocketConnection = shallowRef()
+const practiceRestartStatus = shallowRef('idle')
+const practiceRestartErrorMessage = shallowRef('')
 const appliedLightningActions = shallowRef([{}].slice(1))
 const myLightningCooldownUntil = shallowRef(0)
 const isThreeSceneReady = shallowRef(false)
@@ -136,17 +182,29 @@ const LIGHTNING_COOLDOWN_MS = 2000
 const lightningDamageLabel = computed(() => LIGHTNING_DAMAGE.toLocaleString('en-US'))
 
 const playState = computed(() => {
-  if (gameStartPayload.value === null || gameWaitingPayload.value === null) {
-    return null
+  if (gameStartPayload.value !== null && gameWaitingPayload.value !== null) {
+    return {
+      mode: 'MATCH',
+      gameRoomId: gameStartPayload.value.gameRoomId,
+      startAt: gameStartPayload.value.startAt,
+      durationMs: gameStartPayload.value.scenario.durationMs,
+      scenario: gameStartPayload.value.scenario,
+      webSocketUrl: gameWaitingPayload.value.game.webSocketUrl,
+    }
   }
 
-  return {
-    gameRoomId: gameStartPayload.value.gameRoomId,
-    startAt: gameStartPayload.value.startAt,
-    durationMs: gameStartPayload.value.scenario.durationMs,
-    scenario: gameStartPayload.value.scenario,
-    webSocketUrl: gameWaitingPayload.value.game.webSocketUrl,
+  if (practiceGameStartPayload.value !== null) {
+    return {
+      mode: 'PRACTICE',
+      gameRoomId: practiceGameStartPayload.value.gameRoomId,
+      startAt: practiceGameStartPayload.value.startAt,
+      durationMs: practiceGameStartPayload.value.scenario.durationMs,
+      scenario: practiceGameStartPayload.value.scenario,
+      webSocketUrl: practiceGameStartPayload.value.webSocketUrl,
+    }
   }
+
+  return null
 })
 
 const rawElapsedMs = computed(() =>
@@ -271,6 +329,23 @@ const myLightningSpellAriaLabel = computed(() => {
       return t('gamePlay.lightningButton')
   }
 })
+const isPracticeResultVisible = computed(
+  () => playState.value?.mode === 'PRACTICE' && gameResultReceived.value,
+)
+const practiceResultOutcome = computed(() => {
+  if (!isPracticeResultVisible.value) {
+    return ''
+  }
+
+  const practiceResult = Reflect.get(Object(gameResultPayload.value), 'practiceResult')
+
+  return practiceResult === 'SUCCESS' || practiceResult === 'FAILED' ? practiceResult : ''
+})
+const practiceResultTitle = computed(() =>
+  practiceResultOutcome.value === 'SUCCESS'
+    ? t('gamePlay.practiceSuccessTitle')
+    : t('gamePlay.practiceFailedTitle'),
+)
 const myLightningCooldownStyle = computed(() => ({
   '--lightning-cooldown-progress': `${Math.min(
     100,
@@ -294,21 +369,9 @@ onMounted(() => {
     return
   }
 
-  const payload = readGameStartPayload(gameRoomId)
-  const waitingPayload = readGameWaitingPayload(gameRoomId)
-
-  if (payload === null || waitingPayload === null) {
+  if (!initializePlayFromStorage(gameRoomId)) {
     returnToMatch()
-    return
   }
-
-  gameStartPayload.value = payload
-  gameWaitingPayload.value = waitingPayload
-  void nextTick(() => {
-    initializeThreeScene()
-    startFrameLoop()
-  })
-  connectPlayWebSocket(gameRoomId, waitingPayload.game.webSocketUrl)
 })
 
 onUnmounted(() => {
@@ -405,6 +468,104 @@ function shouldWarnBeforeLeaving() {
 
 function returnToMatch() {
   void router.replace({ name: ROUTE_NAMES.match })
+}
+
+async function restartPractice() {
+  if (practiceRestartStatus.value === 'loading') {
+    return
+  }
+
+  practiceRestartStatus.value = 'loading'
+  practiceRestartErrorMessage.value = ''
+
+  try {
+    const response = await startPractice()
+    const payload = savePracticeGameStartPayloadFromResponse(response)
+
+    if (payload === null) {
+      failPracticeRestart(t('gamePlay.practiceRestartFailed'))
+      return
+    }
+
+    resetPlayRuntimeForPractice()
+    practiceGameStartPayload.value = payload
+    await router.replace({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: String(payload.gameRoomId),
+      },
+    })
+    startPlayRuntime(String(payload.gameRoomId), payload.webSocketUrl)
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message.trim() !== ''
+        ? error.message
+        : t('gamePlay.practiceRestartFailed')
+    failPracticeRestart(message)
+  }
+}
+
+function failPracticeRestart(message = '') {
+  practiceRestartStatus.value = 'error'
+  practiceRestartErrorMessage.value = message
+}
+
+function resetPlayRuntimeForPractice() {
+  closePlayWebSocket()
+  playGameWebSocketConnection.value = undefined
+  closePlayWebSocket = () => {}
+  stopFrameLoop()
+  disposeThreeScene()
+  gameStartPayload.value = null
+  gameWaitingPayload.value = null
+  gameSocketStatus.value = 'idle'
+  gameSocketLastEvent.value = ''
+  gameSocketErrorMessage.value = ''
+  gameResultReceived.value = false
+  gameResultPayload.value = undefined
+  isResultRouteTransitioning.value = false
+  appliedLightningActions.value = []
+  myLightningCooldownUntil.value = 0
+  displayedHp.value = undefined
+  lightningImpactId.value = 0
+  isStarTargeted.value = false
+  isThreeSceneReady.value = false
+  nowMs.value = Date.now()
+  practiceRestartStatus.value = 'idle'
+  practiceRestartErrorMessage.value = ''
+}
+
+function initializePlayFromStorage(gameRoomId = '') {
+  const payload = readGameStartPayload(gameRoomId)
+  const waitingPayload = readGameWaitingPayload(gameRoomId)
+
+  if (payload !== null && waitingPayload !== null) {
+    gameStartPayload.value = payload
+    gameWaitingPayload.value = waitingPayload
+    practiceGameStartPayload.value = null
+    startPlayRuntime(gameRoomId, waitingPayload.game.webSocketUrl)
+    return true
+  }
+
+  const practicePayload = readPracticeGameStartPayload(gameRoomId)
+
+  if (practicePayload !== null) {
+    gameStartPayload.value = null
+    gameWaitingPayload.value = null
+    practiceGameStartPayload.value = practicePayload
+    startPlayRuntime(gameRoomId, practicePayload.webSocketUrl)
+    return true
+  }
+
+  return false
+}
+
+function startPlayRuntime(gameRoomId = '', webSocketUrl = '') {
+  void nextTick(() => {
+    initializeThreeScene()
+    startFrameLoop()
+  })
+  connectPlayWebSocket(gameRoomId, webSocketUrl)
 }
 
 function connectPlayWebSocket(gameRoomId = '', webSocketUrl = '') {
@@ -514,13 +675,20 @@ function handleGameResult(payload = {}) {
     return
   }
 
-  const storedPayload = saveGameResultPayloadFromMessage(payload)
+  const storedPayload = createGameResultPayloadFromMessage(payload)
 
   if (storedPayload === null) {
     gameSocketStatus.value = 'error'
     gameSocketErrorMessage.value = t('gamePlay.resultPayloadInvalid')
     return
   }
+
+  if (isPracticePlayResult(storedPayload)) {
+    handlePracticeGameResult(storedPayload)
+    return
+  }
+
+  saveGameResultPayload(storedPayload)
 
   gameResultReceived.value = true
   gameResultPayload.value = storedPayload
@@ -542,6 +710,39 @@ function handleGameResult(payload = {}) {
       gameSocketStatus.value = 'error'
       gameSocketErrorMessage.value = t('gamePlay.resultTransitionFailed')
     })
+}
+
+function handlePracticeGameResult(storedPayload = {}) {
+  if (!isValidPracticeResultPayload(storedPayload)) {
+    gameSocketStatus.value = 'error'
+    gameSocketErrorMessage.value = t('gamePlay.resultPayloadInvalid')
+    return
+  }
+
+  gameResultReceived.value = true
+  gameResultPayload.value = storedPayload
+  syncAppliedActionsFromGameResult(storedPayload)
+  gameSocketStatus.value = 'resultReceived'
+  gameSocketErrorMessage.value = ''
+  practiceRestartStatus.value = 'idle'
+  practiceRestartErrorMessage.value = ''
+  updateDisplayedHp()
+}
+
+function isPracticePlayResult(storedPayload = {}) {
+  return (
+    playState.value?.mode === 'PRACTICE' ||
+    Reflect.get(Object(storedPayload), 'gameMode') === 'PRACTICE'
+  )
+}
+
+function isValidPracticeResultPayload(storedPayload = {}) {
+  const practiceResult = Reflect.get(Object(storedPayload), 'practiceResult')
+
+  return (
+    Reflect.get(Object(storedPayload), 'gameMode') === 'PRACTICE' &&
+    (practiceResult === 'SUCCESS' || practiceResult === 'FAILED')
+  )
 }
 
 function handleLightningApplied(payload = {}) {
@@ -1012,6 +1213,96 @@ function disposeThreeScene() {
     inset 0 0 10px rgba(0, 0, 0, 0.24);
 }
 
+.practice-result-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(93, 228, 255, 0.16), transparent 34%),
+    rgba(3, 5, 14, 0.74);
+  backdrop-filter: blur(4px);
+}
+
+.practice-result-panel {
+  display: grid;
+  gap: 18px;
+  width: min(430px, 100%);
+  padding: 28px;
+  text-align: center;
+  background: rgba(8, 12, 28, 0.88);
+  border: 1px solid rgba(146, 237, 255, 0.28);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.44),
+    inset 0 0 30px rgba(94, 219, 255, 0.08);
+}
+
+.practice-result-panel p,
+.practice-result-panel h1 {
+  margin: 0;
+}
+
+.practice-result-panel > p:first-child {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: rgba(218, 242, 255, 0.72);
+  text-transform: uppercase;
+}
+
+.practice-result-panel h1 {
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  font-weight: 900;
+  line-height: 0.98;
+  color: #effcff;
+  text-shadow:
+    0 0 18px rgba(87, 222, 255, 0.48),
+    0 0 32px rgba(165, 107, 255, 0.28);
+}
+
+.practice-result-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.practice-result-actions button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  color: #f8fbff;
+  font-weight: 900;
+  background: rgba(20, 35, 58, 0.86);
+  border: 1px solid rgba(99, 242, 232, 0.34);
+  border-radius: 4px;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+.practice-result-actions button:hover:not(:disabled),
+.practice-result-actions button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(99, 242, 232, 0.72);
+  background: rgba(29, 55, 84, 0.92);
+  box-shadow:
+    0 0 0 3px rgba(99, 242, 232, 0.1),
+    0 14px 34px rgba(0, 0, 0, 0.32);
+}
+
+.practice-result-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.practice-result-error {
+  color: #ffd9d6;
+}
+
 @keyframes lightning-cooldown-spin {
   from {
     transform: rotate(0deg);
@@ -1035,6 +1326,14 @@ function disposeThreeScene() {
 }
 
 @media (max-width: 520px) {
+  .practice-result-panel {
+    padding: 22px;
+  }
+
+  .practice-result-actions {
+    grid-template-columns: 1fr;
+  }
+
   .lightning-hud {
     bottom: max(12px, env(safe-area-inset-bottom));
     width: 116px;

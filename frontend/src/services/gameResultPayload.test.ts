@@ -72,6 +72,32 @@ describe('gameResultPayload', () => {
     expect(readGameResultPayload(100)?.reason).toBe('NATURAL_DEATH_DRAW')
   })
 
+  it('stores practice GAME_RESULT metadata when the backend includes it', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))
+
+    const payload = saveGameResultPayloadFromMessage({
+      gameRoomId: 100,
+      gameMode: 'PRACTICE',
+      result: 'PLAYER1_WIN',
+      winnerUserId: 1,
+      reason: 'PRACTICE_LIGHTNING_KILL',
+      practiceResult: 'SUCCESS',
+      finishedAt: 1716192017000,
+      actions: [],
+    })
+
+    expect(payload).toMatchObject({
+      gameMode: 'PRACTICE',
+      practiceResult: 'SUCCESS',
+      reason: 'PRACTICE_LIGHTNING_KILL',
+    })
+    expect(readGameResultPayload(100)).toMatchObject({
+      gameMode: 'PRACTICE',
+      practiceResult: 'SUCCESS',
+    })
+  })
+
   it('does not store invalid GAME_RESULT messages', () => {
     expect(
       saveGameResultPayloadFromMessage({
@@ -91,6 +117,23 @@ describe('gameResultPayload', () => {
             isKill: 'true',
           },
         ],
+      }),
+    ).toBeNull()
+
+    expect(window.sessionStorage.length).toBe(0)
+  })
+
+  it('does not store GAME_RESULT messages with invalid practice metadata', () => {
+    expect(
+      saveGameResultPayloadFromMessage({
+        gameRoomId: 100,
+        gameMode: 'PRACTICE',
+        result: 'PLAYER1_WIN',
+        winnerUserId: 1,
+        reason: 'PRACTICE_LIGHTNING_KILL',
+        practiceResult: 'WIN',
+        finishedAt: 1716192017000,
+        actions: [],
       }),
     ).toBeNull()
 

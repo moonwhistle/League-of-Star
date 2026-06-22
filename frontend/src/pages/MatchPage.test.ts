@@ -306,7 +306,7 @@ describe('MatchPage', () => {
   })
 
   it('prevents duplicate practice start clicks while the request is pending', async () => {
-    let resolvePractice: (value: unknown) => void = () => {}
+    let resolvePractice: (value: Awaited<ReturnType<typeof startPractice>>) => void = () => {}
     startPracticeMock.mockReturnValueOnce(
       new Promise((resolve) => {
         resolvePractice = resolve
