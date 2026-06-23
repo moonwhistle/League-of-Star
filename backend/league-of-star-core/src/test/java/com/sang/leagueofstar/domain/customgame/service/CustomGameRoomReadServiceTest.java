@@ -2,8 +2,11 @@ package com.sang.leagueofstar.domain.customgame.service;
 
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
+import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
+import com.sang.leagueofstar.domain.customgame.repository.CustomGameParticipantRepository;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameRoomRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,9 @@ class CustomGameRoomReadServiceTest {
 
     @Mock
     private CustomGameRoomRepository customGameRoomRepository;
+
+    @Mock
+    private CustomGameParticipantRepository customGameParticipantRepository;
 
     @Test
     @DisplayName("getWaitingRoomByInviteCode - WAITING room을 반환한다")
@@ -99,5 +105,50 @@ class CustomGameRoomReadServiceTest {
 
         // then
         assertThat(result).containsExactlyElementsOf(waitingRooms);
+    }
+
+    @Test
+    @DisplayName("getParticipants - customRoomId 기준 participant 목록을 반환한다")
+    void getParticipants_ReturnParticipants() {
+        // given
+        List<CustomGameParticipant> participants = List.of(
+                CustomGameParticipant.create(10L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER)
+        );
+        given(customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(10L)).willReturn(participants);
+
+        // when
+        List<CustomGameParticipant> result = customGameRoomReadService.getParticipants(10L);
+
+        // then
+        assertThat(result).containsExactlyElementsOf(participants);
+    }
+
+    @Test
+    @DisplayName("findParticipantsByRoomIds - roomId 목록 기준 participant 목록을 반환한다")
+    void findParticipantsByRoomIds_ReturnParticipants() {
+        // given
+        List<Long> roomIds = List.of(10L, 11L);
+        List<CustomGameParticipant> participants = List.of(
+                CustomGameParticipant.create(10L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
+                CustomGameParticipant.create(11L, 2L, CustomRoomParticipantRole.OWNER)
+        );
+        given(customGameParticipantRepository.findByCustomRoomIdInOrderByCustomRoomIdAscIdAsc(roomIds))
+                .willReturn(participants);
+
+        // when
+        List<CustomGameParticipant> result = customGameRoomReadService.findParticipantsByRoomIds(roomIds);
+
+        // then
+        assertThat(result).containsExactlyElementsOf(participants);
+    }
+
+    @Test
+    @DisplayName("findParticipantsByRoomIds - roomId 목록이 비어 있으면 빈 목록을 반환한다")
+    void findParticipantsByRoomIds_EmptyRoomIds_ReturnEmptyList() {
+        // when
+        List<CustomGameParticipant> result = customGameRoomReadService.findParticipantsByRoomIds(List.of());
+
+        // then
+        assertThat(result).isEmpty();
     }
 }

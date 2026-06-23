@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,29 +35,34 @@ public class CustomGameRoomService {
 
     public CustomRoomResponse createRoom(Long ownerUserId) {
         CustomGameRoom room = customGameRoomCommandService.createRoom(ownerUserId);
-        return toRoomResponse(room);
+        return toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
     }
 
     public CustomRoomListResponse getPublicRooms() {
         List<CustomGameRoom> rooms = customGameRoomReadService.findWaitingRooms();
+        Map<Long, List<CustomGameParticipant>> participantsByRoomId = findParticipantsByRoomId(rooms);
         Map<Long, User> ownersById = findUsersById(rooms.stream()
                 .map(CustomGameRoom::getOwnerUserId)
                 .collect(Collectors.toCollection(LinkedHashSet::new)));
 
         List<CustomRoomListItemResponse> roomResponses = rooms.stream()
-                .map(room -> CustomRoomListItemResponse.from(room, roomName(resolveUser(ownersById, room.getOwnerUserId()))))
+                .map(room -> CustomRoomListItemResponse.from(
+                        room,
+                        roomName(resolveUser(ownersById, room.getOwnerUserId())),
+                        participantsByRoomId.getOrDefault(room.getId(), List.of()).size()
+                ))
                 .toList();
         return new CustomRoomListResponse(roomResponses);
     }
 
     public CustomRoomResponse getInvitePreview(String inviteCode) {
         CustomGameRoom room = customGameRoomReadService.getWaitingRoomByInviteCode(inviteCode);
-        return toRoomResponse(room);
+        return toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
     }
 
-    private CustomRoomResponse toRoomResponse(CustomGameRoom room) {
-        Map<Long, User> usersById = findUsersById(participantUserIds(room));
-        List<CustomRoomParticipantResponse> participantResponses = room.getParticipants().stream()
+    private CustomRoomResponse toRoomResponse(CustomGameRoom room, List<CustomGameParticipant> participants) {
+        Map<Long, User> usersById = findUsersById(responseUserIds(room, participants));
+        List<CustomRoomParticipantResponse> participantResponses = participants.stream()
                 .map(participant -> CustomRoomParticipantResponse.from(participant,
                         resolveUser(usersById, participant.getUserId())))
                 .toList();
@@ -64,10 +70,24 @@ public class CustomGameRoomService {
         return CustomRoomResponse.from(room, roomName(owner), participantResponses);
     }
 
-    private Collection<Long> participantUserIds(CustomGameRoom room) {
-        return room.getParticipants().stream()
+    private Map<Long, List<CustomGameParticipant>> findParticipantsByRoomId(List<CustomGameRoom> rooms) {
+        Collection<Long> roomIds = rooms.stream()
+                .map(CustomGameRoom::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return customGameRoomReadService.findParticipantsByRoomIds(roomIds).stream()
+                .collect(Collectors.groupingBy(
+                        CustomGameParticipant::getCustomRoomId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+    }
+
+    private Collection<Long> responseUserIds(CustomGameRoom room, List<CustomGameParticipant> participants) {
+        LinkedHashSet<Long> userIds = participants.stream()
                 .map(CustomGameParticipant::getUserId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+        userIds.add(room.getOwnerUserId());
+        return userIds;
     }
 
     private Map<Long, User> findUsersById(Collection<Long> userIds) {

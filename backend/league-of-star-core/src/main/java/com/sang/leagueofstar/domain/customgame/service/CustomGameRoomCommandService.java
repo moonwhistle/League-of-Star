@@ -2,8 +2,11 @@ package com.sang.leagueofstar.domain.customgame.service;
 
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
+import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
+import com.sang.leagueofstar.domain.customgame.repository.CustomGameParticipantRepository;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameRoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,14 +20,20 @@ public class CustomGameRoomCommandService {
     private static final int MAX_INVITE_CODE_GENERATION_ATTEMPTS = 10;
 
     private final CustomGameRoomRepository customGameRoomRepository;
+    private final CustomGameParticipantRepository customGameParticipantRepository;
     private final CustomRoomInviteCodeGenerator inviteCodeGenerator;
 
     public CustomGameRoom createRoom(Long ownerUserId) {
         validateOwnerUserId(ownerUserId);
         validateNoWaitingRoom(ownerUserId);
 
-        CustomGameRoom customGameRoom = CustomGameRoom.create(ownerUserId, generateUniqueInviteCode());
-        return customGameRoomRepository.save(customGameRoom);
+        CustomGameRoom customGameRoom = customGameRoomRepository.save(
+                CustomGameRoom.create(ownerUserId, generateUniqueInviteCode())
+        );
+        customGameParticipantRepository.save(
+                CustomGameParticipant.create(customGameRoom.getId(), ownerUserId, CustomRoomParticipantRole.OWNER)
+        );
+        return customGameRoom;
     }
 
     private void validateOwnerUserId(Long ownerUserId) {

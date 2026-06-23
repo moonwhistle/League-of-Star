@@ -12,7 +12,7 @@ public record CustomRoomListItemResponse(
         int currentParticipants
 ) {
 
-    public static CustomRoomListItemResponse from(CustomGameRoom room, String roomName) {
+    public static CustomRoomListItemResponse from(CustomGameRoom room, String roomName, int currentParticipants) {
         return new CustomRoomListItemResponse(
                 room.getId(),
                 roomName,
@@ -20,7 +20,7 @@ public record CustomRoomListItemResponse(
                 room.getOwnerUserId(),
                 room.getStatus().name(),
                 CustomGameRoom.MAX_PARTICIPANTS,
-                room.currentParticipantCount()
+                currentParticipants
         );
     }
 }

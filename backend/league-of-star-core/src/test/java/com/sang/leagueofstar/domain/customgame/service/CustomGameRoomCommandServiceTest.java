@@ -6,13 +6,16 @@ import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
+import com.sang.leagueofstar.domain.customgame.repository.CustomGameParticipantRepository;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameRoomRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,6 +36,9 @@ class CustomGameRoomCommandServiceTest {
     private CustomGameRoomRepository customGameRoomRepository;
 
     @Mock
+    private CustomGameParticipantRepository customGameParticipantRepository;
+
+    @Mock
     private CustomRoomInviteCodeGenerator inviteCodeGenerator;
 
     @Test
@@ -44,6 +50,12 @@ class CustomGameRoomCommandServiceTest {
         given(inviteCodeGenerator.generate()).willReturn(INVITE_CODE);
         given(customGameRoomRepository.existsByInviteCode(INVITE_CODE)).willReturn(false);
         given(customGameRoomRepository.save(any(CustomGameRoom.class)))
+                .willAnswer(invocation -> {
+                    CustomGameRoom room = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(room, "id", 100L);
+                    return room;
+                });
+        given(customGameParticipantRepository.save(any(CustomGameParticipant.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -53,14 +65,12 @@ class CustomGameRoomCommandServiceTest {
         assertThat(result.getOwnerUserId()).isEqualTo(OWNER_USER_ID);
         assertThat(result.getInviteCode()).isEqualTo(INVITE_CODE);
         assertThat(result.getStatus()).isEqualTo(CustomRoomStatus.WAITING);
-        assertThat(result.getParticipants()).hasSize(1);
-        assertThat(result.getParticipants())
-                .extracting(CustomGameParticipant::getUserId)
-                .containsExactly(OWNER_USER_ID);
-        assertThat(result.getParticipants())
-                .extracting(CustomGameParticipant::getRole)
-                .containsExactly(CustomRoomParticipantRole.OWNER);
         verify(customGameRoomRepository).save(result);
+        ArgumentCaptor<CustomGameParticipant> participantCaptor = ArgumentCaptor.forClass(CustomGameParticipant.class);
+        verify(customGameParticipantRepository).save(participantCaptor.capture());
+        assertThat(participantCaptor.getValue().getCustomRoomId()).isEqualTo(100L);
+        assertThat(participantCaptor.getValue().getUserId()).isEqualTo(OWNER_USER_ID);
+        assertThat(participantCaptor.getValue().getRole()).isEqualTo(CustomRoomParticipantRole.OWNER);
     }
 
     @Test
@@ -96,6 +106,12 @@ class CustomGameRoomCommandServiceTest {
         given(customGameRoomRepository.existsByInviteCode("DUP123")).willReturn(true);
         given(customGameRoomRepository.existsByInviteCode(INVITE_CODE)).willReturn(false);
         given(customGameRoomRepository.save(any(CustomGameRoom.class)))
+                .willAnswer(invocation -> {
+                    CustomGameRoom room = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(room, "id", 100L);
+                    return room;
+                });
+        given(customGameParticipantRepository.save(any(CustomGameParticipant.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         // when

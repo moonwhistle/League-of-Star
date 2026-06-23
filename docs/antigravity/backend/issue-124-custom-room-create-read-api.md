@@ -43,6 +43,8 @@ flowchart TD
 - 공개 조회는 참가 처리 없이 room preview만 반환한다.
 - 최대 인원은 MVP 기준 2명으로 고정한다.
 - API 모듈은 custom room repository를 직접 참조하지 않고 core service를 사용한다.
+- `CustomGameRoom`은 참가자 컬렉션을 직접 들지 않고, `CustomGameParticipant.customRoomId`로 room을 간접참조한다.
+- 참가자 목록은 room 조회 후 participant repository를 core read service가 별도로 조회해 응답 조립에 사용한다.
 - 참가자 nickname은 `UserReadService.findAllByIdsOrThrow` batch 조회로 가져온다.
 - 새 외부 패키지를 추가하지 않는다.
 
@@ -153,6 +155,7 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 - Custom room 생성 source of truth는 core `CustomGameRoomCommandService`다.
 - Custom room 조회 source of truth는 core `CustomGameRoomReadService`다.
+- Custom room 참가자 source of truth는 core `CustomGameParticipantRepository`이며 API 모듈은 이를 직접 참조하지 않는다.
 - API 응답의 nickname은 core user 도메인의 `UserReadService`를 통해 조회한다.
 - API 응답의 `roomName`은 owner nickname으로 만든 표시용 값이며 저장 source가 아니다.
 - API 모듈은 custom room repository와 user repository를 직접 사용하지 않는다.
@@ -178,14 +181,17 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - `GET /api/v1/custom-games/rooms/invites/{inviteCode}` API 구현.
 - `CustomGamePath` path 상수 추가.
 - `CustomGameRoom`, `CustomGameParticipant` 기본 domain 구현.
+- `CustomGameParticipant.customRoomId` 간접참조 구조 구현.
 - `CustomRoomStatus`, `CustomRoomParticipantRole` enum 구현.
 - `CustomGameRoomRepository` 구현.
+- `CustomGameParticipantRepository` 구현.
 - core command/read service 구현.
 - inviteCode 발급 및 unique 정책 구현.
 - owner의 `WAITING` room 중복 생성 차단.
 - room response DTO 구현.
 - 공개 대기실 목록 response DTO 구현.
 - participant nickname batch 조회 구현.
+- room 목록 participant count batch 조회 구현.
 - RestDocs 성공/실패 문서화.
 - core/api test 구현.
 - `docs/last-구현.md` Section 4-3 정합성 반영.
@@ -232,11 +238,12 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - [x] `domain/customgame` 패키지 추가.
 - [x] `CustomGameRoom` entity 구현.
 - [x] `CustomGameParticipant` entity 구현.
+- [x] `CustomGameParticipant.customRoomId` 기반 간접참조 구현.
 - [x] `CustomRoomStatus` enum 구현.
 - [x] `CustomRoomParticipantRole` enum 구현.
 - [x] `CustomGameRoom.MAX_PARTICIPANTS = 2` 정책 추가.
-- [x] room 생성 시 owner participant 추가 메서드 구현.
-- [x] participant 추가 시 최대 인원 방어 로직 구현.
+- [x] room 생성 시 owner participant를 별도 participant row로 저장하는 구조 구현.
+- [x] 같은 room/user participant 중복 생성을 막는 unique 제약 추가.
 - [x] room status 전환 기본 메서드 구현.
 - [x] inviteCode 필드 unique 제약 추가.
 - [x] ownerUserId + WAITING room 중복 생성을 막기 위한 repository 조회 메서드 구현.
@@ -250,6 +257,8 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - [x] inviteCode unique 충돌 시 재시도 정책 구현.
 - [x] `CustomGameRoomReadService.getWaitingRoomByInviteCode(inviteCode)` 구현.
 - [x] `CustomGameRoomReadService.findWaitingRooms()` 구현.
+- [x] `CustomGameRoomReadService.getParticipants(customRoomId)` 구현.
+- [x] `CustomGameRoomReadService.findParticipantsByRoomIds(roomIds)` 구현.
 - [x] 존재하지 않는 inviteCode 예외 처리.
 - [x] `STARTED`, `CLOSED` room 공개 조회 실패 처리.
 - [x] core custom room error code 추가.
@@ -374,6 +383,7 @@ flowchart TD
 - `GET /api/v1/custom-games/rooms`는 공개 대기실 목록을 조회한다.
 - `GET /api/v1/custom-games/rooms/invites/{inviteCode}`는 초대 링크 미리보기용 공개 조회다.
 - API 모듈은 core custom room service와 user read service를 통해 데이터를 가져온다.
+- custom room 참가자는 room entity 컬렉션이 아니라 `customRoomId` 간접참조 row로 관리한다.
 - participant nickname은 user batch 조회를 사용한다.
 
 ## 📚 Changes
@@ -386,6 +396,8 @@ flowchart TD
   roomId는 내부 식별자이고, inviteCode는 사용자가 공유하는 public key다. 초대 링크에 roomId를 직접 노출하지 않으면 후속 초대/참가 흐름을 더 명확하게 관리할 수 있음.
 - core 모듈에 custom room 도메인 규칙을 둠.
   방 생성, owner participant 저장, 중복 waiting room 차단, inviteCode 조회는 데이터 규칙이므로 core service가 담당한다. api 모듈은 repository를 직접 보지 않고 core service 결과와 user batch 조회를 조합해 HTTP 응답을 만든다.
+- room과 participant를 간접참조로 분리함.
+  custom room은 방 상태, 방장, 초대 코드 같은 방 자체의 정보만 가진다. 참가자는 `customRoomId`를 가진 별도 row로 저장한다. 이렇게 두면 후속 join/leave에서 참가자만 추가하거나 제거할 때 room aggregate 컬렉션을 억지로 로딩하지 않아도 되고, 공개 목록에서는 roomId 목록으로 participant를 한 번에 조회해 현재 인원만 계산할 수 있다.
 - nickname 조회는 batch 방식으로 처리함.
   참가자가 최대 2명이어도 API 응답 조립에서 participant마다 user 단건 조회를 반복하지 않는다. 기존 ranking/record API와 같은 방식으로 userId를 모아 한 번에 조회한다.
 
