@@ -268,15 +268,15 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 
 ### 4. Custom Room API 구현
 
-- [ ] `CustomGamePath`에 join/leave path 상수 추가.
-- [ ] `CustomGameRoomController.joinRoom()` 구현.
-- [ ] `CustomGameRoomController.leaveRoom()` 구현.
-- [ ] `CustomGameRoomService.joinRoom(inviteCode, userId)` 구현.
-- [ ] `CustomGameRoomService.leaveRoom(roomId, userId)` 구현.
-- [ ] API service는 core command 호출 후 participant를 다시 조회해 response 조립.
-- [ ] API service는 custom room repository를 직접 참조하지 않음.
-- [ ] nickname 조회는 `UserReadService.findAllByIdsOrThrow` batch 조회 사용.
-- [ ] owner nickname 기준 roomName 생성 정책 유지.
+- [x] `CustomGamePath`에 join/leave path 상수 추가.
+- [x] `CustomGameRoomController.joinRoom()` 구현.
+- [x] `CustomGameRoomController.leaveRoom()` 구현.
+- [x] `CustomGameRoomService.joinRoom(inviteCode, userId)` 구현.
+- [x] `CustomGameRoomService.leaveRoom(roomId, userId)` 구현.
+- [x] API service는 core command 호출 후 participant를 다시 조회해 response 조립.
+- [x] API service는 custom room repository를 직접 참조하지 않음.
+- [x] nickname 조회는 `UserReadService.findAllByIdsOrThrow` batch 조회 사용.
+- [x] owner nickname 기준 roomName 생성 정책 유지.
 
 ### 5. Test 구현
 
