@@ -261,13 +261,13 @@ sequenceDiagram
 
 ### 3. WebSocket Handshake 구현
 
-- [ ] `CustomRoomWebSocketPathResolver` 구현.
-- [ ] `CustomRoomWebSocketHandshakeInterceptor` 구현.
-- [ ] `JwtTokenResolver.resolveWebSocketToken()` 재사용.
-- [ ] `JwtTokenProvider.validateToken()` / `getUserId()` 재사용.
-- [ ] core read service로 participant 접근 검증.
-- [ ] session attributes에 `customRoomId`, `userId` 저장.
-- [ ] 인증 실패는 `401`, path 실패는 `400`, participant 검증 실패는 `403`으로 처리.
+- [x] `CustomRoomWebSocketPathResolver` 구현.
+- [x] `CustomRoomWebSocketHandshakeInterceptor` 구현.
+- [x] `JwtTokenResolver.resolveWebSocketToken()` 재사용.
+- [x] `JwtTokenProvider.validateToken()` / `getUserId()` 재사용.
+- [x] core read service로 participant 접근 검증.
+- [x] session attributes에 `customRoomId`, `userId` 저장.
+- [x] 인증 실패는 `401`, path 실패는 `400`, participant 검증 실패는 `403`으로 처리.
 
 ### 4. Session Registry 구현
 
