@@ -13,6 +13,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -36,6 +38,39 @@ public class CustomGameRoomCommandService {
         return customGameRoom;
     }
 
+    public CustomGameRoom joinRoom(String inviteCode, Long userId) {
+        validateInviteCode(inviteCode);
+        validateParticipantUserId(userId);
+
+        CustomGameRoom customGameRoom = getWaitingRoomByInviteCodeForUpdate(inviteCode);
+        Long customRoomId = customGameRoom.getId();
+        if (customGameParticipantRepository.existsByCustomRoomIdAndUserId(customRoomId, userId)) {
+            return customGameRoom;
+        }
+        if (customGameParticipantRepository.countByCustomRoomId(customRoomId) >= CustomGameRoom.MAX_PARTICIPANTS) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_FULL);
+        }
+        savePlayerParticipant(customRoomId, userId);
+        return customGameRoom;
+    }
+
+    public CustomGameRoom leaveRoom(Long roomId, Long userId) {
+        validateRoomId(roomId);
+        validateParticipantUserId(userId);
+
+        CustomGameRoom customGameRoom = getWaitingRoomByIdForUpdate(roomId);
+        if (!customGameParticipantRepository.existsByCustomRoomIdAndUserId(roomId, userId)) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT);
+        }
+        if (customGameRoom.getOwnerUserId().equals(userId)) {
+            customGameRoom.close(LocalDateTime.now());
+            customGameParticipantRepository.deleteByCustomRoomId(roomId);
+            return customGameRoom;
+        }
+        customGameParticipantRepository.deleteByCustomRoomIdAndUserId(roomId, userId);
+        return customGameRoom;
+    }
+
     private void validateOwnerUserId(Long ownerUserId) {
         if (ownerUserId == null) {
             throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT);
@@ -46,6 +81,50 @@ public class CustomGameRoomCommandService {
         if (customGameRoomRepository.existsByOwnerUserIdAndStatus(ownerUserId, CustomRoomStatus.WAITING)) {
             throw new CoreException(CoreErrorCode.CUSTOM_ROOM_ACTIVE_EXISTS);
         }
+    }
+
+    private void validateParticipantUserId(Long userId) {
+        if (userId == null) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT);
+        }
+    }
+
+    private void validateRoomId(Long roomId) {
+        if (roomId == null) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND);
+        }
+    }
+
+    private void validateInviteCode(String inviteCode) {
+        if (inviteCode == null || inviteCode.isBlank()) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_INVITE_CODE);
+        }
+    }
+
+    private CustomGameRoom getWaitingRoomByInviteCodeForUpdate(String inviteCode) {
+        CustomGameRoom customGameRoom = customGameRoomRepository.findByInviteCodeForUpdate(inviteCode)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+        validateWaitingRoom(customGameRoom);
+        return customGameRoom;
+    }
+
+    private CustomGameRoom getWaitingRoomByIdForUpdate(Long roomId) {
+        CustomGameRoom customGameRoom = customGameRoomRepository.findByIdForUpdate(roomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+        validateWaitingRoom(customGameRoom);
+        return customGameRoom;
+    }
+
+    private void validateWaitingRoom(CustomGameRoom customGameRoom) {
+        if (!customGameRoom.isWaiting()) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE);
+        }
+    }
+
+    private void savePlayerParticipant(Long customRoomId, Long userId) {
+        customGameParticipantRepository.save(
+                CustomGameParticipant.create(customRoomId, userId, CustomRoomParticipantRole.PLAYER)
+        );
     }
 
     private CustomGameRoom saveRoomWithUniqueRetry(Long ownerUserId) {

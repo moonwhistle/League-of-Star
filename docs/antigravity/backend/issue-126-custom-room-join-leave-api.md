@@ -241,20 +241,20 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 
 ### 2. Core Join / Leave Command 구현
 
-- [ ] `CustomGameRoomCommandService.joinRoom(inviteCode, userId)` 구현.
-- [ ] `CustomGameRoomCommandService.leaveRoom(roomId, userId)` 구현.
-- [ ] join inviteCode null/blank 검증.
-- [ ] leave roomId/userId null 검증.
-- [ ] room 존재 여부 검증.
-- [ ] `WAITING` room만 join/leave 가능하도록 검증.
-- [ ] 이미 참가한 사용자 join은 participant 저장 없이 room 반환.
-- [ ] 신규 참가자는 `PLAYER` participant로 저장.
-- [ ] 참가자 수가 `MAX_PARTICIPANTS` 이상이면 `CUSTOM_ROOM_FULL` 예외 처리.
-- [ ] 일반 참가자 leave 시 participant row 삭제.
-- [ ] 방장 leave 시 room `CLOSED` 전환.
-- [ ] 방장 leave 시 해당 room participant row 전체 삭제.
-- [ ] 참가하지 않은 사용자의 leave 실패 처리.
-- [ ] participant unique 충돌 시 현재 room state 반환.
+- [x] `CustomGameRoomCommandService.joinRoom(inviteCode, userId)` 구현.
+- [x] `CustomGameRoomCommandService.leaveRoom(roomId, userId)` 구현.
+- [x] join inviteCode null/blank 검증.
+- [x] leave roomId/userId null 검증.
+- [x] room 존재 여부 검증.
+- [x] `WAITING` room만 join/leave 가능하도록 검증.
+- [x] 이미 참가한 사용자 join은 participant 저장 없이 room 반환.
+- [x] 신규 참가자는 `PLAYER` participant로 저장.
+- [x] 참가자 수가 `MAX_PARTICIPANTS` 이상이면 `CUSTOM_ROOM_FULL` 예외 처리.
+- [x] 일반 참가자 leave 시 participant row 삭제.
+- [x] 방장 leave 시 room `CLOSED` 전환.
+- [x] 방장 leave 시 해당 room participant row 전체 삭제.
+- [x] 참가하지 않은 사용자의 leave 실패 처리.
+- [x] room row lock 안에서 exists/count/save를 처리해 participant unique 충돌 경로 차단.
 
 ### 3. Core Repository 구현
 
