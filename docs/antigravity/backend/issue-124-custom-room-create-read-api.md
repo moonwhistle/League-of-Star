@@ -256,17 +256,17 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 ### 4. Custom Room API 구현
 
-- [ ] `CustomGamePath` 상수 추가.
-- [ ] `CustomGameRoomController` 구현.
-- [ ] `CustomGameRoomService` 구현.
-- [ ] create API에서 core command service 호출.
-- [ ] public list API에서 core read service 호출.
-- [ ] invite preview API에서 core read service 호출.
-- [ ] response 조립 시 participant userId를 모아 `UserReadService.findAllByIdsOrThrow` 호출.
-- [ ] list response 조립 시 owner userId를 모아 `UserReadService.findAllByIdsOrThrow` 호출.
-- [ ] participant별 user 단건 조회 반복을 금지.
-- [ ] `CustomRoomResponse`, `CustomRoomListResponse`, `CustomRoomListItemResponse`, `CustomRoomParticipantResponse` 구현.
-- [ ] 공개 room list/invite preview API가 security 설정에서 허용되어야 하는지 확인하고 필요한 경우 반영.
+- [x] `CustomGamePath` 상수 추가.
+- [x] `CustomGameRoomController` 구현.
+- [x] `CustomGameRoomService` 구현.
+- [x] create API에서 core command service 호출.
+- [x] public list API에서 core read service 호출.
+- [x] invite preview API에서 core read service 호출.
+- [x] response 조립 시 participant userId를 모아 `UserReadService.findAllByIdsOrThrow` 호출.
+- [x] list response 조립 시 owner userId를 모아 `UserReadService.findAllByIdsOrThrow` 호출.
+- [x] participant별 user 단건 조회 반복을 금지.
+- [x] `CustomRoomResponse`, `CustomRoomListResponse`, `CustomRoomListItemResponse`, `CustomRoomParticipantResponse` 구현.
+- [x] 공개 room list/invite preview API가 security 설정에서 허용되어야 하는지 확인하고 필요한 경우 반영.
 
 ### 5. Test 구현
 
