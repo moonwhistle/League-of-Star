@@ -350,56 +350,88 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 
 사용자 지정 방에 실제로 들어가고 나갈 수 있는 join/leave API를 구현함.
 
-이번 PR은 게임 시작이 아니라 대기실 lifecycle을 다루는 작업이다. 사용자는 issue-124에서 만든 공개 목록이나 초대 코드로 방을 찾고, 이번 PR의 join API로 방에 참가한다. 방을 나갈 때는 leave API를 호출한다.
+이번 PR은 “방을 찾는 기능” 다음 단계다. 사용자는 공개 목록이나 초대 코드로 방을 찾고, join API로 방에 들어간다. 방에서 나갈 때는 leave API를 호출한다.
+
+중요한 점은 이 API가 게임 시작이 아니라 대기실 인원 상태를 바꾸는 command라는 점이다. HTTP 응답은 “요청 처리 결과”이고, 다른 참가자 화면에 실시간으로 알려주는 일은 후속 Room WebSocket 이슈에서 처리한다.
 
 ```mermaid
 flowchart TD
-    A["방 찾기<br/>목록 또는 초대 코드"] --> B["join API"]
-    B --> C{"현재 참가 중?"}
-    C -->|YES| D["현재 room state 반환"]
-    C -->|NO| E{"정원 가능?"}
-    E -->|YES| F["PLAYER participant 저장"]
-    E -->|NO| G["CUSTOM_ROOM_FULL"]
-    F --> H["대기실 표시"]
-    D --> H
+    A["사용자<br/>목록 또는 초대 코드로 방 찾음"] --> B["join API 호출"]
+    B --> C["Core에서 WAITING room lock 획득"]
+    C --> D{"이미 참가 중?"}
+    D -->|YES| E["participant 추가 안 함<br/>현재 room state 반환"]
+    D -->|NO| F{"정원 2명 미만?"}
+    F -->|YES| G["PLAYER participant 저장"]
+    F -->|NO| H["CUSTOM_ROOM_FULL"]
+    G --> I["최신 participant 다시 조회"]
+    E --> I
+    I --> J["CustomRoomResponse 반환"]
 
-    H --> I["leave API"]
-    I --> J{"방장인가?"}
-    J -->|YES| K["room CLOSED"]
-    J -->|NO| L["participant 삭제"]
+    J --> K["leave API 호출"]
+    K --> L["Core에서 WAITING room lock 획득"]
+    L --> M{"방장인가?"}
+    M -->|YES| N["room CLOSED<br/>participant 전체 삭제"]
+    M -->|NO| O["내 participant row 삭제"]
 ```
 
 핵심 정책:
 
-- join/leave는 `WAITING` room에서만 처리한다.
-- 이미 참가한 사용자 join은 멱등적으로 처리한다.
-- 일반 참가자 leave는 participant row 삭제로 처리한다.
-- 방장 leave는 room close로 처리한다.
-- HTTP 응답은 command 결과이고, 실시간 동기화는 후속 Room WebSocket에서 처리한다.
-- 게임 시작과 GameRoom 생성은 후속 이슈에서 처리한다.
+- `WAITING` room에서만 참가/나가기를 허용함.
+- 이미 참가한 사용자의 join은 같은 요청이 반복된 것으로 보고 현재 room state를 반환함.
+- 일반 참가자가 나가면 participant row만 삭제함.
+- 방장이 나가면 방장 없는 대기실을 남기지 않고 room을 `CLOSED`로 닫음.
+- HTTP 응답은 command 결과이고, 다른 사람 화면 갱신은 후속 Room WebSocket에서 처리함.
+- 게임 시작, `GameRoom`, scenario 생성은 후속 이슈에서 처리함.
 
 백엔드와의 구현 계약:
 
-- `POST /api/v1/custom-games/rooms/{inviteCode}/join`은 인증 사용자를 room participant로 추가한다.
-- `POST /api/v1/custom-games/rooms/{roomId}/leave`는 인증 사용자를 room에서 제거하거나 room을 닫는다.
-- API 모듈은 core custom room service와 user read service를 통해 데이터를 가져온다.
-- participant nickname은 user batch 조회를 사용한다.
-- join 정원 검증은 room row lock으로 동시성을 방어한다.
+- `POST /api/v1/custom-games/rooms/{inviteCode}/join`은 인증 사용자를 room participant로 추가함.
+- `POST /api/v1/custom-games/rooms/{roomId}/leave`는 인증 사용자를 room에서 제거하거나 room을 닫음.
+- API 모듈은 custom room repository를 직접 보지 않고 core command/read service를 사용함.
+- participant nickname은 user batch 조회로 붙임.
+- join 정원 검증은 room row 비관락으로 동시성을 방어함.
 
 ## 📚 Changes
 
-- 참가와 조회 책임을 분리함.
-  초대 코드 조회는 방을 보여주는 preview일 뿐이고 실제 참가가 아니다. 이번 PR에서 join API를 따로 만들어 인증 사용자 기준으로 participant를 추가한다.
-- 이미 참가한 사용자 join을 멱등 처리함.
-  사용자가 버튼을 두 번 누르거나 네트워크 재시도로 같은 join이 반복되어도 participant가 중복되지 않고 같은 room state를 돌려준다.
-- leave는 단순 삭제 정책으로 유지함.
-  MVP 대기실에서는 현재 참가자 목록만 필요하므로 일반 참가자 leave history를 저장하지 않는다. 참가자가 나가면 participant row를 삭제한다.
-- 방장 leave는 room close로 처리함.
-  방장이 없는 대기실은 시작할 수 없으므로 방장이 나가면 room을 닫는다. 이 room은 공개 목록에서 사라지고 후속 join/start 대상이 아니다.
-- 동시 join 정원 초과를 lock으로 막음.
-  최대 2명 room에서 두 사용자가 동시에 join하면 count 확인과 insert 사이에 레이스가 생길 수 있다. room row를 잠근 뒤 count와 insert를 처리해 정원 초과를 막는다.
+- 초대 코드 미리보기와 실제 참가를 분리함.
+  초대 코드 조회는 “이 방이 존재하고 들어갈 수 있는지 보여주는 기능”이다. 여기서 participant를 만들면, 사용자가 단순히 링크를 열어보기만 해도 방에 들어간 것으로 처리된다. 그래서 실제 참가 처리는 별도 join API로 분리하고, 인증 사용자가 명확히 참가 의사를 보낸 경우에만 participant를 추가함.
+
+- API 모듈은 응답 조립만 담당하게 유지함.
+  custom room의 상태 변경과 조회는 core 모듈의 책임이다. API 모듈에서 repository를 직접 보면 controller/service가 영속성 구조를 알게 되고, 이후 WebSocket이나 start API에서도 같은 규칙을 중복 구현할 위험이 있다. 그래서 API service는 core command로 상태를 바꾸고, core read service로 현재 participant를 다시 읽은 뒤, user read service로 nickname만 붙여 `CustomRoomResponse`를 만든다.
+
+- join을 멱등적으로 처리함.
+  사용자가 버튼을 두 번 누르거나 네트워크 재시도로 같은 join 요청이 반복될 수 있다. 이때 이미 참가 중이면 에러를 내지 않고 현재 room state를 반환한다. 사용자는 같은 대기실 화면을 유지하고, 서버에는 participant가 중복 생성되지 않는다.
+
+- 비관락을 사용해 최대 2명 정책을 지킴.
+  사용자 지정 방은 최대 2명이다. 참가자가 1명인 방에 두 사용자가 거의 동시에 join하면, 둘 다 “현재 1명”이라고 보고 들어가서 3명이 되는 문제가 생길 수 있다.
+
+```mermaid
+sequenceDiagram
+    participant U1 as 사용자 A
+    participant U2 as 사용자 B
+    participant S as 서버
+    participant DB as DB room row
+
+    U1->>S: join 요청
+    U2->>S: join 요청
+    S->>DB: room row 비관락 획득
+    S->>DB: 참가자 수 확인 후 저장
+    S-->>U1: 성공 또는 현재 room state
+    S->>DB: lock 해제
+    S->>DB: 다음 join이 최신 참가자 수 확인
+    S-->>U2: 성공 또는 CUSTOM_ROOM_FULL
+```
+
+  낙관락은 충돌이 난 뒤 재시도 정책을 별도로 설계해야 한다. 이번 API는 “방에 들어갈 수 있느냐”를 즉시 결정해야 하고, 방당 참가자는 최대 2명이라 잠금 범위가 작다. 그래서 구현 복잡도를 늘리는 낙관락 재시도보다 room row 비관락으로 `exists/count/save`를 한 트랜잭션 안에서 직렬화하는 쪽을 선택함.
+
 - DB unique 제약은 최종 안전장치로 유지함.
-  정상 흐름은 lock 안에서 이미 참가 여부를 확인하므로 같은 사용자의 재요청은 participant를 또 만들지 않고 현재 room state를 반환한다. 그래도 코드 누락이나 예상 밖 경로가 생겼을 때를 대비해 `custom_room_id + user_id` unique 제약은 유지한다.
+  비관락이 정상 동작하면 같은 사용자의 중복 join은 사전 `exists` 확인에서 걸린다. 그래도 코드 누락이나 예상 밖 경로가 생길 수 있으므로 `custom_room_id + user_id` unique 제약은 남겼다. 애플리케이션 정책은 lock으로 지키고, DB 제약은 마지막 방어선으로 두는 구조임.
+
+- leave는 현재 대기실 상태를 단순하게 유지함.
+  일반 참가자가 나가면 participant row를 삭제한다. MVP에서는 “현재 누가 방에 있는지”가 중요하고, 나간 이력은 이번 이슈의 화면/계약에 쓰이지 않는다. 방장이 나가면 시작할 수 없는 방이 되므로 room을 `CLOSED`로 닫고 participant를 정리한다.
+
+- WebSocket과 게임 시작을 분리함.
+  join/leave HTTP 응답은 호출한 사용자에게 command 결과를 알려주는 역할이다. 다른 참가자 화면을 실시간으로 바꾸는 `ROOM_UPDATED`, `ROOM_CLOSED`는 후속 4-5에서 다룬다. 게임 시작과 `GameRoom.gameMode=CUSTOM`, scenario 생성은 후속 4-6에서 다뤄 이번 API가 대기실 lifecycle만 책임지게 함.
 
 ## 📝 Note
 
