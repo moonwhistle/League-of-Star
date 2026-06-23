@@ -4,6 +4,7 @@ import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
+import com.sang.leagueofstar.customgame.websocket.service.CustomRoomWebSocketNotifier;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
@@ -48,6 +49,9 @@ class CustomGameRoomServiceTest {
 
     @Mock
     private UserReadService userReadService;
+
+    @Mock
+    private CustomRoomWebSocketNotifier customRoomWebSocketNotifier;
 
     @Test
     @DisplayName("createRoom - core command 결과와 participant 조회 결과를 조합해 room response를 만든다")
@@ -195,6 +199,7 @@ class CustomGameRoomServiceTest {
                 .containsExactly("OWNER", "PLAYER");
         then(customGameRoomCommandService).should().joinRoom("AB12CD", PLAYER_USER_ID);
         then(customGameRoomReadService).should().getParticipants(100L);
+        then(customRoomWebSocketNotifier).should().notifyRoomUpdatedAfterCommit(response);
         then(userReadService).should(times(1)).findAllByIdsOrThrow(anyCollection());
         then(userReadService).should(never()).findById(OWNER_USER_ID);
         then(userReadService).should(never()).findById(PLAYER_USER_ID);
@@ -212,6 +217,7 @@ class CustomGameRoomServiceTest {
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_FULL));
         then(customGameRoomReadService).should(never()).getParticipants(100L);
+        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
     }
 
     @Test
@@ -236,6 +242,28 @@ class CustomGameRoomServiceTest {
         assertThat(response.participants().get(0).nickname()).isEqualTo("Host");
         then(customGameRoomCommandService).should().leaveRoom(100L, PLAYER_USER_ID);
         then(customGameRoomReadService).should().getParticipants(100L);
+        then(customRoomWebSocketNotifier).should().notifyParticipantLeftAfterCommit(response, PLAYER_USER_ID);
+    }
+
+    @Test
+    @DisplayName("leaveRoom - 방장이 나가 room이 닫히면 ROOM_CLOSED broadcast를 예약한다")
+    void leaveRoom_OwnerClosedRoom_NotifyRoomClosed() {
+        // given
+        CustomGameRoom room = room(100L, OWNER_USER_ID, "AB12CD");
+        room.close(java.time.LocalDateTime.now());
+        given(customGameRoomCommandService.leaveRoom(100L, OWNER_USER_ID)).willReturn(room);
+        given(customGameRoomReadService.getParticipants(100L)).willReturn(List.of());
+        given(userReadService.findAllByIdsOrThrow(anyCollection()))
+                .willReturn(List.of(user(OWNER_USER_ID, "Host")));
+
+        // when
+        CustomRoomResponse response = customGameRoomService.leaveRoom(100L, OWNER_USER_ID);
+
+        // then
+        assertThat(response.roomId()).isEqualTo(100L);
+        assertThat(response.status()).isEqualTo("CLOSED");
+        assertThat(response.participants()).isEmpty();
+        then(customRoomWebSocketNotifier).should().notifyRoomClosedAfterCommit(response);
     }
 
     @Test
@@ -251,6 +279,7 @@ class CustomGameRoomServiceTest {
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
         then(customGameRoomReadService).should(never()).getParticipants(100L);
+        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
     }
 
     private CustomGameRoom room(Long id, Long ownerUserId, String inviteCode) {

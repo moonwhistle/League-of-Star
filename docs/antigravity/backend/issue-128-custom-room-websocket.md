@@ -305,15 +305,15 @@ sequenceDiagram
 
 ### 7. Join / Leave Broadcast 연결
 
-- [ ] `CustomRoomWebSocketNotifier` 구현.
-- [ ] transaction active 시 afterCommit broadcast 예약.
-- [ ] transaction inactive 시 즉시 broadcast.
-- [ ] join 성공 후 `ROOM_UPDATED` broadcast 연결.
-- [ ] 일반 참가자 leave 성공 후 `ROOM_UPDATED` broadcast 연결.
-- [ ] 일반 참가자 leave 호출 user session close/unregister 연결.
-- [ ] 방장 leave 성공 후 `ROOM_CLOSED` broadcast 연결.
-- [ ] 방장 leave 이후 room sessions close/unregister 연결.
-- [ ] command 실패 시 broadcast 미호출 검증.
+- [x] `CustomRoomWebSocketNotifier` 구현.
+- [x] transaction active 시 afterCommit broadcast 예약.
+- [x] transaction inactive 시 즉시 broadcast.
+- [x] join 성공 후 `ROOM_UPDATED` broadcast 연결.
+- [x] 일반 참가자 leave 성공 후 `ROOM_UPDATED` broadcast 연결.
+- [x] 일반 참가자 leave 호출 user session close/unregister 연결.
+- [x] 방장 leave 성공 후 `ROOM_CLOSED` broadcast 연결.
+- [x] 방장 leave 이후 room sessions close/unregister 연결.
+- [x] command 실패 시 broadcast 미호출 검증.
 
 ### 8. Test 구현
 

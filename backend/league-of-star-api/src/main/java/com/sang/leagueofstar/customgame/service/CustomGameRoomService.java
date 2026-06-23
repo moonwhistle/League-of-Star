@@ -6,6 +6,7 @@ import com.sang.leagueofstar.customgame.controller.response.CustomRoomListItemRe
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomParticipantResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
+import com.sang.leagueofstar.customgame.websocket.service.CustomRoomWebSocketNotifier;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomCommandService;
@@ -32,6 +33,7 @@ public class CustomGameRoomService {
     private final CustomGameRoomCommandService customGameRoomCommandService;
     private final CustomGameRoomReadService customGameRoomReadService;
     private final UserReadService userReadService;
+    private final CustomRoomWebSocketNotifier customRoomWebSocketNotifier;
 
     public CustomRoomResponse createRoom(Long ownerUserId) {
         CustomGameRoom room = customGameRoomCommandService.createRoom(ownerUserId);
@@ -67,12 +69,21 @@ public class CustomGameRoomService {
 
     public CustomRoomResponse joinRoom(String inviteCode, Long userId) {
         CustomGameRoom room = customGameRoomCommandService.joinRoom(inviteCode, userId);
-        return toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
+        CustomRoomResponse response = toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
+        customRoomWebSocketNotifier.notifyRoomUpdatedAfterCommit(response);
+        return response;
     }
 
     public CustomRoomResponse leaveRoom(Long roomId, Long userId) {
         CustomGameRoom room = customGameRoomCommandService.leaveRoom(roomId, userId);
-        return toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
+        CustomRoomResponse response = toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
+        if (room.isClosed()) {
+            customRoomWebSocketNotifier.notifyRoomClosedAfterCommit(response);
+            return response;
+        }
+
+        customRoomWebSocketNotifier.notifyParticipantLeftAfterCommit(response, userId);
+        return response;
     }
 
     private CustomRoomResponse toRoomResponse(CustomGameRoom room, List<CustomGameParticipant> participants) {
