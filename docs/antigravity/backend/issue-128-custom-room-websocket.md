@@ -251,13 +251,13 @@ sequenceDiagram
 
 ### 2. Core Participant 검증 구현
 
-- [ ] `CustomGameRoomReadService.validateWaitingParticipant(roomId, userId)` 구현.
-- [ ] roomId/userId null 검증.
-- [ ] room 존재 여부 검증.
-- [ ] room이 `WAITING`인지 검증.
-- [ ] user가 participant인지 검증.
-- [ ] 검증 실패 시 기존 `CoreErrorCode`를 사용.
-- [ ] API 모듈이 custom room repository를 직접 참조하지 않도록 유지.
+- [x] `CustomGameRoomReadService.validateWaitingParticipant(roomId, userId)` 구현.
+- [x] roomId/userId null 검증.
+- [x] room 존재 여부 검증.
+- [x] room이 `WAITING`인지 검증.
+- [x] user가 participant인지 검증.
+- [x] 검증 실패 시 기존 `CoreErrorCode`를 사용.
+- [x] API 모듈이 custom room repository를 직접 참조하지 않도록 유지.
 
 ### 3. WebSocket Handshake 구현
 
