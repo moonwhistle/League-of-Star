@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
@@ -27,6 +28,8 @@ import static org.mockito.BDDMockito.given;
 class CustomGameRoomReadServiceTest {
 
     private static final Long OWNER_USER_ID = 1L;
+    private static final Long PLAYER_USER_ID = 2L;
+    private static final Long ROOM_ID = 10L;
     private static final String INVITE_CODE = "AB12CD";
 
     @InjectMocks
@@ -102,6 +105,54 @@ class CustomGameRoomReadServiceTest {
     }
 
     @Test
+    @DisplayName("getWaitingRoom - roomId 기준 WAITING room을 반환한다")
+    void getWaitingRoom_ReturnWaitingRoom() {
+        // given
+        CustomGameRoom customGameRoom = CustomGameRoom.create(OWNER_USER_ID, INVITE_CODE);
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(customGameRoom));
+
+        // when
+        CustomGameRoom result = customGameRoomReadService.getWaitingRoom(ROOM_ID);
+
+        // then
+        assertThat(result).isSameAs(customGameRoom);
+    }
+
+    @Test
+    @DisplayName("getWaitingRoom - roomId가 null이면 NOT_FOUND를 던진다")
+    void getWaitingRoom_NullRoomId_ThrowException() {
+        assertThatThrownBy(() -> customGameRoomReadService.getWaitingRoom(null))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("getWaitingRoom - room이 없으면 NOT_FOUND를 던진다")
+    void getWaitingRoom_NotFound_ThrowException() {
+        // given
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomReadService.getWaitingRoom(ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("getWaitingRoom - STARTED room이면 INVALID_STATE를 던진다")
+    void getWaitingRoom_StartedRoom_ThrowException() {
+        // given
+        CustomGameRoom customGameRoom = CustomGameRoom.create(OWNER_USER_ID, INVITE_CODE);
+        customGameRoom.markStarted(LocalDateTime.now());
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(customGameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomReadService.getWaitingRoom(ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
+    }
+
+    @Test
     @DisplayName("findWaitingRooms - WAITING room 목록을 반환한다")
     void findWaitingRooms_ReturnWaitingRooms() {
         // given
@@ -159,5 +210,92 @@ class CustomGameRoomReadServiceTest {
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("validateWaitingParticipant - WAITING room participant이면 통과한다")
+    void validateWaitingParticipant_Success() {
+        // given
+        CustomGameRoom customGameRoom = CustomGameRoom.create(OWNER_USER_ID, INVITE_CODE);
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(customGameRoom));
+        given(customGameParticipantRepository.existsByCustomRoomIdAndUserId(ROOM_ID, PLAYER_USER_ID))
+                .willReturn(true);
+
+        // when & then
+        assertThatCode(() -> customGameRoomReadService.validateWaitingParticipant(ROOM_ID, PLAYER_USER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateWaitingParticipant - roomId가 null이면 NOT_FOUND를 던진다")
+    void validateWaitingParticipant_NullRoomId_ThrowException() {
+        assertThatThrownBy(() -> customGameRoomReadService.validateWaitingParticipant(null, PLAYER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("validateWaitingParticipant - userId가 null이면 INVALID_PARTICIPANT를 던진다")
+    void validateWaitingParticipant_NullUserId_ThrowException() {
+        assertThatThrownBy(() -> customGameRoomReadService.validateWaitingParticipant(ROOM_ID, null))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
+    }
+
+    @Test
+    @DisplayName("validateWaitingParticipant - room이 없으면 NOT_FOUND를 던진다")
+    void validateWaitingParticipant_NotFound_ThrowException() {
+        // given
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomReadService.validateWaitingParticipant(ROOM_ID, PLAYER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("validateWaitingParticipant - STARTED room이면 INVALID_STATE를 던진다")
+    void validateWaitingParticipant_StartedRoom_ThrowException() {
+        // given
+        CustomGameRoom customGameRoom = CustomGameRoom.create(OWNER_USER_ID, INVITE_CODE);
+        customGameRoom.markStarted(LocalDateTime.now());
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(customGameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomReadService.validateWaitingParticipant(ROOM_ID, PLAYER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
+    }
+
+    @Test
+    @DisplayName("validateWaitingParticipant - CLOSED room이면 INVALID_STATE를 던진다")
+    void validateWaitingParticipant_ClosedRoom_ThrowException() {
+        // given
+        CustomGameRoom customGameRoom = CustomGameRoom.create(OWNER_USER_ID, INVITE_CODE);
+        customGameRoom.close(LocalDateTime.now());
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(customGameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomReadService.validateWaitingParticipant(ROOM_ID, PLAYER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
+    }
+
+    @Test
+    @DisplayName("validateWaitingParticipant - participant가 아니면 INVALID_PARTICIPANT를 던진다")
+    void validateWaitingParticipant_NotParticipant_ThrowException() {
+        // given
+        CustomGameRoom customGameRoom = CustomGameRoom.create(OWNER_USER_ID, INVITE_CODE);
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(customGameRoom));
+        given(customGameParticipantRepository.existsByCustomRoomIdAndUserId(ROOM_ID, PLAYER_USER_ID))
+                .willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomReadService.validateWaitingParticipant(ROOM_ID, PLAYER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
     }
 }
