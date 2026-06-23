@@ -604,7 +604,7 @@ Acceptance Criteria:
 - [x] LIGHTNING 입력을 테스트할 수 있다.
 - [x] 연습 결과가 랭크/전적에 반영되지 않는다.
 
-### 4-3. [ ] Custom Room 생성 / 조회 API 계약
+### 4-3. [ ] Custom Room 생성 / 공개 목록 / 조회 API 계약
 
 담당: Backend
 
@@ -612,21 +612,25 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 사용자가 사용자 지정 게임 방을 만들고, 생성된 방 상태를 조회할 수 있게 한다.
+- [ ] 사용자가 사용자 지정 게임 방을 만들고, 공개 대기실 목록 또는 초대 코드로 방 상태를 조회할 수 있게 한다.
 - [ ] 초대 링크의 기반이 되는 `inviteCode`를 방 생성 시 발급한다.
 
 Backend:
 
 - [ ] endpoint를 확정한다.
 - [ ] `POST /api/v1/custom-games/rooms`
-- [ ] `GET /api/v1/custom-games/rooms/{roomId}`
+- [ ] `GET /api/v1/custom-games/rooms`
+- [ ] `GET /api/v1/custom-games/rooms/invites/{inviteCode}`
 - [ ] `CustomGameRoom`, `CustomGameParticipant` 기본 모델을 구현한다.
 - [ ] 방 생성자는 `OWNER` participant로 저장한다.
 - [ ] 최대 인원은 2명으로 고정한다.
 - [ ] room status는 `WAITING | STARTED | CLOSED`로 둔다.
 - [ ] `inviteCode`는 공유용 public key로 발급하고 unique 정책을 둔다.
+- [ ] 모든 `WAITING` custom room은 공개 대기실 목록에 노출한다.
+- [ ] 대기실 이름은 `{ownerNickname}'s room`으로 반환한다.
 - [ ] room state response를 확정한다.
   - `roomId`
+  - `roomName`
   - `inviteCode`
   - `ownerUserId`
   - `status`
@@ -640,12 +644,14 @@ Policy:
 - [ ] core 모듈은 room/participant 영속성 계층과 도메인 규칙을 담당한다.
 - [ ] api 모듈은 repository에 직접 접근하지 않고 core service를 사용한다.
 - [ ] inviteCode는 roomId를 직접 공유하지 않기 위한 초대 식별자다.
+- [ ] roomName은 저장값이 아니라 owner nickname 기반 표시값이다.
+- [ ] inviteCode 공개 조회는 참가 처리가 아니라 방 미리보기 용도다.
 - [ ] 이번 이슈에서는 참가, 나가기, WebSocket, 게임 시작을 구현하지 않는다.
 
 Acceptance Criteria:
 
 - [ ] 방 생성 시 owner participant와 inviteCode가 함께 생성된다.
-- [ ] 방 조회 시 참가자 목록과 방 상태를 확인할 수 있다.
+- [ ] 공개 대기실 목록 또는 초대 코드로 참가 가능한 방 상태를 확인할 수 있다.
 - [ ] custom room의 기본 모델과 API 문서가 정리된다.
 
 ### 4-4. [ ] Custom Room 초대 참가 / 나가기 API 계약
@@ -757,7 +763,7 @@ Acceptance Criteria:
 - [ ] 1명 방과 2명 방 모두 시작할 수 있다.
 - [ ] 모든 room socket 참가자에게 동일한 `ROOM_STARTED` payload가 전달된다.
 
-### 4-7. [ ] Custom Game 정산 제외 / 결과 WebSocket 계약
+### 4-7. [ ] Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 
 담당: Backend
 
@@ -765,32 +771,36 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 사용자 지정 게임 결과가 랭크/LP/전적에 반영되지 않도록 서버 결과 정책을 확정한다.
+- [ ] 사용자 지정 게임 결과는 랭크/LP에는 반영하지 않고, 전적에는 남기도록 서버 결과 정책을 확정한다.
 
 Backend:
 
 - [ ] 기존 Game WebSocket, LIGHTNING, Scenario, GameAction 로직을 재사용한다.
 - [ ] `GAME_RESULT.gameMode=CUSTOM` payload를 내려준다.
 - [ ] custom game result reason 정책을 확정한다.
-- [ ] settlement trigger에서 `gameMode=CUSTOM`을 제외한다.
-- [ ] core settlement service에서 `gameMode=CUSTOM`을 제외한다.
-- [ ] recovery scheduler/query에서 `gameMode=CUSTOM`을 제외한다.
-- [ ] Summary API가 custom game을 정산 결과 조회 대상으로 다루지 않게 한다.
+- [ ] custom game도 `game_records`에는 저장한다.
+- [ ] custom game record는 rank/LP 변화 없이 저장한다.
+- [ ] rank settlement trigger에서 `gameMode=CUSTOM`의 LP/rank 변경을 제외한다.
+- [ ] core rank settlement service에서 `gameMode=CUSTOM`의 rank 변경을 제외한다.
+- [ ] recovery scheduler/query에서 custom game record 누락은 복구하되 rank/LP 복구는 제외한다.
+- [ ] Summary API가 custom game의 결과/전적 저장 상태를 조회할 수 있는지 정책을 확정한다.
 
 Policy:
 
-- [ ] `MATCH`만 랭크/LP/전적 반영 대상이다.
-- [ ] `PRACTICE`, `CUSTOM`은 미정산 게임 모드다.
+- [ ] `MATCH`는 랭크/LP/전적 반영 대상이다.
+- [ ] `CUSTOM`은 전적 반영 대상이지만 랭크/LP 반영 대상이 아니다.
+- [ ] `PRACTICE`는 랭크/LP/전적 모두 미반영 대상이다.
 - [ ] custom 최종 결과는 WebSocket `GAME_RESULT`가 source of truth다.
-- [ ] custom 결과는 일반 ranked summary와 섞지 않는다.
+- [ ] custom 결과는 랭크 변화가 없는 전적 결과로 다룬다.
 
 Acceptance Criteria:
 
-- [ ] custom game을 완료해도 rank/record가 생성 또는 변경되지 않는다.
+- [ ] custom game을 완료하면 전적이 생성된다.
+- [ ] custom game을 완료해도 rank/LP는 변경되지 않는다.
 - [ ] custom game result는 WebSocket payload로 확정된다.
-- [ ] settlement/recovery 테스트에서 custom 제외가 검증된다.
+- [ ] settlement/recovery 테스트에서 custom record 저장과 rank/LP 제외가 검증된다.
 
-### 4-8. [ ] Custom Room 생성 / 초대 링크 프론트 구현
+### 4-8. [ ] Custom Room 공개 대기실 / 초대 링크 프론트 구현
 
 담당: Frontend
 
@@ -798,27 +808,33 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage의 사용자 지정 버튼으로 custom room을 만들고 초대 링크를 확인할 수 있게 한다.
+- [ ] MatchPage의 사용자 지정 버튼으로 공개 대기실 목록을 보고, custom room을 만들거나 초대 코드로 방을 찾을 수 있게 한다.
 
 Frontend:
 
 - [ ] custom room service를 추가한다.
-- [ ] MatchPage 사용자 지정 버튼을 4-3 create room API와 연결한다.
+- [ ] MatchPage 사용자 지정 버튼을 공개 대기실 화면으로 연결한다.
+- [ ] 공개 대기실 화면에서 4-3 room list API를 호출한다.
+- [ ] 새 방 만들기 버튼을 4-3 create room API와 연결한다.
 - [ ] `/custom-games/rooms/:roomId` route를 추가한다.
 - [ ] CustomRoomPage에서 room 조회 API를 호출한다.
+- [ ] 대기실 목록에서 roomName, 현재 인원, 방장 정보를 표시한다.
 - [ ] 초대 링크를 표시한다.
+- [ ] 초대 코드 입력으로 4-3 invite preview API를 호출한다.
 - [ ] 초대 링크 복사 버튼을 구현한다.
 - [ ] 참가자 목록과 방장 표시를 구현한다.
 
 Policy:
 
 - [ ] 사용자 지정 방 생성은 일반 match queue와 독립이다.
+- [ ] 모든 `WAITING` custom room은 공개 목록에 표시한다.
 - [ ] 초대 링크는 `inviteCode`를 사용하고 roomId를 공유하지 않는다.
 - [ ] Room WebSocket 연결은 4-9에서 구현한다.
 
 Acceptance Criteria:
 
-- [ ] 사용자 지정 버튼으로 방을 만들 수 있다.
+- [ ] 사용자 지정 버튼으로 공개 대기실 목록을 볼 수 있다.
+- [ ] 새 방 만들기로 방을 만들 수 있다.
 - [ ] 방 페이지에서 초대 링크와 참가자 목록을 확인할 수 있다.
 - [ ] 방 생성 흐름이 매칭 queue 상태와 충돌하지 않는다.
 
@@ -877,14 +893,16 @@ Frontend:
 
 Policy:
 
-- [ ] 사용자 지정 게임은 랭크/LP/전적 화면으로 보내지 않는다.
-- [ ] custom 결과는 Summary API를 호출하지 않는다.
+- [ ] 사용자 지정 게임은 랭크/LP 변화 화면으로 보내지 않는다.
+- [ ] custom 결과는 전적에 남지만 랭크 변화는 표시하지 않는다.
+- [ ] custom 결과 Summary API 사용 여부는 4-7 백엔드 계약을 따른다.
 - [ ] GamePlay WebSocket은 기존 `/ws/game/{gameRoomId}` 정책을 재사용한다.
 
 Acceptance Criteria:
 
 - [ ] 방장과 참가자가 `ROOM_STARTED` 기준으로 같은 게임에 진입한다.
 - [ ] custom game 결과가 GamePlayPage 내부에 표시된다.
+- [ ] custom game 결과가 후속 전적 조회에 남는 정책과 충돌하지 않는다.
 - [ ] 일반 ranked match 결과 route/Summary API 흐름이 깨지지 않는다.
 
 ## Section 5. Deferred Account Features
@@ -971,12 +989,12 @@ Policy:
 11. [x] Section 3-3. 프로필 상세 API 계약
 12. [x] Section 3-4. 프로필 페이지 구현
 13. [x] Section 4-1/4-2. 연습 모드
-14. [ ] Section 4-3. Custom Room 생성 / 조회 API 계약
+14. [ ] Section 4-3. Custom Room 생성 / 공개 목록 / 조회 API 계약
 15. [ ] Section 4-4. Custom Room 초대 참가 / 나가기 API 계약
 16. [ ] Section 4-5. Custom Room WebSocket 동기화 계약
 17. [ ] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
-18. [ ] Section 4-7. Custom Game 정산 제외 / 결과 WebSocket 계약
-19. [ ] Section 4-8. Custom Room 생성 / 초대 링크 프론트 구현
+18. [ ] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
+19. [ ] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
 20. [ ] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
 21. [ ] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
 22. [ ] Section 5-1/5-2. 비밀번호 찾기
