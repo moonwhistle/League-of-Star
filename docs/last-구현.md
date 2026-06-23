@@ -604,7 +604,7 @@ Acceptance Criteria:
 - [x] LIGHTNING 입력을 테스트할 수 있다.
 - [x] 연습 결과가 랭크/전적에 반영되지 않는다.
 
-### 4-3. [ ] 사용자 지정 게임 API / Room 계약
+### 4-3. [ ] Custom Room 생성 / 조회 API 계약
 
 담당: Backend
 
@@ -612,30 +612,185 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 특정 사용자와 방을 만들어 게임할 수 있는 custom game 계약을 확정한다.
+- [ ] 사용자가 사용자 지정 게임 방을 만들고, 생성된 방 상태를 조회할 수 있게 한다.
+- [ ] 초대 링크의 기반이 되는 `inviteCode`를 방 생성 시 발급한다.
 
 Backend:
 
-- [ ] custom room 생성/초대/입장 API 계약을 확정한다.
 - [ ] endpoint를 확정한다.
-  - 후보: `POST /api/v1/custom-games`
-  - 후보: `POST /api/v1/custom-games/{roomId}/join`
-  - 후보: `POST /api/v1/custom-games/{roomId}/start`
-- [ ] 초대 코드, roomId, host 권한 정책을 정한다.
-- [ ] custom game result가 랭크/LP/전적에 반영되는지 결정한다.
+- [ ] `POST /api/v1/custom-games/rooms`
+- [ ] `GET /api/v1/custom-games/rooms/{roomId}`
+- [ ] `CustomGameRoom`, `CustomGameParticipant` 기본 모델을 구현한다.
+- [ ] 방 생성자는 `OWNER` participant로 저장한다.
+- [ ] 최대 인원은 2명으로 고정한다.
+- [ ] room status는 `WAITING | STARTED | CLOSED`로 둔다.
+- [ ] `inviteCode`는 공유용 public key로 발급하고 unique 정책을 둔다.
+- [ ] room state response를 확정한다.
+  - `roomId`
+  - `inviteCode`
+  - `ownerUserId`
+  - `status`
+  - `maxParticipants`
+  - `participants`
+- [ ] 참가자 nickname은 user id를 모아 batch 조회한다.
 - [ ] RestDocs와 ErrorResponse를 정리한다.
 
 Policy:
 
-- [ ] 사용자 지정 게임은 일반 매칭 queue와 독립이다.
-- [ ] 랭크/LP 반영 여부는 별도 정책으로 명확히 둔다.
+- [ ] core 모듈은 room/participant 영속성 계층과 도메인 규칙을 담당한다.
+- [ ] api 모듈은 repository에 직접 접근하지 않고 core service를 사용한다.
+- [ ] inviteCode는 roomId를 직접 공유하지 않기 위한 초대 식별자다.
+- [ ] 이번 이슈에서는 참가, 나가기, WebSocket, 게임 시작을 구현하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] room 생성/입장/시작 payload가 확정된다.
-- [ ] host 권한과 초대 코드 정책이 문서화된다.
+- [ ] 방 생성 시 owner participant와 inviteCode가 함께 생성된다.
+- [ ] 방 조회 시 참가자 목록과 방 상태를 확인할 수 있다.
+- [ ] custom room의 기본 모델과 API 문서가 정리된다.
 
-### 4-4. [ ] 사용자 지정 게임 프론트 구현
+### 4-4. [ ] Custom Room 초대 참가 / 나가기 API 계약
+
+담당: Backend
+
+우선순위: P4
+
+목표:
+
+- [ ] 초대 코드로 사용자 지정 방에 참가하고, 대기 중인 방에서 나갈 수 있게 한다.
+
+Backend:
+
+- [ ] endpoint를 확정한다.
+- [ ] `POST /api/v1/custom-games/rooms/{inviteCode}/join`
+- [ ] `POST /api/v1/custom-games/rooms/{roomId}/leave`
+- [ ] room이 `WAITING`일 때만 참가를 허용한다.
+- [ ] 정원이 2명이면 참가를 거부한다.
+- [ ] 이미 참가한 사용자의 join은 idempotent하게 최신 room state를 반환한다.
+- [ ] 방장이 나가면 room을 `CLOSED`로 전환한다.
+- [ ] 일반 참가자가 나가면 participant left 상태를 반영한다.
+- [ ] RestDocs와 ErrorResponse를 정리한다.
+
+Policy:
+
+- [ ] join/leave는 room lifecycle command다.
+- [ ] join/leave 이후 실시간 broadcast는 4-5 Room WebSocket 이슈에서 연결한다.
+- [ ] started/closed room에는 새 참가를 허용하지 않는다.
+- [ ] 1명 또는 2명 방만 MVP 범위로 둔다.
+
+Acceptance Criteria:
+
+- [ ] inviteCode로 방에 참가할 수 있다.
+- [ ] 정원 초과, 시작된 방, 닫힌 방 참가가 거부된다.
+- [ ] 방장 퇴장 시 방이 닫힌다.
+
+### 4-5. [ ] Custom Room WebSocket 동기화 계약
+
+담당: Backend
+
+우선순위: P4
+
+목표:
+
+- [ ] 사용자 지정 방 페이지에서 참가자 입장/퇴장과 방 상태 변경을 실시간으로 받을 수 있게 한다.
+
+Backend:
+
+- [ ] WebSocket endpoint를 확정한다.
+  - `/ws/custom-games/rooms/{roomId}?token={accessToken}`
+- [ ] token query parameter 인증 정책을 기존 Game WebSocket과 맞춘다.
+- [ ] room participant만 연결을 허용한다.
+- [ ] room별 session registry를 구현한다.
+- [ ] `ROOM_UPDATED` event payload를 확정한다.
+- [ ] `ROOM_CLOSED` event payload를 확정한다.
+- [ ] join/leave command 이후 room 상태 broadcast를 연결한다.
+
+Policy:
+
+- [ ] Room WebSocket은 CustomRoomPage에서만 연결한다.
+- [ ] HTTP join/leave 응답은 command 결과이고, 다른 참가자 반영은 WebSocket event로 전달한다.
+- [ ] Room WebSocket은 게임 플레이 WebSocket과 분리한다.
+
+Acceptance Criteria:
+
+- [ ] 참가자 입장/퇴장 시 room 참여자에게 최신 room state가 broadcast된다.
+- [ ] 닫힌 방은 `ROOM_CLOSED`로 전달된다.
+- [ ] 참가자가 아닌 사용자는 room socket에 연결할 수 없다.
+
+### 4-6. [ ] Custom Game Start API / ROOM_STARTED 계약
+
+담당: Backend
+
+우선순위: P4
+
+목표:
+
+- [ ] 방장이 시작 버튼을 누르면 1명 또는 2명이 같은 game room과 scenario로 진입할 수 있게 한다.
+
+Backend:
+
+- [ ] endpoint를 확정한다.
+  - `POST /api/v1/custom-games/rooms/{roomId}/start`
+- [ ] 방장만 start를 호출할 수 있게 한다.
+- [ ] participant 1명 또는 2명 모두 시작 가능하게 한다.
+- [ ] room status가 `WAITING`일 때만 시작 가능하게 한다.
+- [ ] `gameMode=CUSTOM` GameRoom을 생성한다.
+- [ ] Scenario를 생성/저장한다.
+- [ ] room status를 `STARTED`로 전환한다.
+- [ ] HTTP start 응답은 이동 기준이 아니라 command ack로 둔다.
+- [ ] Room WebSocket `ROOM_STARTED` event payload를 확정한다.
+  - `roomId`
+  - `gameRoomId`
+  - `gameMode=CUSTOM`
+  - `startAt`
+  - `webSocketUrl`
+  - `scenario`
+
+Policy:
+
+- [ ] 실제 GamePlayPage 이동 기준은 HTTP 응답이 아니라 `ROOM_STARTED` event다.
+- [ ] 방장과 참가자가 같은 `gameRoomId`, `scenario`, `startAt`을 받도록 WebSocket broadcast를 사용한다.
+- [ ] start 이후에는 custom room 참가/나가기를 허용하지 않는다.
+
+Acceptance Criteria:
+
+- [ ] 방장만 사용자 지정 게임을 시작할 수 있다.
+- [ ] 1명 방과 2명 방 모두 시작할 수 있다.
+- [ ] 모든 room socket 참가자에게 동일한 `ROOM_STARTED` payload가 전달된다.
+
+### 4-7. [ ] Custom Game 정산 제외 / 결과 WebSocket 계약
+
+담당: Backend
+
+우선순위: P4
+
+목표:
+
+- [ ] 사용자 지정 게임 결과가 랭크/LP/전적에 반영되지 않도록 서버 결과 정책을 확정한다.
+
+Backend:
+
+- [ ] 기존 Game WebSocket, LIGHTNING, Scenario, GameAction 로직을 재사용한다.
+- [ ] `GAME_RESULT.gameMode=CUSTOM` payload를 내려준다.
+- [ ] custom game result reason 정책을 확정한다.
+- [ ] settlement trigger에서 `gameMode=CUSTOM`을 제외한다.
+- [ ] core settlement service에서 `gameMode=CUSTOM`을 제외한다.
+- [ ] recovery scheduler/query에서 `gameMode=CUSTOM`을 제외한다.
+- [ ] Summary API가 custom game을 정산 결과 조회 대상으로 다루지 않게 한다.
+
+Policy:
+
+- [ ] `MATCH`만 랭크/LP/전적 반영 대상이다.
+- [ ] `PRACTICE`, `CUSTOM`은 미정산 게임 모드다.
+- [ ] custom 최종 결과는 WebSocket `GAME_RESULT`가 source of truth다.
+- [ ] custom 결과는 일반 ranked summary와 섞지 않는다.
+
+Acceptance Criteria:
+
+- [ ] custom game을 완료해도 rank/record가 생성 또는 변경되지 않는다.
+- [ ] custom game result는 WebSocket payload로 확정된다.
+- [ ] settlement/recovery 테스트에서 custom 제외가 검증된다.
+
+### 4-8. [ ] Custom Room 생성 / 초대 링크 프론트 구현
 
 담당: Frontend
 
@@ -643,25 +798,94 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 사용자 지정 버튼을 실제 custom room 생성/입장 UI로 연결한다.
+- [ ] MatchPage의 사용자 지정 버튼으로 custom room을 만들고 초대 링크를 확인할 수 있게 한다.
 
 Frontend:
 
-- [ ] CustomGamePage 또는 modal을 구현한다.
-- [ ] room 생성, 초대 코드 복사, 입장, 시작 대기 UI를 구현한다.
-- [ ] 4-3 API 계약에 맞춰 service를 추가한다.
-- [ ] custom game handoff를 기존 waiting/play 구조와 연결한다.
+- [ ] custom room service를 추가한다.
+- [ ] MatchPage 사용자 지정 버튼을 4-3 create room API와 연결한다.
+- [ ] `/custom-games/rooms/:roomId` route를 추가한다.
+- [ ] CustomRoomPage에서 room 조회 API를 호출한다.
+- [ ] 초대 링크를 표시한다.
+- [ ] 초대 링크 복사 버튼을 구현한다.
+- [ ] 참가자 목록과 방장 표시를 구현한다.
 
 Policy:
 
-- [ ] 사용자 지정 게임 UI는 일반 match queue 상태와 독립이다.
-- [ ] custom game result 정책은 4-3 백엔드 계약을 따른다.
+- [ ] 사용자 지정 방 생성은 일반 match queue와 독립이다.
+- [ ] 초대 링크는 `inviteCode`를 사용하고 roomId를 공유하지 않는다.
+- [ ] Room WebSocket 연결은 4-9에서 구현한다.
 
 Acceptance Criteria:
 
-- [ ] 방 생성과 입장 흐름이 동작한다.
-- [ ] 일반 매칭 queue 상태와 충돌하지 않는다.
-- [ ] custom game result 정책이 화면 흐름에 반영된다.
+- [ ] 사용자 지정 버튼으로 방을 만들 수 있다.
+- [ ] 방 페이지에서 초대 링크와 참가자 목록을 확인할 수 있다.
+- [ ] 방 생성 흐름이 매칭 queue 상태와 충돌하지 않는다.
+
+### 4-9. [ ] Custom Room 초대 참가 / WebSocket 프론트 구현
+
+담당: Frontend
+
+우선순위: P4
+
+목표:
+
+- [ ] 초대 링크로 들어온 사용자가 사용자 지정 방에 참가하고, 참가자 목록 변경을 실시간으로 볼 수 있게 한다.
+
+Frontend:
+
+- [ ] `/custom-games/join/:inviteCode` route를 추가한다.
+- [ ] 로그인하지 않은 사용자는 로그인 후 초대 링크로 복귀하게 한다.
+- [ ] join API를 호출하고 성공 시 `/custom-games/rooms/:roomId`로 이동한다.
+- [ ] CustomRoomPage에서 Room WebSocket을 연결한다.
+- [ ] `ROOM_UPDATED`로 참가자 목록을 갱신한다.
+- [ ] `ROOM_CLOSED`로 방 닫힘 상태를 표시하고 `/match` 복귀 액션을 제공한다.
+- [ ] 나가기 버튼을 4-4 leave API와 연결한다.
+
+Policy:
+
+- [ ] Room WebSocket은 방 페이지에서만 연결한다.
+- [ ] HTTP join/leave는 command이고, 최종 room 상태 반영은 WebSocket event를 우선한다.
+- [ ] 친구 목록 기반 초대는 이번 범위에서 제외한다.
+
+Acceptance Criteria:
+
+- [ ] 초대 링크로 방에 참가할 수 있다.
+- [ ] 참가자 입장/퇴장이 실시간으로 반영된다.
+- [ ] 닫힌 방/가득 찬 방/시작된 방 오류가 사용자에게 표시된다.
+
+### 4-10. [ ] Custom Game 시작 / GamePlay 프론트 연결
+
+담당: Frontend
+
+우선순위: P4
+
+목표:
+
+- [ ] 방장이 시작하면 방장과 참가자가 같은 사용자 지정 게임 화면으로 이동한다.
+
+Frontend:
+
+- [ ] 방장에게만 시작 버튼을 표시한다.
+- [ ] 시작 버튼은 4-6 start API를 호출한다.
+- [ ] start HTTP 응답만으로 route 이동하지 않는다.
+- [ ] `ROOM_STARTED` event 수신 시 custom game start payload를 저장한다.
+- [ ] GamePlayPage가 `gameMode=CUSTOM` payload로 play state를 구성한다.
+- [ ] custom game 시작 전 `3 / 2 / 1` countdown을 표시한다.
+- [ ] custom 결과는 GamePlayPage 내부 오버레이로 표시한다.
+- [ ] 결과 오버레이에 `다시 방으로`, `메인으로` 액션을 제공한다.
+
+Policy:
+
+- [ ] 사용자 지정 게임은 랭크/LP/전적 화면으로 보내지 않는다.
+- [ ] custom 결과는 Summary API를 호출하지 않는다.
+- [ ] GamePlay WebSocket은 기존 `/ws/game/{gameRoomId}` 정책을 재사용한다.
+
+Acceptance Criteria:
+
+- [ ] 방장과 참가자가 `ROOM_STARTED` 기준으로 같은 게임에 진입한다.
+- [ ] custom game 결과가 GamePlayPage 내부에 표시된다.
+- [ ] 일반 ranked match 결과 route/Summary API 흐름이 깨지지 않는다.
 
 ## Section 5. Deferred Account Features
 
@@ -747,9 +971,16 @@ Policy:
 11. [x] Section 3-3. 프로필 상세 API 계약
 12. [x] Section 3-4. 프로필 페이지 구현
 13. [x] Section 4-1/4-2. 연습 모드
-14. [ ] Section 4-3/4-4. 사용자 지정 게임
-15. [ ] Section 5-1/5-2. 비밀번호 찾기
-16. [ ] Section 5-3/5-4. OAuth 로그인
+14. [ ] Section 4-3. Custom Room 생성 / 조회 API 계약
+15. [ ] Section 4-4. Custom Room 초대 참가 / 나가기 API 계약
+16. [ ] Section 4-5. Custom Room WebSocket 동기화 계약
+17. [ ] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
+18. [ ] Section 4-7. Custom Game 정산 제외 / 결과 WebSocket 계약
+19. [ ] Section 4-8. Custom Room 생성 / 초대 링크 프론트 구현
+20. [ ] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
+21. [ ] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
+22. [ ] Section 5-1/5-2. 비밀번호 찾기
+23. [ ] Section 5-3/5-4. OAuth 로그인
 
 ## 판단 기준
 
