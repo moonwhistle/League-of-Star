@@ -284,14 +284,14 @@ sequenceDiagram
 
 ### 5. Message DTO / Sender 구현
 
-- [ ] `CustomRoomWebSocketMessageType` 구현.
-- [ ] `CustomRoomWebSocketServerMessage` 구현.
-- [ ] `ROOM_UPDATED` factory 구현.
-- [ ] `ROOM_CLOSED` factory 구현.
-- [ ] `ERROR` factory 구현.
-- [ ] `CustomRoomWebSocketMessageSender` 구현.
-- [ ] open session에만 message 전송.
-- [ ] 전송 실패 시 로그만 남기고 HTTP command 결과를 되돌리지 않음.
+- [x] `CustomRoomWebSocketMessageType` 구현.
+- [x] `CustomRoomWebSocketServerMessage` 구현.
+- [x] `ROOM_UPDATED` factory 구현.
+- [x] `ROOM_CLOSED` factory 구현.
+- [x] `ERROR` factory 구현.
+- [x] `CustomRoomWebSocketMessageSender` 구현.
+- [x] open session에만 message 전송.
+- [x] 전송 실패 시 로그만 남기고 HTTP command 결과를 되돌리지 않음.
 
 ### 6. Handler / Service 구현
 
