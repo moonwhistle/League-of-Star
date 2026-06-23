@@ -242,12 +242,12 @@ sequenceDiagram
 
 ### 1. Backend Contract 정리
 
-- [ ] endpoint를 `/ws/custom-games/rooms/{roomId}?token={accessToken}`로 확정.
-- [ ] token query parameter 인증 정책을 기존 Game WebSocket과 맞춤.
-- [ ] `ROOM_UPDATED`, `ROOM_CLOSED`, `ERROR` payload shape 확정.
-- [ ] disconnect/error는 DB leave가 아니라 session 제거임을 문서화.
-- [ ] HTTP command와 WebSocket event 책임 분리 문서화.
-- [ ] `ROOM_STARTED`는 후속 4-6 범위임을 문서화.
+- [x] endpoint를 `/ws/custom-games/rooms/{roomId}?token={accessToken}`로 확정.
+- [x] token query parameter 인증 정책을 기존 Game WebSocket과 맞춤.
+- [x] `ROOM_UPDATED`, `ROOM_CLOSED`, `ERROR` payload shape 확정.
+- [x] disconnect/error는 DB leave가 아니라 session 제거임을 문서화.
+- [x] HTTP command와 WebSocket event 책임 분리 문서화.
+- [x] `ROOM_STARTED`는 후속 4-6 범위임을 문서화.
 
 ### 2. Core Participant 검증 구현
 
