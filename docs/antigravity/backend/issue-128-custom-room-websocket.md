@@ -33,6 +33,7 @@ flowchart TD
 - WebSocket은 DB 변경 결과를 같은 room session에 전달하는 동기화 채널이다.
 - WebSocket disconnect/error는 DB leave가 아니다.
 - disconnect/error 시에는 local session registry에서만 제거한다.
+- WebSocket origin은 설정값 기반 allowlist를 사용하고 wildcard를 사용하지 않는다.
 - 참가자 여부 검증은 core read service를 통해 수행한다.
 - WebSocket 인증, session registry, message 전송은 api 모듈 책임이다.
 - `ROOM_STARTED`는 후속 4-6 범위이며 이번 이슈에서 구현하지 않는다.
@@ -158,6 +159,7 @@ flowchart TD
 - `sessionId -> session` 역방향 index를 둔다.
 - 같은 room/user가 재연결하면 기존 session을 닫고 새 session으로 교체한다.
 - room 전체 close가 필요하면 해당 room sessions에 message를 보낸 뒤 close/unregister한다.
+- 일반 참가자 leave는 떠난 user session을 먼저 close/unregister한 뒤 남은 room sessions에만 `ROOM_UPDATED`를 보낸다.
 - disconnect/error는 session registry에서만 제거한다.
 - disconnect/error에서 leave API를 호출하거나 participant row를 삭제하지 않는다.
 - 멀티 인스턴스 운영에서는 같은 room이 같은 API 인스턴스로 라우팅되어야 한다. 이번 이슈에서는 기존 Game WebSocket과 동일하게 local memory registry로 제한한다.
@@ -187,7 +189,7 @@ sequenceDiagram
 
 - `joinRoom()` 성공 후 room 상태가 `WAITING`이면 같은 room sessions에 `ROOM_UPDATED`를 보낸다.
 - 일반 참가자 `leaveRoom()` 성공 후 room 상태가 `WAITING`이면 남은 room sessions에 `ROOM_UPDATED`를 보낸다.
-- 일반 참가자 leave를 호출한 user의 session이 registry에 남아 있으면 close/unregister한다.
+- 일반 참가자 leave를 호출한 user의 session이 registry에 남아 있으면 먼저 close/unregister한 뒤 `ROOM_UPDATED`를 보낸다.
 - 방장 `leaveRoom()` 성공 후 room 상태가 `CLOSED`이면 room sessions에 `ROOM_CLOSED`를 보낸 뒤 close/unregister한다.
 - command 실패 시 WebSocket event를 보내지 않는다.
 
@@ -368,6 +370,7 @@ sequenceDiagram
 - 방장 leave 성공 후 room 참가자에게 `ROOM_CLOSED`가 broadcast되고 session이 정리된다.
 - WebSocket disconnect/error는 participant DB row를 삭제하지 않는다.
 - HTTP join/leave 실패 시 WebSocket event가 broadcast되지 않는다.
+- Custom Room WebSocket origin은 `app.websocket.allowed-origin-patterns` 설정값으로 제한하고 wildcard를 사용하지 않는다.
 - core/api 테스트가 통과한다.
 - issue-126, 4-6 문서와 범위가 겹치지 않는다.
 
@@ -402,6 +405,7 @@ flowchart TD
 - 실제 참가/나가기는 HTTP join/leave API만 수행함.
 - WebSocket disconnect/error는 DB leave가 아니며 session registry에서만 제거함.
 - 다른 참가자 화면 갱신은 `ROOM_UPDATED`, `ROOM_CLOSED` event로 전달함.
+- Custom Room WebSocket origin은 설정값 기반 allowlist로 제한함.
 - `ROOM_STARTED`와 게임 시작 이동은 후속 4-6 범위로 남김.
 
 백엔드와의 구현 계약:
@@ -412,6 +416,7 @@ flowchart TD
 - 연결 성공 시 현재 room state를 `ROOM_UPDATED`로 1회 전송함.
 - join/leave command commit 이후 `ROOM_UPDATED` 또는 `ROOM_CLOSED`를 broadcast함.
 - event payload는 HTTP room 응답과 같은 `CustomRoomResponse`를 재사용함.
+- 허용 origin은 `app.websocket.allowed-origin-patterns` 설정값을 사용함.
 
 ## 📚 Changes
 
@@ -423,6 +428,7 @@ flowchart TD
 
 - join/leave 성공 후 같은 방 참가자에게 알려줌.
   누군가 방에 들어오면 `ROOM_UPDATED`가 나가고, 일반 참가자가 나가도 `ROOM_UPDATED`가 나간다. 방장이 나가면 방 자체가 닫히므로 `ROOM_CLOSED`를 보내고 해당 방의 WebSocket session을 정리한다.
+  일반 참가자가 나갈 때는 떠난 사람의 WebSocket session을 먼저 끊은 뒤 남은 사람들에게만 `ROOM_UPDATED`를 보낸다. 그래야 나간 사용자가 “내가 빠진 방의 최신 목록”을 다시 받는 이상한 화면 흐름이 생기지 않는다.
 
 ```mermaid
 flowchart LR
@@ -443,6 +449,9 @@ flowchart LR
 
 - Custom Room WebSocket을 Game WebSocket과 분리함.
   Game WebSocket은 READY, RTT, LIGHTNING, GAME_RESULT처럼 게임 진행 중의 일을 다룬다. Custom Room WebSocket은 대기실에서 참가자 목록과 방 닫힘만 다룬다. 역할이 다르므로 endpoint, DTO, registry를 분리해 후속 게임 시작 로직과 섞이지 않게 했다.
+
+- WebSocket origin을 설정값으로 제한함.
+  인증 token이 query parameter로 전달되는 WebSocket endpoint이므로 아무 origin에서나 브라우저 연결을 열 수 있게 두지 않는다. 이번 Custom Room WebSocket은 `app.websocket.allowed-origin-patterns`에 등록된 프론트 origin만 허용한다. 기존 Game WebSocket origin 정책은 이번 PR 범위에서 바꾸지 않고, 새로 추가한 custom endpoint의 노출면만 먼저 줄였다.
 
 - local memory session registry를 선택함.
   이번 범위는 MVP 기준으로 현재 API 인스턴스에 붙은 WebSocket session을 관리한다. 구조가 단순하고 빠르지만, 여러 API 인스턴스가 동시에 떠 있는 운영 환경에서는 같은 room 사용자가 같은 인스턴스로 붙거나 Redis/pub-sub 같은 broadcast 확장이 필요하다. 그 확장은 이번 PR 범위에서 제외했다.

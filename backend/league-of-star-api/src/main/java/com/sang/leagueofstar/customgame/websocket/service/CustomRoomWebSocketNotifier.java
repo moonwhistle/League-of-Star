@@ -24,11 +24,11 @@ public class CustomRoomWebSocketNotifier {
 
     public void notifyParticipantLeftAfterCommit(CustomRoomResponse response, Long userId) {
         afterCommit(() -> {
+            sessionRegistry.closeAndUnregister(response.roomId(), userId);
             messageSender.broadcast(
                     response.roomId(),
                     CustomRoomWebSocketServerMessage.roomUpdated(response)
             );
-            sessionRegistry.closeAndUnregister(response.roomId(), userId);
         });
     }
 

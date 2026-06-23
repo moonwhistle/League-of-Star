@@ -74,7 +74,7 @@ class CustomRoomWebSocketNotifierTest {
     }
 
     @Test
-    @DisplayName("notifyParticipantLeftAfterCommit - ROOM_UPDATED broadcast 이후 떠난 user session을 닫는다")
+    @DisplayName("notifyParticipantLeftAfterCommit - 떠난 user session을 먼저 닫고 남은 참가자에게 ROOM_UPDATED를 broadcast한다")
     void notifyParticipantLeftAfterCommit_BroadcastAndCloseUserSession() {
         // given
         CustomRoomResponse response = roomResponse("WAITING");
@@ -84,13 +84,13 @@ class CustomRoomWebSocketNotifierTest {
 
         // then
         InOrder inOrder = inOrder(messageSender, sessionRegistry);
+        inOrder.verify(sessionRegistry).closeAndUnregister(CUSTOM_ROOM_ID, USER_ID);
         inOrder.verify(messageSender).broadcast(
                 org.mockito.ArgumentMatchers.eq(CUSTOM_ROOM_ID),
                 org.mockito.ArgumentMatchers.argThat(message ->
                         message.type() == CustomRoomWebSocketMessageType.ROOM_UPDATED
                 )
         );
-        inOrder.verify(sessionRegistry).closeAndUnregister(CUSTOM_ROOM_ID, USER_ID);
     }
 
     @Test
