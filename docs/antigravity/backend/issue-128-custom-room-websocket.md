@@ -317,17 +317,17 @@ sequenceDiagram
 
 ### 8. Test 구현
 
-- [ ] core read service unit test 작성.
-- [ ] core read service `@DataJpaTest` 또는 기존 repository 기반 검증 보강.
-- [ ] path resolver unit test 작성.
-- [ ] handshake interceptor unit test 작성.
-- [ ] session registry unit test 작성.
-- [ ] message DTO unit test 작성.
-- [ ] message sender unit test 작성.
-- [ ] handler unit test 작성.
-- [ ] notifier unit test 작성.
-- [ ] API service join/leave broadcast 연동 test 작성.
-- [ ] disconnect/error가 DB leave를 호출하지 않는지 검증.
+- [x] core read service unit test 작성.
+- [x] core read service `@DataJpaTest` 또는 기존 repository 기반 검증 보강.
+- [x] path resolver unit test 작성.
+- [x] handshake interceptor unit test 작성.
+- [x] session registry unit test 작성.
+- [x] message DTO unit test 작성.
+- [x] message sender unit test 작성.
+- [x] handler unit test 작성.
+- [x] notifier unit test 작성.
+- [x] API service join/leave broadcast 연동 test 작성.
+- [x] disconnect/error가 DB leave를 호출하지 않는지 검증.
 
 ### 9. 문서 정합성 구현
 

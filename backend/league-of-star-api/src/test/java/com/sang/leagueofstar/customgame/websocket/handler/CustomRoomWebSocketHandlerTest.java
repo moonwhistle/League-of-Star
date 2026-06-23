@@ -22,8 +22,10 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class CustomRoomWebSocketHandlerTest {
@@ -87,7 +89,7 @@ class CustomRoomWebSocketHandlerTest {
         WebSocketSession session = session(SESSION_ID);
         given(customGameRoomService.getWaitingRoom(CUSTOM_ROOM_ID)).willReturn(roomResponse("WAITING"));
         handler.afterConnectionEstablished(session);
-        org.mockito.Mockito.clearInvocations(session);
+        clearInvocations(session);
 
         // when
         handler.handleTextMessage(session, new TextMessage("{\"type\":\"PING\"}"));
@@ -118,21 +120,24 @@ class CustomRoomWebSocketHandlerTest {
         WebSocketSession session = session(SESSION_ID);
         given(customGameRoomService.getWaitingRoom(CUSTOM_ROOM_ID)).willReturn(roomResponse("WAITING"));
         handler.afterConnectionEstablished(session);
+        clearInvocations(customGameRoomService);
 
         // when
         handler.afterConnectionClosed(session, CloseStatus.NORMAL);
 
         // then
         assertThat(sessionRegistry.findBySessionId(SESSION_ID)).isEmpty();
+        verifyNoInteractions(customGameRoomService);
     }
 
     @Test
-    @DisplayName("handleTransportError - registry를 정리하고 open session을 SERVER_ERROR로 닫는다")
+    @DisplayName("handleTransportError - registry만 정리하고 open session을 SERVER_ERROR로 닫는다")
     void handleTransportError_UnregisterAndClose() throws Exception {
         // given
         WebSocketSession session = session(SESSION_ID);
         given(customGameRoomService.getWaitingRoom(CUSTOM_ROOM_ID)).willReturn(roomResponse("WAITING"));
         handler.afterConnectionEstablished(session);
+        clearInvocations(customGameRoomService);
 
         // when
         handler.handleTransportError(session, new RuntimeException("transport error"));
@@ -140,6 +145,7 @@ class CustomRoomWebSocketHandlerTest {
         // then
         assertThat(sessionRegistry.findBySessionId(SESSION_ID)).isEmpty();
         verify(session).close(CloseStatus.SERVER_ERROR);
+        verifyNoInteractions(customGameRoomService);
     }
 
     private WebSocketSession session(String sessionId) {
