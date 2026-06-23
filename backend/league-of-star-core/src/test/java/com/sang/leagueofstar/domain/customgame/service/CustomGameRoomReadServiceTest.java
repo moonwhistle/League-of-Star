@@ -105,6 +105,54 @@ class CustomGameRoomReadServiceTest {
     }
 
     @Test
+    @DisplayName("getWaitingRoom - roomId 기준 WAITING room을 반환한다")
+    void getWaitingRoom_ReturnWaitingRoom() {
+        // given
+        CustomGameRoom customGameRoom = CustomGameRoom.create(OWNER_USER_ID, INVITE_CODE);
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(customGameRoom));
+
+        // when
+        CustomGameRoom result = customGameRoomReadService.getWaitingRoom(ROOM_ID);
+
+        // then
+        assertThat(result).isSameAs(customGameRoom);
+    }
+
+    @Test
+    @DisplayName("getWaitingRoom - roomId가 null이면 NOT_FOUND를 던진다")
+    void getWaitingRoom_NullRoomId_ThrowException() {
+        assertThatThrownBy(() -> customGameRoomReadService.getWaitingRoom(null))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("getWaitingRoom - room이 없으면 NOT_FOUND를 던진다")
+    void getWaitingRoom_NotFound_ThrowException() {
+        // given
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomReadService.getWaitingRoom(ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("getWaitingRoom - STARTED room이면 INVALID_STATE를 던진다")
+    void getWaitingRoom_StartedRoom_ThrowException() {
+        // given
+        CustomGameRoom customGameRoom = CustomGameRoom.create(OWNER_USER_ID, INVITE_CODE);
+        customGameRoom.markStarted(LocalDateTime.now());
+        given(customGameRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(customGameRoom));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomReadService.getWaitingRoom(ROOM_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
+    }
+
+    @Test
     @DisplayName("findWaitingRooms - WAITING room 목록을 반환한다")
     void findWaitingRooms_ReturnWaitingRooms() {
         // given

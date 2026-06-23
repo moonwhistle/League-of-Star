@@ -295,13 +295,13 @@ sequenceDiagram
 
 ### 6. Handler / Service 구현
 
-- [ ] `CustomRoomWebSocketHandler` 구현.
-- [ ] 연결 성공 시 registry 등록.
-- [ ] 연결 성공 시 현재 room snapshot을 해당 session에 `ROOM_UPDATED`로 전송.
-- [ ] client text message 수신 시 `ERROR` 응답 후 연결 유지.
-- [ ] close/error 시 registry에서만 제거.
-- [ ] `CustomRoomWebSocketConfig`에 endpoint 등록.
-- [ ] 기존 Game WebSocket endpoint와 충돌 없게 구성.
+- [x] `CustomRoomWebSocketHandler` 구현.
+- [x] 연결 성공 시 registry 등록.
+- [x] 연결 성공 시 현재 room snapshot을 해당 session에 `ROOM_UPDATED`로 전송.
+- [x] client text message 수신 시 `ERROR` 응답 후 연결 유지.
+- [x] close/error 시 registry에서만 제거.
+- [x] `CustomRoomWebSocketConfig`에 endpoint 등록.
+- [x] 기존 Game WebSocket endpoint와 충돌 없게 구성.
 
 ### 7. Join / Leave Broadcast 연결
 

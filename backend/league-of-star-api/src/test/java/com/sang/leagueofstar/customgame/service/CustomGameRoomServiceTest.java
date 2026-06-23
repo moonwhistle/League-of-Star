@@ -146,6 +146,31 @@ class CustomGameRoomServiceTest {
     }
 
     @Test
+    @DisplayName("getWaitingRoom - roomId 조회 결과와 participant nickname을 조립한다")
+    void getWaitingRoom_ReturnRoomResponse() {
+        // given
+        CustomGameRoom room = room(100L, OWNER_USER_ID, "AB12CD");
+        given(customGameRoomReadService.getWaitingRoom(100L)).willReturn(room);
+        given(customGameRoomReadService.getParticipants(100L)).willReturn(List.of(
+                participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
+                participant(100L, PLAYER_USER_ID, CustomRoomParticipantRole.PLAYER)
+        ));
+        given(userReadService.findAllByIdsOrThrow(anyCollection()))
+                .willReturn(List.of(user(OWNER_USER_ID, "Host"), user(PLAYER_USER_ID, "Guest")));
+
+        // when
+        CustomRoomResponse response = customGameRoomService.getWaitingRoom(100L);
+
+        // then
+        assertThat(response.roomId()).isEqualTo(100L);
+        assertThat(response.roomName()).isEqualTo("Host's room");
+        assertThat(response.participants()).extracting("nickname")
+                .containsExactly("Host", "Guest");
+        then(customGameRoomReadService).should().getWaitingRoom(100L);
+        then(customGameRoomReadService).should().getParticipants(100L);
+    }
+
+    @Test
     @DisplayName("joinRoom - core command 이후 현재 participant를 다시 조회해 room response를 만든다")
     void joinRoom_ReturnRoomResponse() {
         // given

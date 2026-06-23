@@ -32,6 +32,16 @@ public class CustomGameRoomReadService {
         return customGameRoom;
     }
 
+    public CustomGameRoom getWaitingRoom(Long roomId) {
+        validateRoomId(roomId);
+        CustomGameRoom customGameRoom = customGameRoomRepository.findById(roomId)
+                .orElseThrow(() -> new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+        if (!customGameRoom.isWaiting()) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE);
+        }
+        return customGameRoom;
+    }
+
     public List<CustomGameRoom> findWaitingRooms() {
         return customGameRoomRepository.findByStatusOrderByIdAsc(CustomRoomStatus.WAITING);
     }
