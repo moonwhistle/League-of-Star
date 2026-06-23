@@ -24,6 +24,9 @@ public enum CoreErrorCode implements BaseErrorCode {
     CUSTOM_ROOM_INVALID_PARTICIPANT(400, "CUSTOM_ROOM_003", "사용자 지정 방 참여자 정보가 올바르지 않습니다."),
     CUSTOM_ROOM_DUPLICATE_PARTICIPANT(400, "CUSTOM_ROOM_004", "이미 사용자 지정 방에 참여한 사용자입니다."),
     CUSTOM_ROOM_INVALID_INVITE_CODE(400, "CUSTOM_ROOM_005", "사용자 지정 방 초대 코드가 올바르지 않습니다."),
+    CUSTOM_ROOM_NOT_FOUND(404, "CUSTOM_ROOM_006", "사용자 지정 방을 찾을 수 없습니다."),
+    CUSTOM_ROOM_ACTIVE_EXISTS(409, "CUSTOM_ROOM_007", "이미 대기 중인 사용자 지정 방이 있습니다."),
+    CUSTOM_ROOM_INVITE_CODE_GENERATION_FAILED(500, "CUSTOM_ROOM_008", "사용자 지정 방 초대 코드를 생성하지 못했습니다."),
 
     // Auth (AUTH_000)
     INVALID_RESET_TOKEN(400, "AUTH_001", "유효하지 않거나 만료된 재설정 토큰입니다."),

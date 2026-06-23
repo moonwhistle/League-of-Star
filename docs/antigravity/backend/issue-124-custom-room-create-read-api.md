@@ -243,16 +243,16 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 ### 3. Core Custom Room Service 구현
 
-- [ ] `CustomGameRoomCommandService.createRoom(ownerUserId)` 구현.
-- [ ] ownerUserId null 검증.
-- [ ] owner의 기존 `WAITING` room 존재 시 예외 처리.
-- [ ] inviteCode 발급기 구현.
-- [ ] inviteCode unique 충돌 시 재시도 정책 구현.
-- [ ] `CustomGameRoomReadService.getWaitingRoomByInviteCode(inviteCode)` 구현.
-- [ ] `CustomGameRoomReadService.findWaitingRooms()` 구현.
-- [ ] 존재하지 않는 inviteCode 예외 처리.
-- [ ] `STARTED`, `CLOSED` room 공개 조회 실패 처리.
-- [ ] core custom room error code 추가.
+- [x] `CustomGameRoomCommandService.createRoom(ownerUserId)` 구현.
+- [x] ownerUserId null 검증.
+- [x] owner의 기존 `WAITING` room 존재 시 예외 처리.
+- [x] inviteCode 발급기 구현.
+- [x] inviteCode unique 충돌 시 재시도 정책 구현.
+- [x] `CustomGameRoomReadService.getWaitingRoomByInviteCode(inviteCode)` 구현.
+- [x] `CustomGameRoomReadService.findWaitingRooms()` 구현.
+- [x] 존재하지 않는 inviteCode 예외 처리.
+- [x] `STARTED`, `CLOSED` room 공개 조회 실패 처리.
+- [x] core custom room error code 추가.
 
 ### 4. Custom Room API 구현
 
