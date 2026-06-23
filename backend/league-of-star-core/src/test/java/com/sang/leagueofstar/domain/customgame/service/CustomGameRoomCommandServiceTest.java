@@ -253,6 +253,20 @@ class CustomGameRoomCommandServiceTest {
     }
 
     @Test
+    @DisplayName("joinRoom - 시작된 room이면 INVALID_STATE를 던진다")
+    void joinRoom_StartedRoom_ThrowException() {
+        // given
+        CustomGameRoom room = room(ROOM_ID, OWNER_USER_ID);
+        room.markStarted(LocalDateTime.now());
+        given(customGameRoomRepository.findByInviteCodeForUpdate(INVITE_CODE)).willReturn(Optional.of(room));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomCommandService.joinRoom(INVITE_CODE, PLAYER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
+    }
+
+    @Test
     @DisplayName("joinRoom - blank inviteCode면 INVALID_INVITE_CODE를 던진다")
     void joinRoom_BlankInviteCode_ThrowException() {
         assertThatThrownBy(() -> customGameRoomCommandService.joinRoom(" ", PLAYER_USER_ID))
@@ -343,6 +357,20 @@ class CustomGameRoomCommandServiceTest {
         // given
         CustomGameRoom room = room(ROOM_ID, OWNER_USER_ID);
         room.close(LocalDateTime.now());
+        given(customGameRoomRepository.findByIdForUpdate(ROOM_ID)).willReturn(Optional.of(room));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomCommandService.leaveRoom(ROOM_ID, OWNER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
+    }
+
+    @Test
+    @DisplayName("leaveRoom - 시작된 room이면 INVALID_STATE를 던진다")
+    void leaveRoom_StartedRoom_ThrowException() {
+        // given
+        CustomGameRoom room = room(ROOM_ID, OWNER_USER_ID);
+        room.markStarted(LocalDateTime.now());
         given(customGameRoomRepository.findByIdForUpdate(ROOM_ID)).willReturn(Optional.of(room));
 
         // when & then

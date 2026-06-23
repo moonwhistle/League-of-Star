@@ -218,6 +218,138 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
                 ));
     }
 
+    @Test
+    @DisplayName("Custom Room join API 문서화")
+    void joinRoom() {
+        // given
+        when(customGameRoomService.joinRoom("AB12CD", USER_ID)).thenReturn(joinedRoomResponse());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/{inviteCode}/join", "AB12CD")
+                .then()
+                .statusCode(200)
+                .apply(document("custom-room-join",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 참가")
+                                .description("""
+                                        초대 코드로 `WAITING` custom room에 참가합니다.
+
+                                        request body는 없습니다.
+                                        참가자는 인증 사용자로 결정하며 이미 참가 중인 사용자가 다시 호출하면 같은 room state를 반환합니다.
+                                        """)
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .pathParameters(
+                                        parameterWithName("inviteCode").description("초대 코드")
+                                )
+                                .responseFields(roomResponseFields())
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Room join full 응답 문서화")
+    void joinRoomFull() {
+        // given
+        when(customGameRoomService.joinRoom("AB12CD", USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_FULL));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/{inviteCode}/join", "AB12CD")
+                .then()
+                .statusCode(400)
+                .apply(document("custom-room-join-full",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 참가 실패 - 정원 초과")
+                                .description("custom room 최대 인원은 MVP 기준 2명입니다. 이미 가득 찬 room에 새 사용자가 참가하면 실패합니다.")
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .pathParameters(
+                                        parameterWithName("inviteCode").description("초대 코드")
+                                )
+                                .responseFields(errorResponseFields("정원 초과 응답에서는 null"))
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Room leave API 문서화")
+    void leaveRoom() {
+        // given
+        when(customGameRoomService.leaveRoom(100L, USER_ID)).thenReturn(roomResponse());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/{roomId}/leave", 100L)
+                .then()
+                .statusCode(200)
+                .apply(document("custom-room-leave",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 나가기")
+                                .description("""
+                                        인증 사용자가 custom room에서 나갑니다.
+
+                                        일반 참가자가 나가면 participant row만 삭제됩니다.
+                                        방장이 나가면 room은 `CLOSED`가 되고 participant 목록이 정리됩니다.
+                                        """)
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .pathParameters(
+                                        parameterWithName("roomId").description("custom room ID")
+                                )
+                                .responseFields(roomResponseFields())
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Room leave invalid participant 응답 문서화")
+    void leaveRoomInvalidParticipant() {
+        // given
+        when(customGameRoomService.leaveRoom(100L, USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/{roomId}/leave", 100L)
+                .then()
+                .statusCode(400)
+                .apply(document("custom-room-leave-invalid-participant",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 나가기 실패 - 참가자 아님")
+                                .description("room에 참가하지 않은 사용자가 leave를 호출하면 실패합니다.")
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .pathParameters(
+                                        parameterWithName("roomId").description("custom room ID")
+                                )
+                                .responseFields(errorResponseFields("참가자 아님 응답에서는 null"))
+                                .build()
+                        )
+                ));
+    }
+
     private CustomRoomResponse roomResponse() {
         return new CustomRoomResponse(
                 100L,
@@ -240,6 +372,21 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
                 2,
                 1
         )));
+    }
+
+    private CustomRoomResponse joinedRoomResponse() {
+        return new CustomRoomResponse(
+                100L,
+                "Host's room",
+                "AB12CD",
+                USER_ID,
+                "WAITING",
+                2,
+                List.of(
+                        new CustomRoomParticipantResponse(USER_ID, "Host", "OWNER"),
+                        new CustomRoomParticipantResponse(2L, "Guest", "PLAYER")
+                )
+        );
     }
 
     private org.springframework.restdocs.payload.FieldDescriptor[] roomResponseFields() {

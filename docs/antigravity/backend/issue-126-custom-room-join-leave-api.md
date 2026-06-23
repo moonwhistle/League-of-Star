@@ -280,21 +280,21 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 
 ### 5. Test 구현
 
-- [ ] core domain unit test 보강.
-- [ ] core repository `@DataJpaTest` 작성.
-- [ ] core service unit test 작성.
-- [ ] API service unit test 작성.
-- [ ] controller `RestAssuredMockMvc` test 작성.
-- [ ] RestDocs test 작성.
-- [ ] join 성공 검증.
-- [ ] 이미 참가한 사용자 join 멱등 처리 검증.
-- [ ] full room join 실패 검증.
-- [ ] `STARTED`, `CLOSED` room join 실패 검증.
-- [ ] 일반 참가자 leave 성공 검증.
-- [ ] 방장 leave 시 room `CLOSED` 전환 검증.
-- [ ] 참가하지 않은 사용자 leave 실패 검증.
-- [ ] room lock 조회 메서드 사용/동작 검증.
-- [ ] user nickname batch 조회 검증.
+- [x] core domain unit test 보강.
+- [x] core repository `@DataJpaTest` 작성.
+- [x] core service unit test 작성.
+- [x] API service unit test 작성.
+- [x] controller `RestAssuredMockMvc` test 작성.
+- [x] RestDocs test 작성.
+- [x] join 성공 검증.
+- [x] 이미 참가한 사용자 join 멱등 처리 검증.
+- [x] full room join 실패 검증.
+- [x] `STARTED`, `CLOSED` room join 실패 검증.
+- [x] 일반 참가자 leave 성공 검증.
+- [x] 방장 leave 시 room `CLOSED` 전환 검증.
+- [x] 참가하지 않은 사용자 leave 실패 검증.
+- [x] room lock 조회 메서드 사용/동작 검증.
+- [x] user nickname batch 조회 검증.
 
 ### 6. 문서 정합성 구현
 
