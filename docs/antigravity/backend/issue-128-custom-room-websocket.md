@@ -331,18 +331,18 @@ sequenceDiagram
 
 ### 9. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 4-5 endpoint와 정책 반영.
-- [ ] issue-126과 HTTP/WebSocket 책임이 충돌하지 않는지 확인.
-- [ ] 후속 4-6 `ROOM_STARTED` 범위와 충돌하지 않는지 확인.
-- [ ] issue-128 PR 섹션 보강.
+- [x] `docs/last-구현.md` Section 4-5 endpoint와 정책 반영.
+- [x] issue-126과 HTTP/WebSocket 책임이 충돌하지 않는지 확인.
+- [x] 후속 4-6 `ROOM_STARTED` 범위와 충돌하지 않는지 확인.
+- [x] issue-128 PR 섹션 보강.
 
 ### 10. 검증
 
-- [ ] `./gradlew :league-of-star-core:test`
-- [ ] `./gradlew :league-of-star-api:test`
-- [ ] `./gradlew test`
-- [ ] `./gradlew build`
-- [ ] `git diff --check`
+- [x] `./gradlew :league-of-star-core:test`
+- [x] `./gradlew :league-of-star-api:test`
+- [x] `./gradlew test`
+- [x] `./gradlew build`
+- [x] `git diff --check`
 
 ## Implementation Policy
 
@@ -432,7 +432,12 @@ flowchart TD
 - 프론트 CustomRoomPage WebSocket 연결은 후속 프론트 이슈 범위임.
 - Redis/pub-sub 기반 멀티 인스턴스 broadcast는 제외함.
 - 새 패키지 추가 없음.
-- 검증 결과를 PR 작성 시 기록함.
+- 검증 결과:
+  - `./gradlew :league-of-star-core:test` 통과함.
+  - `./gradlew :league-of-star-api:test` 통과함.
+  - `./gradlew test` 통과함.
+  - `./gradlew build` 통과함.
+  - `git diff --check` 통과함.
 
 ## 📌 Related Issue
 

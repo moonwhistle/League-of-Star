@@ -689,7 +689,7 @@ Acceptance Criteria:
 - [x] 정원 초과, 시작된 방, 닫힌 방 참가가 거부된다.
 - [x] 방장 퇴장 시 방이 닫힌다.
 
-### 4-5. [ ] Custom Room WebSocket 동기화 계약
+### 4-5. [x] Custom Room WebSocket 동기화 계약
 
 담당: Backend
 
@@ -697,30 +697,30 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 사용자 지정 방 페이지에서 참가자 입장/퇴장과 방 상태 변경을 실시간으로 받을 수 있게 한다.
+- [x] 사용자 지정 방 페이지에서 참가자 입장/퇴장과 방 상태 변경을 실시간으로 받을 수 있게 한다.
 
 Backend:
 
-- [ ] WebSocket endpoint를 확정한다.
+- [x] WebSocket endpoint를 확정한다.
   - `/ws/custom-games/rooms/{roomId}?token={accessToken}`
-- [ ] token query parameter 인증 정책을 기존 Game WebSocket과 맞춘다.
-- [ ] room participant만 연결을 허용한다.
-- [ ] room별 session registry를 구현한다.
-- [ ] `ROOM_UPDATED` event payload를 확정한다.
-- [ ] `ROOM_CLOSED` event payload를 확정한다.
-- [ ] join/leave command 이후 room 상태 broadcast를 연결한다.
+- [x] token query parameter 인증 정책을 기존 Game WebSocket과 맞춘다.
+- [x] room participant만 연결을 허용한다.
+- [x] room별 session registry를 구현한다.
+- [x] `ROOM_UPDATED` event payload를 확정한다.
+- [x] `ROOM_CLOSED` event payload를 확정한다.
+- [x] join/leave command 이후 room 상태 broadcast를 연결한다.
 
 Policy:
 
-- [ ] Room WebSocket은 CustomRoomPage에서만 연결한다.
-- [ ] HTTP join/leave 응답은 command 결과이고, 다른 참가자 반영은 WebSocket event로 전달한다.
-- [ ] Room WebSocket은 게임 플레이 WebSocket과 분리한다.
+- [x] Room WebSocket은 CustomRoomPage에서만 연결한다.
+- [x] HTTP join/leave 응답은 command 결과이고, 다른 참가자 반영은 WebSocket event로 전달한다.
+- [x] Room WebSocket은 게임 플레이 WebSocket과 분리한다.
 
 Acceptance Criteria:
 
-- [ ] 참가자 입장/퇴장 시 room 참여자에게 최신 room state가 broadcast된다.
-- [ ] 닫힌 방은 `ROOM_CLOSED`로 전달된다.
-- [ ] 참가자가 아닌 사용자는 room socket에 연결할 수 없다.
+- [x] 참가자 입장/퇴장 시 room 참여자에게 최신 room state가 broadcast된다.
+- [x] 닫힌 방은 `ROOM_CLOSED`로 전달된다.
+- [x] 참가자가 아닌 사용자는 room socket에 연결할 수 없다.
 
 ### 4-6. [ ] Custom Game Start API / ROOM_STARTED 계약
 
@@ -991,7 +991,7 @@ Policy:
 13. [x] Section 4-1/4-2. 연습 모드
 14. [x] Section 4-3. Custom Room 생성 / 공개 목록 / 조회 API 계약
 15. [x] Section 4-4. Custom Room 초대 참가 / 나가기 API 계약
-16. [ ] Section 4-5. Custom Room WebSocket 동기화 계약
+16. [x] Section 4-5. Custom Room WebSocket 동기화 계약
 17. [ ] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
 18. [ ] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 19. [ ] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
