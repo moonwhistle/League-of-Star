@@ -258,13 +258,13 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 
 ### 3. Core Repository 구현
 
-- [ ] `CustomGameRoomRepository.findByInviteCodeForUpdate(inviteCode)` 구현.
-- [ ] `CustomGameRoomRepository.findByIdForUpdate(roomId)` 구현.
-- [ ] lock 조회는 `@Lock(PESSIMISTIC_WRITE)`를 사용.
-- [ ] `CustomGameParticipantRepository.deleteByCustomRoomIdAndUserId(customRoomId, userId)` 구현.
-- [ ] `CustomGameParticipantRepository.deleteByCustomRoomId(customRoomId)` 구현.
-- [ ] participant count/exists 기존 메서드를 join/leave command에 연결.
-- [ ] 동시 join 정원 초과 방어를 room lock 기준으로 검증.
+- [x] `CustomGameRoomRepository.findByInviteCodeForUpdate(inviteCode)` 구현.
+- [x] `CustomGameRoomRepository.findByIdForUpdate(roomId)` 구현.
+- [x] lock 조회는 `@Lock(PESSIMISTIC_WRITE)`를 사용.
+- [x] `CustomGameParticipantRepository.deleteByCustomRoomIdAndUserId(customRoomId, userId)` 구현.
+- [x] `CustomGameParticipantRepository.deleteByCustomRoomId(customRoomId)` 구현.
+- [x] participant count/exists 기존 메서드를 join/leave command에 연결.
+- [x] 동시 join 정원 초과 방어를 room lock 기준으로 검증.
 
 ### 4. Custom Room API 구현
 
