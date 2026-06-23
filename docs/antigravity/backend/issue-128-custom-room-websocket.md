@@ -379,51 +379,73 @@ sequenceDiagram
 
 사용자 지정 방 대기실의 실시간 동기화를 위한 Custom Room WebSocket을 구현함.
 
-이번 PR은 방에 들어가고 나가는 HTTP command를 대체하지 않는다. HTTP command가 DB 상태를 바꾸고, WebSocket은 그 결과를 같은 방 참가자 화면에 전달한다.
+이번 PR은 “방에 누가 들어왔고 누가 나갔는지”를 같은 대기실에 있는 사람들에게 바로 알려주는 작업이다. 사용자가 방에 실제로 들어가거나 나가는 처리는 기존 HTTP API가 담당하고, WebSocket은 그 결과를 화면에 실시간으로 알려준다.
 
 ```mermaid
 flowchart TD
-    A["join/leave HTTP command"] --> B["DB room/participant 변경"]
-    B --> C["CustomRoomResponse 조립"]
-    C --> D["HTTP 응답"]
-    C --> E["afterCommit WebSocket broadcast"]
-    E --> F{"room status"}
-    F -->|WAITING| G["ROOM_UPDATED"]
-    F -->|CLOSED| H["ROOM_CLOSED + sessions close"]
+    A["사용자 지정 방 페이지 진입"] --> B["Room WebSocket 연결"]
+    B --> C["token + room participant 검증"]
+    C --> D{"연결 허용?"}
+    D -->|NO| E["401 / 400 / 403으로 거부"]
+    D -->|YES| F["현재 room state ROOM_UPDATED 전송"]
+
+    G["join/leave HTTP 성공"] --> H["DB room/participant 변경 commit"]
+    H --> I{"room 상태"}
+    I -->|WAITING| J["ROOM_UPDATED broadcast"]
+    I -->|CLOSED| K["ROOM_CLOSED broadcast"]
+    K --> L["room sessions close/unregister"]
 ```
 
 핵심 정책:
 
-- WebSocket 연결은 DB 참가 상태를 만들지 않음.
-- 실제 참가/나가기는 HTTP command만 수행함.
-- disconnect/error는 session 제거만 수행하고 DB leave로 처리하지 않음.
-- 다른 참가자 화면 반영은 `ROOM_UPDATED`, `ROOM_CLOSED` event 기준으로 처리함.
-- Custom Room WebSocket은 Game WebSocket과 분리함.
+- WebSocket 연결만으로는 방에 들어간 것으로 처리하지 않음.
+- 실제 참가/나가기는 HTTP join/leave API만 수행함.
+- WebSocket disconnect/error는 DB leave가 아니며 session registry에서만 제거함.
+- 다른 참가자 화면 갱신은 `ROOM_UPDATED`, `ROOM_CLOSED` event로 전달함.
+- `ROOM_STARTED`와 게임 시작 이동은 후속 4-6 범위로 남김.
 
 백엔드와의 구현 계약:
 
 - WebSocket endpoint는 `/ws/custom-games/rooms/{roomId}?token={accessToken}`임.
 - token은 query parameter로 전달함.
 - handshake에서 core read service로 room participant 여부를 검증함.
-- event payload는 `CustomRoomResponse`를 재사용함.
-- `ROOM_STARTED`는 후속 4-6에서 구현함.
+- 연결 성공 시 현재 room state를 `ROOM_UPDATED`로 1회 전송함.
+- join/leave command commit 이후 `ROOM_UPDATED` 또는 `ROOM_CLOSED`를 broadcast함.
+- event payload는 HTTP room 응답과 같은 `CustomRoomResponse`를 재사용함.
 
 ## 📚 Changes
 
-- HTTP command와 WebSocket event 책임을 분리함.
-  join/leave HTTP API는 DB 상태 변경 source이고, WebSocket은 다른 참가자에게 최신 상태를 알리는 채널이다. 이 둘을 섞지 않아야 새로고침이나 연결 끊김이 의도치 않은 leave로 처리되지 않는다.
+- 방에 들어가는 일과 화면을 갱신하는 일을 분리함.
+  사용자가 방에 참가하는 실제 행동은 `join` HTTP API가 처리한다. WebSocket 연결은 “이미 방에 참가한 사용자의 화면을 실시간으로 갱신하는 통로”일 뿐이다. 이렇게 나누면 페이지를 새로고침하거나 WebSocket이 끊겼을 때 서버가 사용자를 방에서 나간 것으로 착각하지 않는다.
 
-- disconnect를 leave로 처리하지 않음.
-  브라우저 새로고침, 모바일 네트워크 흔들림, 탭 일시 중단은 모두 WebSocket disconnect로 보일 수 있다. 이때 participant row를 삭제하면 사용자가 의도하지 않았는데 방에서 나가게 된다. 그래서 disconnect는 session registry에서만 제거하고, 실제 나가기는 leave API로만 처리한다.
+- 연결 직후 현재 방 상태를 한 번 내려줌.
+  사용자가 CustomRoomPage에 들어오면 WebSocket handshake를 통과한 뒤 바로 `ROOM_UPDATED`를 받는다. 그래서 화면은 별도 추측 없이 서버가 알고 있는 최신 참가자 목록을 기준으로 그려진다.
 
-- core/api 책임을 분리함.
-  room participant 검증은 core read service에서 수행한다. api 모듈은 WebSocket handshake, session 관리, message 전송만 담당한다. 이렇게 해야 start API와 후속 WebSocket 이슈에서도 같은 participant 검증 정책을 재사용할 수 있다.
+- join/leave 성공 후 같은 방 참가자에게 알려줌.
+  누군가 방에 들어오면 `ROOM_UPDATED`가 나가고, 일반 참가자가 나가도 `ROOM_UPDATED`가 나간다. 방장이 나가면 방 자체가 닫히므로 `ROOM_CLOSED`를 보내고 해당 방의 WebSocket session을 정리한다.
+
+```mermaid
+flowchart LR
+    A["HTTP join/leave"] --> B["DB 상태 변경"]
+    B --> C["afterCommit"]
+    C --> D{"결과"}
+    D -->|참가/일반 leave| E["ROOM_UPDATED"]
+    D -->|방장 leave| F["ROOM_CLOSED"]
+    G["WebSocket disconnect/error"] --> H["session registry만 제거"]
+    H --> I["DB participant 유지"]
+```
 
 - afterCommit broadcast로 커밋 전 이벤트 전송을 막음.
-  DB 변경이 rollback되었는데 WebSocket event만 먼저 나가면 화면과 DB가 어긋난다. join/leave 성공 이벤트는 transaction commit 이후에 전송하도록 해서 클라이언트가 받은 event가 실제 DB 상태와 맞게 한다.
+  DB 변경이 확정되기 전에 WebSocket event가 먼저 나가면, 화면에는 들어온 것처럼 보이는데 실제 DB에는 저장되지 않는 상태가 생길 수 있다. 그래서 join/leave event는 commit 이후에 보내도록 했다. transaction이 이미 끝난 상태에서는 즉시 보낸다.
+
+- core/api 책임을 유지함.
+  “이 사용자가 이 방 참가자인가?” 같은 도메인 검증은 core read service에서 수행한다. API 모듈은 WebSocket handshake, session registry, message 전송만 맡는다. 이 구조 덕분에 후속 start API에서도 같은 참가자 검증 정책을 재사용할 수 있다.
 
 - Custom Room WebSocket을 Game WebSocket과 분리함.
-  Game WebSocket은 READY, RTT, LIGHTNING, GAME_RESULT 같은 게임 진행 상태를 다룬다. Custom Room WebSocket은 대기실 참가자 목록과 room lifecycle만 다룬다. 역할이 다르므로 endpoint, DTO, registry를 분리해 후속 게임 시작 로직과 섞이지 않게 한다.
+  Game WebSocket은 READY, RTT, LIGHTNING, GAME_RESULT처럼 게임 진행 중의 일을 다룬다. Custom Room WebSocket은 대기실에서 참가자 목록과 방 닫힘만 다룬다. 역할이 다르므로 endpoint, DTO, registry를 분리해 후속 게임 시작 로직과 섞이지 않게 했다.
+
+- local memory session registry를 선택함.
+  이번 범위는 MVP 기준으로 현재 API 인스턴스에 붙은 WebSocket session을 관리한다. 구조가 단순하고 빠르지만, 여러 API 인스턴스가 동시에 떠 있는 운영 환경에서는 같은 room 사용자가 같은 인스턴스로 붙거나 Redis/pub-sub 같은 broadcast 확장이 필요하다. 그 확장은 이번 PR 범위에서 제외했다.
 
 ## 📝 Note
 
