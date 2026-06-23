@@ -271,16 +271,16 @@ sequenceDiagram
 
 ### 4. Session Registry 구현
 
-- [ ] `CustomRoomWebSocketSessionAttribute` 구현.
-- [ ] `CustomRoomWebSocketSession` 구현.
-- [ ] `CustomRoomWebSocketSessionRegistry` 구현.
-- [ ] roomId/userId/sessionId 기준 등록 구현.
-- [ ] 같은 room/user 재연결 시 기존 session close 후 교체.
-- [ ] sessionId 기준 unregister 구현.
-- [ ] roomId 기준 session 목록 조회 구현.
-- [ ] userId 기준 session close/unregister 구현.
-- [ ] roomId 기준 전체 session close/unregister 구현.
-- [ ] disconnect/error는 DB 상태를 바꾸지 않음.
+- [x] `CustomRoomWebSocketSessionAttribute` 구현.
+- [x] `CustomRoomWebSocketSession` 구현.
+- [x] `CustomRoomWebSocketSessionRegistry` 구현.
+- [x] roomId/userId/sessionId 기준 등록 구현.
+- [x] 같은 room/user 재연결 시 기존 session close 후 교체.
+- [x] sessionId 기준 unregister 구현.
+- [x] roomId 기준 session 목록 조회 구현.
+- [x] userId 기준 session close/unregister 구현.
+- [x] roomId 기준 전체 session close/unregister 구현.
+- [x] disconnect/error는 DB 상태를 바꾸지 않음.
 
 ### 5. Message DTO / Sender 구현
 
