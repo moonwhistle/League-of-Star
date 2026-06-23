@@ -604,7 +604,7 @@ Acceptance Criteria:
 - [x] LIGHTNING 입력을 테스트할 수 있다.
 - [x] 연습 결과가 랭크/전적에 반영되지 않는다.
 
-### 4-3. [ ] Custom Room 생성 / 공개 목록 / 조회 API 계약
+### 4-3. [x] Custom Room 생성 / 공개 목록 / 조회 API 계약
 
 담당: Backend
 
@@ -612,23 +612,23 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 사용자가 사용자 지정 게임 방을 만들고, 공개 대기실 목록 또는 초대 코드로 방 상태를 조회할 수 있게 한다.
-- [ ] 초대 링크의 기반이 되는 `inviteCode`를 방 생성 시 발급한다.
+- [x] 사용자가 사용자 지정 게임 방을 만들고, 공개 대기실 목록 또는 초대 코드로 방 상태를 조회할 수 있게 한다.
+- [x] 초대 링크의 기반이 되는 `inviteCode`를 방 생성 시 발급한다.
 
 Backend:
 
-- [ ] endpoint를 확정한다.
-- [ ] `POST /api/v1/custom-games/rooms`
-- [ ] `GET /api/v1/custom-games/rooms`
-- [ ] `GET /api/v1/custom-games/rooms/invites/{inviteCode}`
-- [ ] `CustomGameRoom`, `CustomGameParticipant` 기본 모델을 구현한다.
-- [ ] 방 생성자는 `OWNER` participant로 저장한다.
-- [ ] 최대 인원은 2명으로 고정한다.
-- [ ] room status는 `WAITING | STARTED | CLOSED`로 둔다.
-- [ ] `inviteCode`는 공유용 public key로 발급하고 unique 정책을 둔다.
-- [ ] 모든 `WAITING` custom room은 공개 대기실 목록에 노출한다.
-- [ ] 대기실 이름은 `{ownerNickname}'s room`으로 반환한다.
-- [ ] room state response를 확정한다.
+- [x] endpoint를 확정한다.
+- [x] `POST /api/v1/custom-games/rooms`
+- [x] `GET /api/v1/custom-games/rooms`
+- [x] `GET /api/v1/custom-games/rooms/invites/{inviteCode}`
+- [x] `CustomGameRoom`, `CustomGameParticipant` 기본 모델을 구현한다.
+- [x] 방 생성자는 `OWNER` participant로 저장한다.
+- [x] 최대 인원은 2명으로 고정한다.
+- [x] room status는 `WAITING | STARTED | CLOSED`로 둔다.
+- [x] `inviteCode`는 공유용 public key로 발급하고 unique 정책을 둔다.
+- [x] 모든 `WAITING` custom room은 공개 대기실 목록에 노출한다.
+- [x] 대기실 이름은 `{ownerNickname}'s room`으로 반환한다.
+- [x] room state response를 확정한다.
   - `roomId`
   - `roomName`
   - `inviteCode`
@@ -636,23 +636,23 @@ Backend:
   - `status`
   - `maxParticipants`
   - `participants`
-- [ ] 참가자 nickname은 user id를 모아 batch 조회한다.
-- [ ] RestDocs와 ErrorResponse를 정리한다.
+- [x] 참가자 nickname은 user id를 모아 batch 조회한다.
+- [x] RestDocs와 ErrorResponse를 정리한다.
 
 Policy:
 
-- [ ] core 모듈은 room/participant 영속성 계층과 도메인 규칙을 담당한다.
-- [ ] api 모듈은 repository에 직접 접근하지 않고 core service를 사용한다.
-- [ ] inviteCode는 roomId를 직접 공유하지 않기 위한 초대 식별자다.
-- [ ] roomName은 저장값이 아니라 owner nickname 기반 표시값이다.
-- [ ] inviteCode 공개 조회는 참가 처리가 아니라 방 미리보기 용도다.
-- [ ] 이번 이슈에서는 참가, 나가기, WebSocket, 게임 시작을 구현하지 않는다.
+- [x] core 모듈은 room/participant 영속성 계층과 도메인 규칙을 담당한다.
+- [x] api 모듈은 repository에 직접 접근하지 않고 core service를 사용한다.
+- [x] inviteCode는 roomId를 직접 공유하지 않기 위한 초대 식별자다.
+- [x] roomName은 저장값이 아니라 owner nickname 기반 표시값이다.
+- [x] inviteCode 공개 조회는 참가 처리가 아니라 방 미리보기 용도다.
+- [x] 이번 이슈에서는 참가, 나가기, WebSocket, 게임 시작을 구현하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 방 생성 시 owner participant와 inviteCode가 함께 생성된다.
-- [ ] 공개 대기실 목록 또는 초대 코드로 참가 가능한 방 상태를 확인할 수 있다.
-- [ ] custom room의 기본 모델과 API 문서가 정리된다.
+- [x] 방 생성 시 owner participant와 inviteCode가 함께 생성된다.
+- [x] 공개 대기실 목록 또는 초대 코드로 참가 가능한 방 상태를 확인할 수 있다.
+- [x] custom room의 기본 모델과 API 문서가 정리된다.
 
 ### 4-4. [ ] Custom Room 초대 참가 / 나가기 API 계약
 

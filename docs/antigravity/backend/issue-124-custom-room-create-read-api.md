@@ -296,19 +296,19 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 4-3 endpoint를 공개 목록/초대 코드 조회 기준으로 보정.
-- [ ] 후속 4-4 join API가 inviteCode를 사용함을 문서와 충돌 없게 확인.
-- [ ] 후속 4-8 프론트 대기실 목록/초대 링크 구현이 공개 목록과 inviteCode 기반임을 확인.
-- [ ] issue-124 PR 섹션 보강.
+- [x] `docs/last-구현.md` Section 4-3 endpoint를 공개 목록/초대 코드 조회 기준으로 보정.
+- [x] 후속 4-4 join API가 inviteCode를 사용함을 문서와 충돌 없게 확인.
+- [x] 후속 4-8 프론트 대기실 목록/초대 링크 구현이 공개 목록과 inviteCode 기반임을 확인.
+- [x] issue-124 PR 섹션 보강.
 
 ### 7. 검증
 
-- [ ] `./gradlew :league-of-star-core:test`
-- [ ] `./gradlew :league-of-star-api:test`
-- [ ] `./gradlew test`
-- [ ] `./gradlew build`
-- [ ] RestDocs snippet 생성 확인.
-- [ ] `git diff --check`
+- [x] `./gradlew :league-of-star-core:test`
+- [x] `./gradlew :league-of-star-api:test`
+- [x] `./gradlew test`
+- [x] `./gradlew build`
+- [x] RestDocs snippet 생성 확인.
+- [x] `git diff --check`
 
 ## Implementation Policy
 
@@ -408,7 +408,9 @@ flowchart TD
 - custom game 랭크 제외 / 전적 기록은 후속 4-7 범위임.
 - 프론트 초대 링크 UI는 후속 4-8 범위임.
 - 새 패키지 추가 없음.
-- 검증 결과를 PR 작성 시 기록함.
+- 검증 완료함.
+  `./gradlew :league-of-star-core:test`, `./gradlew :league-of-star-api:test`, `./gradlew test`, `./gradlew build`, `git diff --check` 통과함.
+  RestDocs snippet은 `custom-room-create`, `custom-room-create-active-exists`, `custom-room-public-list`, `custom-room-invite-preview`, `custom-room-invite-preview-not-found` 생성을 확인함.
 
 ## 📌 Related Issue
 
