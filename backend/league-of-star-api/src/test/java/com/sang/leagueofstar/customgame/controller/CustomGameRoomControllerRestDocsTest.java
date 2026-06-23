@@ -1,0 +1,269 @@
+package com.sang.leagueofstar.customgame.controller;
+
+import com.sang.leagueofstar.common.exception.CoreErrorCode;
+import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.common.path.customgame.CustomGamePath;
+import com.sang.leagueofstar.customgame.controller.response.CustomRoomListItemResponse;
+import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
+import com.sang.leagueofstar.customgame.controller.response.CustomRoomParticipantResponse;
+import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
+import com.sang.leagueofstar.customgame.service.CustomGameRoomService;
+import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
+import com.sang.leagueofstar.global.restdocs.RestDocsSupport;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.MethodParameter;
+import org.springframework.restdocs.payload.JsonFieldType;
+import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;
+
+import java.util.List;
+
+import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+import static com.epages.restdocs.apispec.ResourceDocumentation.headerWithName;
+import static com.epages.restdocs.apispec.ResourceDocumentation.parameterWithName;
+import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+
+class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
+
+    private static final Long USER_ID = 1L;
+
+    private final CustomGameRoomService customGameRoomService = mock(CustomGameRoomService.class);
+
+    @Override
+    protected Object initController() {
+        return new CustomGameRoomController(customGameRoomService);
+    }
+
+    @Override
+    protected HandlerMethodArgumentResolver[] customArgumentResolvers() {
+        return new HandlerMethodArgumentResolver[]{
+                new HandlerMethodArgumentResolver() {
+                    @Override
+                    public boolean supportsParameter(MethodParameter parameter) {
+                        return parameter.hasParameterAnnotation(AuthUser.class);
+                    }
+
+                    @Override
+                    public Object resolveArgument(
+                            MethodParameter parameter,
+                            ModelAndViewContainer mavContainer,
+                            NativeWebRequest webRequest,
+                            WebDataBinderFactory binderFactory
+                    ) {
+                        return USER_ID;
+                    }
+                }
+        };
+    }
+
+    @Test
+    @DisplayName("Custom Room 생성 API 문서화")
+    void createRoom() {
+        // given
+        when(customGameRoomService.createRoom(USER_ID)).thenReturn(roomResponse());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE)
+                .then()
+                .statusCode(200)
+                .apply(document("custom-room-create",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 생성")
+                                .description("""
+                                        로그인 사용자의 사용자 지정 방을 생성합니다.
+
+                                        이번 API는 게임 시작이 아니라 대기실 생성 계약입니다.
+                                        생성자는 OWNER participant로 저장되고, 후속 join/start 이슈에서 이 room을 이어받습니다.
+                                        """)
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .responseFields(roomResponseFields())
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Room 생성 중복 실패 응답 문서화")
+    void createRoomActiveExists() {
+        // given
+        when(customGameRoomService.createRoom(USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_ACTIVE_EXISTS));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE)
+                .then()
+                .statusCode(409)
+                .apply(document("custom-room-create-active-exists",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 생성 실패 - 대기 중인 방 존재")
+                                .description("방장은 `WAITING` custom room을 1개만 가질 수 있습니다.")
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .responseFields(errorResponseFields("대기 중인 방 존재 응답에서는 null"))
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Room 공개 목록 API 문서화")
+    void getPublicRooms() {
+        // given
+        when(customGameRoomService.getPublicRooms()).thenReturn(roomListResponse());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .when()
+                .get(CustomGamePath.CUSTOM_ROOM_BASE)
+                .then()
+                .statusCode(200)
+                .apply(document("custom-room-public-list",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 공개 대기실 목록")
+                                .description("""
+                                        모든 `WAITING` custom room을 공개 목록으로 조회합니다.
+
+                                        이 API는 참가 처리를 하지 않습니다.
+                                        사용자가 목록에서 방을 선택하면 후속 join API가 실제 참가 source of truth가 됩니다.
+                                        """)
+                                .responseFields(
+                                        fieldWithPath("rooms[]").type(JsonFieldType.ARRAY).description("공개 대기실 목록"),
+                                        fieldWithPath("rooms[].roomId").type(JsonFieldType.NUMBER).description("custom room ID"),
+                                        fieldWithPath("rooms[].roomName").type(JsonFieldType.STRING).description("표시용 방 이름. `{ownerNickname}'s room`"),
+                                        fieldWithPath("rooms[].inviteCode").type(JsonFieldType.STRING).description("초대 링크용 public key"),
+                                        fieldWithPath("rooms[].ownerUserId").type(JsonFieldType.NUMBER).description("방장 userId"),
+                                        fieldWithPath("rooms[].status").type(JsonFieldType.STRING).description("room 상태. 공개 목록은 `WAITING`만 반환"),
+                                        fieldWithPath("rooms[].maxParticipants").type(JsonFieldType.NUMBER).description("최대 참가 인원. MVP는 2명"),
+                                        fieldWithPath("rooms[].currentParticipants").type(JsonFieldType.NUMBER).description("현재 참가자 수")
+                                )
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Room invite preview API 문서화")
+    void getInvitePreview() {
+        // given
+        when(customGameRoomService.getInvitePreview("AB12CD")).thenReturn(roomResponse());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .when()
+                .get(CustomGamePath.CUSTOM_ROOM_BASE + CustomGamePath.INVITES + "/{inviteCode}", "AB12CD")
+                .then()
+                .statusCode(200)
+                .apply(document("custom-room-invite-preview",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 초대 코드 미리보기")
+                                .description("""
+                                        초대 코드로 `WAITING` custom room 상태를 조회합니다.
+
+                                        이 API는 인증 없이 호출할 수 있는 preview API이며 참가 처리는 하지 않습니다.
+                                        실제 참가는 후속 join API에서 인증 사용자 기준으로 처리합니다.
+                                        """)
+                                .pathParameters(
+                                        parameterWithName("inviteCode").description("초대 코드")
+                                )
+                                .responseFields(roomResponseFields())
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Room invite preview not found 응답 문서화")
+    void getInvitePreviewNotFound() {
+        // given
+        when(customGameRoomService.getInvitePreview("NONE"))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .when()
+                .get(CustomGamePath.CUSTOM_ROOM_BASE + CustomGamePath.INVITES + "/{inviteCode}", "NONE")
+                .then()
+                .statusCode(404)
+                .apply(document("custom-room-invite-preview-not-found",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 초대 코드 미리보기 실패 - 방 없음")
+                                .description("초대 코드에 해당하는 custom room이 없으면 전역 `ErrorResponse` 형식으로 응답합니다.")
+                                .pathParameters(
+                                        parameterWithName("inviteCode").description("초대 코드")
+                                )
+                                .responseFields(errorResponseFields("방 없음 응답에서는 null"))
+                                .build()
+                        )
+                ));
+    }
+
+    private CustomRoomResponse roomResponse() {
+        return new CustomRoomResponse(
+                100L,
+                "Host's room",
+                "AB12CD",
+                USER_ID,
+                "WAITING",
+                2,
+                List.of(new CustomRoomParticipantResponse(USER_ID, "Host", "OWNER"))
+        );
+    }
+
+    private CustomRoomListResponse roomListResponse() {
+        return new CustomRoomListResponse(List.of(new CustomRoomListItemResponse(
+                100L,
+                "Host's room",
+                "AB12CD",
+                USER_ID,
+                "WAITING",
+                2,
+                1
+        )));
+    }
+
+    private org.springframework.restdocs.payload.FieldDescriptor[] roomResponseFields() {
+        return new org.springframework.restdocs.payload.FieldDescriptor[]{
+                fieldWithPath("roomId").type(JsonFieldType.NUMBER).description("custom room ID"),
+                fieldWithPath("roomName").type(JsonFieldType.STRING).description("표시용 방 이름. `{ownerNickname}'s room`"),
+                fieldWithPath("inviteCode").type(JsonFieldType.STRING).description("초대 링크용 public key"),
+                fieldWithPath("ownerUserId").type(JsonFieldType.NUMBER).description("방장 userId"),
+                fieldWithPath("status").type(JsonFieldType.STRING).description("room 상태"),
+                fieldWithPath("maxParticipants").type(JsonFieldType.NUMBER).description("최대 참가 인원. MVP는 2명"),
+                fieldWithPath("participants[]").type(JsonFieldType.ARRAY).description("현재 참가자 목록"),
+                fieldWithPath("participants[].userId").type(JsonFieldType.NUMBER).description("참가자 userId"),
+                fieldWithPath("participants[].nickname").type(JsonFieldType.STRING).description("참가자 닉네임"),
+                fieldWithPath("participants[].role").type(JsonFieldType.STRING).description("참가자 역할. `OWNER` 또는 `PLAYER`")
+        };
+    }
+
+    private org.springframework.restdocs.payload.FieldDescriptor[] errorResponseFields(String errorsDescription) {
+        return new org.springframework.restdocs.payload.FieldDescriptor[]{
+                fieldWithPath("timestamp").type(JsonFieldType.ARRAY).description("에러 발생 시각"),
+                fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
+                fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
+                fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
+                fieldWithPath("errors").type(JsonFieldType.NULL).description("필드 검증 에러 목록. " + errorsDescription)
+        };
+    }
+}

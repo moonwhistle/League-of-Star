@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.auth.security.config;
 
 import com.sang.leagueofstar.auth.service.CustomOAuth2UserService;
+import com.sang.leagueofstar.common.path.customgame.CustomGamePath;
 import com.sang.leagueofstar.common.path.security.SecurityPath;
 import com.sang.leagueofstar.auth.infrastructure.jwt.JwtTokenProvider;
 import com.sang.leagueofstar.auth.filter.JwtAuthenticationFilter;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -61,6 +63,11 @@ public class SecurityConfig {
 
             // 인가 경로 설정
             .authorizeHttpRequests(authorize -> authorize
+                .requestMatchers(
+                        HttpMethod.GET,
+                        CustomGamePath.CUSTOM_ROOM_PUBLIC_LIST,
+                        CustomGamePath.CUSTOM_ROOM_INVITE_PREVIEW_PATTERN
+                ).permitAll()
                 .requestMatchers(SecurityPath.AUTH_WHITELIST).permitAll()
                 .anyRequest().authenticated()
             )

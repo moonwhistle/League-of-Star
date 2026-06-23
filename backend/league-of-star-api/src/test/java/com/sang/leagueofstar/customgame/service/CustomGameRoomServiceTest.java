@@ -1,0 +1,165 @@
+package com.sang.leagueofstar.customgame.service;
+
+import com.sang.leagueofstar.common.exception.CoreErrorCode;
+import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
+import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
+import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
+import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
+import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
+import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomCommandService;
+import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomReadService;
+import com.sang.leagueofstar.domain.user.domain.User;
+import com.sang.leagueofstar.domain.user.service.UserReadService;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Collection;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+
+@ExtendWith(MockitoExtension.class)
+class CustomGameRoomServiceTest {
+
+    private static final Long OWNER_USER_ID = 1L;
+    private static final Long PLAYER_USER_ID = 2L;
+
+    @InjectMocks
+    private CustomGameRoomService customGameRoomService;
+
+    @Mock
+    private CustomGameRoomCommandService customGameRoomCommandService;
+
+    @Mock
+    private CustomGameRoomReadService customGameRoomReadService;
+
+    @Mock
+    private UserReadService userReadService;
+
+    @Test
+    @DisplayName("createRoom - core command 결과와 participant 조회 결과를 조합해 room response를 만든다")
+    void createRoom_ReturnRoomResponse() {
+        // given
+        CustomGameRoom room = room(100L, OWNER_USER_ID, "AB12CD");
+        List<CustomGameParticipant> participants = List.of(participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER));
+        given(customGameRoomCommandService.createRoom(OWNER_USER_ID)).willReturn(room);
+        given(customGameRoomReadService.getParticipants(100L)).willReturn(participants);
+        given(userReadService.findAllByIdsOrThrow(anyCollection())).willReturn(List.of(user(OWNER_USER_ID, "Host")));
+
+        // when
+        CustomRoomResponse response = customGameRoomService.createRoom(OWNER_USER_ID);
+
+        // then
+        assertThat(response.roomId()).isEqualTo(100L);
+        assertThat(response.roomName()).isEqualTo("Host's room");
+        assertThat(response.inviteCode()).isEqualTo("AB12CD");
+        assertThat(response.participants()).hasSize(1);
+        assertThat(response.participants().get(0).nickname()).isEqualTo("Host");
+        assertThat(response.participants().get(0).role()).isEqualTo("OWNER");
+        then(customGameRoomCommandService).should().createRoom(OWNER_USER_ID);
+        then(customGameRoomReadService).should().getParticipants(100L);
+    }
+
+    @Test
+    @DisplayName("getPublicRooms - WAITING room 목록과 participant count를 batch 조회로 조립한다")
+    void getPublicRooms_ReturnPublicRoomList() {
+        // given
+        CustomGameRoom firstRoom = room(100L, OWNER_USER_ID, "AB12CD");
+        CustomGameRoom secondRoom = room(101L, PLAYER_USER_ID, "EF34GH");
+        given(customGameRoomReadService.findWaitingRooms()).willReturn(List.of(firstRoom, secondRoom));
+        given(customGameRoomReadService.findParticipantsByRoomIds(anyCollection())).willReturn(List.of(
+                participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
+                participant(100L, PLAYER_USER_ID, CustomRoomParticipantRole.PLAYER),
+                participant(101L, PLAYER_USER_ID, CustomRoomParticipantRole.OWNER)
+        ));
+        given(userReadService.findAllByIdsOrThrow(anyCollection()))
+                .willReturn(List.of(user(OWNER_USER_ID, "Host"), user(PLAYER_USER_ID, "Guest")));
+
+        // when
+        CustomRoomListResponse response = customGameRoomService.getPublicRooms();
+
+        // then
+        assertThat(response.rooms()).hasSize(2);
+        assertThat(response.rooms().get(0).roomName()).isEqualTo("Host's room");
+        assertThat(response.rooms().get(0).currentParticipants()).isEqualTo(2);
+        assertThat(response.rooms().get(1).roomName()).isEqualTo("Guest's room");
+        assertThat(response.rooms().get(1).currentParticipants()).isEqualTo(1);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<Long>> roomIdsCaptor =
+                (ArgumentCaptor<Collection<Long>>) (ArgumentCaptor<?>) ArgumentCaptor.forClass(Collection.class);
+        then(customGameRoomReadService).should().findParticipantsByRoomIds(roomIdsCaptor.capture());
+        assertThat(roomIdsCaptor.getValue()).containsExactly(100L, 101L);
+        then(userReadService).should(times(1)).findAllByIdsOrThrow(anyCollection());
+        then(userReadService).should(never()).findById(OWNER_USER_ID);
+        then(userReadService).should(never()).findById(PLAYER_USER_ID);
+    }
+
+    @Test
+    @DisplayName("getInvitePreview - inviteCode 조회 결과와 participant nickname을 조립한다")
+    void getInvitePreview_ReturnRoomResponse() {
+        // given
+        CustomGameRoom room = room(100L, OWNER_USER_ID, "AB12CD");
+        given(customGameRoomReadService.getWaitingRoomByInviteCode("AB12CD")).willReturn(room);
+        given(customGameRoomReadService.getParticipants(100L)).willReturn(List.of(
+                participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
+                participant(100L, PLAYER_USER_ID, CustomRoomParticipantRole.PLAYER)
+        ));
+        given(userReadService.findAllByIdsOrThrow(anyCollection()))
+                .willReturn(List.of(user(OWNER_USER_ID, "Host"), user(PLAYER_USER_ID, "Guest")));
+
+        // when
+        CustomRoomResponse response = customGameRoomService.getInvitePreview("AB12CD");
+
+        // then
+        assertThat(response.roomId()).isEqualTo(100L);
+        assertThat(response.roomName()).isEqualTo("Host's room");
+        assertThat(response.participants()).extracting("nickname")
+                .containsExactly("Host", "Guest");
+    }
+
+    @Test
+    @DisplayName("getInvitePreview - inviteCode가 없으면 core 예외를 전달한다")
+    void getInvitePreview_NotFound_ThrowException() {
+        // given
+        given(customGameRoomReadService.getWaitingRoomByInviteCode("NONE"))
+                .willThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomService.getInvitePreview("NONE"))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+        then(customGameRoomReadService).should(never()).getParticipants(100L);
+    }
+
+    private CustomGameRoom room(Long id, Long ownerUserId, String inviteCode) {
+        CustomGameRoom room = CustomGameRoom.create(ownerUserId, inviteCode);
+        ReflectionTestUtils.setField(room, "id", id);
+        return room;
+    }
+
+    private CustomGameParticipant participant(Long roomId, Long userId, CustomRoomParticipantRole role) {
+        return CustomGameParticipant.create(roomId, userId, role);
+    }
+
+    private User user(Long id, String nickname) {
+        return User.builder()
+                .id(id)
+                .email("user" + id + "@example.com")
+                .nickname(nickname)
+                .build();
+    }
+}
