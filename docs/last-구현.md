@@ -673,7 +673,7 @@ Backend:
 - [ ] 정원이 2명이면 참가를 거부한다.
 - [ ] 이미 참가한 사용자의 join은 idempotent하게 최신 room state를 반환한다.
 - [ ] 방장이 나가면 room을 `CLOSED`로 전환한다.
-- [ ] 일반 참가자가 나가면 participant left 상태를 반영한다.
+- [ ] 일반 참가자가 나가면 participant row를 삭제한다.
 - [ ] RestDocs와 ErrorResponse를 정리한다.
 
 Policy:

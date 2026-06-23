@@ -226,18 +226,18 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 
 ### 1. Backend Contract 정리
 
-- [ ] endpoint를 `POST /api/v1/custom-games/rooms/{inviteCode}/join`로 확정.
-- [ ] endpoint를 `POST /api/v1/custom-games/rooms/{roomId}/leave`로 확정.
-- [ ] join/leave request body 없음과 `@AuthUser Long userId` 인증 사용자 식별 정책 문서화.
-- [ ] join response shape를 기존 `CustomRoomResponse`로 확정.
-- [ ] leave response shape를 기존 `CustomRoomResponse`로 확정.
-- [ ] join은 inviteCode 기반 command임을 문서화.
-- [ ] leave는 roomId 기반 command임을 문서화.
-- [ ] 이미 참가한 사용자 join은 멱등적으로 현재 room state를 반환함을 문서화.
-- [ ] 일반 참가자 leave는 participant row 삭제임을 문서화.
-- [ ] 방장 leave는 room `CLOSED` 전환임을 문서화.
-- [ ] HTTP 응답은 command 결과이고 WebSocket broadcast는 후속 이슈임을 문서화.
-- [ ] core/api 책임 분리 정책 문서화.
+- [x] endpoint를 `POST /api/v1/custom-games/rooms/{inviteCode}/join`로 확정.
+- [x] endpoint를 `POST /api/v1/custom-games/rooms/{roomId}/leave`로 확정.
+- [x] join/leave request body 없음과 `@AuthUser Long userId` 인증 사용자 식별 정책 문서화.
+- [x] join response shape를 기존 `CustomRoomResponse`로 확정.
+- [x] leave response shape를 기존 `CustomRoomResponse`로 확정.
+- [x] join은 inviteCode 기반 command임을 문서화.
+- [x] leave는 roomId 기반 command임을 문서화.
+- [x] 이미 참가한 사용자 join은 멱등적으로 현재 room state를 반환함을 문서화.
+- [x] 일반 참가자 leave는 participant row 삭제임을 문서화.
+- [x] 방장 leave는 room `CLOSED` 전환임을 문서화.
+- [x] HTTP 응답은 command 결과이고 WebSocket broadcast는 후속 이슈임을 문서화.
+- [x] core/api 책임 분리 정책 문서화.
 
 ### 2. Core Join / Leave Command 구현
 
