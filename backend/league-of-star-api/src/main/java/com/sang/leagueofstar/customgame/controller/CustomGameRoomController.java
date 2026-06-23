@@ -36,4 +36,20 @@ public class CustomGameRoomController {
     ) {
         return ResponseEntity.ok(customGameRoomService.getInvitePreview(inviteCode));
     }
+
+    @PostMapping(CustomGamePath.JOIN)
+    public ResponseEntity<CustomRoomResponse> joinRoom(
+            @PathVariable(CustomGamePath.INVITE_CODE) String inviteCode,
+            @AuthUser Long userId
+    ) {
+        return ResponseEntity.ok(customGameRoomService.joinRoom(inviteCode, userId));
+    }
+
+    @PostMapping(CustomGamePath.LEAVE)
+    public ResponseEntity<CustomRoomResponse> leaveRoom(
+            @PathVariable(CustomGamePath.ROOM_ID) Long roomId,
+            @AuthUser Long userId
+    ) {
+        return ResponseEntity.ok(customGameRoomService.leaveRoom(roomId, userId));
+    }
 }

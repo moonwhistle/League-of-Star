@@ -15,4 +15,8 @@ public interface CustomGameParticipantRepository extends JpaRepository<CustomGam
     List<CustomGameParticipant> findByCustomRoomIdOrderByIdAsc(Long customRoomId);
 
     List<CustomGameParticipant> findByCustomRoomIdInOrderByCustomRoomIdAscIdAsc(Collection<Long> customRoomIds);
+
+    void deleteByCustomRoomIdAndUserId(Long customRoomId, Long userId);
+
+    void deleteByCustomRoomId(Long customRoomId);
 }

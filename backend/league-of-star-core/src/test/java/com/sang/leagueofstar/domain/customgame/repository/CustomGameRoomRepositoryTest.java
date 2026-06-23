@@ -4,13 +4,16 @@ import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
+import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -109,6 +112,40 @@ class CustomGameRoomRepositoryTest {
     }
 
     @Test
+    @DisplayName("findByInviteCodeForUpdate와 findByIdForUpdate는 room을 조회한다")
+    void findForUpdate_ReturnRoom() {
+        // given
+        CustomGameRoom room = customGameRoomRepository.saveAndFlush(CustomGameRoom.create(1L, "AB12CD"));
+
+        // when & then
+        assertThat(customGameRoomRepository.findByInviteCodeForUpdate("AB12CD"))
+                .isPresent()
+                .get()
+                .extracting(CustomGameRoom::getId)
+                .isEqualTo(room.getId());
+        assertThat(customGameRoomRepository.findByIdForUpdate(room.getId()))
+                .isPresent()
+                .get()
+                .extracting(CustomGameRoom::getInviteCode)
+                .isEqualTo("AB12CD");
+    }
+
+    @Test
+    @DisplayName("for update 조회 메서드는 PESSIMISTIC_WRITE lock을 사용한다")
+    void forUpdateMethods_UsePessimisticWriteLock() throws NoSuchMethodException {
+        // given
+        Method findByInviteCodeForUpdate =
+                CustomGameRoomRepository.class.getMethod("findByInviteCodeForUpdate", String.class);
+        Method findByIdForUpdate = CustomGameRoomRepository.class.getMethod("findByIdForUpdate", Long.class);
+
+        // when & then
+        assertThat(findByInviteCodeForUpdate.getAnnotation(Lock.class).value())
+                .isEqualTo(LockModeType.PESSIMISTIC_WRITE);
+        assertThat(findByIdForUpdate.getAnnotation(Lock.class).value())
+                .isEqualTo(LockModeType.PESSIMISTIC_WRITE);
+    }
+
+    @Test
     @DisplayName("participant는 customRoomId 간접참조로 조회하고 같은 room/user 중복을 막는다")
     void participantIndirectReference() {
         // given
@@ -152,5 +189,48 @@ class CustomGameRoomRepositoryTest {
                 1L,
                 CustomRoomParticipantRole.PLAYER
         ))).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("participant는 room/user 단위 또는 room 단위로 삭제할 수 있다")
+    void deleteParticipants() {
+        // given
+        CustomGameRoom firstRoom = customGameRoomRepository.saveAndFlush(CustomGameRoom.create(1L, "AB12CD"));
+        CustomGameRoom secondRoom = customGameRoomRepository.saveAndFlush(CustomGameRoom.create(2L, "EF34GH"));
+        customGameParticipantRepository.save(CustomGameParticipant.create(
+                firstRoom.getId(),
+                1L,
+                CustomRoomParticipantRole.OWNER
+        ));
+        customGameParticipantRepository.save(CustomGameParticipant.create(
+                firstRoom.getId(),
+                3L,
+                CustomRoomParticipantRole.PLAYER
+        ));
+        customGameParticipantRepository.save(CustomGameParticipant.create(
+                secondRoom.getId(),
+                2L,
+                CustomRoomParticipantRole.OWNER
+        ));
+        customGameParticipantRepository.flush();
+
+        // when
+        customGameParticipantRepository.deleteByCustomRoomIdAndUserId(firstRoom.getId(), 3L);
+        customGameParticipantRepository.flush();
+
+        // then
+        assertThat(customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(firstRoom.getId()))
+                .extracting(CustomGameParticipant::getUserId)
+                .containsExactly(1L);
+
+        // when
+        customGameParticipantRepository.deleteByCustomRoomId(firstRoom.getId());
+        customGameParticipantRepository.flush();
+
+        // then
+        assertThat(customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(firstRoom.getId())).isEmpty();
+        assertThat(customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(secondRoom.getId()))
+                .extracting(CustomGameParticipant::getUserId)
+                .containsExactly(2L);
     }
 }

@@ -122,6 +122,79 @@ class CustomGameRoomControllerTest {
                 .body("code", equalTo("CUSTOM_ROOM_006"));
     }
 
+    @Test
+    @DisplayName("joinRoom - 인증 사용자 기준으로 custom room에 참가한다")
+    void joinRoom() {
+        // given
+        when(customGameRoomService.joinRoom("AB12CD", USER_ID)).thenReturn(joinedRoomResponse());
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/AB12CD/join")
+                .then()
+                .statusCode(200)
+                .body("roomId", equalTo(100))
+                .body("participants[1].nickname", equalTo("Guest"))
+                .body("participants[1].role", equalTo("PLAYER"));
+
+        verify(customGameRoomService).joinRoom("AB12CD", USER_ID);
+    }
+
+    @Test
+    @DisplayName("joinRoom - 정원이 가득 찬 room이면 400을 반환한다")
+    void joinRoom_FullRoom() {
+        // given
+        when(customGameRoomService.joinRoom("AB12CD", USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_FULL));
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/AB12CD/join")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("CUSTOM_ROOM_001"));
+    }
+
+    @Test
+    @DisplayName("leaveRoom - 인증 사용자 기준으로 custom room에서 나간다")
+    void leaveRoom() {
+        // given
+        when(customGameRoomService.leaveRoom(100L, USER_ID)).thenReturn(roomResponse());
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/100/leave")
+                .then()
+                .statusCode(200)
+                .body("roomId", equalTo(100))
+                .body("participants[0].nickname", equalTo("Host"));
+
+        verify(customGameRoomService).leaveRoom(100L, USER_ID);
+    }
+
+    @Test
+    @DisplayName("leaveRoom - 참가하지 않은 사용자가 나가면 400을 반환한다")
+    void leaveRoom_InvalidParticipant() {
+        // given
+        when(customGameRoomService.leaveRoom(100L, USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/100/leave")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("CUSTOM_ROOM_003"));
+    }
+
     private CustomRoomResponse roomResponse() {
         return new CustomRoomResponse(
                 100L,
@@ -144,6 +217,21 @@ class CustomGameRoomControllerTest {
                 2,
                 1
         )));
+    }
+
+    private CustomRoomResponse joinedRoomResponse() {
+        return new CustomRoomResponse(
+                100L,
+                "Host's room",
+                "AB12CD",
+                USER_ID,
+                "WAITING",
+                2,
+                List.of(
+                        new CustomRoomParticipantResponse(USER_ID, "Host", "OWNER"),
+                        new CustomRoomParticipantResponse(2L, "Guest", "PLAYER")
+                )
+        );
     }
 
     private HandlerMethodArgumentResolver authUserArgumentResolver() {

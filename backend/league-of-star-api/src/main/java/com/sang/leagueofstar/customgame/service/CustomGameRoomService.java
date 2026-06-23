@@ -60,6 +60,16 @@ public class CustomGameRoomService {
         return toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
     }
 
+    public CustomRoomResponse joinRoom(String inviteCode, Long userId) {
+        CustomGameRoom room = customGameRoomCommandService.joinRoom(inviteCode, userId);
+        return toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
+    }
+
+    public CustomRoomResponse leaveRoom(Long roomId, Long userId) {
+        CustomGameRoom room = customGameRoomCommandService.leaveRoom(roomId, userId);
+        return toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
+    }
+
     private CustomRoomResponse toRoomResponse(CustomGameRoom room, List<CustomGameParticipant> participants) {
         Map<Long, User> usersById = findUsersById(responseUserIds(room, participants));
         List<CustomRoomParticipantResponse> participantResponses = participants.stream()

@@ -654,7 +654,7 @@ Acceptance Criteria:
 - [x] 공개 대기실 목록 또는 초대 코드로 참가 가능한 방 상태를 확인할 수 있다.
 - [x] custom room의 기본 모델과 API 문서가 정리된다.
 
-### 4-4. [ ] Custom Room 초대 참가 / 나가기 API 계약
+### 4-4. [x] Custom Room 초대 참가 / 나가기 API 계약
 
 담당: Backend
 
@@ -662,32 +662,32 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 초대 코드로 사용자 지정 방에 참가하고, 대기 중인 방에서 나갈 수 있게 한다.
+- [x] 초대 코드로 사용자 지정 방에 참가하고, 대기 중인 방에서 나갈 수 있게 한다.
 
 Backend:
 
-- [ ] endpoint를 확정한다.
-- [ ] `POST /api/v1/custom-games/rooms/{inviteCode}/join`
-- [ ] `POST /api/v1/custom-games/rooms/{roomId}/leave`
-- [ ] room이 `WAITING`일 때만 참가를 허용한다.
-- [ ] 정원이 2명이면 참가를 거부한다.
-- [ ] 이미 참가한 사용자의 join은 idempotent하게 최신 room state를 반환한다.
-- [ ] 방장이 나가면 room을 `CLOSED`로 전환한다.
-- [ ] 일반 참가자가 나가면 participant left 상태를 반영한다.
-- [ ] RestDocs와 ErrorResponse를 정리한다.
+- [x] endpoint를 확정한다.
+- [x] `POST /api/v1/custom-games/rooms/{inviteCode}/join`
+- [x] `POST /api/v1/custom-games/rooms/{roomId}/leave`
+- [x] room이 `WAITING`일 때만 참가를 허용한다.
+- [x] 정원이 2명이면 참가를 거부한다.
+- [x] 이미 참가한 사용자의 join은 idempotent하게 최신 room state를 반환한다.
+- [x] 방장이 나가면 room을 `CLOSED`로 전환한다.
+- [x] 일반 참가자가 나가면 participant row를 삭제한다.
+- [x] RestDocs와 ErrorResponse를 정리한다.
 
 Policy:
 
-- [ ] join/leave는 room lifecycle command다.
-- [ ] join/leave 이후 실시간 broadcast는 4-5 Room WebSocket 이슈에서 연결한다.
-- [ ] started/closed room에는 새 참가를 허용하지 않는다.
-- [ ] 1명 또는 2명 방만 MVP 범위로 둔다.
+- [x] join/leave는 room lifecycle command다.
+- [x] join/leave 이후 실시간 broadcast는 4-5 Room WebSocket 이슈에서 연결한다.
+- [x] started/closed room에는 새 참가를 허용하지 않는다.
+- [x] 1명 또는 2명 방만 MVP 범위로 둔다.
 
 Acceptance Criteria:
 
-- [ ] inviteCode로 방에 참가할 수 있다.
-- [ ] 정원 초과, 시작된 방, 닫힌 방 참가가 거부된다.
-- [ ] 방장 퇴장 시 방이 닫힌다.
+- [x] inviteCode로 방에 참가할 수 있다.
+- [x] 정원 초과, 시작된 방, 닫힌 방 참가가 거부된다.
+- [x] 방장 퇴장 시 방이 닫힌다.
 
 ### 4-5. [ ] Custom Room WebSocket 동기화 계약
 
@@ -989,8 +989,8 @@ Policy:
 11. [x] Section 3-3. 프로필 상세 API 계약
 12. [x] Section 3-4. 프로필 페이지 구현
 13. [x] Section 4-1/4-2. 연습 모드
-14. [ ] Section 4-3. Custom Room 생성 / 공개 목록 / 조회 API 계약
-15. [ ] Section 4-4. Custom Room 초대 참가 / 나가기 API 계약
+14. [x] Section 4-3. Custom Room 생성 / 공개 목록 / 조회 API 계약
+15. [x] Section 4-4. Custom Room 초대 참가 / 나가기 API 계약
 16. [ ] Section 4-5. Custom Room WebSocket 동기화 계약
 17. [ ] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
 18. [ ] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약

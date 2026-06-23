@@ -145,6 +145,89 @@ class CustomGameRoomServiceTest {
         then(customGameRoomReadService).should(never()).getParticipants(100L);
     }
 
+    @Test
+    @DisplayName("joinRoom - core command 이후 현재 participant를 다시 조회해 room response를 만든다")
+    void joinRoom_ReturnRoomResponse() {
+        // given
+        CustomGameRoom room = room(100L, OWNER_USER_ID, "AB12CD");
+        given(customGameRoomCommandService.joinRoom("AB12CD", PLAYER_USER_ID)).willReturn(room);
+        given(customGameRoomReadService.getParticipants(100L)).willReturn(List.of(
+                participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
+                participant(100L, PLAYER_USER_ID, CustomRoomParticipantRole.PLAYER)
+        ));
+        given(userReadService.findAllByIdsOrThrow(anyCollection()))
+                .willReturn(List.of(user(OWNER_USER_ID, "Host"), user(PLAYER_USER_ID, "Guest")));
+
+        // when
+        CustomRoomResponse response = customGameRoomService.joinRoom("AB12CD", PLAYER_USER_ID);
+
+        // then
+        assertThat(response.roomId()).isEqualTo(100L);
+        assertThat(response.roomName()).isEqualTo("Host's room");
+        assertThat(response.participants()).extracting("nickname")
+                .containsExactly("Host", "Guest");
+        assertThat(response.participants()).extracting("role")
+                .containsExactly("OWNER", "PLAYER");
+        then(customGameRoomCommandService).should().joinRoom("AB12CD", PLAYER_USER_ID);
+        then(customGameRoomReadService).should().getParticipants(100L);
+        then(userReadService).should(times(1)).findAllByIdsOrThrow(anyCollection());
+        then(userReadService).should(never()).findById(OWNER_USER_ID);
+        then(userReadService).should(never()).findById(PLAYER_USER_ID);
+    }
+
+    @Test
+    @DisplayName("joinRoom - core command 예외가 발생하면 participant를 조회하지 않는다")
+    void joinRoom_CoreException_ThrowException() {
+        // given
+        given(customGameRoomCommandService.joinRoom("AB12CD", PLAYER_USER_ID))
+                .willThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_FULL));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomService.joinRoom("AB12CD", PLAYER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_FULL));
+        then(customGameRoomReadService).should(never()).getParticipants(100L);
+    }
+
+    @Test
+    @DisplayName("leaveRoom - core command 이후 현재 participant를 다시 조회해 room response를 만든다")
+    void leaveRoom_ReturnRoomResponse() {
+        // given
+        CustomGameRoom room = room(100L, OWNER_USER_ID, "AB12CD");
+        given(customGameRoomCommandService.leaveRoom(100L, PLAYER_USER_ID)).willReturn(room);
+        given(customGameRoomReadService.getParticipants(100L)).willReturn(List.of(
+                participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER)
+        ));
+        given(userReadService.findAllByIdsOrThrow(anyCollection()))
+                .willReturn(List.of(user(OWNER_USER_ID, "Host")));
+
+        // when
+        CustomRoomResponse response = customGameRoomService.leaveRoom(100L, PLAYER_USER_ID);
+
+        // then
+        assertThat(response.roomId()).isEqualTo(100L);
+        assertThat(response.roomName()).isEqualTo("Host's room");
+        assertThat(response.participants()).hasSize(1);
+        assertThat(response.participants().get(0).nickname()).isEqualTo("Host");
+        then(customGameRoomCommandService).should().leaveRoom(100L, PLAYER_USER_ID);
+        then(customGameRoomReadService).should().getParticipants(100L);
+    }
+
+    @Test
+    @DisplayName("leaveRoom - core command 예외가 발생하면 participant를 조회하지 않는다")
+    void leaveRoom_CoreException_ThrowException() {
+        // given
+        given(customGameRoomCommandService.leaveRoom(100L, PLAYER_USER_ID))
+                .willThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomService.leaveRoom(100L, PLAYER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
+        then(customGameRoomReadService).should(never()).getParticipants(100L);
+    }
+
     private CustomGameRoom room(Long id, Long ownerUserId, String inviteCode) {
         CustomGameRoom room = CustomGameRoom.create(ownerUserId, inviteCode);
         ReflectionTestUtils.setField(room, "id", id);
