@@ -90,8 +90,8 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 - 이미 참가한 사용자가 join하면 새 participant를 만들지 않고 현재 room state를 반환한다.
 - 참가자가 2명이면 `CUSTOM_ROOM_FULL`로 실패한다.
 - 동시 join으로 정원 초과가 발생하지 않도록 core command에서 room row를 pessimistic lock으로 조회한다.
-- participant 중복 insert는 `custom_room_id + user_id` unique 제약으로 최종 방어한다.
-- unique 충돌이 발생해도 일반 500으로 흘리지 않고 “이미 참가한 사용자”로 간주해 현재 room state를 반환한다.
+- participant 중복 insert는 command의 room row lock과 사전 `exists` 확인으로 차단한다.
+- `custom_room_id + user_id` unique 제약은 애플리케이션 레벨 방어가 누락될 때를 대비한 DB 최종 방어다.
 
 ### Custom Room Leave API
 
@@ -183,7 +183,7 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 - 정원이 가득 찬 room에 새 사용자가 join하면 `CUSTOM_ROOM_FULL` 기반 에러를 반환한다.
 - 참가하지 않은 사용자가 leave하면 `CUSTOM_ROOM_INVALID_PARTICIPANT` 기반 에러를 반환한다.
 - participant user 조회 중 User가 없으면 `CoreErrorCode.USER_NOT_FOUND` 기반 에러를 반환한다.
-- 동시 join 중 participant unique 충돌이 발생해도 일반 500으로 흘리지 않고 현재 room state를 반환한다.
+- 동시 join은 room row lock 안에서 `exists/count/save`를 수행해 정원 초과와 participant 중복을 차단한다.
 
 ## Scope Boundary
 
@@ -298,19 +298,19 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` Section 4-4 endpoint와 정책 반영.
-- [ ] 후속 4-5 Room WebSocket이 join/leave 이후 broadcast를 담당함을 문서와 충돌 없게 확인.
-- [ ] 후속 4-6 start API가 `WAITING` participants를 기준으로 시작함을 문서와 충돌 없게 확인.
-- [ ] issue-126 PR 섹션 보강.
+- [x] `docs/last-구현.md` Section 4-4 endpoint와 정책 반영.
+- [x] 후속 4-5 Room WebSocket이 join/leave 이후 broadcast를 담당함을 문서와 충돌 없게 확인.
+- [x] 후속 4-6 start API가 `WAITING` participants를 기준으로 시작함을 문서와 충돌 없게 확인.
+- [x] issue-126 PR 섹션 보강.
 
 ### 7. 검증
 
-- [ ] `./gradlew :league-of-star-core:test`
-- [ ] `./gradlew :league-of-star-api:test`
-- [ ] `./gradlew test`
-- [ ] `./gradlew build`
-- [ ] RestDocs snippet 생성 확인.
-- [ ] `git diff --check`
+- [x] `./gradlew :league-of-star-core:test`
+- [x] `./gradlew :league-of-star-api:test`
+- [x] `./gradlew test`
+- [x] `./gradlew build`
+- [x] RestDocs snippet 생성 확인.
+- [x] `git diff --check`
 
 ## Implementation Policy
 
@@ -398,6 +398,8 @@ flowchart TD
   방장이 없는 대기실은 시작할 수 없으므로 방장이 나가면 room을 닫는다. 이 room은 공개 목록에서 사라지고 후속 join/start 대상이 아니다.
 - 동시 join 정원 초과를 lock으로 막음.
   최대 2명 room에서 두 사용자가 동시에 join하면 count 확인과 insert 사이에 레이스가 생길 수 있다. room row를 잠근 뒤 count와 insert를 처리해 정원 초과를 막는다.
+- DB unique 제약은 최종 안전장치로 유지함.
+  정상 흐름은 lock 안에서 이미 참가 여부를 확인하므로 같은 사용자의 재요청은 participant를 또 만들지 않고 현재 room state를 반환한다. 그래도 코드 누락이나 예상 밖 경로가 생겼을 때를 대비해 `custom_room_id + user_id` unique 제약은 유지한다.
 
 ## 📝 Note
 
@@ -406,7 +408,13 @@ flowchart TD
 - 사용자 지정 게임 시작, `GameRoom.gameMode=CUSTOM`, scenario 생성은 후속 4-6 범위임.
 - 프론트 CustomRoomPage 연결은 후속 프론트 이슈 범위임.
 - 새 패키지 추가 없음.
-- 검증 결과를 PR 작성 시 기록함.
+- 검증 결과:
+  - `./gradlew :league-of-star-core:test` 통과함.
+  - `./gradlew :league-of-star-api:test` 통과함.
+  - `./gradlew test` 통과함.
+  - `./gradlew build` 통과함.
+  - RestDocs snippet 생성 확인함.
+  - `git diff --check` 통과함.
 
 ## 📌 Related Issue
 
