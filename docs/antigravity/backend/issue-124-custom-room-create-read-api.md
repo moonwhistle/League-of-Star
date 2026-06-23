@@ -201,7 +201,7 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - custom game scenario 생성.
 - GamePlayPage custom handoff.
 - custom game 결과 WebSocket 처리.
-- custom game 정산 제외 구현.
+- custom game 랭크 제외 / 전적 기록 구현.
 - 프론트 방 생성/초대 링크 UI.
 - 친구 목록 기반 초대.
 - room 만료 scheduler.
@@ -212,20 +212,20 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 ### 1. Backend Contract 정리
 
-- [ ] endpoint를 `POST /api/v1/custom-games/rooms`로 확정.
-- [ ] endpoint를 `GET /api/v1/custom-games/rooms`로 확정.
-- [ ] endpoint를 `GET /api/v1/custom-games/rooms/invites/{inviteCode}`로 확정.
-- [ ] create request body 없음과 `@AuthUser Long userId` 인증 사용자 식별 정책 문서화.
-- [ ] public room list는 인증 없이 호출 가능함을 문서화.
-- [ ] invite preview는 인증 없이 호출 가능함을 문서화.
-- [ ] room response shape를 `roomId`, `roomName`, `inviteCode`, `ownerUserId`, `status`, `maxParticipants`, `participants`로 확정.
-- [ ] room list response shape를 `rooms[].roomId`, `rooms[].roomName`, `rooms[].inviteCode`, `rooms[].ownerUserId`, `rooms[].status`, `rooms[].maxParticipants`, `rooms[].currentParticipants`로 확정.
-- [ ] 모든 `WAITING` custom room은 공개 목록에 노출함을 문서화.
-- [ ] roomName은 `{ownerNickname}'s room` 표시값임을 문서화.
-- [ ] inviteCode는 roomId를 직접 공유하지 않는 public key임을 문서화.
-- [ ] 방장은 `WAITING` room을 1개만 가질 수 있음을 문서화.
-- [ ] 이번 이슈는 join/leave/WebSocket/start/GameRoom 생성을 제외함을 문서화.
-- [ ] core/api 책임 분리 정책 문서화.
+- [x] endpoint를 `POST /api/v1/custom-games/rooms`로 확정.
+- [x] endpoint를 `GET /api/v1/custom-games/rooms`로 확정.
+- [x] endpoint를 `GET /api/v1/custom-games/rooms/invites/{inviteCode}`로 확정.
+- [x] create request body 없음과 `@AuthUser Long userId` 인증 사용자 식별 정책 문서화.
+- [x] public room list는 인증 없이 호출 가능함을 문서화.
+- [x] invite preview는 인증 없이 호출 가능함을 문서화.
+- [x] room response shape를 `roomId`, `roomName`, `inviteCode`, `ownerUserId`, `status`, `maxParticipants`, `participants`로 확정.
+- [x] room list response shape를 `rooms[].roomId`, `rooms[].roomName`, `rooms[].inviteCode`, `rooms[].ownerUserId`, `rooms[].status`, `rooms[].maxParticipants`, `rooms[].currentParticipants`로 확정.
+- [x] 모든 `WAITING` custom room은 공개 목록에 노출함을 문서화.
+- [x] roomName은 `{ownerNickname}'s room` 표시값임을 문서화.
+- [x] inviteCode는 roomId를 직접 공유하지 않는 public key임을 문서화.
+- [x] 방장은 `WAITING` room을 1개만 가질 수 있음을 문서화.
+- [x] 이번 이슈는 join/leave/WebSocket/start/GameRoom 생성을 제외함을 문서화.
+- [x] core/api 책임 분리 정책 문서화.
 
 ### 2. Core Custom Room Domain 구현
 
@@ -393,7 +393,7 @@ flowchart TD
 
 - 이번 PR에서 초대 참가, 나가기, Room WebSocket, 게임 시작은 제외함.
 - `gameMode=CUSTOM` GameRoom 생성은 후속 4-6 범위임.
-- custom game 정산 제외는 후속 4-7 범위임.
+- custom game 랭크 제외 / 전적 기록은 후속 4-7 범위임.
 - 프론트 초대 링크 UI는 후속 4-8 범위임.
 - 새 패키지 추가 없음.
 - 검증 결과를 PR 작성 시 기록함.
