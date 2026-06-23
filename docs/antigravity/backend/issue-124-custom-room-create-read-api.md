@@ -229,17 +229,17 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 ### 2. Core Custom Room Domain 구현
 
-- [ ] `domain/customgame` 패키지 추가.
-- [ ] `CustomGameRoom` entity 구현.
-- [ ] `CustomGameParticipant` entity 구현.
-- [ ] `CustomRoomStatus` enum 구현.
-- [ ] `CustomRoomParticipantRole` enum 구현.
-- [ ] `CustomGameRoom.MAX_PARTICIPANTS = 2` 정책 추가.
-- [ ] room 생성 시 owner participant 추가 메서드 구현.
-- [ ] participant 추가 시 최대 인원 방어 로직 구현.
-- [ ] room status 전환 기본 메서드 구현.
-- [ ] inviteCode 필드 unique 제약 추가.
-- [ ] ownerUserId + WAITING room 중복 생성을 막기 위한 repository 조회 메서드 구현.
+- [x] `domain/customgame` 패키지 추가.
+- [x] `CustomGameRoom` entity 구현.
+- [x] `CustomGameParticipant` entity 구현.
+- [x] `CustomRoomStatus` enum 구현.
+- [x] `CustomRoomParticipantRole` enum 구현.
+- [x] `CustomGameRoom.MAX_PARTICIPANTS = 2` 정책 추가.
+- [x] room 생성 시 owner participant 추가 메서드 구현.
+- [x] participant 추가 시 최대 인원 방어 로직 구현.
+- [x] room status 전환 기본 메서드 구현.
+- [x] inviteCode 필드 unique 제약 추가.
+- [x] ownerUserId + WAITING room 중복 생성을 막기 위한 repository 조회 메서드 구현.
 
 ### 3. Core Custom Room Service 구현
 

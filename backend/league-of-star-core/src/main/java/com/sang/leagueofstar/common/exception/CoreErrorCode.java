@@ -18,6 +18,13 @@ public enum CoreErrorCode implements BaseErrorCode {
     INVALID_GAME_PARTICIPANTS(400, "GAME_004", "게임 참여자 정보가 올바르지 않습니다."),
     GAME_ROOM_NOT_FOUND(404, "GAME_005", "게임방을 찾을 수 없습니다."),
 
+    // Custom Room (CUSTOM_ROOM_000)
+    CUSTOM_ROOM_FULL(400, "CUSTOM_ROOM_001", "사용자 지정 방 인원이 초과되었습니다."),
+    CUSTOM_ROOM_INVALID_STATE(400, "CUSTOM_ROOM_002", "사용자 지정 방 상태가 올바르지 않습니다."),
+    CUSTOM_ROOM_INVALID_PARTICIPANT(400, "CUSTOM_ROOM_003", "사용자 지정 방 참여자 정보가 올바르지 않습니다."),
+    CUSTOM_ROOM_DUPLICATE_PARTICIPANT(400, "CUSTOM_ROOM_004", "이미 사용자 지정 방에 참여한 사용자입니다."),
+    CUSTOM_ROOM_INVALID_INVITE_CODE(400, "CUSTOM_ROOM_005", "사용자 지정 방 초대 코드가 올바르지 않습니다."),
+
     // Auth (AUTH_000)
     INVALID_RESET_TOKEN(400, "AUTH_001", "유효하지 않거나 만료된 재설정 토큰입니다."),
 
