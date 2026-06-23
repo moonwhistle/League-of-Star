@@ -345,61 +345,99 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 ## 📌 Summary
 
-사용자 지정 게임을 위한 가장 작은 방 생성/공개 대기실 기반을 구현함.
+사용자 지정 게임을 시작하기 전 단계인 “방 만들기 / 공개 대기실 보기 / 초대 코드로 방 확인하기” 기반을 구현함.
 
-이번 PR은 게임을 바로 시작하는 작업이 아니라, 사용자가 사용자 지정 방을 만들고 공개 대기실 목록 또는 초대 코드로 방 상태를 확인할 수 있게 하는 작업이다. 방 참가, 실시간 동기화, 게임 시작은 후속 이슈로 분리한다.
+이번 PR은 게임을 바로 시작하는 작업이 아니다. 사용자가 먼저 대기실을 만들고, 다른 사용자가 그 방을 목록이나 초대 코드로 찾을 수 있게 하는 작업이다.
+
+그래서 `CustomGameRoom`은 “아직 게임이 시작되기 전 대기실”만 담당한다. 실제 플레이에 필요한 `GameRoom`, scenario, WebSocket 시작 이벤트는 후속 이슈에서 만든다. 이렇게 나눈 이유는 대기실 조회/참가/시작 흐름과 실제 게임 플레이 흐름을 섞지 않기 위해서다.
 
 ```mermaid
 flowchart TD
-    A["방 생성 요청"] --> B["Core CustomGameRoomCommandService"]
-    B --> C{"방장의 WAITING room 존재?"}
-    C -->|YES| D["409 실패"]
-    C -->|NO| E["inviteCode 발급"]
-    E --> F["CustomGameRoom + OWNER participant 저장"]
-    F --> G["participant userId batch 조회"]
-    G --> H["room response 반환"]
+    A["사용자 지정 방 생성"] --> B["CustomGameRoom 저장"]
+    B --> C["OWNER participant 저장"]
+    C --> D["inviteCode 반환"]
 
-    I["대기실 목록 조회"] --> J["WAITING room 목록"]
-    J --> K["owner nickname으로 roomName 생성"]
-    K --> L["공개 목록 반환"]
+    E["다른 사용자"] --> F{"방 찾는 방법"}
+    F -->|공개 목록| G["WAITING room 목록 조회"]
+    F -->|초대 코드| H["inviteCode로 room preview 조회"]
 
-    M["초대 코드 조회"] --> N["inviteCode로 WAITING room 조회"]
-    N --> O["room preview 반환"]
+    G --> I["후속 join API에서 참가"]
+    H --> I
+    I --> J["후속 Room WebSocket 동기화"]
+    J --> K["후속 start API"]
+    K --> L["GameRoom + scenario 생성"]
 ```
 
 핵심 정책:
 
-- custom room은 일반 match queue와 독립이다.
-- 방장은 `WAITING` custom room을 1개만 가질 수 있다.
-- 모든 `WAITING` custom room은 공개 대기실 목록에 노출한다.
-- 대기실 이름은 `{ownerNickname}'s room`으로 표시한다.
-- 초대 링크는 `roomId`가 아니라 `inviteCode`를 사용한다.
-- 공개 조회는 참가 처리를 하지 않는다.
-- 이번 PR에서는 `GameRoom`, scenario, WebSocket, 게임 시작을 만들지 않는다.
+- custom room은 “게임 전 대기실”이고, match queue와 독립임.
+- `GameRoom`은 실제 게임이 시작될 때 만들기 때문에 이번 PR에서 만들지 않음.
+- 방장은 `WAITING` custom room을 1개만 가질 수 있음.
+- 모든 `WAITING` custom room은 공개 대기실 목록에 노출함.
+- 초대 링크는 내부 ID인 `roomId`가 아니라 공유용 코드인 `inviteCode`를 사용함.
+- 공개 목록/초대 코드 조회는 방을 보여주기만 하고, 참가 처리는 하지 않음.
+- 참가, 나가기, Room WebSocket, 게임 시작은 후속 이슈 범위임.
 
 백엔드와의 구현 계약:
 
 - `POST /api/v1/custom-games/rooms`는 인증 사용자의 custom room을 생성한다.
 - `GET /api/v1/custom-games/rooms`는 공개 대기실 목록을 조회한다.
 - `GET /api/v1/custom-games/rooms/invites/{inviteCode}`는 초대 링크 미리보기용 공개 조회다.
-- API 모듈은 core custom room service와 user read service를 통해 데이터를 가져온다.
-- custom room 참가자는 room entity 컬렉션이 아니라 `customRoomId` 간접참조 row로 관리한다.
-- participant nickname은 user batch 조회를 사용한다.
+- 방 생성자는 자동으로 `OWNER` participant로 저장된다.
+- API 모듈은 repository를 직접 사용하지 않고 core custom room service를 통해 room/participant를 가져온다.
+- nickname은 user 도메인의 `UserReadService`를 통해 가져온다.
+- custom room 참가자는 room entity 내부 컬렉션이 아니라 `customRoomId`를 가진 별도 row로 관리한다.
 
 ## 📚 Changes
 
-- 사용자 지정 게임을 바로 시작하지 않고 먼저 공개 대기실 개념부터 분리함.
-  사용자는 대기실 목록에서 방을 고르거나 초대 코드로 방을 찾은 뒤 입장하게 된다. GameRoom/Scenario 생성은 시작 버튼을 누른 뒤의 책임이므로 이번 PR에서는 custom room 테이블, 공개 목록, inviteCode만 만들고 실제 게임 시작은 후속 이슈로 남김.
-- 방 이름을 owner nickname 기준으로 응답에서 만들어 내려줌.
-  방 생성 request body를 받지 않으므로 사용자가 직접 방 제목을 정하지 않는다. MVP에서는 모든 공개 방을 `{nickname}'s room`으로 표시해 별도 제목 검증 없이 대기실 목록을 구성함.
-- 초대 링크를 roomId가 아니라 inviteCode로 설계함.
-  roomId는 내부 식별자이고, inviteCode는 사용자가 공유하는 public key다. 초대 링크에 roomId를 직접 노출하지 않으면 후속 초대/참가 흐름을 더 명확하게 관리할 수 있음.
-- core 모듈에 custom room 도메인 규칙을 둠.
-  방 생성, owner participant 저장, 중복 waiting room 차단, inviteCode 조회는 데이터 규칙이므로 core service가 담당한다. api 모듈은 repository를 직접 보지 않고 core service 결과와 user batch 조회를 조합해 HTTP 응답을 만든다.
-- room과 participant를 간접참조로 분리함.
-  custom room은 방 상태, 방장, 초대 코드 같은 방 자체의 정보만 가진다. 참가자는 `customRoomId`를 가진 별도 row로 저장한다. 이렇게 두면 후속 join/leave에서 참가자만 추가하거나 제거할 때 room aggregate 컬렉션을 억지로 로딩하지 않아도 되고, 공개 목록에서는 roomId 목록으로 participant를 한 번에 조회해 현재 인원만 계산할 수 있다.
+- 사용자 흐름을 “대기실”과 “실제 게임”으로 분리함.
+  사용자가 사용자 지정 게임을 누르면 바로 게임이 시작되는 것이 아니라 먼저 방이 만들어진다. 다른 사용자는 그 방을 공개 목록에서 고르거나 초대 코드로 찾는다. 실제 게임 시작은 방장이 start를 누른 뒤에 일어나므로, 이번 PR에서는 `CustomGameRoom`까지만 만들고 `GameRoom` 생성은 후속 이슈로 남겼다. 이렇게 해야 “방을 찾는 단계”와 “게임을 플레이하는 단계”가 섞이지 않는다.
+
+```mermaid
+flowchart LR
+    A["CustomGameRoom"] --> B["대기실 상태"]
+    B --> C["참가/나가기"]
+    C --> D["방장 start"]
+    D --> E["GameRoom"]
+    E --> F["scenario + play"]
+```
+
+- `CustomGameRoom`과 `CustomGameParticipant`를 간접참조로 분리함.
+  처음에는 room 안에 participants 컬렉션을 직접 둘 수도 있다. 하지만 사용자 지정 방은 후속 이슈에서 join/leave가 계속 붙는다. 참가자만 추가하거나 제거하려고 매번 room 전체와 컬렉션을 함께 다루면 구조가 무거워진다. 그래서 room은 방 상태, 방장, 초대 코드만 알고, 참가자는 `customRoomId`로 room을 가리키게 했다.
+
+```mermaid
+erDiagram
+    CUSTOM_GAME_ROOMS {
+        long id
+        string invite_code
+        long owner_user_id
+        string status
+    }
+
+    CUSTOM_GAME_PARTICIPANTS {
+        long id
+        long custom_room_id
+        long user_id
+        string role
+    }
+
+    CUSTOM_GAME_ROOMS ||--o{ CUSTOM_GAME_PARTICIPANTS : "custom_room_id"
+```
+
+- 간접참조를 선택한 이유는 후속 기능이 단순해지기 때문임.
+  join API는 participant row를 추가하면 되고, leave API는 participant row를 제거하거나 room을 닫으면 된다. 공개 대기실 목록은 room 목록을 먼저 가져오고 roomId 목록으로 participant를 한 번에 조회해 현재 인원을 계산하면 된다. 즉, 방 메타데이터와 참가자 목록을 필요한 순간에만 조합할 수 있다.
+
+- core 모듈과 api 모듈의 책임을 분리함.
+  방 생성, `WAITING` room 중복 차단, inviteCode 발급/조회, participant 저장은 데이터 규칙이므로 core 모듈에 둔다. api 모듈은 HTTP 요청을 받고 core service와 user read service 결과를 조합해 response를 만드는 역할만 한다. 이렇게 해야 api 모듈이 repository를 직접 만지지 않고, 데이터 규칙이 core 안에 모인다.
+
 - nickname 조회는 batch 방식으로 처리함.
-  참가자가 최대 2명이어도 API 응답 조립에서 participant마다 user 단건 조회를 반복하지 않는다. 기존 ranking/record API와 같은 방식으로 userId를 모아 한 번에 조회한다.
+  응답에는 participant nickname이 필요하지만 participant row에는 userId만 저장한다. 그래서 api service가 userId를 모아 `UserReadService.findAllByIdsOrThrow`로 한 번에 조회한다. 참가자가 최대 2명이어도 row마다 user를 따로 조회하는 습관을 만들지 않기 위해 기존 ranking/record API와 같은 batch 정책을 적용했다.
+
+- 방 이름은 저장하지 않고 owner nickname으로 만든다.
+  MVP에서는 사용자가 방 제목을 직접 입력하지 않는다. 별도 제목 검증과 수정 기능을 만들기보다 `{ownerNickname}'s room`을 응답에서 만들어 내려준다. 방 이름은 표시값이고 source of truth는 owner userId와 user nickname이다.
+
+- 초대 링크는 `roomId`가 아니라 `inviteCode`를 사용함.
+  `roomId`는 내부 DB 식별자이고, `inviteCode`는 사용자가 공유하는 공개 키다. 초대 링크에서 내부 ID를 직접 쓰지 않으면 후속 초대/참가 흐름을 더 명확하게 분리할 수 있다. 이번 preview API는 “이 코드가 어떤 방인지 보여주기”만 하고, 실제 참가 여부는 후속 join API에서 인증 사용자 기준으로 결정한다.
 
 ## 📝 Note
 
