@@ -15,12 +15,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,7 +51,7 @@ class CustomGameRoomCommandServiceTest {
                 .willReturn(false);
         given(inviteCodeGenerator.generate()).willReturn(INVITE_CODE);
         given(customGameRoomRepository.existsByInviteCode(INVITE_CODE)).willReturn(false);
-        given(customGameRoomRepository.save(any(CustomGameRoom.class)))
+        given(customGameRoomRepository.saveAndFlush(any(CustomGameRoom.class)))
                 .willAnswer(invocation -> {
                     CustomGameRoom room = invocation.getArgument(0);
                     ReflectionTestUtils.setField(room, "id", 100L);
@@ -65,7 +67,7 @@ class CustomGameRoomCommandServiceTest {
         assertThat(result.getOwnerUserId()).isEqualTo(OWNER_USER_ID);
         assertThat(result.getInviteCode()).isEqualTo(INVITE_CODE);
         assertThat(result.getStatus()).isEqualTo(CustomRoomStatus.WAITING);
-        verify(customGameRoomRepository).save(result);
+        verify(customGameRoomRepository).saveAndFlush(result);
         ArgumentCaptor<CustomGameParticipant> participantCaptor = ArgumentCaptor.forClass(CustomGameParticipant.class);
         verify(customGameParticipantRepository).save(participantCaptor.capture());
         assertThat(participantCaptor.getValue().getCustomRoomId()).isEqualTo(100L);
@@ -105,7 +107,7 @@ class CustomGameRoomCommandServiceTest {
         given(inviteCodeGenerator.generate()).willReturn("DUP123", INVITE_CODE);
         given(customGameRoomRepository.existsByInviteCode("DUP123")).willReturn(true);
         given(customGameRoomRepository.existsByInviteCode(INVITE_CODE)).willReturn(false);
-        given(customGameRoomRepository.save(any(CustomGameRoom.class)))
+        given(customGameRoomRepository.saveAndFlush(any(CustomGameRoom.class)))
                 .willAnswer(invocation -> {
                     CustomGameRoom room = invocation.getArgument(0);
                     ReflectionTestUtils.setField(room, "id", 100L);
@@ -119,6 +121,43 @@ class CustomGameRoomCommandServiceTest {
 
         // then
         assertThat(result.getInviteCode()).isEqualTo(INVITE_CODE);
+    }
+
+    @Test
+    @DisplayName("createRoom - WAITING unique 충돌이 발생하면 ACTIVE_EXISTS로 변환한다")
+    void createRoom_WaitingOwnerUniqueConflict_ThrowActiveExists() {
+        // given
+        given(customGameRoomRepository.existsByOwnerUserIdAndStatus(OWNER_USER_ID, CustomRoomStatus.WAITING))
+                .willReturn(false);
+        given(inviteCodeGenerator.generate()).willReturn(INVITE_CODE);
+        given(customGameRoomRepository.existsByInviteCode(INVITE_CODE)).willReturn(false);
+        given(customGameRoomRepository.saveAndFlush(any(CustomGameRoom.class)))
+                .willThrow(new DataIntegrityViolationException("uk_custom_game_rooms_waiting_owner"));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomCommandService.createRoom(OWNER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_ACTIVE_EXISTS));
+        verify(customGameParticipantRepository, never()).save(any(CustomGameParticipant.class));
+    }
+
+    @Test
+    @DisplayName("createRoom - inviteCode DB unique 충돌이 발생하면 도메인 예외로 변환한다")
+    void createRoom_InviteCodeUniqueConflict_ThrowInviteCodeGenerationFailed() {
+        // given
+        given(customGameRoomRepository.existsByOwnerUserIdAndStatus(OWNER_USER_ID, CustomRoomStatus.WAITING))
+                .willReturn(false);
+        given(inviteCodeGenerator.generate()).willReturn(INVITE_CODE);
+        given(customGameRoomRepository.existsByInviteCode(INVITE_CODE)).willReturn(false);
+        given(customGameRoomRepository.saveAndFlush(any(CustomGameRoom.class)))
+                .willThrow(new DataIntegrityViolationException("inviteCode unique conflict"));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomCommandService.createRoom(OWNER_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVITE_CODE_GENERATION_FAILED));
+        verify(customGameParticipantRepository, never()).save(any(CustomGameParticipant.class));
     }
 
     @Test

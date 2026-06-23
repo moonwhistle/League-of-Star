@@ -22,6 +22,7 @@ class CustomGameRoomTest {
 
         // then
         assertThat(room.getOwnerUserId()).isEqualTo(1L);
+        assertThat(room.getWaitingOwnerUserId()).isEqualTo(1L);
         assertThat(room.getInviteCode()).isEqualTo("AB12CD");
         assertThat(room.getStatus()).isEqualTo(CustomRoomStatus.WAITING);
         assertThat(room.isWaiting()).isTrue();
@@ -55,7 +56,24 @@ class CustomGameRoomTest {
 
         // then
         assertThat(room.isStarted()).isTrue();
+        assertThat(room.getWaitingOwnerUserId()).isNull();
         assertThat(room.getStartedAt()).isEqualTo(startedAt);
+    }
+
+    @Test
+    @DisplayName("close - WAITING unique 대상에서 room을 제거한다")
+    void close() {
+        // given
+        CustomGameRoom room = CustomGameRoom.create(1L, "AB12CD");
+        LocalDateTime closedAt = LocalDateTime.now();
+
+        // when
+        room.close(closedAt);
+
+        // then
+        assertThat(room.isClosed()).isTrue();
+        assertThat(room.getWaitingOwnerUserId()).isNull();
+        assertThat(room.getClosedAt()).isEqualTo(closedAt);
     }
 
     @Test

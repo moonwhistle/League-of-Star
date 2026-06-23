@@ -48,6 +48,36 @@ class CustomGameRoomRepositoryTest {
     }
 
     @Test
+    @DisplayName("같은 owner는 WAITING room을 동시에 2개 저장할 수 없다")
+    void waitingOwnerUniqueConstraint() {
+        // given
+        customGameRoomRepository.saveAndFlush(CustomGameRoom.create(1L, "AB12CD"));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomRepository.saveAndFlush(CustomGameRoom.create(1L, "EF34GH")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("같은 owner라도 WAITING이 아니면 히스토리 room을 여러 개 가질 수 있다")
+    void waitingOwnerUniqueConstraint_AllowNonWaitingRooms() {
+        // given
+        CustomGameRoom startedRoom = CustomGameRoom.create(1L, "AB12CD");
+        startedRoom.markStarted(LocalDateTime.now());
+        customGameRoomRepository.saveAndFlush(startedRoom);
+
+        CustomGameRoom closedRoom = CustomGameRoom.create(1L, "EF34GH");
+        closedRoom.close(LocalDateTime.now());
+        customGameRoomRepository.saveAndFlush(closedRoom);
+
+        // when
+        CustomGameRoom waitingRoom = customGameRoomRepository.saveAndFlush(CustomGameRoom.create(1L, "IJ56KL"));
+
+        // then
+        assertThat(waitingRoom.isWaiting()).isTrue();
+    }
+
+    @Test
     @DisplayName("WAITING room 목록만 id 오름차순으로 조회한다")
     void findByStatusOrderByIdAsc() {
         // given

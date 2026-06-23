@@ -9,6 +9,7 @@ import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameParticipantRepository;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameRoomRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CustomGameRoomCommandService {
 
     private static final int MAX_INVITE_CODE_GENERATION_ATTEMPTS = 10;
+    private static final String WAITING_OWNER_UNIQUE_CONSTRAINT = "uk_custom_game_rooms_waiting_owner";
 
     private final CustomGameRoomRepository customGameRoomRepository;
     private final CustomGameParticipantRepository customGameParticipantRepository;
@@ -27,9 +29,7 @@ public class CustomGameRoomCommandService {
         validateOwnerUserId(ownerUserId);
         validateNoWaitingRoom(ownerUserId);
 
-        CustomGameRoom customGameRoom = customGameRoomRepository.save(
-                CustomGameRoom.create(ownerUserId, generateUniqueInviteCode())
-        );
+        CustomGameRoom customGameRoom = saveRoomWithUniqueRetry(ownerUserId);
         customGameParticipantRepository.save(
                 CustomGameParticipant.create(customGameRoom.getId(), ownerUserId, CustomRoomParticipantRole.OWNER)
         );
@@ -48,13 +48,35 @@ public class CustomGameRoomCommandService {
         }
     }
 
-    private String generateUniqueInviteCode() {
+    private CustomGameRoom saveRoomWithUniqueRetry(Long ownerUserId) {
         for (int attempt = 0; attempt < MAX_INVITE_CODE_GENERATION_ATTEMPTS; attempt++) {
             String inviteCode = inviteCodeGenerator.generate();
-            if (!customGameRoomRepository.existsByInviteCode(inviteCode)) {
-                return inviteCode;
+            if (customGameRoomRepository.existsByInviteCode(inviteCode)) {
+                continue;
+            }
+            try {
+                return customGameRoomRepository.saveAndFlush(
+                        CustomGameRoom.create(ownerUserId, inviteCode)
+                );
+            } catch (DataIntegrityViolationException exception) {
+                if (isWaitingOwnerUniqueViolation(exception)) {
+                    throw new CoreException(CoreErrorCode.CUSTOM_ROOM_ACTIVE_EXISTS);
+                }
+                throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVITE_CODE_GENERATION_FAILED);
             }
         }
         throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVITE_CODE_GENERATION_FAILED);
+    }
+
+    private boolean isWaitingOwnerUniqueViolation(DataIntegrityViolationException exception) {
+        Throwable current = exception;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.contains(WAITING_OWNER_UNIQUE_CONSTRAINT)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

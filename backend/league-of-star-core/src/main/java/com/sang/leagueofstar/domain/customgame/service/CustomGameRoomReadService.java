@@ -23,6 +23,7 @@ public class CustomGameRoomReadService {
     private final CustomGameParticipantRepository customGameParticipantRepository;
 
     public CustomGameRoom getWaitingRoomByInviteCode(String inviteCode) {
+        validateInviteCode(inviteCode);
         CustomGameRoom customGameRoom = customGameRoomRepository.findByInviteCode(inviteCode)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
         if (!customGameRoom.isWaiting()) {
@@ -44,5 +45,11 @@ public class CustomGameRoomReadService {
             return List.of();
         }
         return customGameParticipantRepository.findByCustomRoomIdInOrderByCustomRoomIdAscIdAsc(customRoomIds);
+    }
+
+    private void validateInviteCode(String inviteCode) {
+        if (inviteCode == null || inviteCode.isBlank()) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_INVITE_CODE);
+        }
     }
 }

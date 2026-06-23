@@ -25,7 +25,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "custom_game_rooms",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_custom_game_rooms_invite_code", columnNames = "invite_code")
+                @UniqueConstraint(name = "uk_custom_game_rooms_invite_code", columnNames = "invite_code"),
+                @UniqueConstraint(name = "uk_custom_game_rooms_waiting_owner", columnNames = "waiting_owner_user_id")
         }
 )
 @Getter
@@ -46,6 +47,9 @@ public class CustomGameRoom extends BaseEntity {
     @Column(name = "owner_user_id", nullable = false)
     private Long ownerUserId;
 
+    @Column(name = "waiting_owner_user_id")
+    private Long waitingOwnerUserId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
@@ -63,6 +67,7 @@ public class CustomGameRoom extends BaseEntity {
 
         return CustomGameRoom.builder()
                 .ownerUserId(ownerUserId)
+                .waitingOwnerUserId(ownerUserId)
                 .inviteCode(inviteCode)
                 .build();
     }
@@ -84,6 +89,7 @@ public class CustomGameRoom extends BaseEntity {
             throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE);
         }
         this.status = CustomRoomStatus.STARTED;
+        this.waitingOwnerUserId = null;
         this.startedAt = startedAt;
     }
 
@@ -92,6 +98,7 @@ public class CustomGameRoom extends BaseEntity {
             return;
         }
         this.status = CustomRoomStatus.CLOSED;
+        this.waitingOwnerUserId = null;
         this.closedAt = closedAt;
     }
 

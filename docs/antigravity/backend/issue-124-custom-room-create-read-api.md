@@ -36,6 +36,7 @@ flowchart TD
 - 이번 이슈에서는 custom room만 만들고, 아직 `GameRoom`은 만들지 않는다.
 - `GameRoom.gameMode=CUSTOM` 생성은 후속 4-6 이슈에서 처리한다.
 - 방장은 `WAITING` 상태 custom room을 1개만 가질 수 있다.
+- 방장별 `WAITING` custom room 1개 정책은 애플리케이션 사전 조회와 DB unique 제약으로 함께 방어한다.
 - 모든 `WAITING` custom room은 공개 대기실 목록에 노출한다.
 - 대기실 이름은 owner nickname 기준 `{nickname}'s room`으로 내려준다.
 - 초대 링크는 `roomId`가 아니라 `inviteCode`를 사용한다.
@@ -168,9 +169,11 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - 인증 없음/만료/유효하지 않은 token은 기존 security/auth error response를 따른다.
 - 방장이 이미 `WAITING` custom room을 가지고 있으면 `409`를 반환한다.
 - inviteCode가 존재하지 않으면 `404`를 반환한다.
+- inviteCode가 null/blank이면 잘못된 입력으로 처리한다.
 - inviteCode가 `STARTED` 또는 `CLOSED` room을 가리키면 공개 조회를 실패 처리한다.
 - participant user 조회 중 User가 없으면 `CoreErrorCode.USER_NOT_FOUND` 기반 에러를 반환한다.
 - inviteCode 충돌이 반복되어 발급에 실패하면 custom room 생성 실패 에러를 반환한다.
+- 동시 생성 중 DB unique 충돌이 발생해도 일반 500으로 흘리지 않고 custom room 도메인 예외로 변환한다.
 
 ## Scope Boundary
 
@@ -247,6 +250,7 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - [x] room status 전환 기본 메서드 구현.
 - [x] inviteCode 필드 unique 제약 추가.
 - [x] ownerUserId + WAITING room 중복 생성을 막기 위한 repository 조회 메서드 구현.
+- [x] 동시 요청에서도 owner의 `WAITING` room 중복 저장을 막는 DB unique 제약 추가.
 
 ### 3. Core Custom Room Service 구현
 
@@ -286,11 +290,14 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - [x] controller `RestAssuredMockMvc` test 작성.
 - [x] RestDocs test 작성.
 - [x] owner 중복 `WAITING` room 생성 실패 검증.
+- [x] owner 중복 `WAITING` room DB unique 제약 검증.
 - [x] 공개 room list 조회 성공 검증.
 - [x] 공개 room list에는 `WAITING` room만 포함되는지 검증.
 - [x] roomName이 owner nickname 기준으로 만들어지는지 검증.
 - [x] inviteCode 공개 조회 성공 검증.
 - [x] 존재하지 않는 inviteCode 조회 실패 검증.
+- [x] blank inviteCode 조회 실패 검증.
+- [x] DB unique 충돌의 도메인 예외 변환 검증.
 - [x] `STARTED`, `CLOSED` room 공개 조회 실패 검증.
 - [x] user nickname batch 조회 검증.
 
@@ -323,6 +330,7 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - invite preview API는 참가 처리를 하지 않는다.
 - inviteCode는 roomId 노출을 피하기 위한 public join key다.
 - 방장은 `WAITING` custom room을 1개만 가질 수 있다.
+- 방장별 `WAITING` room 중복 생성은 DB unique 제약으로 최종 방어한다.
 - 새 외부 패키지를 추가하지 않는다.
 
 ## Acceptance Criteria
@@ -429,6 +437,12 @@ erDiagram
 
 - core 모듈과 api 모듈의 책임을 분리함.
   방 생성, `WAITING` room 중복 차단, inviteCode 발급/조회, participant 저장은 데이터 규칙이므로 core 모듈에 둔다. api 모듈은 HTTP 요청을 받고 core service와 user read service 결과를 조합해 response를 만드는 역할만 한다. 이렇게 해야 api 모듈이 repository를 직접 만지지 않고, 데이터 규칙이 core 안에 모인다.
+
+- `WAITING` room 중복 생성을 DB 제약으로 한 번 더 막음.
+  사용자가 방 생성 버튼을 빠르게 두 번 누르거나 같은 요청이 동시에 들어오면, 사전 조회만으로는 둘 다 “대기 중인 방이 없다”고 판단할 수 있다. 그래서 `WAITING` 상태에서만 owner userId가 들어가는 unique key를 두었다. STARTED/CLOSED room은 이 key에서 빠지기 때문에 히스토리 room은 여러 개 남길 수 있고, 지금 대기 중인 room만 1개로 제한된다.
+
+- inviteCode 충돌과 잘못된 입력을 도메인 에러로 정리함.
+  inviteCode도 DB unique 제약이 있으므로 동시 생성 중 충돌할 수 있다. 이때 DB 예외가 그대로 500으로 나가지 않게 custom room 도메인 예외로 변환한다. 또한 blank inviteCode 조회는 “없는 방”이 아니라 “잘못된 초대 코드”이므로 입력 오류로 구분한다.
 
 - nickname 조회는 batch 방식으로 처리함.
   응답에는 participant nickname이 필요하지만 participant row에는 userId만 저장한다. 그래서 api service가 userId를 모아 `UserReadService.findAllByIdsOrThrow`로 한 번에 조회한다. 참가자가 최대 2명이어도 row마다 user를 따로 조회하는 습관을 만들지 않기 위해 기존 ranking/record API와 같은 batch 정책을 적용했다.

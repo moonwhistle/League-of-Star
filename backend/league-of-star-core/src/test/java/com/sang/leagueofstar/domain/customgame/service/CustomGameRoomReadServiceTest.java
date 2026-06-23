@@ -65,6 +65,15 @@ class CustomGameRoomReadServiceTest {
     }
 
     @Test
+    @DisplayName("getWaitingRoomByInviteCode - inviteCode가 blank면 INVALID_INVITE_CODE를 던진다")
+    void getWaitingRoomByInviteCode_BlankInviteCode_ThrowException() {
+        assertThatThrownBy(() -> customGameRoomReadService.getWaitingRoomByInviteCode(" "))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_INVITE_CODE));
+    }
+
+    @Test
     @DisplayName("getWaitingRoomByInviteCode - STARTED room이면 공개 조회할 수 없다")
     void getWaitingRoomByInviteCode_Started_ThrowException() {
         // given
