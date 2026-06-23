@@ -279,20 +279,20 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 ### 5. Test 구현
 
-- [ ] core domain unit test 작성.
-- [ ] core repository `@DataJpaTest` 작성.
-- [ ] core service test 작성.
-- [ ] API service unit test 작성.
-- [ ] controller `RestAssuredMockMvc` test 작성.
-- [ ] RestDocs test 작성.
-- [ ] owner 중복 `WAITING` room 생성 실패 검증.
-- [ ] 공개 room list 조회 성공 검증.
-- [ ] 공개 room list에는 `WAITING` room만 포함되는지 검증.
-- [ ] roomName이 owner nickname 기준으로 만들어지는지 검증.
-- [ ] inviteCode 공개 조회 성공 검증.
-- [ ] 존재하지 않는 inviteCode 조회 실패 검증.
-- [ ] `STARTED`, `CLOSED` room 공개 조회 실패 검증.
-- [ ] user nickname batch 조회 검증.
+- [x] core domain unit test 작성.
+- [x] core repository `@DataJpaTest` 작성.
+- [x] core service test 작성.
+- [x] API service unit test 작성.
+- [x] controller `RestAssuredMockMvc` test 작성.
+- [x] RestDocs test 작성.
+- [x] owner 중복 `WAITING` room 생성 실패 검증.
+- [x] 공개 room list 조회 성공 검증.
+- [x] 공개 room list에는 `WAITING` room만 포함되는지 검증.
+- [x] roomName이 owner nickname 기준으로 만들어지는지 검증.
+- [x] inviteCode 공개 조회 성공 검증.
+- [x] 존재하지 않는 inviteCode 조회 실패 검증.
+- [x] `STARTED`, `CLOSED` room 공개 조회 실패 검증.
+- [x] user nickname batch 조회 검증.
 
 ### 6. 문서 정합성 구현
 
