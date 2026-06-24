@@ -43,4 +43,10 @@ describe('router route meta', () => {
       name: ROUTE_NAMES.match,
     })
   })
+
+  it('registers the invite route path', () => {
+    const inviteRoute = getRoute(ROUTE_NAMES.customRoomInvite)
+
+    expect(inviteRoute.path).toBe('/custom-games/join/:inviteCode')
+  })
 })

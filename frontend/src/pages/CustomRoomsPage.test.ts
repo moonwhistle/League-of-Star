@@ -14,14 +14,8 @@ import type { CustomRoomResponse } from '@/types/customRoom'
 import CustomRoomsPage from './CustomRoomsPage.vue'
 
 const routerPushMock = vi.hoisted(() => vi.fn())
-const routeMock = vi.hoisted(() => ({
-  params: {
-    inviteCode: '',
-  },
-}))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => routeMock,
   useRouter: () => ({
     push: routerPushMock,
   }),
@@ -42,7 +36,6 @@ describe('CustomRoomsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setLocale('ko')
-    routeMock.params.inviteCode = ''
     routerPushMock.mockResolvedValue(undefined)
     getCustomRoomsMock.mockResolvedValue({
       rooms: [
@@ -132,25 +125,6 @@ describe('CustomRoomsPage', () => {
         roomId: '102',
       },
     })
-  })
-
-  it('resolves invite link route params with preview without joining the room', async () => {
-    routeMock.params.inviteCode = ' star12 '
-
-    const wrapper = mount(CustomRoomsPage)
-    await flushPromises()
-
-    expect(
-      wrapper.get<HTMLInputElement>('[data-testid="custom-room-invite-input"]').element.value,
-    ).toBe('STAR12')
-    expect(getCustomRoomInvitePreviewMock).toHaveBeenCalledWith('STAR12', expect.any(AbortSignal))
-    expect(routerPushMock).toHaveBeenCalledWith({
-      name: ROUTE_NAMES.customRoom,
-      params: {
-        roomId: '102',
-      },
-    })
-    expect(createCustomRoomMock).not.toHaveBeenCalled()
   })
 
   it('does not request invite preview when invite code is blank', async () => {

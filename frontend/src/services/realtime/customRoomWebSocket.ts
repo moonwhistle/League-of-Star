@@ -27,10 +27,7 @@ export function connectCustomRoomWebSocket(
   socket.addEventListener('open', (event) => currentHandlers.onOpen?.(event))
   socket.addEventListener('message', (event: MessageEvent<string>) => {
     try {
-      currentHandlers.onMessage?.(
-        JSON.parse(event.data) as CustomRoomWebSocketServerMessage,
-        event,
-      )
+      currentHandlers.onMessage?.(JSON.parse(event.data) as CustomRoomWebSocketServerMessage, event)
     } catch (error) {
       currentHandlers.onError?.(error)
     }

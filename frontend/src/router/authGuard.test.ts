@@ -37,13 +37,13 @@ function getRouteMeta(routeName: string): RouteMeta {
   return route!.meta
 }
 
-function createRoute(meta: RouteMeta = {}): RouteLocationNormalized {
-  return { meta } as RouteLocationNormalized
+function createRoute(meta: RouteMeta = {}, fullPath = '/protected'): RouteLocationNormalized {
+  return { fullPath, meta } as RouteLocationNormalized
 }
 
-function runGuard(meta: RouteMeta) {
+function runGuard(meta: RouteMeta, fullPath?: string) {
   return authGuard(
-    createRoute(meta),
+    createRoute(meta, fullPath),
     {} as RouteLocationNormalizedLoaded,
     vi.fn() as NavigationGuardNext,
   )
@@ -57,7 +57,12 @@ describe('authGuard', () => {
   it.each(protectedRouteNames)('redirects unauthenticated %s route to login', (routeName) => {
     hasAuthSessionMock.mockReturnValue(false)
 
-    expect(runGuard(getRouteMeta(routeName))).toEqual({ name: ROUTE_NAMES.login })
+    expect(runGuard(getRouteMeta(routeName), '/custom-games/join/AB12CD')).toEqual({
+      name: ROUTE_NAMES.login,
+      query: {
+        redirect: '/custom-games/join/AB12CD',
+      },
+    })
   })
 
   it.each(protectedRouteNames)('allows authenticated %s route', (routeName) => {

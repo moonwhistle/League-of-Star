@@ -84,9 +84,7 @@ describe('connectCustomRoomWebSocket', () => {
     connectCustomRoomWebSocket(100, { onMessage, onError })
     const socket = MockWebSocket.instances[0]
 
-    socket?.emitMessage(
-      '{"type":"ROOM_UPDATED","payload":{"roomId":100,"participants":[]}}',
-    )
+    socket?.emitMessage('{"type":"ROOM_UPDATED","payload":{"roomId":100,"participants":[]}}')
     socket?.emitMessage('{')
 
     expect(onMessage).toHaveBeenCalledWith(

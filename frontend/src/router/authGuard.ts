@@ -7,7 +7,12 @@ export const authGuard: NavigationGuard = (to) => {
   const isAuthenticated = hasAuthSession()
 
   if (to.meta.requiresAuth === true && !isAuthenticated) {
-    return { name: ROUTE_NAMES.login }
+    return {
+      name: ROUTE_NAMES.login,
+      query: {
+        redirect: to.fullPath,
+      },
+    }
   }
 
   if (to.meta.guestOnly === true && isAuthenticated) {

@@ -111,8 +111,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
@@ -128,7 +128,6 @@ import backgroundImageUrl from '../../img/background-new-sharp.png'
 
 type LoadStatus = 'idle' | 'loading' | 'success' | 'error'
 
-const route = useRoute()
 const router = useRouter()
 const { t } = useLocale()
 const roomsStatus = ref<LoadStatus>('idle')
@@ -140,7 +139,6 @@ const inviteErrorMessage = ref('')
 const rooms = shallowRef<CustomRoomListItem[]>([])
 const inviteCodeInput = ref('')
 const normalizedInviteCode = computed(() => inviteCodeInput.value.trim().toUpperCase())
-const routeInviteCode = computed(() => normalizeInviteCode(route.params.inviteCode))
 const roomsAbortController = shallowRef<AbortController>()
 const createAbortController = shallowRef<AbortController>()
 const inviteAbortController = shallowRef<AbortController>()
@@ -148,18 +146,6 @@ const inviteAbortController = shallowRef<AbortController>()
 onMounted(() => {
   void loadRooms()
 })
-
-watch(
-  routeInviteCode,
-  (inviteCode) => {
-    if (inviteCode === '') {
-      return
-    }
-
-    void findInviteRoomByCode(inviteCode)
-  },
-  { immediate: true },
-)
 
 onUnmounted(() => {
   abortRoomsRequest()
@@ -257,18 +243,6 @@ async function findInviteRoomByCode(inviteCode: string) {
     inviteStatus.value = 'error'
     inviteErrorMessage.value = errorMessage(error, t('customRooms.inviteFailed'))
   }
-}
-
-function normalizeInviteCode(value: unknown) {
-  if (Array.isArray(value)) {
-    return String(value[0] ?? '')
-      .trim()
-      .toUpperCase()
-  }
-
-  return String(value ?? '')
-    .trim()
-    .toUpperCase()
 }
 
 function returnToMatch() {

@@ -65,7 +65,7 @@ export const router = createRouter({
     {
       path: ROUTE_PATHS.customRoomInvite,
       name: ROUTE_NAMES.customRoomInvite,
-      component: () => import('@/pages/CustomRoomsPage.vue'),
+      component: () => import('@/pages/CustomRoomJoinPage.vue'),
       meta: {
         requiresAuth: true,
       },

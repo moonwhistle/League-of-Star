@@ -140,12 +140,27 @@ async function handleSubmit() {
 
     setAuthTokens(response.accessToken, response.refreshToken)
 
-    await router.push({ name: ROUTE_NAMES.match })
+    await router.push(loginSuccessTarget())
   } catch (error) {
     errorMessage.value = error instanceof ApiClientError ? error.message : t('login.failed')
   } finally {
     isSubmitting.value = false
   }
+}
+
+function loginSuccessTarget() {
+  const redirect = route.query.redirect
+  const redirectPath = Array.isArray(redirect) ? redirect[0] : redirect
+
+  if (typeof redirectPath === 'string' && isSafeInternalRedirect(redirectPath)) {
+    return redirectPath
+  }
+
+  return { name: ROUTE_NAMES.match }
+}
+
+function isSafeInternalRedirect(redirectPath: string) {
+  return redirectPath.startsWith('/') && !redirectPath.startsWith('//')
 }
 </script>
 
