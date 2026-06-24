@@ -722,7 +722,7 @@ Acceptance Criteria:
 - [x] 닫힌 방은 `ROOM_CLOSED`로 전달된다.
 - [x] 참가자가 아닌 사용자는 room socket에 연결할 수 없다.
 
-### 4-6. [ ] Custom Game Start API / ROOM_STARTED 계약
+### 4-6. [x] Custom Game Start API / ROOM_STARTED 계약
 
 담당: Backend
 
@@ -730,20 +730,20 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 방장이 시작 버튼을 누르면 정확히 2명이 같은 custom game room과 scenario로 진입할 수 있게 한다.
+- [x] 방장이 시작 버튼을 누르면 정확히 2명이 같은 custom game room과 scenario로 진입할 수 있게 한다.
 
 Backend:
 
-- [ ] endpoint를 확정한다.
+- [x] endpoint를 확정한다.
   - `POST /api/v1/custom-games/rooms/{roomId}/start`
-- [ ] 방장만 start를 호출할 수 있게 한다.
-- [ ] participant가 정확히 2명일 때만 시작 가능하게 한다.
-- [ ] room status가 `WAITING`일 때만 시작 가능하게 한다.
-- [ ] `gameMode=CUSTOM` GameRoom을 생성한다.
-- [ ] Scenario를 생성/저장한다.
-- [ ] room status를 `STARTED`로 전환한다.
-- [ ] HTTP start 응답은 이동 기준이 아니라 command ack로 둔다.
-- [ ] Room WebSocket `ROOM_STARTED` event payload를 확정한다.
+- [x] 방장만 start를 호출할 수 있게 한다.
+- [x] participant가 정확히 2명일 때만 시작 가능하게 한다.
+- [x] room status가 `WAITING`일 때만 시작 가능하게 한다.
+- [x] `gameMode=CUSTOM` GameRoom을 생성한다.
+- [x] Scenario를 생성/저장한다.
+- [x] room status를 `STARTED`로 전환한다.
+- [x] HTTP start 응답은 이동 기준이 아니라 command ack로 둔다.
+- [x] Room WebSocket `ROOM_STARTED` event payload를 확정한다.
   - `roomId`
   - `gameRoomId`
   - `gameMode=CUSTOM`
@@ -753,16 +753,16 @@ Backend:
 
 Policy:
 
-- [ ] Practice Mode는 1인 플레이를 담당하고, Custom Game은 2인 비랭크 대전을 담당한다.
-- [ ] 실제 GamePlayPage 이동 기준은 HTTP 응답이 아니라 `ROOM_STARTED` event다.
-- [ ] 방장과 참가자가 같은 `gameRoomId`, `scenario`, `startAt`을 받도록 WebSocket broadcast를 사용한다.
-- [ ] start 이후에는 custom room 참가/나가기를 허용하지 않는다.
+- [x] Practice Mode는 1인 플레이를 담당하고, Custom Game은 2인 비랭크 대전을 담당한다.
+- [x] 실제 GamePlayPage 이동 기준은 HTTP 응답이 아니라 `ROOM_STARTED` event다.
+- [x] 방장과 참가자가 같은 `gameRoomId`, `scenario`, `startAt`을 받도록 WebSocket broadcast를 사용한다.
+- [x] start 이후에는 custom room 참가/나가기를 허용하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 방장만 사용자 지정 게임을 시작할 수 있다.
-- [ ] 1명 방은 시작할 수 없고 2명 방만 시작할 수 있다.
-- [ ] 모든 room socket 참가자에게 동일한 `ROOM_STARTED` payload가 전달된다.
+- [x] 방장만 사용자 지정 게임을 시작할 수 있다.
+- [x] 1명 방은 시작할 수 없고 2명 방만 시작할 수 있다.
+- [x] 모든 room socket 참가자에게 동일한 `ROOM_STARTED` payload가 전달된다.
 
 ### 4-7. [x] Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 
@@ -801,7 +801,7 @@ Acceptance Criteria:
 - [x] custom game result는 WebSocket payload로 확정된다.
 - [x] settlement/recovery 테스트에서 custom record 저장과 rank/LP 제외가 검증된다.
 
-### 4-8. [ ] Custom Room 공개 대기실 / 초대 링크 프론트 구현
+### 4-8. [x] Custom Room 공개 대기실 / 초대 링크 프론트 구현
 
 담당: Frontend
 
@@ -809,35 +809,35 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage의 사용자 지정 버튼으로 공개 대기실 목록을 보고, custom room을 만들거나 초대 코드로 방을 찾을 수 있게 한다.
+- [x] MatchPage의 사용자 지정 버튼으로 공개 대기실 목록을 보고, custom room을 만들거나 초대 코드로 방을 찾을 수 있게 한다.
 
 Frontend:
 
-- [ ] custom room service를 추가한다.
-- [ ] MatchPage 사용자 지정 버튼을 공개 대기실 화면으로 연결한다.
-- [ ] 공개 대기실 화면에서 4-3 room list API를 호출한다.
-- [ ] 새 방 만들기 버튼을 4-3 create room API와 연결한다.
-- [ ] `/custom-games/rooms/:roomId` route를 추가한다.
-- [ ] CustomRoomPage에서 room 조회 API를 호출한다.
-- [ ] 대기실 목록에서 roomName, 현재 인원, 방장 정보를 표시한다.
-- [ ] 초대 링크를 표시한다.
-- [ ] 초대 코드 입력으로 4-3 invite preview API를 호출한다.
-- [ ] 초대 링크 복사 버튼을 구현한다.
-- [ ] 참가자 목록과 방장 표시를 구현한다.
+- [x] custom room service를 추가한다.
+- [x] MatchPage 사용자 지정 버튼을 공개 대기실 화면으로 연결한다.
+- [x] 공개 대기실 화면에서 4-3 room list API를 호출한다.
+- [x] 새 방 만들기 버튼을 4-3 create room API와 연결한다.
+- [x] `/custom-games/rooms/:roomId` route를 추가한다.
+- [x] CustomRoomPage에서 room 조회 API를 호출한다.
+- [x] 대기실 목록에서 roomName, 현재 인원, 방장 정보를 표시한다.
+- [x] 초대 링크를 표시한다.
+- [x] 초대 코드 입력으로 4-3 invite preview API를 호출한다.
+- [x] 초대 링크 복사 버튼을 구현한다.
+- [x] 참가자 목록과 방장 표시를 구현한다.
 
 Policy:
 
-- [ ] 사용자 지정 방 생성은 일반 match queue와 독립이다.
-- [ ] 모든 `WAITING` custom room은 공개 목록에 표시한다.
-- [ ] 초대 링크는 `inviteCode`를 사용하고 roomId를 공유하지 않는다.
-- [ ] Room WebSocket 연결은 4-9에서 구현한다.
+- [x] 사용자 지정 방 생성은 일반 match queue와 독립이다.
+- [x] 모든 `WAITING` custom room은 공개 목록에 표시한다.
+- [x] 초대 링크는 `inviteCode`를 사용하고 roomId를 공유하지 않는다.
+- [x] Room WebSocket 연결은 4-9에서 구현한다.
 
 Acceptance Criteria:
 
-- [ ] 사용자 지정 버튼으로 공개 대기실 목록을 볼 수 있다.
-- [ ] 새 방 만들기로 방을 만들 수 있다.
-- [ ] 방 페이지에서 초대 링크와 참가자 목록을 확인할 수 있다.
-- [ ] 방 생성 흐름이 매칭 queue 상태와 충돌하지 않는다.
+- [x] 사용자 지정 버튼으로 공개 대기실 목록을 볼 수 있다.
+- [x] 새 방 만들기로 방을 만들 수 있다.
+- [x] 방 페이지에서 초대 링크와 참가자 목록을 확인할 수 있다.
+- [x] 방 생성 흐름이 매칭 queue 상태와 충돌하지 않는다.
 
 ### 4-9. [ ] Custom Room 초대 참가 / WebSocket 프론트 구현
 
@@ -993,9 +993,9 @@ Policy:
 14. [x] Section 4-3. Custom Room 생성 / 공개 목록 / 조회 API 계약
 15. [x] Section 4-4. Custom Room 초대 참가 / 나가기 API 계약
 16. [x] Section 4-5. Custom Room WebSocket 동기화 계약
-17. [ ] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
+17. [x] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
 18. [x] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
-19. [ ] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
+19. [x] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
 20. [ ] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
 21. [ ] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
 22. [ ] Section 5-1/5-2. 비밀번호 찾기

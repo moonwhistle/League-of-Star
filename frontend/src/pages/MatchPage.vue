@@ -28,6 +28,7 @@
     :data-ranking-error-message="rankingErrorMessage"
     :data-practice-status="practiceStatus"
     :data-practice-error-message="practiceErrorMessage"
+    :data-can-open-custom-rooms="canOpenCustomRooms"
   >
     <header class="match-app-bar" aria-label="Match navigation">
       <h1>LEAGUE OF STAR</h1>
@@ -148,7 +149,14 @@
           >
             {{ practiceActionLabel }}
           </button>
-          <button type="button">{{ t('match.custom') }}</button>
+          <button
+            type="button"
+            data-testid="custom-room-button"
+            :disabled="!canOpenCustomRooms"
+            @click="navigateToCustomRooms"
+          >
+            {{ t('match.custom') }}
+          </button>
         </div>
       </section>
     </section>
@@ -424,6 +432,14 @@ const canLogout = computed(
     !hasSubmittedMatchResponseCommand.value,
 )
 const canStartPractice = computed(
+  () =>
+    practiceStatus.value !== 'loading' &&
+    queueStatus.value === 'ready' &&
+    !hasActiveMatchFoundResponse.value &&
+    !isMatchResponseCommandPending.value &&
+    !hasSubmittedMatchResponseCommand.value,
+)
+const canOpenCustomRooms = computed(
   () =>
     practiceStatus.value !== 'loading' &&
     queueStatus.value === 'ready' &&
@@ -763,6 +779,14 @@ async function finalizeLogout() {
 
 function navigateToProfile() {
   void router.push({ name: ROUTE_NAMES.profile })
+}
+
+function navigateToCustomRooms() {
+  if (!canOpenCustomRooms.value) {
+    return
+  }
+
+  void router.push({ name: ROUTE_NAMES.customRooms })
 }
 
 async function startPracticeMode() {

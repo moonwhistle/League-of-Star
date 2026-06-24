@@ -47,6 +47,30 @@ export const router = createRouter({
       },
     },
     {
+      path: ROUTE_PATHS.customRooms,
+      name: ROUTE_NAMES.customRooms,
+      component: () => import('@/pages/CustomRoomsPage.vue'),
+      meta: {
+        requiresAuth: true,
+      },
+    },
+    {
+      path: ROUTE_PATHS.customRoom,
+      name: ROUTE_NAMES.customRoom,
+      component: () => import('@/pages/CustomRoomPage.vue'),
+      meta: {
+        requiresAuth: true,
+      },
+    },
+    {
+      path: ROUTE_PATHS.customRoomInvite,
+      name: ROUTE_NAMES.customRoomInvite,
+      component: () => import('@/pages/CustomRoomsPage.vue'),
+      meta: {
+        requiresAuth: true,
+      },
+    },
+    {
       path: ROUTE_PATHS.gameWaiting,
       name: ROUTE_NAMES.gameWaiting,
       component: () => import('@/pages/GameWaitingPage.vue'),

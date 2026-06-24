@@ -101,6 +101,10 @@ function getPracticeButton(wrapper: VueWrapper) {
   return wrapper.get('[data-testid="practice-start-button"]')
 }
 
+function getCustomRoomButton(wrapper: VueWrapper) {
+  return wrapper.get('[data-testid="custom-room-button"]')
+}
+
 async function openLogoutConfirm(wrapper: VueWrapper) {
   await getLogoutButton(wrapper).trigger('click')
   await wrapper.vm.$nextTick()
@@ -351,6 +355,38 @@ describe('MatchPage', () => {
     await wrapper.get('.match-action-button').trigger('click')
 
     expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.profile })
+  })
+
+  it('moves to the custom rooms route from the custom action without entering the queue', async () => {
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    await getCustomRoomButton(wrapper).trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.customRooms })
+    expect(connectMatchEventSourceMock).not.toHaveBeenCalled()
+    expect(joinMatchQueueMock).not.toHaveBeenCalled()
+    expect(leaveMatchQueueMock).not.toHaveBeenCalled()
+  })
+
+  it('disables custom room navigation while queued', async () => {
+    const wrapper = mount(MatchPage)
+    await flushPromises()
+
+    await getStartButton(wrapper).trigger('click')
+    getCurrentHandlers().onConnected?.({
+      userId: 1,
+      connectedAt: '2026-06-01T00:00:00Z',
+    })
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-queue-status')).toBe('queued')
+    expect(wrapper.get('main').attributes('data-can-open-custom-rooms')).toBe('false')
+    expect(getCustomRoomButton(wrapper).attributes('disabled')).toBeDefined()
+
+    await getCustomRoomButton(wrapper).trigger('click')
+
+    expect(routerPushMock).not.toHaveBeenCalledWith({ name: ROUTE_NAMES.customRooms })
   })
 
   it('keeps matchmaking available when the profile request fails', async () => {

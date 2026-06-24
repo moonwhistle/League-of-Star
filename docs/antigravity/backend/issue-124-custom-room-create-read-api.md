@@ -24,10 +24,15 @@ flowchart TD
     N --> O["roomName = nickname's room"]
     O --> P["대기실 목록 반환"]
 
-    Q["GET /api/v1/custom-games/rooms/invites/{inviteCode}"] --> R["Core CustomGameRoomReadService"]
+    Q["GET /api/v1/custom-games/rooms/{roomId}"] --> R["Core CustomGameRoomReadService"]
     R --> S{"WAITING room?"}
-    S -->|YES| T["room preview 반환"]
+    S -->|YES| T["room detail 반환"]
     S -->|NO| U["404/409 ErrorResponse"]
+
+    V["GET /api/v1/custom-games/rooms/invites/{inviteCode}"] --> W["Core CustomGameRoomReadService"]
+    W --> X{"WAITING room?"}
+    X -->|YES| Y["room preview 반환"]
+    X -->|NO| Z["404/409 ErrorResponse"]
 ```
 
 핵심 정책은 다음과 같다.
@@ -39,6 +44,7 @@ flowchart TD
 - 방장별 `WAITING` custom room 1개 정책은 애플리케이션 사전 조회와 DB unique 제약으로 함께 방어한다.
 - 모든 `WAITING` custom room은 공개 대기실 목록에 노출한다.
 - 대기실 이름은 owner nickname 기준 `{nickname}'s room`으로 내려준다.
+- room detail 조회는 `roomId` 기반 route 새로고침 복구용이며 참가 처리를 하지 않는다.
 - 초대 링크는 `roomId`가 아니라 `inviteCode`를 사용한다.
 - inviteCode 공개 조회는 인증 없이 호출할 수 있다.
 - 공개 조회는 참가 처리 없이 room preview만 반환한다.
@@ -106,6 +112,34 @@ GET /api/v1/custom-games/rooms
 }
 ```
 
+### Custom Room Detail API
+
+```http
+GET /api/v1/custom-games/rooms/{roomId}
+```
+
+인증 없이 호출 가능하다. 이 API는 프론트의 `/custom-games/rooms/:roomId` 상세 화면에서 새로고침하거나 직접 진입했을 때 방 정보를 복구하기 위한 조회 API다. 참가 처리는 하지 않으며, `WAITING` custom room만 반환한다.
+
+#### Response
+
+```json
+{
+  "roomId": 1,
+  "roomName": "Host's room",
+  "inviteCode": "AB12CD",
+  "ownerUserId": 10,
+  "status": "WAITING",
+  "maxParticipants": 2,
+  "participants": [
+    {
+      "userId": 10,
+      "nickname": "Host",
+      "role": "OWNER"
+    }
+  ]
+}
+```
+
 ### Custom Room Invite Preview API
 
 ```http
@@ -168,6 +202,8 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 - 인증 없음/만료/유효하지 않은 token은 기존 security/auth error response를 따른다.
 - 방장이 이미 `WAITING` custom room을 가지고 있으면 `409`를 반환한다.
+- roomId가 존재하지 않으면 `404`를 반환한다.
+- roomId가 `STARTED` 또는 `CLOSED` room을 가리키면 상세 조회를 실패 처리한다.
 - inviteCode가 존재하지 않으면 `404`를 반환한다.
 - inviteCode가 null/blank이면 잘못된 입력으로 처리한다.
 - inviteCode가 `STARTED` 또는 `CLOSED` room을 가리키면 공개 조회를 실패 처리한다.
@@ -181,6 +217,7 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 - `POST /api/v1/custom-games/rooms` API 구현.
 - `GET /api/v1/custom-games/rooms` API 구현.
+- `GET /api/v1/custom-games/rooms/{roomId}` API 구현.
 - `GET /api/v1/custom-games/rooms/invites/{inviteCode}` API 구현.
 - `CustomGamePath` path 상수 추가.
 - `CustomGameRoom`, `CustomGameParticipant` 기본 domain 구현.
@@ -223,9 +260,11 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 
 - [x] endpoint를 `POST /api/v1/custom-games/rooms`로 확정.
 - [x] endpoint를 `GET /api/v1/custom-games/rooms`로 확정.
+- [x] endpoint를 `GET /api/v1/custom-games/rooms/{roomId}`로 확정.
 - [x] endpoint를 `GET /api/v1/custom-games/rooms/invites/{inviteCode}`로 확정.
 - [x] create request body 없음과 `@AuthUser Long userId` 인증 사용자 식별 정책 문서화.
 - [x] public room list는 인증 없이 호출 가능함을 문서화.
+- [x] room detail은 인증 없이 호출 가능하며 참가 처리를 하지 않음을 문서화.
 - [x] invite preview는 인증 없이 호출 가능함을 문서화.
 - [x] room response shape를 `roomId`, `roomName`, `inviteCode`, `ownerUserId`, `status`, `maxParticipants`, `participants`로 확정.
 - [x] room list response shape를 `rooms[].roomId`, `rooms[].roomName`, `rooms[].inviteCode`, `rooms[].ownerUserId`, `rooms[].status`, `rooms[].maxParticipants`, `rooms[].currentParticipants`로 확정.

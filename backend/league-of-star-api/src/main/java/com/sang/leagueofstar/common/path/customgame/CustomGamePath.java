@@ -8,6 +8,7 @@ public final class CustomGamePath {
 
     public static final String CUSTOM_ROOM_BASE = "/api/v1/custom-games/rooms";
     public static final String INVITES = "/invites";
+    public static final String ROOM_DETAIL = "/{roomId}";
     public static final String INVITE_PREVIEW = INVITES + "/{inviteCode}";
     public static final String JOIN = "/{inviteCode}/join";
     public static final String LEAVE = "/{roomId}/leave";

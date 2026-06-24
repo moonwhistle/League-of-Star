@@ -31,6 +31,13 @@ public class CustomGameRoomController {
         return ResponseEntity.ok(customGameRoomService.getPublicRooms());
     }
 
+    @GetMapping(CustomGamePath.ROOM_DETAIL)
+    public ResponseEntity<CustomRoomResponse> getRoom(
+            @PathVariable(CustomGamePath.ROOM_ID) Long roomId
+    ) {
+        return ResponseEntity.ok(customGameRoomService.getWaitingRoom(roomId));
+    }
+
     @GetMapping(CustomGamePath.INVITE_PREVIEW)
     public ResponseEntity<CustomRoomResponse> getInvitePreview(
             @PathVariable(CustomGamePath.INVITE_CODE) String inviteCode
