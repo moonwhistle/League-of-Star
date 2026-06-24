@@ -228,11 +228,11 @@ Custom Room WebSocket server message에 `ROOM_STARTED`를 추가한다.
 
 ### 8. 검증
 
-- [ ] `./gradlew :league-of-star-core:test`
-- [ ] `./gradlew :league-of-star-api:test`
-- [ ] `./gradlew test`
-- [ ] `./gradlew build`
-- [ ] `git diff --check`
+- [x] `./gradlew :league-of-star-core:test`
+- [x] `./gradlew :league-of-star-api:test`
+- [x] `./gradlew test`
+- [x] `./gradlew build`
+- [x] `git diff --check`
 
 ## Implementation Policy
 
