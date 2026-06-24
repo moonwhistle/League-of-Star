@@ -99,7 +99,6 @@
                   room.maxParticipants
                 }}</span
               >
-              <span>{{ t('customRooms.status') }} {{ room.status }}</span>
             </div>
             <button type="button" @click="openRoom(room.roomId)">
               {{ t('customRooms.openRoom') }}

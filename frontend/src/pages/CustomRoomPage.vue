@@ -40,7 +40,6 @@
           <section class="custom-room-panel" :aria-label="t('customRoom.roomInfo')">
             <div class="custom-room-panel-heading">
               <span>{{ t('customRoom.roomInfo') }}</span>
-              <strong>{{ room.status }}</strong>
             </div>
 
             <dl class="custom-room-info-list">
@@ -51,10 +50,6 @@
               <div>
                 <dt>{{ t('customRoom.inviteCode') }}</dt>
                 <dd>{{ room.inviteCode }}</dd>
-              </div>
-              <div>
-                <dt>{{ t('customRoom.status') }}</dt>
-                <dd>{{ room.status }}</dd>
               </div>
             </dl>
           </section>
