@@ -181,98 +181,98 @@ type CustomRoomWebSocketServerMessage =
 
 ### 1. Frontend Custom Room Contract 정리
 
-- [ ] backend issue-126 join/leave 계약을 재확인한다.
-- [ ] backend issue-128 Room WebSocket 계약을 재확인한다.
-- [ ] HTTP join/leave는 command이고 화면 동기화는 WebSocket event 기준임을 문서화한다.
-- [ ] disconnect/error는 DB leave가 아님을 문서화한다.
-- [ ] 4-10 start/GamePlay 범위를 제외함을 문서화한다.
+- [x] backend issue-126 join/leave 계약을 재확인한다.
+- [x] backend issue-128 Room WebSocket 계약을 재확인한다.
+- [x] HTTP join/leave는 command이고 화면 동기화는 WebSocket event 기준임을 문서화한다.
+- [x] disconnect/error는 DB leave가 아님을 문서화한다.
+- [x] 4-10 start/GamePlay 범위를 제외함을 문서화한다.
 
 ### 2. Custom Room Service / Type 구현
 
-- [ ] `joinCustomRoom(inviteCode, signal?)`를 추가한다.
-- [ ] `leaveCustomRoom(roomId, signal?)`를 추가한다.
-- [ ] inviteCode와 roomId를 `encodeURIComponent`로 처리한다.
-- [ ] `CustomRoomWebSocketServerMessage` type을 추가한다.
-- [ ] `ROOM_UPDATED`, `ROOM_CLOSED`, `ERROR` payload type을 명확히 한다.
+- [x] `joinCustomRoom(inviteCode, signal?)`를 추가한다.
+- [x] `leaveCustomRoom(roomId, signal?)`를 추가한다.
+- [x] inviteCode와 roomId를 `encodeURIComponent`로 처리한다.
+- [x] `CustomRoomWebSocketServerMessage` type을 추가한다.
+- [x] `ROOM_UPDATED`, `ROOM_CLOSED`, `ERROR` payload type을 명확히 한다.
 
 ### 3. Login Redirect 구현
 
-- [ ] auth guard가 보호 route 접근 시 현재 fullPath를 `redirect` query로 넘기게 한다.
-- [ ] LoginPage가 로그인 성공 후 안전한 내부 redirect path로 이동하게 한다.
-- [ ] redirect query가 없거나 외부 URL이면 기존처럼 MatchPage로 이동하게 한다.
-- [ ] 비로그인 초대 링크 진입 후 로그인하면 초대 링크로 복귀하게 한다.
+- [x] auth guard가 보호 route 접근 시 현재 fullPath를 `redirect` query로 넘기게 한다.
+- [x] LoginPage가 로그인 성공 후 안전한 내부 redirect path로 이동하게 한다.
+- [x] redirect query가 없거나 외부 URL이면 기존처럼 MatchPage로 이동하게 한다.
+- [x] 비로그인 초대 링크 진입 후 로그인하면 초대 링크로 복귀하게 한다.
 
 ### 4. Invite Join Route 구현
 
-- [ ] `/custom-games/join/:inviteCode` route에서 join API를 호출한다.
-- [ ] join 성공 시 응답의 `roomId`로 CustomRoomPage에 이동한다.
-- [ ] join 실패 시 backend error message를 표시한다.
-- [ ] 빈 inviteCode는 API 호출 없이 오류 처리한다.
-- [ ] join 중 중복 호출을 막는다.
+- [x] `/custom-games/join/:inviteCode` route에서 join API를 호출한다.
+- [x] join 성공 시 응답의 `roomId`로 CustomRoomPage에 이동한다.
+- [x] join 실패 시 backend error message를 표시한다.
+- [x] 빈 inviteCode는 API 호출 없이 오류 처리한다.
+- [x] join 중 중복 호출을 막는다.
 
 ### 5. Room WebSocket Service 구현
 
-- [ ] `/ws/custom-games/rooms/{roomId}?token={accessToken}` URL을 구성한다.
-- [ ] access token이 없으면 연결하지 않고 명확한 에러를 반환한다.
-- [ ] relative WebSocket path는 `WS_BASE_URL` 기준으로 resolve한다.
-- [ ] server message JSON parse와 invalid JSON error 처리를 구현한다.
-- [ ] close가 중복 호출되지 않게 한다.
+- [x] `/ws/custom-games/rooms/{roomId}?token={accessToken}` URL을 구성한다.
+- [x] access token이 없으면 연결하지 않고 명확한 에러를 반환한다.
+- [x] relative WebSocket path는 `WS_BASE_URL` 기준으로 resolve한다.
+- [x] server message JSON parse와 invalid JSON error 처리를 구현한다.
+- [x] close가 중복 호출되지 않게 한다.
 
 ### 6. CustomRoomPage WebSocket 연결
 
-- [ ] CustomRoomPage mount/roomId 변경 시 Room WebSocket을 연결한다.
-- [ ] unmount 시 WebSocket을 닫는다.
-- [ ] `ROOM_UPDATED` 수신 시 room state를 payload로 교체한다.
-- [ ] `ROOM_CLOSED` 수신 시 closed state를 표시한다.
-- [ ] `ERROR`, socket error, socket close 상태를 UI에 표시한다.
-- [ ] socket error/close에서 leave API를 호출하지 않는다.
+- [x] CustomRoomPage mount/roomId 변경 시 Room WebSocket을 연결한다.
+- [x] unmount 시 WebSocket을 닫는다.
+- [x] `ROOM_UPDATED` 수신 시 room state를 payload로 교체한다.
+- [x] `ROOM_CLOSED` 수신 시 closed state를 표시한다.
+- [x] `ERROR`, socket error, socket close 상태를 UI에 표시한다.
+- [x] socket error/close에서 leave API를 호출하지 않는다.
 
 ### 7. Leave UI 구현
 
-- [ ] CustomRoomPage에 나가기 버튼을 추가한다.
-- [ ] leave API 호출 중 버튼을 비활성화한다.
-- [ ] leave 성공 시 `/custom-games/rooms`로 이동한다.
-- [ ] leave 실패 시 현재 페이지에 error message를 표시한다.
-- [ ] closed state에서는 나가기 버튼 대신 `/match` 복귀 액션을 표시한다.
+- [x] CustomRoomPage에 나가기 버튼을 추가한다.
+- [x] leave API 호출 중 버튼을 비활성화한다.
+- [x] leave 성공 시 `/custom-games/rooms`로 이동한다.
+- [x] leave 실패 시 현재 페이지에 error message를 표시한다.
+- [x] closed state에서는 나가기 버튼 대신 `/match` 복귀 액션을 표시한다.
 
 ### 8. UI / Locale 구현
 
-- [ ] join loading/error 문구를 추가한다.
-- [ ] leave loading/error 문구를 추가한다.
-- [ ] WebSocket 연결 오류 문구를 추가한다.
-- [ ] 방 닫힘 문구와 `/match` 복귀 버튼 문구를 추가한다.
-- [ ] 기존 대기실 UI와 톤을 맞추고 불필요한 상태 노출을 늘리지 않는다.
+- [x] join loading/error 문구를 추가한다.
+- [x] leave loading/error 문구를 추가한다.
+- [x] WebSocket 연결 오류 문구를 추가한다.
+- [x] 방 닫힘 문구와 `/match` 복귀 버튼 문구를 추가한다.
+- [x] 기존 대기실 UI와 톤을 맞추고 불필요한 상태 노출을 늘리지 않는다.
 
 ### 9. Test 구현
 
-- [ ] customRoomService join/leave path 테스트를 추가한다.
-- [ ] customRoomWebSocket URL/token/message/close 테스트를 추가한다.
-- [ ] auth guard redirect query 테스트를 추가한다.
-- [ ] LoginPage redirect 성공 테스트를 추가한다.
-- [ ] invite join route 성공/실패 테스트를 추가한다.
-- [ ] CustomRoomPage `ROOM_UPDATED` 갱신 테스트를 추가한다.
-- [ ] CustomRoomPage `ROOM_CLOSED` UI 테스트를 추가한다.
-- [ ] leave 성공/실패 테스트를 추가한다.
-- [ ] socket error/close가 leave API를 호출하지 않는지 테스트한다.
+- [x] customRoomService join/leave path 테스트를 추가한다.
+- [x] customRoomWebSocket URL/token/message/close 테스트를 추가한다.
+- [x] auth guard redirect query 테스트를 추가한다.
+- [x] LoginPage redirect 성공 테스트를 추가한다.
+- [x] invite join route 성공/실패 테스트를 추가한다.
+- [x] CustomRoomPage `ROOM_UPDATED` 갱신 테스트를 추가한다.
+- [x] CustomRoomPage `ROOM_CLOSED` UI 테스트를 추가한다.
+- [x] leave 성공/실패 테스트를 추가한다.
+- [x] socket error/close가 leave API를 호출하지 않는지 테스트한다.
 
 ### 10. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 4-9 세부 체크박스를 완료 처리한다.
-- [ ] `docs/last-구현.md` 하단 Section 4-9 체크를 완료 처리한다.
-- [ ] issue-134의 후속 범위와 issue-136 구현 범위가 충돌하지 않는지 확인한다.
-- [ ] backend issue-126/128 계약과 프론트 문서가 일치하는지 확인한다.
-- [ ] issue-136 Tasks 완료 상태를 반영한다.
-- [ ] issue-136 PR 섹션을 설계 중심으로 보강한다.
+- [x] `docs/last-구현.md` 4-9 세부 체크박스를 완료 처리한다.
+- [x] `docs/last-구현.md` 하단 Section 4-9 체크를 완료 처리한다.
+- [x] issue-134의 후속 범위와 issue-136 구현 범위가 충돌하지 않는지 확인한다.
+- [x] backend issue-126/128 계약과 프론트 문서가 일치하는지 확인한다.
+- [x] issue-136 Tasks 완료 상태를 반영한다.
+- [x] issue-136 PR 섹션을 설계 중심으로 보강한다.
 
 ### 11. 검증
 
-- [ ] `npm run format`을 통과시킨다.
-- [ ] `npm run lint`를 통과시킨다.
-- [ ] `npm run typecheck`를 통과시킨다.
-- [ ] `npm run test`를 통과시킨다.
-- [ ] `npm run build`를 통과시킨다.
-- [ ] desktop `1440x900` UI overflow를 확인한다.
-- [ ] mobile `390x844` UI overflow를 확인한다.
+- [x] `npm run format`을 통과시킨다.
+- [x] `npm run lint`를 통과시킨다.
+- [x] `npm run typecheck`를 통과시킨다.
+- [x] `npm run test`를 통과시킨다.
+- [x] `npm run build`를 통과시킨다.
+- [x] desktop `1440x900` UI overflow를 확인한다.
+- [x] mobile `390x844` UI overflow를 확인한다.
 
 ## Implementation Policy
 
@@ -352,12 +352,25 @@ flowchart TD
 - 로그인 후 초대 링크 복귀를 보강함.
   초대 링크는 외부에서 들어오는 진입점이므로 비로그인 사용자를 로그인으로 보낸 뒤 원래 초대 링크로 되돌려야 흐름이 끊기지 않음.
 
+- Room WebSocket 연결 위치를 방 상세 화면으로 제한함.
+  공개 대기실 목록이나 초대 참가 route에서 WebSocket을 열면 사용자가 아직 방 상태를 보고 있지 않은데도 세션이 생긴다. 방 상세 화면에서만 연결하면 “현재 이 방을 보고 있는 사용자”에게만 실시간 동기화 책임을 부여할 수 있음.
+
+- start/GamePlay 이동을 이번 PR에 섞지 않음.
+  참가/나가기는 room membership 문제이고, start는 같은 gameRoom/scenario로 두 사용자를 이동시키는 문제다. 둘을 한 PR에 섞으면 어느 event가 화면 전환 기준인지 흐려지므로 `ROOM_STARTED` 처리는 후속 4-10에서 다룸.
+
 ## 📝 Note
 
 - 이번 PR에서 방장 start 버튼, `ROOM_STARTED`, GamePlay 이동은 제외함.
 - 친구 목록 기반 초대는 제외함.
 - 새 패키지 추가 없음.
-- 검증 결과를 여기에 기록함.
+- 검증 결과:
+  - `npm run format` 통과함.
+  - `npm run lint` 통과함.
+  - `npm run typecheck` 통과함.
+  - `npm run test` 통과함. 33 files / 300 tests passed 확인함.
+  - `npm run build` 통과함.
+  - Chrome headless UI 확인 완료함. `/custom-games/rooms`, `/custom-games/join/STAR12`, `/custom-games/rooms/101`에서 desktop `1440x900`, mobile `390x844` 모두 horizontal overflow 없음, text overflow 후보 없음.
+  - 8081 목서버 기준 초대 링크 참가 후 `/custom-games/rooms/101` 이동, WebSocket `open`, 참가자 수 2명 표시 확인함.
 
 ## 📌 Related Issue
 

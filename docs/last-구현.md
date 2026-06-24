@@ -839,7 +839,7 @@ Acceptance Criteria:
 - [x] 방 페이지에서 초대 링크와 참가자 목록을 확인할 수 있다.
 - [x] 방 생성 흐름이 매칭 queue 상태와 충돌하지 않는다.
 
-### 4-9. [ ] Custom Room 초대 참가 / WebSocket 프론트 구현
+### 4-9. [x] Custom Room 초대 참가 / WebSocket 프론트 구현
 
 담당: Frontend
 
@@ -847,29 +847,29 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 초대 링크로 들어온 사용자가 사용자 지정 방에 참가하고, 참가자 목록 변경을 실시간으로 볼 수 있게 한다.
+- [x] 초대 링크로 들어온 사용자가 사용자 지정 방에 참가하고, 참가자 목록 변경을 실시간으로 볼 수 있게 한다.
 
 Frontend:
 
-- [ ] `/custom-games/join/:inviteCode` route를 추가한다.
-- [ ] 로그인하지 않은 사용자는 로그인 후 초대 링크로 복귀하게 한다.
-- [ ] join API를 호출하고 성공 시 `/custom-games/rooms/:roomId`로 이동한다.
-- [ ] CustomRoomPage에서 Room WebSocket을 연결한다.
-- [ ] `ROOM_UPDATED`로 참가자 목록을 갱신한다.
-- [ ] `ROOM_CLOSED`로 방 닫힘 상태를 표시하고 `/match` 복귀 액션을 제공한다.
-- [ ] 나가기 버튼을 4-4 leave API와 연결한다.
+- [x] `/custom-games/join/:inviteCode` route를 추가한다.
+- [x] 로그인하지 않은 사용자는 로그인 후 초대 링크로 복귀하게 한다.
+- [x] join API를 호출하고 성공 시 `/custom-games/rooms/:roomId`로 이동한다.
+- [x] CustomRoomPage에서 Room WebSocket을 연결한다.
+- [x] `ROOM_UPDATED`로 참가자 목록을 갱신한다.
+- [x] `ROOM_CLOSED`로 방 닫힘 상태를 표시하고 `/match` 복귀 액션을 제공한다.
+- [x] 나가기 버튼을 4-4 leave API와 연결한다.
 
 Policy:
 
-- [ ] Room WebSocket은 방 페이지에서만 연결한다.
-- [ ] HTTP join/leave는 command이고, 최종 room 상태 반영은 WebSocket event를 우선한다.
-- [ ] 친구 목록 기반 초대는 이번 범위에서 제외한다.
+- [x] Room WebSocket은 방 페이지에서만 연결한다.
+- [x] HTTP join/leave는 command이고, 최종 room 상태 반영은 WebSocket event를 우선한다.
+- [x] 친구 목록 기반 초대는 이번 범위에서 제외한다.
 
 Acceptance Criteria:
 
-- [ ] 초대 링크로 방에 참가할 수 있다.
-- [ ] 참가자 입장/퇴장이 실시간으로 반영된다.
-- [ ] 닫힌 방/가득 찬 방/시작된 방 오류가 사용자에게 표시된다.
+- [x] 초대 링크로 방에 참가할 수 있다.
+- [x] 참가자 입장/퇴장이 실시간으로 반영된다.
+- [x] 닫힌 방/가득 찬 방/시작된 방 오류가 사용자에게 표시된다.
 
 ### 4-10. [ ] Custom Game 시작 / GamePlay 프론트 연결
 
@@ -996,7 +996,7 @@ Policy:
 17. [x] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
 18. [x] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 19. [x] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
-20. [ ] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
+20. [x] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
 21. [ ] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
 22. [ ] Section 5-1/5-2. 비밀번호 찾기
 23. [ ] Section 5-3/5-4. OAuth 로그인
