@@ -216,15 +216,15 @@ Custom Room WebSocket server message에 `ROOM_STARTED`를 추가한다.
 
 ### 7. Test 구현
 
-- [ ] core custom room start service unit test 작성.
-- [ ] core custom room repository lock/start 흐름 test 작성.
-- [ ] core custom game room 생성 test 작성.
-- [ ] controller RestAssuredMockMvc + RestDocs test 작성.
-- [ ] API service start 성공/실패 unit test 작성.
-- [ ] `ROOM_STARTED` notifier afterCommit test 작성.
-- [ ] start 실패 시 WebSocket 미전송 test 작성.
-- [ ] 1명 방 start 실패 test 작성.
-- [ ] 방장 아닌 user start 실패 test 작성.
+- [x] core custom room start service unit test 작성.
+- [x] core custom room repository lock/start 흐름 test 작성.
+- [x] core custom game room 생성 test 작성.
+- [x] controller RestAssuredMockMvc + RestDocs test 작성.
+- [x] API service start 성공/실패 unit test 작성.
+- [x] `ROOM_STARTED` notifier afterCommit test 작성.
+- [x] start 실패 시 WebSocket 미전송 test 작성.
+- [x] 1명 방 start 실패 test 작성.
+- [x] 방장 아닌 user start 실패 test 작성.
 
 ### 8. 검증
 

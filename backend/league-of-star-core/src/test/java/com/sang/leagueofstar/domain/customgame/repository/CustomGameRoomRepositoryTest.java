@@ -5,6 +5,7 @@ import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,9 @@ class CustomGameRoomRepositoryTest {
 
     @Autowired
     private CustomGameParticipantRepository customGameParticipantRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Test
     @DisplayName("WAITING room은 ownerUserId와 status로 중복 생성 여부를 확인한다")
@@ -143,6 +147,45 @@ class CustomGameRoomRepositoryTest {
                 .isEqualTo(LockModeType.PESSIMISTIC_WRITE);
         assertThat(findByIdForUpdate.getAnnotation(Lock.class).value())
                 .isEqualTo(LockModeType.PESSIMISTIC_WRITE);
+    }
+
+    @Test
+    @DisplayName("start 흐름 - lock 조회한 WAITING room을 STARTED로 저장하고 participant 순서를 유지한다")
+    void startFlow_LockRoomAndSaveStartedStatus() {
+        // given
+        CustomGameRoom room = customGameRoomRepository.saveAndFlush(CustomGameRoom.create(1L, "AB12CD"));
+        CustomGameParticipant owner = customGameParticipantRepository.save(CustomGameParticipant.create(
+                room.getId(),
+                1L,
+                CustomRoomParticipantRole.OWNER
+        ));
+        CustomGameParticipant player = customGameParticipantRepository.save(CustomGameParticipant.create(
+                room.getId(),
+                2L,
+                CustomRoomParticipantRole.PLAYER
+        ));
+        customGameParticipantRepository.flush();
+        entityManager.clear();
+
+        // when
+        LocalDateTime startedAt = LocalDateTime.of(2026, 6, 24, 12, 0);
+        CustomGameRoom lockedRoom = customGameRoomRepository.findByIdForUpdate(room.getId()).orElseThrow();
+        List<CustomGameParticipant> participants =
+                customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(room.getId());
+        lockedRoom.markStarted(startedAt);
+        customGameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        CustomGameRoom foundRoom = customGameRoomRepository.findById(room.getId()).orElseThrow();
+        assertThat(participants).extracting(CustomGameParticipant::getId)
+                .containsExactly(owner.getId(), player.getId());
+        assertThat(foundRoom.getStatus()).isEqualTo(CustomRoomStatus.STARTED);
+        assertThat(foundRoom.getStartedAt()).isEqualTo(startedAt);
+        assertThat(foundRoom.getWaitingOwnerUserId()).isNull();
+        assertThat(customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(room.getId()))
+                .extracting(CustomGameParticipant::getUserId)
+                .containsExactly(1L, 2L);
     }
 
     @Test
