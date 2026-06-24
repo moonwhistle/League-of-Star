@@ -681,7 +681,7 @@ Policy:
 - [x] join/leave는 room lifecycle command다.
 - [x] join/leave 이후 실시간 broadcast는 4-5 Room WebSocket 이슈에서 연결한다.
 - [x] started/closed room에는 새 참가를 허용하지 않는다.
-- [x] 1명 또는 2명 방만 MVP 범위로 둔다.
+- [x] 대기실은 1명 또는 2명 상태를 허용하되, game start는 4-6의 2명 필수 정책을 따른다.
 
 Acceptance Criteria:
 
@@ -730,14 +730,14 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 방장이 시작 버튼을 누르면 1명 또는 2명이 같은 game room과 scenario로 진입할 수 있게 한다.
+- [ ] 방장이 시작 버튼을 누르면 정확히 2명이 같은 custom game room과 scenario로 진입할 수 있게 한다.
 
 Backend:
 
 - [ ] endpoint를 확정한다.
   - `POST /api/v1/custom-games/rooms/{roomId}/start`
 - [ ] 방장만 start를 호출할 수 있게 한다.
-- [ ] participant 1명 또는 2명 모두 시작 가능하게 한다.
+- [ ] participant가 정확히 2명일 때만 시작 가능하게 한다.
 - [ ] room status가 `WAITING`일 때만 시작 가능하게 한다.
 - [ ] `gameMode=CUSTOM` GameRoom을 생성한다.
 - [ ] Scenario를 생성/저장한다.
@@ -753,6 +753,7 @@ Backend:
 
 Policy:
 
+- [ ] Practice Mode는 1인 플레이를 담당하고, Custom Game은 2인 비랭크 대전을 담당한다.
 - [ ] 실제 GamePlayPage 이동 기준은 HTTP 응답이 아니라 `ROOM_STARTED` event다.
 - [ ] 방장과 참가자가 같은 `gameRoomId`, `scenario`, `startAt`을 받도록 WebSocket broadcast를 사용한다.
 - [ ] start 이후에는 custom room 참가/나가기를 허용하지 않는다.
@@ -760,7 +761,7 @@ Policy:
 Acceptance Criteria:
 
 - [ ] 방장만 사용자 지정 게임을 시작할 수 있다.
-- [ ] 1명 방과 2명 방 모두 시작할 수 있다.
+- [ ] 1명 방은 시작할 수 없고 2명 방만 시작할 수 있다.
 - [ ] 모든 room socket 참가자에게 동일한 `ROOM_STARTED` payload가 전달된다.
 
 ### 4-7. [ ] Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
@@ -771,7 +772,7 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 사용자 지정 게임 결과는 랭크/LP에는 반영하지 않고, 전적에는 남기도록 서버 결과 정책을 확정한다.
+- [ ] 2인 사용자 지정 게임 결과는 랭크/LP에는 반영하지 않고, 전적에는 남기도록 서버 결과 정책을 확정한다.
 
 Backend:
 
@@ -788,7 +789,7 @@ Backend:
 Policy:
 
 - [ ] `MATCH`는 랭크/LP/전적 반영 대상이다.
-- [ ] `CUSTOM`은 전적 반영 대상이지만 랭크/LP 반영 대상이 아니다.
+- [ ] `CUSTOM`은 2인 전적 반영 대상이지만 랭크/LP 반영 대상이 아니다.
 - [ ] `PRACTICE`는 랭크/LP/전적 모두 미반영 대상이다.
 - [ ] custom 최종 결과는 WebSocket `GAME_RESULT`가 source of truth다.
 - [ ] custom 결과는 랭크 변화가 없는 전적 결과로 다룬다.
