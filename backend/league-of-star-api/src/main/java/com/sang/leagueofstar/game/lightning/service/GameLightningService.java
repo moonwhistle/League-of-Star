@@ -74,7 +74,7 @@ public class GameLightningService {
                 saveResult.action().getUserId()
         );
         return finishedGameRoom.map(finishedRoom -> {
-            if (finishedRoom.isMatchMode()) {
+            if (!finishedRoom.isPracticeMode()) {
                 gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
             }
             return GameLightningHandleResponse.appliedAndBroadcastResult(
@@ -116,8 +116,7 @@ public class GameLightningService {
         }
         return gameResultPayloadFactory.lightningKill(
                 gameRoomId,
-                gameRoom.getResult(),
-                gameRoom.getWinnerId(),
+                gameRoom,
                 Instant.now(clock).toEpochMilli(),
                 gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(gameRoomId)
         );

@@ -24,7 +24,7 @@ public interface GameRoomRepository extends JpaRepository<GameRoom, Long> {
             select g.id
             from GameRoom g
             where g.status = :status
-              and g.gameMode = :gameMode
+              and g.gameMode in :gameModes
               and (
                     select count(r)
                     from GameRecord r
@@ -32,9 +32,9 @@ public interface GameRoomRepository extends JpaRepository<GameRoom, Long> {
                   ) <> :expectedRecordCount
             order by g.id asc
             """)
-    List<Long> findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
+    List<Long> findGameRoomIdsByStatusAndGameModeInAndRecordCountNot(
             @Param("status") GameStatus status,
-            @Param("gameMode") GameMode gameMode,
+            @Param("gameModes") Collection<GameMode> gameModes,
             @Param("expectedRecordCount") long expectedRecordCount,
             Pageable pageable
     );

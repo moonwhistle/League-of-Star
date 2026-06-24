@@ -16,15 +16,14 @@ import java.util.List;
 public class GameResultPayloadFactory {
 
     public GameResultPayload lightningKill(Long gameRoomId,
-                                           GameResult result,
-                                           Long winnerUserId,
+                                           GameRoom gameRoom,
                                            long finishedAt,
                                            List<GameAction> actions) {
         return create(
                 gameRoomId,
-                GameMode.MATCH,
-                result,
-                winnerUserId,
+                gameRoom.getGameMode(),
+                gameRoom.getResult(),
+                gameRoom.getWinnerId(),
                 GameResultReason.LIGHTNING_KILL,
                 null,
                 finishedAt,
@@ -50,15 +49,14 @@ public class GameResultPayloadFactory {
     }
 
     public GameResultPayload naturalDeathDraw(Long gameRoomId,
-                                              GameResult result,
-                                              Long winnerUserId,
+                                              GameRoom gameRoom,
                                               long finishedAt,
                                               List<GameAction> actions) {
         return create(
                 gameRoomId,
-                GameMode.MATCH,
-                result,
-                winnerUserId,
+                gameRoom.getGameMode(),
+                gameRoom.getResult(),
+                gameRoom.getWinnerId(),
                 GameResultReason.NATURAL_DEATH_DRAW,
                 null,
                 finishedAt,

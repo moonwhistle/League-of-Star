@@ -31,7 +31,7 @@ public class FinishedGameMatchStatusCleanupService {
 
     private void cleanup(Long gameRoomId) {
         GameMode gameMode = gameRoomReadService.getMode(gameRoomId);
-        if (gameMode.isPractice()) {
+        if (!gameMode.isMatch()) {
             return;
         }
 

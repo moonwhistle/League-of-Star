@@ -8,12 +8,14 @@ import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
 import com.sang.leagueofstar.domain.game.service.GameRoomResultResolver;
+import com.sang.leagueofstar.domain.rank.domain.UserRankInfo;
 import com.sang.leagueofstar.domain.rank.domain.vo.Division;
 import com.sang.leagueofstar.domain.rank.domain.vo.Rank;
 import com.sang.leagueofstar.domain.rank.domain.vo.Tier;
 import com.sang.leagueofstar.domain.rank.service.dto.RankRecordSettlementCommand;
 import com.sang.leagueofstar.domain.rank.service.dto.RankRecordSettlementResult;
 import com.sang.leagueofstar.domain.rank.service.RankCommandService;
+import com.sang.leagueofstar.domain.rank.service.RankReadService;
 import com.sang.leagueofstar.domain.record.domain.GameRecord;
 import com.sang.leagueofstar.domain.record.domain.vo.GameRecordResult;
 import com.sang.leagueofstar.domain.record.domain.vo.GameRecordSeriesType;
@@ -55,6 +57,9 @@ class GameRecordRankSettlementServiceTest {
 
     @Mock
     private RankCommandService rankCommandService;
+
+    @Mock
+    private RankReadService rankReadService;
 
     @Spy
     private GameRoomResultResolver gameRoomResultResolver;
@@ -235,6 +240,49 @@ class GameRecordRankSettlementServiceTest {
     }
 
     @Test
+    @DisplayName("settleFinishedGameRoom - CUSTOM gameRoom이면 rank 변경 없이 현재 rank snapshot으로 record만 저장한다")
+    void settleFinishedGameRoom_CustomRoom_SaveRecordsWithoutRankSettlement() {
+        // given
+        GameRoom gameRoom = createFinishedCustomGameRoom(GameResult.PLAYER1_WIN, FIRST_USER_ID);
+        given(gameRoomRepository.findByIdForUpdate(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+        given(gameRecordRepository.countByGameRoomId(GAME_ROOM_ID)).willReturn(0L);
+        given(rankReadService.getUserRankInfo(FIRST_USER_ID))
+                .willReturn(rankInfo(FIRST_USER_ID, 42, Rank.of(Tier.GOLD, Division.III)));
+        given(rankReadService.getUserRankInfo(SECOND_USER_ID))
+                .willReturn(rankInfo(SECOND_USER_ID, 15, Rank.of(Tier.SILVER, Division.I)));
+
+        // when
+        gameRecordRankSettlementService.settleFinishedGameRoom(GAME_ROOM_ID);
+
+        // then
+        ArgumentCaptor<List<GameRecord>> recordsCaptor = gameRecordListCaptor();
+        verify(gameRecordRepository).saveAll(recordsCaptor.capture());
+        assertThat(recordsCaptor.getValue())
+                .extracting(
+                        GameRecord::getGameRoomId,
+                        GameRecord::getUserId,
+                        GameRecord::getOpponentId,
+                        GameRecord::getResult,
+                        GameRecord::getLpBefore,
+                        GameRecord::getLpAfter,
+                        GameRecord::getLpChange,
+                        GameRecord::getSeriesType,
+                        GameRecord::getRankSeriesId,
+                        GameRecord::getRankBefore,
+                        GameRecord::getRankAfter
+                )
+                .containsExactly(
+                        tuple(GAME_ROOM_ID, FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.WIN,
+                                42, 42, 0, GameRecordSeriesType.CUSTOM, null,
+                                Rank.of(Tier.GOLD, Division.III), Rank.of(Tier.GOLD, Division.III)),
+                        tuple(GAME_ROOM_ID, SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.LOSS,
+                                15, 15, 0, GameRecordSeriesType.CUSTOM, null,
+                                Rank.of(Tier.SILVER, Division.I), Rank.of(Tier.SILVER, Division.I))
+                );
+        verify(rankCommandService, never()).applyRecordResults(anyList());
+    }
+
+    @Test
     @DisplayName("settleFinishedGameRoom - record가 1행이면 불완전 정산 상태로 보고 예외를 던진다")
     void settleFinishedGameRoom_PartiallySettled_ThrowException() {
         // given
@@ -287,9 +335,9 @@ class GameRecordRankSettlementServiceTest {
     void findUnsettledFinishedGameRoomIds() {
         // given
         int limit = 100;
-        given(gameRoomRepository.findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
+        given(gameRoomRepository.findGameRoomIdsByStatusAndGameModeInAndRecordCountNot(
                 GameStatus.FINISHED,
-                GameMode.MATCH,
+                List.of(GameMode.MATCH, GameMode.CUSTOM),
                 GameRoom.MAX_PARTICIPANTS,
                 PageRequest.of(0, limit)
         )).willReturn(List.of(GAME_ROOM_ID));
@@ -312,6 +360,16 @@ class GameRecordRankSettlementServiceTest {
                 .gameMode(GameMode.PRACTICE)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.finish(result, winnerId);
+        return gameRoom;
+    }
+
+    private GameRoom createFinishedCustomGameRoom(GameResult result, Long winnerId) {
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.CUSTOM)
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
         gameRoom.finish(result, winnerId);
         return gameRoom;
     }
@@ -344,6 +402,14 @@ class GameRecordRankSettlementServiceTest {
                 Rank.of(Tier.IRON, Division.IV),
                 Rank.of(Tier.IRON, Division.IV)
         );
+    }
+
+    private UserRankInfo rankInfo(Long userId, int lp, Rank rank) {
+        return UserRankInfo.builder()
+                .userId(userId)
+                .lp(lp)
+                .rank(rank)
+                .build();
     }
 
     @SuppressWarnings("unchecked")

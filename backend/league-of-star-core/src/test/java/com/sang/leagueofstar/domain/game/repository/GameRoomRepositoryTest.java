@@ -22,6 +22,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -72,12 +73,13 @@ class GameRoomRepositoryTest {
     }
 
     @Test
-    @DisplayName("findGameRoomIdsByStatusAndGameModeAndRecordCountNot - MATCH FINISHED 중 record 2행이 아닌 gameRoom만 조회한다")
+    @DisplayName("findGameRoomIdsByStatusAndGameModeInAndRecordCountNot - MATCH/CUSTOM FINISHED 중 record 2행이 아닌 gameRoom만 조회한다")
     void findGameRoomIdsByStatusAndGameModeAndRecordCountNot() {
         // given
         User p1 = userRepository.save(User.builder().email("p1-count@test.com").nickname("p1c").build());
         User p2 = userRepository.save(User.builder().email("p2-count@test.com").nickname("p2c").build());
         GameRoom noRecordRoom = saveFinishedRoom(p1.getId(), p2.getId());
+        GameRoom customNoRecordRoom = saveFinishedCustomRoom(p1.getId(), p2.getId());
         GameRoom oneRecordRoom = saveFinishedRoom(p1.getId(), p2.getId());
         GameRoom settledRoom = saveFinishedRoom(p1.getId(), p2.getId());
         GameRoom inProgressRoom = saveRoom(GameStatus.IN_PROGRESS, p1.getId(), p2.getId());
@@ -88,15 +90,15 @@ class GameRoomRepositoryTest {
         gameRecordRepository.flush();
 
         // when
-        List<Long> result = gameRoomRepository.findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
+        List<Long> result = gameRoomRepository.findGameRoomIdsByStatusAndGameModeInAndRecordCountNot(
                 GameStatus.FINISHED,
-                GameMode.MATCH,
+                List.of(GameMode.MATCH, GameMode.CUSTOM),
                 GameRoom.MAX_PARTICIPANTS,
                 PageRequest.of(0, 10)
         );
 
         // then
-        assertThat(result).containsExactly(noRecordRoom.getId(), oneRecordRoom.getId());
+        assertThat(result).containsExactly(noRecordRoom.getId(), customNoRecordRoom.getId(), oneRecordRoom.getId());
         assertThat(result).doesNotContain(settledRoom.getId(), inProgressRoom.getId(), practiceRoom.getId());
     }
 
@@ -114,6 +116,19 @@ class GameRoomRepositoryTest {
                 .build();
         gameRoom.addParticipant(userId);
         gameRoom.finish(GameResult.PLAYER1_WIN, userId);
+        return gameRoomRepository.save(gameRoom);
+    }
+
+    private GameRoom saveFinishedCustomRoom(Long firstUserId, Long secondUserId) {
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.CUSTOM)
+                .durationSeconds(60)
+                .scenarioData(GameScenario.of(List.of(new HpStep(0, 10000))))
+                .build();
+        gameRoom.addParticipant(firstUserId);
+        gameRoom.addParticipant(secondUserId);
+        gameRoom.start(LocalDateTime.now());
+        gameRoom.finish(GameResult.PLAYER1_WIN, firstUserId);
         return gameRoomRepository.save(gameRoom);
     }
 

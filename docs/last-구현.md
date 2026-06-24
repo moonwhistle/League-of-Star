@@ -764,7 +764,7 @@ Acceptance Criteria:
 - [ ] 1명 방은 시작할 수 없고 2명 방만 시작할 수 있다.
 - [ ] 모든 room socket 참가자에게 동일한 `ROOM_STARTED` payload가 전달된다.
 
-### 4-7. [ ] Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
+### 4-7. [x] Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 
 담당: Backend
 
@@ -772,34 +772,34 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 2인 사용자 지정 게임 결과는 랭크/LP에는 반영하지 않고, 전적에는 남기도록 서버 결과 정책을 확정한다.
+- [x] 2인 사용자 지정 게임 결과는 랭크/LP에는 반영하지 않고, 전적에는 남기도록 서버 결과 정책을 확정한다.
 
 Backend:
 
-- [ ] 기존 Game WebSocket, LIGHTNING, Scenario, GameAction 로직을 재사용한다.
-- [ ] `GAME_RESULT.gameMode=CUSTOM` payload를 내려준다.
-- [ ] custom game result reason 정책을 확정한다.
-- [ ] custom game도 `game_records`에는 저장한다.
-- [ ] custom game record는 rank/LP 변화 없이 저장한다.
-- [ ] rank settlement trigger에서 `gameMode=CUSTOM`의 LP/rank 변경을 제외한다.
-- [ ] core rank settlement service에서 `gameMode=CUSTOM`의 rank 변경을 제외한다.
-- [ ] recovery scheduler/query에서 custom game record 누락은 복구하되 rank/LP 복구는 제외한다.
-- [ ] Summary API가 custom game의 결과/전적 저장 상태를 조회할 수 있는지 정책을 확정한다.
+- [x] 기존 Game WebSocket, LIGHTNING, Scenario, GameAction 로직을 재사용한다.
+- [x] `GAME_RESULT.gameMode=CUSTOM` payload를 내려준다.
+- [x] custom game result reason 정책을 확정한다.
+- [x] custom game도 `game_records`에는 저장한다.
+- [x] custom game record는 rank/LP 변화 없이 저장한다.
+- [x] rank settlement trigger에서 `gameMode=CUSTOM`의 LP/rank 변경을 제외한다.
+- [x] core rank settlement service에서 `gameMode=CUSTOM`의 rank 변경을 제외한다.
+- [x] recovery scheduler/query에서 custom game record 누락은 복구하되 rank/LP 복구는 제외한다.
+- [x] Summary API가 custom game의 결과/전적 저장 상태를 조회할 수 있는지 정책을 확정한다.
 
 Policy:
 
-- [ ] `MATCH`는 랭크/LP/전적 반영 대상이다.
-- [ ] `CUSTOM`은 2인 전적 반영 대상이지만 랭크/LP 반영 대상이 아니다.
-- [ ] `PRACTICE`는 랭크/LP/전적 모두 미반영 대상이다.
-- [ ] custom 최종 결과는 WebSocket `GAME_RESULT`가 source of truth다.
-- [ ] custom 결과는 랭크 변화가 없는 전적 결과로 다룬다.
+- [x] `MATCH`는 랭크/LP/전적 반영 대상이다.
+- [x] `CUSTOM`은 2인 전적 반영 대상이지만 랭크/LP 반영 대상이 아니다.
+- [x] `PRACTICE`는 랭크/LP/전적 모두 미반영 대상이다.
+- [x] custom 최종 결과는 WebSocket `GAME_RESULT`가 source of truth다.
+- [x] custom 결과는 랭크 변화가 없는 전적 결과로 다룬다.
 
 Acceptance Criteria:
 
-- [ ] custom game을 완료하면 전적이 생성된다.
-- [ ] custom game을 완료해도 rank/LP는 변경되지 않는다.
-- [ ] custom game result는 WebSocket payload로 확정된다.
-- [ ] settlement/recovery 테스트에서 custom record 저장과 rank/LP 제외가 검증된다.
+- [x] custom game을 완료하면 전적이 생성된다.
+- [x] custom game을 완료해도 rank/LP는 변경되지 않는다.
+- [x] custom game result는 WebSocket payload로 확정된다.
+- [x] settlement/recovery 테스트에서 custom record 저장과 rank/LP 제외가 검증된다.
 
 ### 4-8. [ ] Custom Room 공개 대기실 / 초대 링크 프론트 구현
 
@@ -994,7 +994,7 @@ Policy:
 15. [x] Section 4-4. Custom Room 초대 참가 / 나가기 API 계약
 16. [x] Section 4-5. Custom Room WebSocket 동기화 계약
 17. [ ] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
-18. [ ] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
+18. [x] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 19. [ ] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
 20. [ ] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
 21. [ ] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결

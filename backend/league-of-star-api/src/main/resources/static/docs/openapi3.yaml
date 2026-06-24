@@ -35,14 +35,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-rankings1374840482'
               examples:
                 ranking-list-rank-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 716843000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 38, 578462000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"RANK_001\",\n  \"message\"\
                     \ : \"유저의 랭크 정보를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
                 ranking-list-user-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 728140000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 38, 590165000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"USER_001\",\n  \"message\"\
                     \ : \"해당 유저를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "400":
@@ -50,10 +50,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-rankings564766604'
               examples:
                 ranking-list-invalid-limit:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 701535000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 38, 567476000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"COMMON_003\",\n  \"\
                     message\" : \"입력값이 유효하지 않습니다\",\n  \"errors\" : null\n}"
         "200":
@@ -226,7 +226,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-custom-games-rooms-1788760647'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms-invites-inviteCode-1788760647'
               examples:
                 custom-room-create:
                   value: "{\n  \"roomId\" : 100,\n  \"roomName\" : \"Host's room\"\
@@ -239,10 +239,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms1570193490'
               examples:
                 custom-room-create-active-exists:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 33, 13176000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 31, 665816000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"CUSTOM_ROOM_007\",\n\
                     \  \"message\" : \"이미 대기 중인 사용자 지정 방이 있습니다.\",\n  \"errors\" :\
                     \ null\n}"
@@ -284,10 +284,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-games-practice1039643107'
               examples:
                 game-practice-start-active-room:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 35, 454360000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 33, 664319000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"GAME_PRACTICE_001\"\
                     ,\n  \"message\" : \"이미 진행 중인 게임이 있습니다.\",\n  \"errors\" : null\n\
                     }"
@@ -431,10 +431,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-games-gameId-summary166921680'
               examples:
                 game-summary-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 38112000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 34, 313337000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"GAME_005\",\n  \"message\"\
                     \ : \"게임방을 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "409":
@@ -442,10 +442,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-games-gameId-summary166921680'
               examples:
                 game-summary-not-finished:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 110296000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 34, 358443000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"GAME_SUMMARY_001\",\n\
                     \  \"message\" : \"종료된 게임의 결과만 조회할 수 있습니다.\",\n  \"errors\" :\
                     \ null\n}"
@@ -454,10 +454,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-games-gameId-summary166921680'
               examples:
                 game-summary-forbidden:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 96301000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 34, 344287000\
                     \ ],\n  \"status\" : 403,\n  \"code\" : \"AUTH_002\",\n  \"message\"\
                     \ : \"해당 리소스에 대한 접근 권한이 없습니다.\",\n  \"errors\" : null\n}"
   /api/v1/match/{matchId}/accept:
@@ -492,10 +492,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-match-matchId-reject1897412631'
               examples:
                 match-accept-failure:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 937306000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 35, 298374000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"MATCH_011\",\n  \"message\"\
                     \ : \"이미 응답 시간이 초과된 매칭입니다.\",\n  \"errors\" : null\n}"
         "200":
@@ -531,10 +531,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-match-matchId-reject1897412631'
               examples:
                 match-reject-failure:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 898080000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 35, 237026000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"MATCH_008\",\n  \"message\"\
                     \ : \"이미 수락한 매칭입니다.\",\n  \"errors\" : null\n}"
   /api/v1/notifications/match/stream:
@@ -604,10 +604,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-rankings1374840482'
               examples:
                 user-game-records-user-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 934906000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 38, 837586000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"USER_001\",\n  \"message\"\
                     \ : \"해당 유저를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "400":
@@ -618,7 +618,7 @@ paths:
                 $ref: '#/components/schemas/api-v1-users-me-game-records396781695'
               examples:
                 user-game-records-invalid-page:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 950930000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 38, 879298000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"COMMON_003\",\n  \"\
                     message\" : \"입력값이 유효하지 않습니다\",\n  \"errors\" : [ {\n    \"field\"\
                     \ : \"page\",\n    \"value\" : \"4\",\n    \"reason\" : \"must\
@@ -666,10 +666,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-rankings1374840482'
               examples:
                 user-profile-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 994628000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 38, 936355000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"USER_001\",\n  \"message\"\
                     \ : \"해당 유저를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "200":
@@ -707,14 +707,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-rankings1374840482'
               examples:
                 user-rank-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 964451000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 38, 897455000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"RANK_001\",\n  \"message\"\
                     \ : \"유저의 랭크 정보를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
                 user-rank-user-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 985111000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 38, 925754000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"USER_001\",\n  \"message\"\
                     \ : \"해당 유저를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "200":
@@ -753,7 +753,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-custom-games-rooms-1788760647'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms-invites-inviteCode-1788760647'
               examples:
                 custom-room-invite-preview:
                   value: "{\n  \"roomId\" : 100,\n  \"roomName\" : \"Host's room\"\
@@ -766,10 +766,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms-invites-inviteCode-1580653385'
               examples:
                 custom-room-invite-preview-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 32, 992295000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 31, 643338000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"CUSTOM_ROOM_006\",\n\
                     \  \"message\" : \"사용자 지정 방을 찾을 수 없습니다.\",\n  \"errors\" : null\n\
                     }"
@@ -800,10 +800,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms-inviteCode-join-919595411'
               examples:
                 custom-room-join-full:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 32, 937874000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 31, 586028000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"CUSTOM_ROOM_001\",\n\
                     \  \"message\" : \"사용자 지정 방 인원이 초과되었습니다.\",\n  \"errors\" : null\n\
                     }"
@@ -812,7 +812,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-custom-games-rooms-1788760647'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms-invites-inviteCode-1788760647'
               examples:
                 custom-room-join:
                   value: "{\n  \"roomId\" : 100,\n  \"roomName\" : \"Host's room\"\
@@ -852,7 +852,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-custom-games-rooms-1788760647'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms-invites-inviteCode-1788760647'
               examples:
                 custom-room-leave:
                   value: "{\n  \"roomId\" : 100,\n  \"roomName\" : \"Host's room\"\
@@ -865,10 +865,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms-roomId-leave-274689922'
               examples:
                 custom-room-leave-invalid-participant:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 33, 101148000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 31, 766470000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"CUSTOM_ROOM_003\",\n\
                     \  \"message\" : \"사용자 지정 방 참여자 정보가 올바르지 않습니다.\",\n  \"errors\"\
                     \ : null\n}"
@@ -899,10 +899,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms-roomId-start-1324203013'
               examples:
                 custom-game-start-incomplete-participants:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 33, 127354000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 58, 31, 786668000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"GAME_003\",\n  \"message\"\
                     \ : \"참여자 인원 또는 상태가 올바르지 않습니다.\",\n  \"errors\" : null\n}"
         "200":
@@ -922,22 +922,6 @@ paths:
                     \ 0\n    } ]\n  }\n}"
 components:
   schemas:
-    api-v1-auth-signUp1187183266:
-      required:
-      - email
-      - nickname
-      - password
-      type: object
-      properties:
-        password:
-          type: string
-          description: 비밀번호 (8~20자)
-        nickname:
-          type: string
-          description: 닉네임 (2~16자)
-        email:
-          type: string
-          description: 사용자 이메일
     api-v1-users-me-rank-2066775793:
       required:
       - division
@@ -982,106 +966,6 @@ components:
         userId:
           type: number
           description: 사용자 ID
-    api-v1-auth-refresh132229249:
-      required:
-      - refreshToken
-      type: object
-      properties:
-        refreshToken:
-          type: string
-          description: 기존 리프레시 토큰
-    api-v1-users-me-game-records1935318520:
-      required:
-      - hasNext
-      - page
-      - records
-      - size
-      - totalElements
-      - totalPages
-      type: object
-      properties:
-        size:
-          type: number
-          description: 서버 고정 page size. 항상 10
-        records:
-          type: array
-          description: 전적 목록
-          items:
-            required:
-            - gameId
-            - lpAfter
-            - lpBefore
-            - lpChange
-            - opponentNickname
-            - opponentUserId
-            - playedAt
-            - rankAfter
-            - rankBefore
-            - result
-            type: object
-            properties:
-              lpChange:
-                type: number
-                description: LP 변화량
-              result:
-                type: string
-                description: 현재 사용자 기준 결과. WIN/LOSS/DRAW
-              gameId:
-                type: number
-                description: 게임방 ID
-              opponentUserId:
-                type: number
-                description: 상대 사용자 ID
-              rankAfter:
-                type: string
-                description: 게임 후 rank 문자열
-              playedAt:
-                type: string
-                description: 전적 생성 시각. GameRecord.createdAt 기반
-              rankBefore:
-                type: string
-                description: 게임 전 rank 문자열
-              lpAfter:
-                type: number
-                description: 게임 후 LP
-              lpBefore:
-                type: number
-                description: 게임 전 LP
-              opponentNickname:
-                type: string
-                description: 상대 사용자 닉네임
-        totalPages:
-          type: number
-          description: 최근 30경기 cap 기준 전체 페이지 수. 최대 3
-        hasNext:
-          type: boolean
-          description: 다음 페이지 존재 여부
-        page:
-          type: number
-          description: 현재 페이지 번호
-        totalElements:
-          type: number
-          description: 최근 30경기 cap이 반영된 총 표시 가능 전적 수
-    api-v1-users-me-profile1969105341:
-      required:
-      - createdAt
-      - email
-      - nickname
-      - userId
-      type: object
-      properties:
-        createdAt:
-          type: string
-          description: 계정 생성 시각
-        nickname:
-          type: string
-          description: 사용자 닉네임
-        userId:
-          type: number
-          description: 사용자 ID
-        email:
-          type: string
-          description: 사용자 이메일
     api-v1-custom-games-rooms-roomId-start1813726495:
       required:
       - gameMode
@@ -1188,15 +1072,7 @@ components:
         startAt:
           type: number
           description: 클라이언트 play 시작 기준 시각 epoch millis
-    api-v1-auth-logout392386629:
-      required:
-      - refreshToken
-      type: object
-      properties:
-        refreshToken:
-          type: string
-          description: 무효화할 리프레시 토큰
-    api-v1-rankings2042838415:
+    api-v1-custom-games-rooms1570193490:
       required:
       - code
       - errors
@@ -1211,6 +1087,9 @@ components:
         message:
           type: string
           description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. 대기 중인 방 존재 응답에서는 null
         status:
           type: number
           description: HTTP 상태 코드
@@ -1263,6 +1142,506 @@ components:
               status:
                 type: string
                 description: room 상태. 공개 목록은 `WAITING`만 반환
+    api-v1-match-matchId-reject1897412631:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. 매칭 응답 실패에서는 null
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+    api-v1-auth-password-reset-request-1598584392:
+      required:
+      - email
+      type: object
+      properties:
+        email:
+          type: string
+          description: 사용자 이메일
+    api-v1-rankings1374840482:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. 유저 없음 응답에서는 null
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+    api-v1-games-practice1039643107:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. active gameRoom 존재 응답에서는 null
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+    api-v1-custom-games-rooms-invites-inviteCode-1788760647:
+      required:
+      - inviteCode
+      - maxParticipants
+      - ownerUserId
+      - participants
+      - roomId
+      - roomName
+      - status
+      type: object
+      properties:
+        inviteCode:
+          type: string
+          description: 초대 링크용 public key
+        ownerUserId:
+          type: number
+          description: 방장 userId
+        roomName:
+          type: string
+          description: "표시용 방 이름. `{ownerNickname}'s room`"
+        roomId:
+          type: number
+          description: custom room ID
+        participants:
+          type: array
+          description: 현재 참가자 목록
+          items:
+            required:
+            - nickname
+            - role
+            - userId
+            type: object
+            properties:
+              role:
+                type: string
+                description: 참가자 역할. `OWNER` 또는 `PLAYER`
+              nickname:
+                type: string
+                description: 참가자 닉네임
+              userId:
+                type: number
+                description: 참가자 userId
+        maxParticipants:
+          type: number
+          description: 최대 참가 인원. MVP는 2명
+        status:
+          type: string
+          description: room 상태
+    api-v1-users-me-game-records396781695:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: array
+          description: 필드 검증 에러 목록
+          items:
+            required:
+            - field
+            - reason
+            - value
+            type: object
+            properties:
+              reason:
+                type: string
+                description: 검증 실패 사유
+              field:
+                type: string
+                description: 검증 실패 필드명
+              value:
+                type: string
+                description: 요청으로 전달된 잘못된 값
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+    api-v1-auth-login1260122497:
+      required:
+      - accessToken
+      - nickname
+      - refreshToken
+      - userId
+      type: object
+      properties:
+        nickname:
+          type: string
+          description: 사용자 닉네임
+        accessToken:
+          type: string
+          description: 액세스 토큰
+        userId:
+          type: number
+          description: 사용자 ID
+        refreshToken:
+          type: string
+          description: 리프레시 토큰
+    api-v1-auth-login-2103469501:
+      required:
+      - email
+      - password
+      type: object
+      properties:
+        password:
+          type: string
+          description: 비밀번호
+        email:
+          type: string
+          description: 사용자 이메일
+    api-v1-custom-games-rooms-inviteCode-join-919595411:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. 정원 초과 응답에서는 null
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+    api-v1-custom-games-rooms-roomId-leave-274689922:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. 참가자 아님 응답에서는 null
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+    api-v1-auth-password-reset-submit486549215:
+      type: object
+    api-v1-auth-signUp1187183266:
+      required:
+      - email
+      - nickname
+      - password
+      type: object
+      properties:
+        password:
+          type: string
+          description: 비밀번호 (8~20자)
+        nickname:
+          type: string
+          description: 닉네임 (2~16자)
+        email:
+          type: string
+          description: 사용자 이메일
+    api-v1-auth-refresh132229249:
+      required:
+      - refreshToken
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: 기존 리프레시 토큰
+    api-v1-users-me-game-records1935318520:
+      required:
+      - hasNext
+      - page
+      - records
+      - size
+      - totalElements
+      - totalPages
+      type: object
+      properties:
+        size:
+          type: number
+          description: 서버 고정 page size. 항상 10
+        records:
+          type: array
+          description: 전적 목록
+          items:
+            required:
+            - gameId
+            - lpAfter
+            - lpBefore
+            - lpChange
+            - opponentNickname
+            - opponentUserId
+            - playedAt
+            - rankAfter
+            - rankBefore
+            - result
+            type: object
+            properties:
+              lpChange:
+                type: number
+                description: LP 변화량
+              result:
+                type: string
+                description: 현재 사용자 기준 결과. WIN/LOSS/DRAW
+              gameId:
+                type: number
+                description: 게임방 ID
+              opponentUserId:
+                type: number
+                description: 상대 사용자 ID
+              rankAfter:
+                type: string
+                description: 게임 후 rank 문자열
+              playedAt:
+                type: string
+                description: 전적 생성 시각. GameRecord.createdAt 기반
+              rankBefore:
+                type: string
+                description: 게임 전 rank 문자열
+              lpAfter:
+                type: number
+                description: 게임 후 LP
+              lpBefore:
+                type: number
+                description: 게임 전 LP
+              opponentNickname:
+                type: string
+                description: 상대 사용자 닉네임
+        totalPages:
+          type: number
+          description: 최근 30경기 cap 기준 전체 페이지 수. 최대 3
+        hasNext:
+          type: boolean
+          description: 다음 페이지 존재 여부
+        page:
+          type: number
+          description: 현재 페이지 번호
+        totalElements:
+          type: number
+          description: 최근 30경기 cap이 반영된 총 표시 가능 전적 수
+    api-v1-games-gameId-summary166921680:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. summary 조회 실패에서는 null
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+    api-v1-users-me-profile1969105341:
+      required:
+      - createdAt
+      - email
+      - nickname
+      - userId
+      type: object
+      properties:
+        createdAt:
+          type: string
+          description: 계정 생성 시각
+        nickname:
+          type: string
+          description: 사용자 닉네임
+        userId:
+          type: number
+          description: 사용자 ID
+        email:
+          type: string
+          description: 사용자 이메일
+    api-v1-rankings564766604:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. query parameter 검증 실패 응답에서는 null
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+    api-v1-auth-logout392386629:
+      required:
+      - refreshToken
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: 무효화할 리프레시 토큰
+    api-v1-custom-games-rooms-roomId-start-1324203013:
+      required:
+      - code
+      - errors
+      - message
+      - status
+      - timestamp
+      type: object
+      properties:
+        code:
+          type: string
+          description: 애플리케이션 에러 코드
+        message:
+          type: string
+          description: 에러 메시지
+        errors:
+          type: object
+          description: 필드 검증 에러 목록. 참가자 부족 응답에서는 null
+        status:
+          type: number
+          description: HTTP 상태 코드
+        timestamp:
+          type: array
+          description: 에러 발생 시각
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
     api-v1-rankings1288202534:
       required:
       - entries
@@ -1391,14 +1770,6 @@ components:
               userId:
                 type: number
                 description: 사용자 ID
-    api-v1-auth-password-reset-request-1598584392:
-      required:
-      - email
-      type: object
-      properties:
-        email:
-          type: string
-          description: 사용자 이메일
     api-v1-auth-signUp-590972362:
       required:
       - email
@@ -1427,54 +1798,6 @@ components:
         token:
           type: string
           description: 재설정 토큰
-    api-v1-custom-games-rooms-1788760647:
-      required:
-      - inviteCode
-      - maxParticipants
-      - ownerUserId
-      - participants
-      - roomId
-      - roomName
-      - status
-      type: object
-      properties:
-        inviteCode:
-          type: string
-          description: 초대 링크용 public key
-        ownerUserId:
-          type: number
-          description: 방장 userId
-        roomName:
-          type: string
-          description: "표시용 방 이름. `{ownerNickname}'s room`"
-        roomId:
-          type: number
-          description: custom room ID
-        participants:
-          type: array
-          description: 현재 참가자 목록
-          items:
-            required:
-            - nickname
-            - role
-            - userId
-            type: object
-            properties:
-              role:
-                type: string
-                description: 참가자 역할. `OWNER` 또는 `PLAYER`
-              nickname:
-                type: string
-                description: 참가자 닉네임
-              userId:
-                type: number
-                description: 참가자 userId
-        maxParticipants:
-          type: number
-          description: 최대 참가 인원. MVP는 2명
-        status:
-          type: string
-          description: room 상태
     api-v1-games-gameId-summary104297999:
       required:
       - finishedAt
@@ -1591,7 +1914,19 @@ components:
         finishedAt:
           type: string
           description: gameRoom 종료 시각
-    api-v1-users-me-game-records396781695:
+    api-v1-auth-refresh1249058254:
+      required:
+      - accessToken
+      - refreshToken
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: 새로운 액세스 토큰
+        refreshToken:
+          type: string
+          description: 새로운 리프레시 토큰 (Rotation 적용)
+    api-v1-custom-games-rooms-invites-inviteCode-1580653385:
       required:
       - code
       - errors
@@ -1607,24 +1942,8 @@ components:
           type: string
           description: 에러 메시지
         errors:
-          type: array
-          description: 필드 검증 에러 목록
-          items:
-            required:
-            - field
-            - reason
-            - value
-            type: object
-            properties:
-              reason:
-                type: string
-                description: 검증 실패 사유
-              field:
-                type: string
-                description: 검증 실패 필드명
-              value:
-                type: string
-                description: 요청으로 전달된 잘못된 값
+          type: object
+          description: 필드 검증 에러 목록. 방 없음 응답에서는 null
         status:
           type: number
           description: HTTP 상태 코드
@@ -1637,49 +1956,3 @@ components:
             - type: boolean
             - type: string
             - type: number
-    api-v1-auth-login1260122497:
-      required:
-      - accessToken
-      - nickname
-      - refreshToken
-      - userId
-      type: object
-      properties:
-        nickname:
-          type: string
-          description: 사용자 닉네임
-        accessToken:
-          type: string
-          description: 액세스 토큰
-        userId:
-          type: number
-          description: 사용자 ID
-        refreshToken:
-          type: string
-          description: 리프레시 토큰
-    api-v1-auth-login-2103469501:
-      required:
-      - email
-      - password
-      type: object
-      properties:
-        password:
-          type: string
-          description: 비밀번호
-        email:
-          type: string
-          description: 사용자 이메일
-    api-v1-auth-refresh1249058254:
-      required:
-      - accessToken
-      - refreshToken
-      type: object
-      properties:
-        accessToken:
-          type: string
-          description: 새로운 액세스 토큰
-        refreshToken:
-          type: string
-          description: 새로운 리프레시 토큰 (Rotation 적용)
-    api-v1-auth-password-reset-submit486549215:
-      type: object
