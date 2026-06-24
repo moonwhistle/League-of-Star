@@ -150,6 +150,37 @@ class GameEndSettlementServiceTest {
     }
 
     @Test
+    @DisplayName("processDueEndDeadlines - CUSTOM 자연사 종료이면 기존 reason과 CUSTOM gameMode GAME_RESULT를 broadcast한다")
+    void processDueEndDeadlines_CustomNaturalDeath_BroadcastCustomDrawResult() throws Exception {
+        // given
+        when(gameEndScheduleService.findDueEndDeadlines(
+                NOW.toEpochMilli(),
+                GameEndConstants.END_DEADLINE_CANDIDATE_BATCH_SIZE
+        )).thenReturn(List.of(FIRST_GAME_ROOM_ID));
+        when(gameNaturalDeathSettlementService.settle(FIRST_GAME_ROOM_ID, NOW.toEpochMilli()))
+                .thenReturn(finishedCustomNaturalDeathResult(FIRST_GAME_ROOM_ID));
+
+        // when
+        service.processDueEndDeadlines();
+
+        // then
+        ArgumentCaptor<GameResultPayload> payloadCaptor = ArgumentCaptor.forClass(GameResultPayload.class);
+        verify(gameResultWebSocketSender).broadcastGameResult(
+                org.mockito.ArgumentMatchers.eq(FIRST_GAME_ROOM_ID),
+                payloadCaptor.capture()
+        );
+        GameResultPayload payload = payloadCaptor.getValue();
+        org.assertj.core.api.Assertions.assertThat(payload.gameMode()).isEqualTo(GameMode.CUSTOM);
+        org.assertj.core.api.Assertions.assertThat(payload.result()).isEqualTo(GameResult.DRAW);
+        org.assertj.core.api.Assertions.assertThat(payload.winnerUserId()).isNull();
+        org.assertj.core.api.Assertions.assertThat(payload.reason()).isEqualTo("NATURAL_DEATH_DRAW");
+        org.assertj.core.api.Assertions.assertThat(payload.practiceResult()).isNull();
+        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(
+                org.mockito.ArgumentMatchers.any(GameRoom.class)
+        );
+    }
+
+    @Test
     @DisplayName("processDueEndDeadlines - 특정 gameRoom 정산이 실패해도 다음 gameRoom 처리를 계속한다")
     void processDueEndDeadlines_Exception_ContinueNext() throws Exception {
         // given
@@ -218,6 +249,16 @@ class GameEndSettlementServiceTest {
         GameRoom gameRoom = GameRoom.builder()
                 .id(gameRoomId)
                 .gameMode(GameMode.PRACTICE)
+                .build();
+        gameRoom.finish(GameResult.DRAW, null);
+        GameAction action = GameAction.lightning(gameRoomId, 1L, NOW.toEpochMilli() - 100L, 900, 1_000);
+        return GameNaturalDeathSettlementResult.finished(gameRoom, List.of(action));
+    }
+
+    private GameNaturalDeathSettlementResult finishedCustomNaturalDeathResult(Long gameRoomId) {
+        GameRoom gameRoom = GameRoom.builder()
+                .id(gameRoomId)
+                .gameMode(GameMode.CUSTOM)
                 .build();
         gameRoom.finish(GameResult.DRAW, null);
         GameAction action = GameAction.lightning(gameRoomId, 1L, NOW.toEpochMilli() - 100L, 900, 1_000);

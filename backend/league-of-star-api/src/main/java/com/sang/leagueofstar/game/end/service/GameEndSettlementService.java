@@ -89,8 +89,7 @@ public class GameEndSettlementService {
         }
         return gameResultPayloadFactory.naturalDeathDraw(
                 gameRoomId,
-                result.finishedGameRoom().getResult(),
-                result.finishedGameRoom().getWinnerId(),
+                result.finishedGameRoom(),
                 finishedAtMillis,
                 result.actions()
         );

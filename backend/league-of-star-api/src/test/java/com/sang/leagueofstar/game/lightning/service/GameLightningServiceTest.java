@@ -163,6 +163,38 @@ class GameLightningServiceTest {
     }
 
     @Test
+    @DisplayName("handleLightning - CUSTOM 처치이면 기존 reason과 CUSTOM gameMode GAME_RESULT를 반환한다")
+    void handleLightning_CustomKill_ReturnCustomGameResult() {
+        GameRoom lockedRoom = mockInProgressRoom();
+        GameRoom finishedRoom = mock(GameRoom.class);
+        GameAction action = GameAction.lightning(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS, 2_200, 1_000);
+        when(gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(GAME_ROOM_ID))
+                .thenReturn(List.of())
+                .thenReturn(List.of(action));
+        when(gameLightningJudgementService.judge(lockedRoom, USER_ID, SERVER_RECEIVE_TIME_MS, List.of()))
+                .thenReturn(Optional.of(action));
+        when(gameActionCommandService.save(action)).thenReturn(GameActionSaveResult.saved(action));
+        when(gameRoomCommandService.finishInProgressRoomByLightningKill(GAME_ROOM_ID, USER_ID))
+                .thenReturn(Optional.of(finishedRoom));
+        when(finishedRoom.isPracticeMode()).thenReturn(false);
+        when(finishedRoom.isMatchMode()).thenReturn(false);
+        when(finishedRoom.getGameMode()).thenReturn(GameMode.CUSTOM);
+        when(finishedRoom.getResult()).thenReturn(GameResult.PLAYER1_WIN);
+        when(finishedRoom.getWinnerId()).thenReturn(USER_ID);
+
+        var result = service.handleLightning(new GameLightningCommand(GAME_ROOM_ID, USER_ID, SERVER_RECEIVE_TIME_MS));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().gameResult()).isNotNull();
+        assertThat(result.get().gameResultBroadcast()).isTrue();
+        assertThat(result.get().gameResult().gameMode()).isEqualTo(GameMode.CUSTOM);
+        assertThat(result.get().gameResult().reason()).isEqualTo("LIGHTNING_KILL");
+        assertThat(result.get().gameResult().practiceResult()).isNull();
+        assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
+        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
+    }
+
+    @Test
     @DisplayName("handleLightning - 이미 FINISHED인 gameRoom이면 action 저장 없이 현재 session용 GAME_RESULT만 반환한다")
     void handleLightning_AlreadyFinished_ReturnCurrentGameResultOnly() {
         GameRoom finishedRoom = mock(GameRoom.class);

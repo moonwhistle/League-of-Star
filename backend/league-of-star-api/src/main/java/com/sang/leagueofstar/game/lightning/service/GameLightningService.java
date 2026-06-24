@@ -116,8 +116,7 @@ public class GameLightningService {
         }
         return gameResultPayloadFactory.lightningKill(
                 gameRoomId,
-                gameRoom.getResult(),
-                gameRoom.getWinnerId(),
+                gameRoom,
                 Instant.now(clock).toEpochMilli(),
                 gameActionReadService.findByGameRoomIdOrderByServerReceiveTimeMsAscIdAsc(gameRoomId)
         );

@@ -194,12 +194,12 @@ Custom Game record 저장 기준:
 
 ### 3. Result Payload / WebSocket 흐름 구현
 
-- [ ] LIGHTNING kill Custom Game 결과 payload가 `gameMode=CUSTOM`으로 생성되게 수정.
-- [ ] Custom LIGHTNING kill reason은 `LIGHTNING_KILL`로 유지.
-- [ ] Custom 자연사 draw payload가 `gameMode=CUSTOM`으로 생성되게 수정.
-- [ ] Custom 자연사 draw reason은 `NATURAL_DEATH_DRAW`로 유지.
-- [ ] Practice payload와 practiceResult 정책이 기존과 동일하게 유지되는지 확인.
-- [ ] 새 WebSocket event type 없이 기존 `GAME_RESULT`를 재사용.
+- [x] LIGHTNING kill Custom Game 결과 payload가 `gameMode=CUSTOM`으로 생성되게 수정.
+- [x] Custom LIGHTNING kill reason은 `LIGHTNING_KILL`로 유지.
+- [x] Custom 자연사 draw payload가 `gameMode=CUSTOM`으로 생성되게 수정.
+- [x] Custom 자연사 draw reason은 `NATURAL_DEATH_DRAW`로 유지.
+- [x] Practice payload와 practiceResult 정책이 기존과 동일하게 유지되는지 확인.
+- [x] 새 WebSocket event type 없이 기존 `GAME_RESULT`를 재사용.
 
 ### 4. Settlement Trigger / Recovery 구현
 
