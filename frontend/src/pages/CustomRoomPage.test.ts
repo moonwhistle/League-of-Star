@@ -71,8 +71,8 @@ describe('CustomRoomPage', () => {
     const wrapper = mount(CustomRoomPage)
     await flushPromises()
 
-    const inviteLinkInput = wrapper.get<HTMLInputElement>('[data-testid="custom-room-invite-link"]')
-    expect(inviteLinkInput.element.value).toBe('http://localhost:5173/custom-games/join/AB12CD')
+    const inviteLink = wrapper.get('[data-testid="custom-room-invite-link"]')
+    expect(inviteLink.text()).toBe('http://localhost:5173/custom-games/join/AB12CD')
 
     await wrapper.get('[data-testid="custom-room-copy-button"]').trigger('click')
     await flushPromises()

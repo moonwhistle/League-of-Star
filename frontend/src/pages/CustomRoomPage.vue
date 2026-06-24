@@ -67,12 +67,9 @@
               <span>{{ t('customRoom.inviteLink') }}</span>
             </div>
             <div class="custom-room-invite-copy">
-              <input
-                data-testid="custom-room-invite-link"
-                type="text"
-                :value="inviteLink"
-                readonly
-              />
+              <p class="custom-room-invite-link" data-testid="custom-room-invite-link">
+                {{ inviteLink }}
+              </p>
               <button type="button" data-testid="custom-room-copy-button" @click="copyInviteLink">
                 {{ t('customRoom.copyInvite') }}
               </button>
@@ -372,16 +369,18 @@ function errorMessage(error: unknown, fallback: string) {
   white-space: nowrap;
 }
 
-.custom-room-invite-copy input {
+.custom-room-invite-link {
   min-width: 0;
   flex: 1;
   min-height: 40px;
+  margin: 0;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
-  padding: 0 12px;
+  padding: 10px 12px;
   color: #f8fbff;
   background: rgba(0, 0, 0, 0.26);
   font: inherit;
+  overflow-wrap: anywhere;
 }
 
 .custom-room-copy-message {
@@ -438,7 +437,7 @@ function errorMessage(error: unknown, fallback: string) {
 
   .custom-room-actions button,
   .custom-room-invite-copy button,
-  .custom-room-invite-copy input {
+  .custom-room-invite-link {
     width: 100%;
   }
 }
