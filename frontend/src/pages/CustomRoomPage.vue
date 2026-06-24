@@ -162,6 +162,7 @@ const room = shallowRef<CustomRoomResponse>()
 const roomAbortController = shallowRef<AbortController>()
 const leaveAbortController = shallowRef<AbortController>()
 const roomSocketConnection = shallowRef<CustomRoomWebSocketConnection>()
+const expectedSocketClose = ref(false)
 const routeRoomId = computed(() => String(route.params.roomId ?? '').trim())
 const inviteLink = computed(() => {
   const inviteCode = room.value?.inviteCode.trim() ?? ''
@@ -297,6 +298,7 @@ function connectRoomSocket(roomId: number) {
   closeRoomSocket()
   socketStatus.value = 'connecting'
   socketErrorMessage.value = ''
+  expectedSocketClose.value = false
 
   try {
     let connection: CustomRoomWebSocketConnection | undefined
@@ -329,6 +331,9 @@ function connectRoomSocket(roomId: number) {
         }
 
         socketStatus.value = 'closed'
+        if (!expectedSocketClose.value && roomStatus.value === 'success') {
+          socketErrorMessage.value = t('customRoom.socketError')
+        }
       },
     })
 
@@ -353,7 +358,7 @@ function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
     roomStatus.value = 'closed'
     socketStatus.value = 'closed'
     socketErrorMessage.value = ''
-    closeRoomSocket()
+    closeRoomSocket(false)
     return
   }
 
@@ -364,6 +369,7 @@ function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
 function closeRoomSocket(resetStatus = true) {
   const connection = roomSocketConnection.value
   roomSocketConnection.value = undefined
+  expectedSocketClose.value = true
   if (resetStatus) {
     socketStatus.value = 'idle'
   }

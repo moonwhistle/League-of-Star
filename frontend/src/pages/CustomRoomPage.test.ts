@@ -208,6 +208,7 @@ describe('CustomRoomPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-custom-room-status')).toBe('closed')
+    expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('closed')
     expect(localStorage.getItem('league-of-star.currentCustomRoomId')).toBeNull()
     expect(wrapper.text()).toContain('방이 닫혔습니다.')
     expect(leaveCustomRoomMock).not.toHaveBeenCalled()
@@ -254,6 +255,25 @@ describe('CustomRoomPage', () => {
 
     expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('error')
     expect(wrapper.text()).toContain('socket failed')
+    expect(leaveCustomRoomMock).not.toHaveBeenCalled()
+  })
+
+  it('shows a socket close warning without calling leave API', async () => {
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    const closeEvent = new CloseEvent('close', {
+      code: 1006,
+      reason: 'network closed',
+    })
+    Object.defineProperty(closeEvent, 'target', {
+      value: customRoomSocketMock.socket,
+    })
+    customRoomSocketMock.handlers?.onClose?.(closeEvent)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('closed')
+    expect(wrapper.text()).toContain('대기실 실시간 연결이 끊겼습니다.')
     expect(leaveCustomRoomMock).not.toHaveBeenCalled()
   })
 })
