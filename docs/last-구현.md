@@ -722,7 +722,7 @@ Acceptance Criteria:
 - [x] 닫힌 방은 `ROOM_CLOSED`로 전달된다.
 - [x] 참가자가 아닌 사용자는 room socket에 연결할 수 없다.
 
-### 4-6. [ ] Custom Game Start API / ROOM_STARTED 계약
+### 4-6. [x] Custom Game Start API / ROOM_STARTED 계약
 
 담당: Backend
 
@@ -730,20 +730,20 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 방장이 시작 버튼을 누르면 정확히 2명이 같은 custom game room과 scenario로 진입할 수 있게 한다.
+- [x] 방장이 시작 버튼을 누르면 정확히 2명이 같은 custom game room과 scenario로 진입할 수 있게 한다.
 
 Backend:
 
-- [ ] endpoint를 확정한다.
+- [x] endpoint를 확정한다.
   - `POST /api/v1/custom-games/rooms/{roomId}/start`
-- [ ] 방장만 start를 호출할 수 있게 한다.
-- [ ] participant가 정확히 2명일 때만 시작 가능하게 한다.
-- [ ] room status가 `WAITING`일 때만 시작 가능하게 한다.
-- [ ] `gameMode=CUSTOM` GameRoom을 생성한다.
-- [ ] Scenario를 생성/저장한다.
-- [ ] room status를 `STARTED`로 전환한다.
-- [ ] HTTP start 응답은 이동 기준이 아니라 command ack로 둔다.
-- [ ] Room WebSocket `ROOM_STARTED` event payload를 확정한다.
+- [x] 방장만 start를 호출할 수 있게 한다.
+- [x] participant가 정확히 2명일 때만 시작 가능하게 한다.
+- [x] room status가 `WAITING`일 때만 시작 가능하게 한다.
+- [x] `gameMode=CUSTOM` GameRoom을 생성한다.
+- [x] Scenario를 생성/저장한다.
+- [x] room status를 `STARTED`로 전환한다.
+- [x] HTTP start 응답은 이동 기준이 아니라 command ack로 둔다.
+- [x] Room WebSocket `ROOM_STARTED` event payload를 확정한다.
   - `roomId`
   - `gameRoomId`
   - `gameMode=CUSTOM`
@@ -753,16 +753,16 @@ Backend:
 
 Policy:
 
-- [ ] Practice Mode는 1인 플레이를 담당하고, Custom Game은 2인 비랭크 대전을 담당한다.
-- [ ] 실제 GamePlayPage 이동 기준은 HTTP 응답이 아니라 `ROOM_STARTED` event다.
-- [ ] 방장과 참가자가 같은 `gameRoomId`, `scenario`, `startAt`을 받도록 WebSocket broadcast를 사용한다.
-- [ ] start 이후에는 custom room 참가/나가기를 허용하지 않는다.
+- [x] Practice Mode는 1인 플레이를 담당하고, Custom Game은 2인 비랭크 대전을 담당한다.
+- [x] 실제 GamePlayPage 이동 기준은 HTTP 응답이 아니라 `ROOM_STARTED` event다.
+- [x] 방장과 참가자가 같은 `gameRoomId`, `scenario`, `startAt`을 받도록 WebSocket broadcast를 사용한다.
+- [x] start 이후에는 custom room 참가/나가기를 허용하지 않는다.
 
 Acceptance Criteria:
 
-- [ ] 방장만 사용자 지정 게임을 시작할 수 있다.
-- [ ] 1명 방은 시작할 수 없고 2명 방만 시작할 수 있다.
-- [ ] 모든 room socket 참가자에게 동일한 `ROOM_STARTED` payload가 전달된다.
+- [x] 방장만 사용자 지정 게임을 시작할 수 있다.
+- [x] 1명 방은 시작할 수 없고 2명 방만 시작할 수 있다.
+- [x] 모든 room socket 참가자에게 동일한 `ROOM_STARTED` payload가 전달된다.
 
 ### 4-7. [x] Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 
@@ -993,7 +993,7 @@ Policy:
 14. [x] Section 4-3. Custom Room 생성 / 공개 목록 / 조회 API 계약
 15. [x] Section 4-4. Custom Room 초대 참가 / 나가기 API 계약
 16. [x] Section 4-5. Custom Room WebSocket 동기화 계약
-17. [ ] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
+17. [x] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
 18. [x] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 19. [x] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
 20. [ ] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
