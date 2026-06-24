@@ -9,11 +9,14 @@ import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
 import com.sang.leagueofstar.domain.game.service.GameRoomResultResolver;
 import com.sang.leagueofstar.domain.game.service.dto.GameRoomParticipantResult;
+import com.sang.leagueofstar.domain.rank.domain.UserRankInfo;
 import com.sang.leagueofstar.domain.rank.service.dto.RankRecordSettlementCommand;
 import com.sang.leagueofstar.domain.rank.service.dto.RankRecordSettlementResult;
 import com.sang.leagueofstar.domain.rank.service.RankCommandService;
+import com.sang.leagueofstar.domain.rank.service.RankReadService;
 import com.sang.leagueofstar.domain.record.domain.GameRecord;
 import com.sang.leagueofstar.domain.record.domain.vo.GameRecordResult;
+import com.sang.leagueofstar.domain.record.domain.vo.GameRecordSeriesType;
 import com.sang.leagueofstar.domain.record.repository.GameRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -35,6 +38,7 @@ public class GameRecordRankSettlementService {
     private final GameRoomRepository gameRoomRepository;
     private final GameRecordRepository gameRecordRepository;
     private final RankCommandService rankCommandService;
+    private final RankReadService rankReadService;
     private final GameRoomResultResolver gameRoomResultResolver;
 
     /**
@@ -57,6 +61,15 @@ public class GameRecordRankSettlementService {
         }
 
         List<GameRoomParticipantResult> participantResults = gameRoomResultResolver.resolveParticipantResults(gameRoom);
+        if (gameRoom.isCustomMode()) {
+            settleCustomGameRoom(gameRoomId, participantResults);
+            return;
+        }
+
+        settleMatchGameRoom(gameRoomId, participantResults);
+    }
+
+    private void settleMatchGameRoom(Long gameRoomId, List<GameRoomParticipantResult> participantResults) {
         Map<Long, RankRecordSettlementResult> rankResults = rankCommandService.applyRecordResults(
                         participantResults.stream()
                                 .map(this::toRankCommand)
@@ -70,6 +83,24 @@ public class GameRecordRankSettlementService {
                         gameRoomId,
                         participantResult,
                         rankResults.get(participantResult.userId())
+                ))
+                .toList();
+
+        gameRecordRepository.saveAll(records);
+    }
+
+    private void settleCustomGameRoom(Long gameRoomId, List<GameRoomParticipantResult> participantResults) {
+        Map<Long, UserRankInfo> rankInfos = participantResults.stream()
+                .map(GameRoomParticipantResult::userId)
+                .distinct()
+                .map(rankReadService::getUserRankInfo)
+                .collect(Collectors.toMap(UserRankInfo::getUserId, Function.identity()));
+
+        List<GameRecord> records = participantResults.stream()
+                .map(participantResult -> createCustomRecord(
+                        gameRoomId,
+                        participantResult,
+                        rankInfos.get(participantResult.userId())
                 ))
                 .toList();
 
@@ -124,6 +155,28 @@ public class GameRecordRankSettlementService {
                 rankResult.lpAfter(),
                 rankResult.rankBefore(),
                 rankResult.rankAfter()
+        );
+    }
+
+    private GameRecord createCustomRecord(
+            Long gameRoomId,
+            GameRoomParticipantResult participantResult,
+            UserRankInfo rankInfo
+    ) {
+        if (rankInfo == null) {
+            throw new CoreException(CoreErrorCode.RANK_NOT_FOUND);
+        }
+        return GameRecord.create(
+                gameRoomId,
+                participantResult.userId(),
+                participantResult.opponentId(),
+                null,
+                GameRecordSeriesType.CUSTOM,
+                toRecordResult(participantResult.result()),
+                rankInfo.getLp(),
+                rankInfo.getLp(),
+                rankInfo.getRank(),
+                rankInfo.getRank()
         );
     }
 

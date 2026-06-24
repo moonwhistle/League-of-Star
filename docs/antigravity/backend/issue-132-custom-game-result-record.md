@@ -183,14 +183,14 @@ Custom Game record 저장 기준:
 
 ### 2. Core Record Settlement Policy 구현
 
-- [ ] `GameRecordSeriesType.CUSTOM` 추가.
-- [ ] record settlement service를 `gameMode` 기준으로 분기.
-- [ ] `MATCH`는 기존 rank 정산 + record 저장 유지.
-- [ ] `CUSTOM`은 rank 정산 없이 record만 저장.
-- [ ] `PRACTICE`는 record/rank no-op 유지.
-- [ ] Custom record에 현재 rank/lp snapshot을 before/after 동일하게 저장.
-- [ ] Custom record의 `rankSeriesId=null`, `seriesType=CUSTOM`, `lpChange=0` 보장.
-- [ ] API 모듈이 record/rank repository를 직접 참조하지 않는 구조 유지.
+- [x] `GameRecordSeriesType.CUSTOM` 추가.
+- [x] record settlement service를 `gameMode` 기준으로 분기.
+- [x] `MATCH`는 기존 rank 정산 + record 저장 유지.
+- [x] `CUSTOM`은 rank 정산 없이 record만 저장.
+- [x] `PRACTICE`는 record/rank no-op 유지.
+- [x] Custom record에 현재 rank/lp snapshot을 before/after 동일하게 저장.
+- [x] Custom record의 `rankSeriesId=null`, `seriesType=CUSTOM`, `lpChange=0` 보장.
+- [x] API 모듈이 record/rank repository를 직접 참조하지 않는 구조 유지.
 
 ### 3. Result Payload / WebSocket 흐름 구현
 

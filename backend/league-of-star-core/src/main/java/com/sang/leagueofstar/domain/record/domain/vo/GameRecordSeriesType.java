@@ -11,7 +11,8 @@ import lombok.RequiredArgsConstructor;
 public enum GameRecordSeriesType {
     RANK("일반 랭크"),
     PLACEMENT("배치 고사"),
-    PROMOTION("승급전");
+    PROMOTION("승급전"),
+    CUSTOM("사용자 지정 게임");
 
     private final String description;
 }
