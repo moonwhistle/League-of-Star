@@ -801,7 +801,7 @@ Acceptance Criteria:
 - [x] custom game result는 WebSocket payload로 확정된다.
 - [x] settlement/recovery 테스트에서 custom record 저장과 rank/LP 제외가 검증된다.
 
-### 4-8. [ ] Custom Room 공개 대기실 / 초대 링크 프론트 구현
+### 4-8. [x] Custom Room 공개 대기실 / 초대 링크 프론트 구현
 
 담당: Frontend
 
@@ -809,28 +809,28 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] MatchPage의 사용자 지정 버튼으로 공개 대기실 목록을 보고, custom room을 만들거나 초대 코드로 방을 찾을 수 있게 한다.
+- [x] MatchPage의 사용자 지정 버튼으로 공개 대기실 목록을 보고, custom room을 만들거나 초대 코드로 방을 찾을 수 있게 한다.
 
 Frontend:
 
-- [ ] custom room service를 추가한다.
-- [ ] MatchPage 사용자 지정 버튼을 공개 대기실 화면으로 연결한다.
-- [ ] 공개 대기실 화면에서 4-3 room list API를 호출한다.
-- [ ] 새 방 만들기 버튼을 4-3 create room API와 연결한다.
-- [ ] `/custom-games/rooms/:roomId` route를 추가한다.
-- [ ] CustomRoomPage에서 room 조회 API를 호출한다.
-- [ ] 대기실 목록에서 roomName, 현재 인원, 방장 정보를 표시한다.
-- [ ] 초대 링크를 표시한다.
-- [ ] 초대 코드 입력으로 4-3 invite preview API를 호출한다.
-- [ ] 초대 링크 복사 버튼을 구현한다.
-- [ ] 참가자 목록과 방장 표시를 구현한다.
+- [x] custom room service를 추가한다.
+- [x] MatchPage 사용자 지정 버튼을 공개 대기실 화면으로 연결한다.
+- [x] 공개 대기실 화면에서 4-3 room list API를 호출한다.
+- [x] 새 방 만들기 버튼을 4-3 create room API와 연결한다.
+- [x] `/custom-games/rooms/:roomId` route를 추가한다.
+- [x] CustomRoomPage에서 room 조회 API를 호출한다.
+- [x] 대기실 목록에서 roomName, 현재 인원, 방장 정보를 표시한다.
+- [x] 초대 링크를 표시한다.
+- [x] 초대 코드 입력으로 4-3 invite preview API를 호출한다.
+- [x] 초대 링크 복사 버튼을 구현한다.
+- [x] 참가자 목록과 방장 표시를 구현한다.
 
 Policy:
 
-- [ ] 사용자 지정 방 생성은 일반 match queue와 독립이다.
-- [ ] 모든 `WAITING` custom room은 공개 목록에 표시한다.
-- [ ] 초대 링크는 `inviteCode`를 사용하고 roomId를 공유하지 않는다.
-- [ ] Room WebSocket 연결은 4-9에서 구현한다.
+- [x] 사용자 지정 방 생성은 일반 match queue와 독립이다.
+- [x] 모든 `WAITING` custom room은 공개 목록에 표시한다.
+- [x] 초대 링크는 `inviteCode`를 사용하고 roomId를 공유하지 않는다.
+- [x] Room WebSocket 연결은 4-9에서 구현한다.
 
 Acceptance Criteria:
 
@@ -995,7 +995,7 @@ Policy:
 16. [x] Section 4-5. Custom Room WebSocket 동기화 계약
 17. [ ] Section 4-6. Custom Game Start API / ROOM_STARTED 계약
 18. [x] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
-19. [ ] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
+19. [x] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
 20. [ ] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
 21. [ ] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
 22. [ ] Section 5-1/5-2. 비밀번호 찾기

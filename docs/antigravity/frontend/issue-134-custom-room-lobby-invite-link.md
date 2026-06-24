@@ -287,12 +287,12 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 9. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 4-8 세부 체크박스를 완료 처리한다.
-- [ ] `docs/last-구현.md` 하단 Section 4-8 체크를 완료 처리한다.
-- [ ] `docs/antigravity/frontend/front-plan.md` custom room 프론트 흐름과 정합성을 확인한다.
-- [ ] `docs/antigravity/backend/issue-124-custom-room-create-read-api.md`에 room detail API 보강 내용을 맞춘다.
-- [ ] issue-134 Tasks 완료 상태를 반영한다.
-- [ ] issue-134 PR 섹션을 설계 중심으로 보강한다.
+- [x] `docs/last-구현.md` 4-8 세부 체크박스를 완료 처리한다.
+- [x] `docs/last-구현.md` 하단 Section 4-8 체크를 완료 처리한다.
+- [x] `docs/antigravity/frontend/front-plan.md` custom room 프론트 흐름과 정합성을 확인한다.
+- [x] `docs/antigravity/backend/issue-124-custom-room-create-read-api.md`에 room detail API 보강 내용을 맞춘다.
+- [x] issue-134 Tasks 완료 상태를 반영한다.
+- [x] issue-134 PR 섹션을 설계 중심으로 보강한다.
 
 ### 10. 검증
 
