@@ -268,22 +268,22 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 7. UI / Locale 구현
 
-- [ ] 한국어 locale을 추가한다.
-- [ ] 영어 locale을 추가한다.
-- [ ] Match/Profile 계열 배경과 시각 톤을 맞춘다.
-- [ ] 버튼 hover/disabled/loading 상태를 명확히 한다.
-- [ ] desktop/mobile에서 text overflow와 horizontal overflow를 방지한다.
+- [x] 한국어 locale을 추가한다.
+- [x] 영어 locale을 추가한다.
+- [x] Match/Profile 계열 배경과 시각 톤을 맞춘다.
+- [x] 버튼 hover/disabled/loading 상태를 명확히 한다.
+- [x] desktop/mobile에서 text overflow와 horizontal overflow를 방지한다.
 
 ### 8. Test 구현
 
-- [ ] custom room service path/method 테스트를 추가한다.
-- [ ] CustomRoomsPage 목록 조회 성공/빈 목록/실패 테스트를 추가한다.
-- [ ] CustomRoomsPage 새 방 만들기 성공/실패 테스트를 추가한다.
-- [ ] CustomRoomsPage 초대 코드 preview 성공/실패 테스트를 추가한다.
-- [ ] CustomRoomPage 상세 조회 성공/실패 테스트를 추가한다.
-- [ ] CustomRoomPage 초대 링크 복사 테스트를 추가한다.
-- [ ] MatchPage 사용자 지정 버튼 route 이동 테스트를 추가한다.
-- [ ] router protected route 테스트를 갱신한다.
+- [x] custom room service path/method 테스트를 추가한다.
+- [x] CustomRoomsPage 목록 조회 성공/빈 목록/실패 테스트를 추가한다.
+- [x] CustomRoomsPage 새 방 만들기 성공/실패 테스트를 추가한다.
+- [x] CustomRoomsPage 초대 코드 preview 성공/실패 테스트를 추가한다.
+- [x] CustomRoomPage 상세 조회 성공/실패 테스트를 추가한다.
+- [x] CustomRoomPage 초대 링크 복사 테스트를 추가한다.
+- [x] MatchPage 사용자 지정 버튼 route 이동 테스트를 추가한다.
+- [x] router protected route 테스트를 갱신한다.
 
 ### 9. 문서 정합성 구현
 

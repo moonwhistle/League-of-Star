@@ -81,6 +81,19 @@ describe('CustomRoomsPage', () => {
     expect(createCustomRoomMock).not.toHaveBeenCalled()
   })
 
+  it('renders an empty state when there are no waiting custom rooms', async () => {
+    getCustomRoomsMock.mockResolvedValueOnce({
+      rooms: [],
+    })
+
+    const wrapper = mount(CustomRoomsPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-custom-rooms-status')).toBe('success')
+    expect(wrapper.get('main').attributes('data-custom-rooms-count')).toBe('0')
+    expect(wrapper.text()).toContain('대기 중인 사용자 지정 방이 없습니다.')
+  })
+
   it('creates a custom room and moves to its detail route', async () => {
     const wrapper = mount(CustomRoomsPage)
     await flushPromises()
@@ -124,6 +137,24 @@ describe('CustomRoomsPage', () => {
     expect(getCustomRoomInvitePreviewMock).not.toHaveBeenCalled()
     expect(wrapper.get('main').attributes('data-custom-room-invite-status')).toBe('error')
     expect(wrapper.text()).toContain('초대 코드를 입력해 주세요.')
+  })
+
+  it('renders invite preview failure state without moving route', async () => {
+    getCustomRoomInvitePreviewMock.mockRejectedValueOnce(
+      new ApiClientError(404, { message: '초대 코드에 해당하는 방이 없습니다.' }),
+    )
+    const wrapper = mount(CustomRoomsPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="custom-room-invite-input"]').setValue('NONE')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-custom-room-invite-status')).toBe('error')
+    expect(wrapper.text()).toContain('초대 코드에 해당하는 방이 없습니다.')
+    expect(routerPushMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: ROUTE_NAMES.customRoom }),
+    )
   })
 
   it('renders backend error messages for room list and create failures', async () => {
