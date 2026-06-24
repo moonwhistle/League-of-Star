@@ -296,16 +296,16 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 10. 검증
 
-- [ ] backend custom room controller 테스트를 통과시킨다.
-- [ ] backend build를 통과시킨다.
-- [ ] frontend 관련 테스트를 통과시킨다.
-- [ ] `npm run format`을 통과시킨다.
-- [ ] `npm run lint`를 통과시킨다.
-- [ ] `npm run typecheck`를 통과시킨다.
-- [ ] `npm run test`를 통과시킨다.
-- [ ] `npm run build`를 통과시킨다.
-- [ ] desktop `1440x900` UI overflow를 확인한다.
-- [ ] mobile `390x844` UI overflow를 확인한다.
+- [x] backend custom room controller 테스트를 통과시킨다.
+- [x] backend build를 통과시킨다.
+- [x] frontend 관련 테스트를 통과시킨다.
+- [x] `npm run format`을 통과시킨다.
+- [x] `npm run lint`를 통과시킨다.
+- [x] `npm run typecheck`를 통과시킨다.
+- [x] `npm run test`를 통과시킨다.
+- [x] `npm run build`를 통과시킨다.
+- [x] desktop `1440x900` UI overflow를 확인한다.
+- [x] mobile `390x844` UI overflow를 확인한다.
 
 ## Implementation Policy
 
@@ -401,10 +401,16 @@ flowchart TD
 - 방장 start와 `ROOM_STARTED` 처리는 후속 4-10 범위임.
 - 새 패키지 추가 없음.
 - 검증 결과:
-  - backend custom room controller test 통과.
-  - backend build 통과.
-  - frontend format/lint/typecheck/test/build 통과.
-  - desktop/mobile overflow 확인 완료.
+  - `./gradlew :league-of-star-api:test --tests 'com.sang.leagueofstar.customgame.controller.CustomGameRoomControllerTest' --tests 'com.sang.leagueofstar.customgame.controller.CustomGameRoomControllerRestDocsTest'` 통과.
+  - `./gradlew build` 통과.
+  - `npm run format` 통과.
+  - `npm run lint` 통과.
+  - `npm run typecheck` 통과.
+  - `npm run test` 통과. 31 files / 276 passed.
+  - `npm run build` 통과.
+  - Chrome headless + mock API로 `/custom-games/rooms`, `/custom-games/rooms/101` 확인 완료.
+  - desktop `1440x900`, mobile `390x844` 모두 horizontal overflow 없음.
+  - desktop `1440x900`, mobile `390x844` 모두 text overflow 후보 없음.
 
 ## 📌 Related Issue
 
