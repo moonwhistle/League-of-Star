@@ -1,5 +1,6 @@
 package com.sang.leagueofstar.customgame.websocket.service;
 
+import com.sang.leagueofstar.customgame.controller.response.CustomGameStartResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
 import com.sang.leagueofstar.customgame.websocket.dto.CustomRoomWebSocketServerMessage;
 import com.sang.leagueofstar.customgame.websocket.session.CustomRoomWebSocketSessionRegistry;
@@ -37,6 +38,16 @@ public class CustomRoomWebSocketNotifier {
             messageSender.broadcast(
                     response.roomId(),
                     CustomRoomWebSocketServerMessage.roomClosed(response)
+            );
+            sessionRegistry.closeAndUnregisterRoom(response.roomId());
+        });
+    }
+
+    public void notifyRoomStartedAfterCommit(CustomGameStartResponse response) {
+        afterCommit(() -> {
+            messageSender.broadcast(
+                    response.roomId(),
+                    CustomRoomWebSocketServerMessage.roomStarted(response)
             );
             sessionRegistry.closeAndUnregisterRoom(response.roomId());
         });

@@ -355,7 +355,7 @@ class CustomGameRoomServiceTest {
                 LocalDateTime.ofInstant(Instant.ofEpochMilli(expectedStartAt), ZoneOffset.UTC)
         );
         then(gameEndScheduleService).should().registerEndDeadline(GAME_ROOM_ID, expectedStartAt, 12_000L);
-        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
+        then(customRoomWebSocketNotifier).should().notifyRoomStartedAfterCommit(response);
     }
 
     @Test
@@ -373,6 +373,7 @@ class CustomGameRoomServiceTest {
                         assertThat(exception.getErrorCode()).isEqualTo(ApiErrorCode.GAME_ACTIVE_ROOM_EXISTS));
         then(gameRoomCommandService).should(never()).createCustomRoom(OWNER_USER_ID, PLAYER_USER_ID);
         then(gameEndScheduleService).shouldHaveNoInteractions();
+        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
     }
 
     @Test
@@ -394,6 +395,7 @@ class CustomGameRoomServiceTest {
                         assertThat(exception.getErrorCode()).isEqualTo(ApiErrorCode.GAME_CUSTOM_START_FAILED));
         then(gameRoomCommandService).should().abortReadyRoomIfReady(GAME_ROOM_ID);
         then(gameEndScheduleService).shouldHaveNoInteractions();
+        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
     }
 
     @Test
@@ -416,6 +418,7 @@ class CustomGameRoomServiceTest {
         assertThatThrownBy(() -> customGameRoomService.startRoom(CUSTOM_ROOM_ID, OWNER_USER_ID))
                 .isSameAs(deadlineFailure);
         then(gameRoomCommandService).should().abortInProgressRoomIfInProgress(GAME_ROOM_ID);
+        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
     }
 
     private CustomGameRoom room(Long id, Long ownerUserId, String inviteCode) {

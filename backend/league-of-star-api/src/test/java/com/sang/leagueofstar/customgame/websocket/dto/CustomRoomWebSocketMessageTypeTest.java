@@ -12,6 +12,7 @@ class CustomRoomWebSocketMessageTypeTest {
     void serverMessageTypes() {
         assertThat(CustomRoomWebSocketMessageType.ROOM_UPDATED.isServerMessage()).isTrue();
         assertThat(CustomRoomWebSocketMessageType.ROOM_CLOSED.isServerMessage()).isTrue();
+        assertThat(CustomRoomWebSocketMessageType.ROOM_STARTED.isServerMessage()).isTrue();
         assertThat(CustomRoomWebSocketMessageType.ERROR.isServerMessage()).isTrue();
     }
 }

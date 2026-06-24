@@ -206,13 +206,13 @@ Custom Room WebSocket server message에 `ROOM_STARTED`를 추가한다.
 
 ### 6. ROOM_STARTED WebSocket 구현
 
-- [ ] `CustomRoomWebSocketMessageType.ROOM_STARTED` 추가.
-- [ ] `CustomRoomStartedPayload` 또는 equivalent DTO 추가.
-- [ ] `CustomRoomWebSocketServerMessage.roomStarted(payload)` factory 추가.
-- [ ] `CustomRoomWebSocketNotifier.notifyRoomStartedAfterCommit(payload)` 구현.
-- [ ] transaction commit 이후 `ROOM_STARTED` broadcast.
-- [ ] broadcast 이후 custom room sessions close/unregister.
-- [ ] start 실패 시 broadcast하지 않음.
+- [x] `CustomRoomWebSocketMessageType.ROOM_STARTED` 추가.
+- [x] `CustomRoomStartedPayload` 또는 equivalent DTO 추가.
+- [x] `CustomRoomWebSocketServerMessage.roomStarted(payload)` factory 추가.
+- [x] `CustomRoomWebSocketNotifier.notifyRoomStartedAfterCommit(payload)` 구현.
+- [x] transaction commit 이후 `ROOM_STARTED` broadcast.
+- [x] broadcast 이후 custom room sessions close/unregister.
+- [x] start 실패 시 broadcast하지 않음.
 
 ### 7. Test 구현
 

@@ -121,7 +121,7 @@ public class CustomGameRoomService {
         GameStartScenarioPayload scenario = GameStartScenarioPayload.from(gameRoom.getScenarioData());
         registerEndDeadline(gameRoom.getId(), startAt.toEpochMilli(), scenario.durationMs());
 
-        return new CustomGameStartResponse(
+        CustomGameStartResponse response = new CustomGameStartResponse(
                 startResult.room().getId(),
                 gameRoom.getId(),
                 GameMode.CUSTOM.name(),
@@ -130,6 +130,8 @@ public class CustomGameRoomService {
                 GAME_WEB_SOCKET_URL_FORMAT.formatted(gameRoom.getId()),
                 scenario
         );
+        customRoomWebSocketNotifier.notifyRoomStartedAfterCommit(response);
+        return response;
     }
 
     private void validateNoActiveGameRoom(List<Long> userIds) {

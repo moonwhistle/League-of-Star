@@ -2,8 +2,10 @@ package com.sang.leagueofstar.customgame.websocket.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sang.leagueofstar.customgame.controller.response.CustomGameStartResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomParticipantResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
+import com.sang.leagueofstar.game.start.dto.GameStartScenarioPayload;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -45,6 +47,20 @@ class CustomRoomWebSocketServerMessageTest {
     }
 
     @Test
+    @DisplayName("roomStarted - ROOM_STARTED 메시지를 생성한다")
+    void roomStarted() {
+        CustomRoomWebSocketServerMessage result = CustomRoomWebSocketServerMessage.roomStarted(startResponse());
+
+        JsonNode json = objectMapper.valueToTree(result);
+        assertThat(json.get("type").asText()).isEqualTo(CustomRoomWebSocketMessageType.ROOM_STARTED.name());
+        assertThat(json.get("payload").get("roomId").asLong()).isEqualTo(CUSTOM_ROOM_ID);
+        assertThat(json.get("payload").get("gameRoomId").asLong()).isEqualTo(200L);
+        assertThat(json.get("payload").get("gameMode").asText()).isEqualTo("CUSTOM");
+        assertThat(json.get("payload").get("webSocketUrl").asText()).isEqualTo("/ws/game/200");
+        assertThat(json.get("payload").get("scenario").get("starCoreMaxHp").asInt()).isEqualTo(10000);
+    }
+
+    @Test
     @DisplayName("invalidMessageType - ERROR 메시지를 생성한다")
     void invalidMessageType() {
         CustomRoomWebSocketServerMessage result = CustomRoomWebSocketServerMessage.invalidMessageType();
@@ -67,6 +83,22 @@ class CustomRoomWebSocketServerMessageTest {
                 List.of(
                         new CustomRoomParticipantResponse(OWNER_USER_ID, "Host", "OWNER"),
                         new CustomRoomParticipantResponse(PLAYER_USER_ID, "Guest", "PLAYER")
+                )
+        );
+    }
+
+    private CustomGameStartResponse startResponse() {
+        return new CustomGameStartResponse(
+                CUSTOM_ROOM_ID,
+                200L,
+                "CUSTOM",
+                1_000L,
+                5_000L,
+                "/ws/game/200",
+                new GameStartScenarioPayload(
+                        10000,
+                        12_000L,
+                        List.of(new GameStartScenarioPayload.HpTimelineStep(0L, 10000))
                 )
         );
     }
