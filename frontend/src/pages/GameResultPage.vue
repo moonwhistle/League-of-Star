@@ -10,6 +10,8 @@
       gameSummaryPayload?.winnerUserId ?? gameResultPayload?.winnerUserId ?? ''
     "
     :data-game-result-reason="gameResultPayload?.reason ?? ''"
+    :data-game-result-mode="gameResultPayload?.gameMode ?? ''"
+    :data-game-result-custom="isCustomGameResult"
     :data-game-result-outcome="resultOutcome"
     :data-game-summary-status="summaryStatus"
     :data-game-summary-error-status="summaryErrorStatus"
@@ -48,7 +50,7 @@
                 <dt>{{ t('gameResult.playerResult') }}</dt>
                 <dd>{{ formatPlayerResult(gameSummaryPayload.me.result) }}</dd>
               </div>
-              <div>
+              <div v-if="!isCustomGameResult">
                 <dt>{{ t('gameResult.rank') }}</dt>
                 <dd>
                   {{
@@ -59,7 +61,7 @@
                   }}
                 </dd>
               </div>
-              <div>
+              <div v-if="!isCustomGameResult">
                 <dt>{{ t('gameResult.lp') }}</dt>
                 <dd>
                   {{ gameSummaryPayload.me.lpBefore }} -> {{ gameSummaryPayload.me.lpAfter }} ({{
@@ -78,7 +80,7 @@
                 <dt>{{ t('gameResult.playerResult') }}</dt>
                 <dd>{{ formatPlayerResult(gameSummaryPayload.opponent.result) }}</dd>
               </div>
-              <div>
+              <div v-if="!isCustomGameResult">
                 <dt>{{ t('gameResult.rank') }}</dt>
                 <dd>
                   {{
@@ -89,7 +91,7 @@
                   }}
                 </dd>
               </div>
-              <div>
+              <div v-if="!isCustomGameResult">
                 <dt>{{ t('gameResult.lp') }}</dt>
                 <dd>
                   {{ gameSummaryPayload.opponent.lpBefore }} ->
@@ -100,6 +102,9 @@
             </dl>
           </article>
         </div>
+        <p v-if="isCustomGameResult" class="summary-panel__custom-note">
+          {{ t('gameResult.customNoRankChange') }}
+        </p>
       </section>
 
       <button class="match-return-button" type="button" @click="returnToMatch">
@@ -116,6 +121,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { readCustomGameStartPayload } from '@/services/customGameStartPayload'
 import { readGameResultPayload } from '@/services/gameResultPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { getGameSummary } from '@/services/gameSummaryService'
@@ -126,6 +132,7 @@ const { t } = useLocale()
 const gameRoomId = shallowRef()
 const gameResultPayload = shallowRef(readGameResultPayload('__missing__'))
 const gameWaitingPayload = shallowRef(readGameWaitingPayload('__missing__'))
+const customGameStartPayload = shallowRef(readCustomGameStartPayload('__missing__'))
 const gameSummaryPayload = shallowRef()
 const summaryStatus = shallowRef('idle')
 const summaryErrorMessage = shallowRef('')
@@ -146,6 +153,12 @@ const resultOutcome = computed(() => {
     return 'draw'
   }
 
+  const customMyUserId = customGameStartPayload.value?.myUserId
+
+  if (gameResultPayload.value.gameMode === 'CUSTOM' && Number.isFinite(customMyUserId)) {
+    return gameResultPayload.value.winnerUserId === customMyUserId ? 'win' : 'lose'
+  }
+
   const opponentUserId = gameWaitingPayload.value?.opponent?.userId
 
   if (!Number.isFinite(opponentUserId)) {
@@ -154,6 +167,7 @@ const resultOutcome = computed(() => {
 
   return gameResultPayload.value.winnerUserId === opponentUserId ? 'lose' : 'win'
 })
+const isCustomGameResult = computed(() => gameResultPayload.value?.gameMode === 'CUSTOM')
 
 const resultTitle = computed(() => {
   switch (resultOutcome.value) {
@@ -179,6 +193,7 @@ onMounted(() => {
   gameRoomId.value = routeGameRoomId
   gameResultPayload.value = readGameResultPayload(routeGameRoomId)
   gameWaitingPayload.value = readGameWaitingPayload(routeGameRoomId)
+  customGameStartPayload.value = readCustomGameStartPayload(routeGameRoomId)
   void fetchGameSummary(routeGameRoomId)
 })
 
@@ -363,11 +378,16 @@ function returnToMatch() {
 
 .game-result-summary__status,
 .game-result-summary__error,
-.summary-panel__finished-at {
+.summary-panel__finished-at,
+.summary-panel__custom-note {
   margin: 0;
   color: rgba(223, 239, 255, 0.82);
   font-size: 15px;
   font-weight: 800;
+}
+
+.summary-panel__custom-note {
+  color: #8eeeff;
 }
 
 .game-result-summary__error {

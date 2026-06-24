@@ -279,6 +279,7 @@ const messages = {
     'gameResult.playerResult': '결과',
     'gameResult.rank': '랭크',
     'gameResult.lp': 'LP',
+    'gameResult.customNoRankChange': '사용자 지정 게임은 전적에만 남고 랭크와 LP는 변하지 않습니다.',
     'gameResult.win': '승리',
     'gameResult.loss': '패배',
     'gameResult.draw': '무승부',
@@ -561,6 +562,8 @@ const messages = {
     'gameResult.playerResult': 'Result',
     'gameResult.rank': 'Rank',
     'gameResult.lp': 'LP',
+    'gameResult.customNoRankChange':
+      'Custom games are recorded, but rank and LP do not change.',
     'gameResult.win': 'Win',
     'gameResult.loss': 'Loss',
     'gameResult.draw': 'Draw',
