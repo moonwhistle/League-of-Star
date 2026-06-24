@@ -236,12 +236,12 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 4. Route / MatchPage 연결
 
-- [ ] `/custom-games/rooms` route를 추가한다.
-- [ ] `/custom-games/rooms/:roomId` route를 추가한다.
-- [ ] 두 route 모두 로그인 사용자 route로 처리한다.
-- [ ] MatchPage `사용자 지정` 버튼을 공개 대기실 route로 연결한다.
-- [ ] 매칭 진행 중 사용자 지정 진입 정책을 기존 match queue 상태와 충돌하지 않게 정리한다.
-- [ ] router/auth guard 테스트를 갱신한다.
+- [x] `/custom-games/rooms` route를 추가한다.
+- [x] `/custom-games/rooms/:roomId` route를 추가한다.
+- [x] 두 route 모두 로그인 사용자 route로 처리한다.
+- [x] MatchPage `사용자 지정` 버튼을 공개 대기실 route로 연결한다.
+- [x] 매칭 진행 중 사용자 지정 진입 정책을 기존 match queue 상태와 충돌하지 않게 정리한다.
+- [x] router/auth guard 테스트를 갱신한다.
 
 ### 5. CustomRoomsPage 구현
 
