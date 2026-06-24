@@ -191,7 +191,7 @@ class GameLightningServiceTest {
         assertThat(result.get().gameResult().reason()).isEqualTo("LIGHTNING_KILL");
         assertThat(result.get().gameResult().practiceResult()).isNull();
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
-        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
+        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(finishedRoom);
     }
 
     @Test

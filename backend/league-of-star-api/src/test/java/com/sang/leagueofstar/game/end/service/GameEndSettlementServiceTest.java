@@ -175,8 +175,8 @@ class GameEndSettlementServiceTest {
         org.assertj.core.api.Assertions.assertThat(payload.winnerUserId()).isNull();
         org.assertj.core.api.Assertions.assertThat(payload.reason()).isEqualTo("NATURAL_DEATH_DRAW");
         org.assertj.core.api.Assertions.assertThat(payload.practiceResult()).isNull();
-        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(
-                org.mockito.ArgumentMatchers.any(GameRoom.class)
+        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(
+                org.mockito.ArgumentMatchers.argThat(gameRoom -> gameRoom.getId().equals(FIRST_GAME_ROOM_ID))
         );
     }
 

@@ -55,7 +55,7 @@ public class GameEndSettlementService {
         }
         if (result.status().isFinished()) {
             broadcastNaturalDeathResult(gameRoomId, nowMillis, result);
-            if (result.finishedGameRoom().isMatchMode()) {
+            if (!result.finishedGameRoom().isPracticeMode()) {
                 gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(result.finishedGameRoom());
             }
         }

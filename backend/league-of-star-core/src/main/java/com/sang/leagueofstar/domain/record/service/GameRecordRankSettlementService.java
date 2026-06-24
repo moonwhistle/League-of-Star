@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 public class GameRecordRankSettlementService {
 
     private static final long SETTLED_RECORD_COUNT = GameRoom.MAX_PARTICIPANTS;
+    private static final List<GameMode> RECORD_SETTLEMENT_RECOVERY_MODES = List.of(GameMode.MATCH, GameMode.CUSTOM);
 
     private final GameRoomRepository gameRoomRepository;
     private final GameRecordRepository gameRecordRepository;
@@ -120,9 +121,9 @@ public class GameRecordRankSettlementService {
      */
     @Transactional(readOnly = true)
     public List<Long> findUnsettledFinishedGameRoomIds(int limit) {
-        return gameRoomRepository.findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
+        return gameRoomRepository.findGameRoomIdsByStatusAndGameModeInAndRecordCountNot(
                 GameStatus.FINISHED,
-                GameMode.MATCH,
+                RECORD_SETTLEMENT_RECOVERY_MODES,
                 SETTLED_RECORD_COUNT,
                 PageRequest.of(0, limit)
         );

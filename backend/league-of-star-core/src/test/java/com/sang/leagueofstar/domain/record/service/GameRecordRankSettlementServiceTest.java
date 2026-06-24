@@ -335,9 +335,9 @@ class GameRecordRankSettlementServiceTest {
     void findUnsettledFinishedGameRoomIds() {
         // given
         int limit = 100;
-        given(gameRoomRepository.findGameRoomIdsByStatusAndGameModeAndRecordCountNot(
+        given(gameRoomRepository.findGameRoomIdsByStatusAndGameModeInAndRecordCountNot(
                 GameStatus.FINISHED,
-                GameMode.MATCH,
+                List.of(GameMode.MATCH, GameMode.CUSTOM),
                 GameRoom.MAX_PARTICIPANTS,
                 PageRequest.of(0, limit)
         )).willReturn(List.of(GAME_ROOM_ID));

@@ -203,13 +203,13 @@ Custom Game record 저장 기준:
 
 ### 4. Settlement Trigger / Recovery 구현
 
-- [ ] LIGHTNING kill 종료 후 `MATCH`, `CUSTOM`은 settlement trigger를 등록.
-- [ ] 자연사 종료 후 `MATCH`, `CUSTOM`은 settlement trigger를 등록.
-- [ ] `PRACTICE`는 settlement trigger 등록하지 않음.
-- [ ] recovery 후보 조회를 `MATCH`, `CUSTOM`으로 확장.
-- [ ] `PRACTICE` recovery 후보 제외 유지.
-- [ ] Custom recovery는 record만 복구하고 rank/LP는 변경하지 않음.
-- [ ] 부분 record 1행 상태 경고/예외 정책 유지.
+- [x] LIGHTNING kill 종료 후 `MATCH`, `CUSTOM`은 settlement trigger를 등록.
+- [x] 자연사 종료 후 `MATCH`, `CUSTOM`은 settlement trigger를 등록.
+- [x] `PRACTICE`는 settlement trigger 등록하지 않음.
+- [x] recovery 후보 조회를 `MATCH`, `CUSTOM`으로 확장.
+- [x] `PRACTICE` recovery 후보 제외 유지.
+- [x] Custom recovery는 record만 복구하고 rank/LP는 변경하지 않음.
+- [x] 부분 record 1행 상태 경고/예외 정책 유지.
 
 ### 5. Match Status Cleanup / Summary 정리
 
