@@ -8,6 +8,7 @@ import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRo
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameParticipantRepository;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameRoomRepository;
+import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomStartResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +20,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -409,9 +411,134 @@ class CustomGameRoomCommandServiceTest {
                                 .isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
     }
 
+    @Test
+    @DisplayName("startRoom - 방장이 2명 참가자 WAITING room을 STARTED로 전환하고 참가자 userId를 순서대로 반환한다")
+    void startRoom_Success() {
+        // given
+        LocalDateTime startedAt = LocalDateTime.now();
+        CustomGameRoom room = room(ROOM_ID, OWNER_USER_ID);
+        given(customGameRoomRepository.findByIdForUpdate(ROOM_ID)).willReturn(Optional.of(room));
+        given(customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(ROOM_ID))
+                .willReturn(List.of(
+                        participant(ROOM_ID, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
+                        participant(ROOM_ID, PLAYER_USER_ID, CustomRoomParticipantRole.PLAYER)
+                ));
+
+        // when
+        CustomGameRoomStartResult result = customGameRoomCommandService.startRoom(
+                ROOM_ID,
+                OWNER_USER_ID,
+                startedAt
+        );
+
+        // then
+        assertThat(result.room()).isSameAs(room);
+        assertThat(result.room().isStarted()).isTrue();
+        assertThat(result.room().getStartedAt()).isEqualTo(startedAt);
+        assertThat(result.participantUserIds()).containsExactly(OWNER_USER_ID, PLAYER_USER_ID);
+    }
+
+    @Test
+    @DisplayName("startRoom - 방장이 아니면 INVALID_PARTICIPANT를 던진다")
+    void startRoom_NotOwner_ThrowException() {
+        // given
+        CustomGameRoom room = room(ROOM_ID, OWNER_USER_ID);
+        given(customGameRoomRepository.findByIdForUpdate(ROOM_ID)).willReturn(Optional.of(room));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomCommandService.startRoom(
+                ROOM_ID,
+                PLAYER_USER_ID,
+                LocalDateTime.now()
+        )).isInstanceOfSatisfying(CoreException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
+        verify(customGameParticipantRepository, never()).findByCustomRoomIdOrderByIdAsc(ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("startRoom - 참가자가 1명이면 INCOMPLETE_PARTICIPANTS를 던진다")
+    void startRoom_OneParticipant_ThrowException() {
+        // given
+        CustomGameRoom room = room(ROOM_ID, OWNER_USER_ID);
+        given(customGameRoomRepository.findByIdForUpdate(ROOM_ID)).willReturn(Optional.of(room));
+        given(customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(ROOM_ID))
+                .willReturn(List.of(participant(ROOM_ID, OWNER_USER_ID, CustomRoomParticipantRole.OWNER)));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomCommandService.startRoom(
+                ROOM_ID,
+                OWNER_USER_ID,
+                LocalDateTime.now()
+        )).isInstanceOfSatisfying(CoreException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INCOMPLETE_PARTICIPANTS));
+        assertThat(room.isWaiting()).isTrue();
+    }
+
+    @Test
+    @DisplayName("startRoom - 시작된 room이면 INVALID_STATE를 던진다")
+    void startRoom_StartedRoom_ThrowException() {
+        // given
+        CustomGameRoom room = room(ROOM_ID, OWNER_USER_ID);
+        room.markStarted(LocalDateTime.now());
+        given(customGameRoomRepository.findByIdForUpdate(ROOM_ID)).willReturn(Optional.of(room));
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomCommandService.startRoom(
+                ROOM_ID,
+                OWNER_USER_ID,
+                LocalDateTime.now()
+        )).isInstanceOfSatisfying(CoreException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
+    }
+
+    @Test
+    @DisplayName("startRoom - 존재하지 않는 room이면 NOT_FOUND를 던진다")
+    void startRoom_NotFound_ThrowException() {
+        // given
+        given(customGameRoomRepository.findByIdForUpdate(ROOM_ID)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomCommandService.startRoom(
+                ROOM_ID,
+                OWNER_USER_ID,
+                LocalDateTime.now()
+        )).isInstanceOfSatisfying(CoreException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("startRoom - roomId가 null이면 NOT_FOUND를 던진다")
+    void startRoom_NullRoomId_ThrowException() {
+        assertThatThrownBy(() -> customGameRoomCommandService.startRoom(
+                null,
+                OWNER_USER_ID,
+                LocalDateTime.now()
+        )).isInstanceOfSatisfying(CoreException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("startRoom - ownerUserId가 null이면 INVALID_PARTICIPANT를 던진다")
+    void startRoom_NullOwnerUserId_ThrowException() {
+        assertThatThrownBy(() -> customGameRoomCommandService.startRoom(
+                ROOM_ID,
+                null,
+                LocalDateTime.now()
+        )).isInstanceOfSatisfying(CoreException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT));
+    }
+
     private CustomGameRoom room(Long roomId, Long ownerUserId) {
         CustomGameRoom room = CustomGameRoom.create(ownerUserId, INVITE_CODE);
         ReflectionTestUtils.setField(room, "id", roomId);
         return room;
+    }
+
+    private CustomGameParticipant participant(
+            Long roomId,
+            Long userId,
+            CustomRoomParticipantRole role
+    ) {
+        return CustomGameParticipant.create(roomId, userId, role);
     }
 }

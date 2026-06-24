@@ -12,6 +12,7 @@ public enum CustomRoomWebSocketMessageType {
 
     ROOM_UPDATED(Direction.SERVER),
     ROOM_CLOSED(Direction.SERVER),
+    ROOM_STARTED(Direction.SERVER),
     ERROR(Direction.SERVER);
 
     private final Direction direction;

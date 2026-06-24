@@ -102,6 +102,30 @@ class GameRoomCommandServiceJpaTest {
     }
 
     @Test
+    @DisplayName("createCustomRoom - CUSTOM 게임룸, 참가자, 시나리오를 DB에 저장한다")
+    void createCustomRoom_SaveCustomGameRoomParticipantsAndScenario() {
+        // when
+        GameRoom savedGameRoom = gameRoomCommandService.createCustomRoom(FIRST_USER_ID, SECOND_USER_ID);
+        gameRoomRepository.flush();
+        entityManager.clear();
+
+        // then
+        GameRoom foundGameRoom = gameRoomRepository.findById(savedGameRoom.getId()).orElseThrow();
+        assertThat(foundGameRoom.getGameMode()).isEqualTo(GameMode.CUSTOM);
+        assertThat(foundGameRoom.getStatus()).isEqualTo(GameStatus.READY);
+        assertThat(foundGameRoom.getDurationSeconds()).isBetween(MIN_GAME_DURATION_SECONDS, MAX_GAME_DURATION_SECONDS);
+        assertThat(foundGameRoom.getParticipants()).hasSize(GameRoom.MAX_PARTICIPANTS);
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getUserId)
+                .containsExactlyInAnyOrder(FIRST_USER_ID, SECOND_USER_ID);
+        assertThat(foundGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsOnly(ParticipantStatus.READY);
+        assertThat(foundGameRoom.getScenarioData().steps().get(0).hp()).isEqualTo(GameRoom.DEFAULT_STAR_CORE_MAX_HP);
+        assertThat(foundGameRoom.getScenarioData().steps().get(0).timeMs()).isZero();
+    }
+
+    @Test
     @DisplayName("abortReadyRoom - 게임룸과 참가자 ABORTED 상태를 DB에 저장한다")
     void abortReadyRoom_SaveAbortedStatus() {
         // given

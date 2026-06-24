@@ -1,7 +1,10 @@
 package com.sang.leagueofstar.customgame.service;
 
+import com.sang.leagueofstar.common.exception.ApiErrorCode;
+import com.sang.leagueofstar.common.exception.ApiException;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.customgame.controller.response.CustomGameStartResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListItemResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomParticipantResponse;
@@ -11,11 +14,23 @@ import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomCommandService;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomReadService;
+import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomStartResult;
+import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
+import com.sang.leagueofstar.domain.game.service.GameRoomCommandService;
+import com.sang.leagueofstar.domain.game.service.GameRoomReadService;
 import com.sang.leagueofstar.domain.user.domain.User;
 import com.sang.leagueofstar.domain.user.service.UserReadService;
+import com.sang.leagueofstar.game.end.service.GameEndScheduleService;
+import com.sang.leagueofstar.game.start.common.constant.GameStartConstants;
+import com.sang.leagueofstar.game.start.dto.GameStartScenarioPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -29,11 +44,16 @@ import java.util.stream.Collectors;
 public class CustomGameRoomService {
 
     private static final String ROOM_NAME_FORMAT = "%s's room";
+    private static final String GAME_WEB_SOCKET_URL_FORMAT = "/ws/game/%d";
 
     private final CustomGameRoomCommandService customGameRoomCommandService;
     private final CustomGameRoomReadService customGameRoomReadService;
+    private final GameRoomReadService gameRoomReadService;
+    private final GameRoomCommandService gameRoomCommandService;
+    private final GameEndScheduleService gameEndScheduleService;
     private final UserReadService userReadService;
     private final CustomRoomWebSocketNotifier customRoomWebSocketNotifier;
+    private final Clock clock;
 
     public CustomRoomResponse createRoom(Long ownerUserId) {
         CustomGameRoom room = customGameRoomCommandService.createRoom(ownerUserId);
@@ -84,6 +104,75 @@ public class CustomGameRoomService {
 
         customRoomWebSocketNotifier.notifyParticipantLeftAfterCommit(response, userId);
         return response;
+    }
+
+    @Transactional
+    public CustomGameStartResponse startRoom(Long roomId, Long ownerUserId) {
+        Instant serverTime = Instant.now(clock);
+        Instant startAt = serverTime.plusMillis(GameStartConstants.START_DELAY_MILLIS);
+        CustomGameRoomStartResult startResult = customGameRoomCommandService.startRoom(
+                roomId,
+                ownerUserId,
+                LocalDateTime.ofInstant(startAt, clock.getZone())
+        );
+        validateNoActiveGameRoom(startResult.participantUserIds());
+
+        GameRoom gameRoom = createStartedCustomGameRoom(startResult.participantUserIds(), startAt);
+        GameStartScenarioPayload scenario = GameStartScenarioPayload.from(gameRoom.getScenarioData());
+        registerEndDeadline(gameRoom.getId(), startAt.toEpochMilli(), scenario.durationMs());
+
+        CustomGameStartResponse response = new CustomGameStartResponse(
+                startResult.room().getId(),
+                gameRoom.getId(),
+                GameMode.CUSTOM.name(),
+                serverTime.toEpochMilli(),
+                startAt.toEpochMilli(),
+                GAME_WEB_SOCKET_URL_FORMAT.formatted(gameRoom.getId()),
+                scenario
+        );
+        customRoomWebSocketNotifier.notifyRoomStartedAfterCommit(response);
+        return response;
+    }
+
+    private void validateNoActiveGameRoom(List<Long> userIds) {
+        boolean hasActiveGameRoom = userIds.stream()
+                .anyMatch(gameRoomReadService::existsActiveGameRoomByUserId);
+        if (hasActiveGameRoom) {
+            throw new ApiException(ApiErrorCode.GAME_ACTIVE_ROOM_EXISTS);
+        }
+    }
+
+    private GameRoom createStartedCustomGameRoom(List<Long> participantUserIds, Instant startAt) {
+        GameRoom gameRoom = gameRoomCommandService.createCustomRoom(
+                participantUserIds.get(0),
+                participantUserIds.get(1)
+        );
+        boolean started = gameRoomCommandService.startReadyRoomIfReady(
+                gameRoom.getId(),
+                LocalDateTime.ofInstant(startAt, clock.getZone())
+        );
+        if (!started) {
+            abortReadyRoom(gameRoom.getId());
+            throw new ApiException(ApiErrorCode.GAME_CUSTOM_START_FAILED);
+        }
+        return gameRoom;
+    }
+
+    private void registerEndDeadline(Long gameRoomId, long startAtMillis, long durationMs) {
+        try {
+            gameEndScheduleService.registerEndDeadline(gameRoomId, startAtMillis, durationMs);
+        } catch (RuntimeException exception) {
+            abortInProgressRoom(gameRoomId);
+            throw exception;
+        }
+    }
+
+    private void abortReadyRoom(Long gameRoomId) {
+        gameRoomCommandService.abortReadyRoomIfReady(gameRoomId);
+    }
+
+    private void abortInProgressRoom(Long gameRoomId) {
+        gameRoomCommandService.abortInProgressRoomIfInProgress(gameRoomId);
     }
 
     private CustomRoomResponse toRoomResponse(CustomGameRoom room, List<CustomGameParticipant> participants) {

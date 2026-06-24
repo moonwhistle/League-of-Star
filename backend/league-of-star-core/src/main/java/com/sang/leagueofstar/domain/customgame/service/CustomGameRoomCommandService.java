@@ -8,12 +8,14 @@ import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRo
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameParticipantRepository;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameRoomRepository;
+import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomStartResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -71,6 +73,27 @@ public class CustomGameRoomCommandService {
         return customGameRoom;
     }
 
+    public CustomGameRoomStartResult startRoom(Long roomId, Long ownerUserId, LocalDateTime startedAt) {
+        validateRoomId(roomId);
+        validateOwnerUserId(ownerUserId);
+        validateStartedAt(startedAt);
+
+        CustomGameRoom customGameRoom = getWaitingRoomByIdForUpdate(roomId);
+        validateRoomOwner(customGameRoom, ownerUserId);
+
+        List<CustomGameParticipant> participants =
+                customGameParticipantRepository.findByCustomRoomIdOrderByIdAsc(roomId);
+        validateStartParticipants(participants);
+
+        customGameRoom.markStarted(startedAt);
+        return new CustomGameRoomStartResult(
+                customGameRoom,
+                participants.stream()
+                        .map(CustomGameParticipant::getUserId)
+                        .toList()
+        );
+    }
+
     private void validateOwnerUserId(Long ownerUserId) {
         if (ownerUserId == null) {
             throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT);
@@ -98,6 +121,31 @@ public class CustomGameRoomCommandService {
     private void validateInviteCode(String inviteCode) {
         if (inviteCode == null || inviteCode.isBlank()) {
             throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_INVITE_CODE);
+        }
+    }
+
+    private void validateStartedAt(LocalDateTime startedAt) {
+        if (startedAt == null) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE);
+        }
+    }
+
+    private void validateRoomOwner(CustomGameRoom customGameRoom, Long ownerUserId) {
+        if (!customGameRoom.getOwnerUserId().equals(ownerUserId)) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT);
+        }
+    }
+
+    private void validateStartParticipants(List<CustomGameParticipant> participants) {
+        if (participants.size() != CustomGameRoom.MAX_PARTICIPANTS) {
+            throw new CoreException(CoreErrorCode.INCOMPLETE_PARTICIPANTS);
+        }
+        long distinctUserCount = participants.stream()
+                .map(CustomGameParticipant::getUserId)
+                .distinct()
+                .count();
+        if (distinctUserCount != CustomGameRoom.MAX_PARTICIPANTS) {
+            throw new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_PARTICIPANT);
         }
     }
 

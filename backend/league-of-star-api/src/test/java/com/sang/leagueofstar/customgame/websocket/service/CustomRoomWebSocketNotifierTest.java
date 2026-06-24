@@ -1,9 +1,11 @@
 package com.sang.leagueofstar.customgame.websocket.service;
 
+import com.sang.leagueofstar.customgame.controller.response.CustomGameStartResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
 import com.sang.leagueofstar.customgame.websocket.dto.CustomRoomWebSocketMessageType;
 import com.sang.leagueofstar.customgame.websocket.dto.CustomRoomWebSocketServerMessage;
 import com.sang.leagueofstar.customgame.websocket.session.CustomRoomWebSocketSessionRegistry;
+import com.sang.leagueofstar.game.start.dto.GameStartScenarioPayload;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -113,6 +115,59 @@ class CustomRoomWebSocketNotifierTest {
         inOrder.verify(sessionRegistry).closeAndUnregisterRoom(CUSTOM_ROOM_ID);
     }
 
+    @Test
+    @DisplayName("notifyRoomStartedAfterCommit - ROOM_STARTED broadcast 이후 room 전체 session을 닫는다")
+    void notifyRoomStartedAfterCommit_BroadcastAndCloseRoomSessions() {
+        // given
+        CustomGameStartResponse response = startResponse();
+
+        // when
+        notifier.notifyRoomStartedAfterCommit(response);
+
+        // then
+        InOrder inOrder = inOrder(messageSender, sessionRegistry);
+        inOrder.verify(messageSender).broadcast(
+                org.mockito.ArgumentMatchers.eq(CUSTOM_ROOM_ID),
+                org.mockito.ArgumentMatchers.argThat(message ->
+                        message.type() == CustomRoomWebSocketMessageType.ROOM_STARTED
+                )
+        );
+        inOrder.verify(sessionRegistry).closeAndUnregisterRoom(CUSTOM_ROOM_ID);
+    }
+
+    @Test
+    @DisplayName("notifyRoomStartedAfterCommit - transaction이 있으면 afterCommit에 ROOM_STARTED를 broadcast한다")
+    void notifyRoomStartedAfterCommit_ActiveTransaction_BroadcastAfterCommit() {
+        // given
+        CustomGameStartResponse response = startResponse();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            // when
+            notifier.notifyRoomStartedAfterCommit(response);
+
+            // then
+            verify(messageSender, never()).broadcast(
+                    org.mockito.ArgumentMatchers.anyLong(),
+                    org.mockito.ArgumentMatchers.any()
+            );
+            List<TransactionSynchronization> synchronizations =
+                    TransactionSynchronizationManager.getSynchronizations();
+            assertThat(synchronizations).hasSize(1);
+
+            synchronizations.get(0).afterCommit();
+            InOrder inOrder = inOrder(messageSender, sessionRegistry);
+            inOrder.verify(messageSender).broadcast(
+                    org.mockito.ArgumentMatchers.eq(CUSTOM_ROOM_ID),
+                    org.mockito.ArgumentMatchers.argThat(message ->
+                            message.type() == CustomRoomWebSocketMessageType.ROOM_STARTED
+                    )
+            );
+            inOrder.verify(sessionRegistry).closeAndUnregisterRoom(CUSTOM_ROOM_ID);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
     private CustomRoomWebSocketServerMessage captureBroadcastMessage() {
         ArgumentCaptor<CustomRoomWebSocketServerMessage> messageCaptor =
                 ArgumentCaptor.forClass(CustomRoomWebSocketServerMessage.class);
@@ -129,6 +184,22 @@ class CustomRoomWebSocketNotifierTest {
                 status,
                 2,
                 List.of()
+        );
+    }
+
+    private CustomGameStartResponse startResponse() {
+        return new CustomGameStartResponse(
+                CUSTOM_ROOM_ID,
+                200L,
+                "CUSTOM",
+                1_000L,
+                5_000L,
+                "/ws/game/200",
+                new GameStartScenarioPayload(
+                        10000,
+                        12_000L,
+                        List.of(new GameStartScenarioPayload.HpTimelineStep(0L, 10000))
+                )
         );
     }
 }

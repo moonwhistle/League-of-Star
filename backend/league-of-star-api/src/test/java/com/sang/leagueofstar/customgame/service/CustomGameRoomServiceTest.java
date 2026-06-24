@@ -2,6 +2,9 @@ package com.sang.leagueofstar.customgame.service;
 
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
+import com.sang.leagueofstar.common.exception.ApiErrorCode;
+import com.sang.leagueofstar.common.exception.ApiException;
+import com.sang.leagueofstar.customgame.controller.response.CustomGameStartResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
 import com.sang.leagueofstar.customgame.websocket.service.CustomRoomWebSocketNotifier;
@@ -10,23 +13,38 @@ import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomCommandService;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomReadService;
+import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomStartResult;
+import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
+import com.sang.leagueofstar.domain.game.domain.vo.HpStep;
+import com.sang.leagueofstar.domain.game.service.GameRoomCommandService;
+import com.sang.leagueofstar.domain.game.service.GameRoomReadService;
 import com.sang.leagueofstar.domain.user.domain.User;
 import com.sang.leagueofstar.domain.user.service.UserReadService;
+import com.sang.leagueofstar.game.end.service.GameEndScheduleService;
+import com.sang.leagueofstar.game.start.common.constant.GameStartConstants;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -37,6 +55,13 @@ class CustomGameRoomServiceTest {
 
     private static final Long OWNER_USER_ID = 1L;
     private static final Long PLAYER_USER_ID = 2L;
+    private static final Long CUSTOM_ROOM_ID = 100L;
+    private static final Long GAME_ROOM_ID = 200L;
+    private static final Instant SERVER_TIME = Instant.parse("2026-06-24T00:00:00Z");
+    private static final GameScenario SCENARIO = GameScenario.of(List.of(
+            new HpStep(0L, GameRoom.DEFAULT_STAR_CORE_MAX_HP),
+            new HpStep(12_000L, 0)
+    ));
 
     @InjectMocks
     private CustomGameRoomService customGameRoomService;
@@ -48,10 +73,22 @@ class CustomGameRoomServiceTest {
     private CustomGameRoomReadService customGameRoomReadService;
 
     @Mock
+    private GameRoomReadService gameRoomReadService;
+
+    @Mock
+    private GameRoomCommandService gameRoomCommandService;
+
+    @Mock
+    private GameEndScheduleService gameEndScheduleService;
+
+    @Mock
     private UserReadService userReadService;
 
     @Mock
     private CustomRoomWebSocketNotifier customRoomWebSocketNotifier;
+
+    @Spy
+    private Clock clock = Clock.fixed(SERVER_TIME, ZoneOffset.UTC);
 
     @Test
     @DisplayName("createRoom - core command 결과와 participant 조회 결과를 조합해 room response를 만든다")
@@ -282,6 +319,108 @@ class CustomGameRoomServiceTest {
         then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
     }
 
+    @Test
+    @DisplayName("startRoom - core start 결과로 CUSTOM game room을 만들고 start ack를 반환한다")
+    void startRoom_ReturnStartResponse() {
+        // given
+        CustomGameRoom room = room(CUSTOM_ROOM_ID, OWNER_USER_ID, "AB12CD");
+        GameRoom gameRoom = customGameRoom(GAME_ROOM_ID);
+        given(customGameRoomCommandService.startRoom(any(), any(), any()))
+                .willReturn(new CustomGameRoomStartResult(room, List.of(OWNER_USER_ID, PLAYER_USER_ID)));
+        given(gameRoomReadService.existsActiveGameRoomByUserId(OWNER_USER_ID)).willReturn(false);
+        given(gameRoomReadService.existsActiveGameRoomByUserId(PLAYER_USER_ID)).willReturn(false);
+        given(gameRoomCommandService.createCustomRoom(OWNER_USER_ID, PLAYER_USER_ID)).willReturn(gameRoom);
+        given(gameRoomCommandService.startReadyRoomIfReady(any(), any())).willReturn(true);
+
+        // when
+        CustomGameStartResponse response = customGameRoomService.startRoom(CUSTOM_ROOM_ID, OWNER_USER_ID);
+
+        // then
+        long expectedStartAt = SERVER_TIME.toEpochMilli() + GameStartConstants.START_DELAY_MILLIS;
+        assertThat(response.roomId()).isEqualTo(CUSTOM_ROOM_ID);
+        assertThat(response.gameRoomId()).isEqualTo(GAME_ROOM_ID);
+        assertThat(response.gameMode()).isEqualTo("CUSTOM");
+        assertThat(response.serverTime()).isEqualTo(SERVER_TIME.toEpochMilli());
+        assertThat(response.startAt()).isEqualTo(expectedStartAt);
+        assertThat(response.webSocketUrl()).isEqualTo("/ws/game/200");
+        assertThat(response.scenario().durationMs()).isEqualTo(12_000L);
+        then(customGameRoomCommandService).should().startRoom(
+                CUSTOM_ROOM_ID,
+                OWNER_USER_ID,
+                LocalDateTime.ofInstant(Instant.ofEpochMilli(expectedStartAt), ZoneOffset.UTC)
+        );
+        then(gameRoomCommandService).should().createCustomRoom(OWNER_USER_ID, PLAYER_USER_ID);
+        then(gameRoomCommandService).should().startReadyRoomIfReady(
+                GAME_ROOM_ID,
+                LocalDateTime.ofInstant(Instant.ofEpochMilli(expectedStartAt), ZoneOffset.UTC)
+        );
+        then(gameEndScheduleService).should().registerEndDeadline(GAME_ROOM_ID, expectedStartAt, 12_000L);
+        then(customRoomWebSocketNotifier).should().notifyRoomStartedAfterCommit(response);
+    }
+
+    @Test
+    @DisplayName("startRoom - 참가자에게 active game room이 있으면 CUSTOM game room을 생성하지 않는다")
+    void startRoom_ActiveGameRoom_ThrowException() {
+        // given
+        CustomGameRoom room = room(CUSTOM_ROOM_ID, OWNER_USER_ID, "AB12CD");
+        given(customGameRoomCommandService.startRoom(any(), any(), any()))
+                .willReturn(new CustomGameRoomStartResult(room, List.of(OWNER_USER_ID, PLAYER_USER_ID)));
+        given(gameRoomReadService.existsActiveGameRoomByUserId(OWNER_USER_ID)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomService.startRoom(CUSTOM_ROOM_ID, OWNER_USER_ID))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ApiErrorCode.GAME_ACTIVE_ROOM_EXISTS));
+        then(gameRoomCommandService).should(never()).createCustomRoom(OWNER_USER_ID, PLAYER_USER_ID);
+        then(gameEndScheduleService).shouldHaveNoInteractions();
+        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("startRoom - 생성한 CUSTOM game room을 시작하지 못하면 ready room abort 후 예외를 던진다")
+    void startRoom_StartReadyRoomFailed_AbortReadyRoom() {
+        // given
+        CustomGameRoom room = room(CUSTOM_ROOM_ID, OWNER_USER_ID, "AB12CD");
+        GameRoom gameRoom = customGameRoom(GAME_ROOM_ID);
+        given(customGameRoomCommandService.startRoom(any(), any(), any()))
+                .willReturn(new CustomGameRoomStartResult(room, List.of(OWNER_USER_ID, PLAYER_USER_ID)));
+        given(gameRoomReadService.existsActiveGameRoomByUserId(OWNER_USER_ID)).willReturn(false);
+        given(gameRoomReadService.existsActiveGameRoomByUserId(PLAYER_USER_ID)).willReturn(false);
+        given(gameRoomCommandService.createCustomRoom(OWNER_USER_ID, PLAYER_USER_ID)).willReturn(gameRoom);
+        given(gameRoomCommandService.startReadyRoomIfReady(any(), any())).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomService.startRoom(CUSTOM_ROOM_ID, OWNER_USER_ID))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ApiErrorCode.GAME_CUSTOM_START_FAILED));
+        then(gameRoomCommandService).should().abortReadyRoomIfReady(GAME_ROOM_ID);
+        then(gameEndScheduleService).shouldHaveNoInteractions();
+        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("startRoom - end deadline 등록 실패 시 in-progress game room abort를 시도한다")
+    void startRoom_EndDeadlineFailed_AbortInProgressRoom() {
+        // given
+        RuntimeException deadlineFailure = new RuntimeException("deadline failure");
+        CustomGameRoom room = room(CUSTOM_ROOM_ID, OWNER_USER_ID, "AB12CD");
+        GameRoom gameRoom = customGameRoom(GAME_ROOM_ID);
+        given(customGameRoomCommandService.startRoom(any(), any(), any()))
+                .willReturn(new CustomGameRoomStartResult(room, List.of(OWNER_USER_ID, PLAYER_USER_ID)));
+        given(gameRoomReadService.existsActiveGameRoomByUserId(OWNER_USER_ID)).willReturn(false);
+        given(gameRoomReadService.existsActiveGameRoomByUserId(PLAYER_USER_ID)).willReturn(false);
+        given(gameRoomCommandService.createCustomRoom(OWNER_USER_ID, PLAYER_USER_ID)).willReturn(gameRoom);
+        given(gameRoomCommandService.startReadyRoomIfReady(any(), any())).willReturn(true);
+        given(gameEndScheduleService.registerEndDeadline(any(), anyLong(), anyLong()))
+                .willThrow(deadlineFailure);
+
+        // when & then
+        assertThatThrownBy(() -> customGameRoomService.startRoom(CUSTOM_ROOM_ID, OWNER_USER_ID))
+                .isSameAs(deadlineFailure);
+        then(gameRoomCommandService).should().abortInProgressRoomIfInProgress(GAME_ROOM_ID);
+        then(customRoomWebSocketNotifier).shouldHaveNoInteractions();
+    }
+
     private CustomGameRoom room(Long id, Long ownerUserId, String inviteCode) {
         CustomGameRoom room = CustomGameRoom.create(ownerUserId, inviteCode);
         ReflectionTestUtils.setField(room, "id", id);
@@ -290,6 +429,18 @@ class CustomGameRoomServiceTest {
 
     private CustomGameParticipant participant(Long roomId, Long userId, CustomRoomParticipantRole role) {
         return CustomGameParticipant.create(roomId, userId, role);
+    }
+
+    private GameRoom customGameRoom(Long id) {
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(com.sang.leagueofstar.domain.game.domain.vo.GameMode.CUSTOM)
+                .durationSeconds(12)
+                .scenarioData(SCENARIO)
+                .build();
+        gameRoom.addParticipant(OWNER_USER_ID);
+        gameRoom.addParticipant(PLAYER_USER_ID);
+        ReflectionTestUtils.setField(gameRoom, "id", id);
+        return gameRoom;
     }
 
     private User user(Long id, String nickname) {

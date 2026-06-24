@@ -11,6 +11,7 @@ public final class CustomGamePath {
     public static final String INVITE_PREVIEW = INVITES + "/{inviteCode}";
     public static final String JOIN = "/{inviteCode}/join";
     public static final String LEAVE = "/{roomId}/leave";
+    public static final String START = "/{roomId}/start";
     public static final String INVITE_CODE = "inviteCode";
     public static final String ROOM_ID = "roomId";
 
