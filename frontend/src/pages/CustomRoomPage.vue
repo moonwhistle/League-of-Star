@@ -14,6 +14,9 @@
     :data-custom-room-socket-error-message="socketErrorMessage"
     :data-custom-room-leave-status="leaveStatus"
     :data-custom-room-leave-error-message="leaveErrorMessage"
+    :data-custom-room-start-status="startStatus"
+    :data-custom-room-start-error-message="startErrorMessage"
+    :data-custom-room-can-start="canStartCustomGame"
     data-testid="custom-room-page"
   >
     <section class="custom-room-shell">
@@ -25,6 +28,15 @@
         <nav class="custom-room-actions" :aria-label="t('customRoom.pageLabel')">
           <button type="button" :disabled="roomStatus === 'loading'" @click="loadRoom">
             {{ t('customRoom.refresh') }}
+          </button>
+          <button
+            v-if="canShowStartButton"
+            type="button"
+            data-testid="custom-room-start-button"
+            :disabled="!canStartCustomGame"
+            @click="startRoom"
+          >
+            {{ startButtonLabel }}
           </button>
           <button
             v-if="roomStatus === 'success'"
@@ -94,6 +106,12 @@
             <p v-if="copyMessage !== ''" class="custom-room-copy-message" role="status">
               {{ copyMessage }}
             </p>
+            <p v-if="startStatus === 'waiting'" class="custom-room-copy-message" role="status">
+              {{ t('customRoom.startWaiting') }}
+            </p>
+            <p v-if="startErrorMessage !== ''" class="custom-room-alert" role="alert">
+              {{ startErrorMessage }}
+            </p>
             <p v-if="socketErrorMessage !== ''" class="custom-room-alert" role="alert">
               {{ socketErrorMessage }}
             </p>
@@ -132,19 +150,23 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
-import { getCustomRoom, leaveCustomRoom } from '@/services/customRoomService'
+import { startCustomRoom, getCustomRoom, leaveCustomRoom } from '@/services/customRoomService'
+import { saveCustomGameStartPayloadFromResponse } from '@/services/customGameStartPayload'
+import { getMyProfile } from '@/services/profileService'
 import {
   connectCustomRoomWebSocket,
   type CustomRoomWebSocketConnection,
 } from '@/services/realtime/customRoomWebSocket'
 import { clearCurrentCustomRoom, rememberCurrentCustomRoom } from '@/services/customRoomSession'
 import type { CustomRoomResponse, CustomRoomWebSocketServerMessage } from '@/types/customRoom'
+import type { UserProfileResponse } from '@/types/user'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
 
 type LoadStatus = 'idle' | 'loading' | 'success' | 'error' | 'closed'
 type CopyStatus = 'idle' | 'success' | 'error'
 type LeaveStatus = 'idle' | 'loading' | 'success' | 'error'
+type StartStatus = 'idle' | 'loading' | 'waiting' | 'started' | 'error'
 type SocketStatus = 'idle' | 'connecting' | 'open' | 'error' | 'closed'
 
 const route = useRoute()
@@ -153,17 +175,54 @@ const { t } = useLocale()
 const roomStatus = ref<LoadStatus>('idle')
 const copyStatus = ref<CopyStatus>('idle')
 const leaveStatus = ref<LeaveStatus>('idle')
+const startStatus = ref<StartStatus>('idle')
 const socketStatus = ref<SocketStatus>('idle')
 const roomErrorMessage = ref('')
 const copyMessage = ref('')
 const leaveErrorMessage = ref('')
+const startErrorMessage = ref('')
 const socketErrorMessage = ref('')
 const room = shallowRef<CustomRoomResponse>()
+const profile = shallowRef<UserProfileResponse>()
 const roomAbortController = shallowRef<AbortController>()
 const leaveAbortController = shallowRef<AbortController>()
+const startAbortController = shallowRef<AbortController>()
+const profileAbortController = shallowRef<AbortController>()
 const roomSocketConnection = shallowRef<CustomRoomWebSocketConnection>()
 const expectedSocketClose = ref(false)
 const routeRoomId = computed(() => String(route.params.roomId ?? '').trim())
+const canShowStartButton = computed(
+  () => room.value !== undefined && profile.value?.userId === room.value.ownerUserId,
+)
+const canStartCustomGame = computed(
+  () =>
+    canShowStartButton.value &&
+    room.value?.status === 'WAITING' &&
+    room.value.participants.length === room.value.maxParticipants &&
+    socketStatus.value === 'open' &&
+    startStatus.value !== 'loading' &&
+    startStatus.value !== 'waiting' &&
+    startStatus.value !== 'started',
+)
+const startButtonLabel = computed(() => {
+  if (startStatus.value === 'loading') {
+    return t('customRoom.starting')
+  }
+
+  if (startStatus.value === 'waiting') {
+    return t('customRoom.startWaitingShort')
+  }
+
+  if (room.value !== undefined && room.value.participants.length < room.value.maxParticipants) {
+    return t('customRoom.startNeedsPlayers')
+  }
+
+  if (socketStatus.value !== 'open') {
+    return t('customRoom.startNeedsSocket')
+  }
+
+  return t('customRoom.start')
+})
 const inviteLink = computed(() => {
   const inviteCode = room.value?.inviteCode.trim() ?? ''
 
@@ -177,6 +236,7 @@ const inviteLink = computed(() => {
 watch(
   routeRoomId,
   () => {
+    void loadProfile()
     void loadRoom()
   },
   { immediate: true },
@@ -185,15 +245,43 @@ watch(
 onUnmounted(() => {
   abortRoomRequest()
   abortLeaveRequest()
+  abortStartRequest()
+  abortProfileRequest()
   closeRoomSocket()
 })
+
+async function loadProfile() {
+  abortProfileRequest()
+  const controller = new AbortController()
+  profileAbortController.value = controller
+
+  try {
+    const response = await getMyProfile(controller.signal)
+
+    if (profileAbortController.value !== controller) {
+      return
+    }
+
+    profile.value = response
+  } catch {
+    if (!controller.signal.aborted) {
+      profile.value = undefined
+    }
+  } finally {
+    if (profileAbortController.value === controller) {
+      profileAbortController.value = undefined
+    }
+  }
+}
 
 async function loadRoom() {
   copyStatus.value = 'idle'
   copyMessage.value = ''
   leaveErrorMessage.value = ''
+  startErrorMessage.value = ''
   socketErrorMessage.value = ''
   roomErrorMessage.value = ''
+  startStatus.value = 'idle'
 
   if (routeRoomId.value === '') {
     room.value = undefined
@@ -264,6 +352,39 @@ async function leaveRoom() {
   }
 }
 
+async function startRoom() {
+  if (room.value === undefined || !canStartCustomGame.value) {
+    return
+  }
+
+  abortStartRequest()
+  const controller = new AbortController()
+  startAbortController.value = controller
+  startStatus.value = 'loading'
+  startErrorMessage.value = ''
+
+  try {
+    await startCustomRoom(room.value.roomId, controller.signal)
+
+    if (startAbortController.value !== controller) {
+      return
+    }
+
+    startStatus.value = 'waiting'
+  } catch (error) {
+    if (controller.signal.aborted) {
+      return
+    }
+
+    startStatus.value = 'error'
+    startErrorMessage.value = errorMessage(error, t('customRoom.startFailed'))
+  } finally {
+    if (startAbortController.value === controller) {
+      startAbortController.value = undefined
+    }
+  }
+}
+
 async function copyInviteLink() {
   copyStatus.value = 'idle'
   copyMessage.value = ''
@@ -292,6 +413,14 @@ function abortRoomRequest() {
 
 function abortLeaveRequest() {
   leaveAbortController.value?.abort()
+}
+
+function abortStartRequest() {
+  startAbortController.value?.abort()
+}
+
+function abortProfileRequest() {
+  profileAbortController.value?.abort()
 }
 
 function connectRoomSocket(roomId: number) {
@@ -362,8 +491,73 @@ function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
     return
   }
 
+  if (message.type === 'ROOM_STARTED') {
+    void handleRoomStarted(message.payload)
+    return
+  }
+
   socketStatus.value = 'error'
   socketErrorMessage.value = message.payload.reason || t('customRoom.socketError')
+}
+
+async function handleRoomStarted(payload = {}) {
+  const participantContext = resolveCustomParticipantContext()
+
+  if (participantContext === null) {
+    startStatus.value = 'error'
+    startErrorMessage.value = t('customRoom.startPayloadInvalid')
+    return
+  }
+
+  const storedPayload = saveCustomGameStartPayloadFromResponse(
+    payload,
+    participantContext.myUserId,
+    participantContext.opponentUserId,
+  )
+
+  if (storedPayload === null) {
+    startStatus.value = 'error'
+    startErrorMessage.value = t('customRoom.startPayloadInvalid')
+    return
+  }
+
+  clearCurrentCustomRoom()
+  startStatus.value = 'started'
+  startErrorMessage.value = ''
+  socketErrorMessage.value = ''
+  closeRoomSocket(false)
+
+  try {
+    await router.replace({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: String(storedPayload.gameRoomId),
+      },
+    })
+  } catch {
+    startStatus.value = 'error'
+    startErrorMessage.value = t('customRoom.startTransitionFailed')
+  }
+}
+
+function resolveCustomParticipantContext() {
+  const myUserId = profile.value?.userId
+  const participants = room.value?.participants ?? []
+
+  if (typeof myUserId !== 'number' || !Number.isFinite(myUserId)) {
+    return null
+  }
+
+  const opponent = participants.find((participant) => participant.userId !== myUserId)
+
+  if (opponent === undefined) {
+    return null
+  }
+
+  return {
+    myUserId,
+    opponentUserId: opponent.userId,
+  }
 }
 
 function closeRoomSocket(resetStatus = true) {

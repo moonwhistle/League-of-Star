@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
-import { getCustomRoom, leaveCustomRoom } from '@/services/customRoomService'
+import { readCustomGameStartPayload } from '@/services/customGameStartPayload'
+import { getCustomRoom, leaveCustomRoom, startCustomRoom } from '@/services/customRoomService'
+import { getMyProfile } from '@/services/profileService'
 import { connectCustomRoomWebSocket } from '@/services/realtime/customRoomWebSocket'
 import type { CustomRoomResponse, CustomRoomWebSocketServerMessage } from '@/types/customRoom'
 
@@ -16,6 +18,7 @@ const routeMock = vi.hoisted(() => ({
   },
 }))
 const routerPushMock = vi.hoisted(() => vi.fn())
+const routerReplaceMock = vi.hoisted(() => vi.fn())
 const customRoomSocketMock = vi.hoisted(() => ({
   handlers: undefined as
     | {
@@ -33,12 +36,18 @@ vi.mock('vue-router', () => ({
   useRoute: () => routeMock,
   useRouter: () => ({
     push: routerPushMock,
+    replace: routerReplaceMock,
   }),
 }))
 
 vi.mock('@/services/customRoomService', () => ({
   getCustomRoom: vi.fn(),
   leaveCustomRoom: vi.fn(),
+  startCustomRoom: vi.fn(),
+}))
+
+vi.mock('@/services/profileService', () => ({
+  getMyProfile: vi.fn(),
 }))
 
 vi.mock('@/services/realtime/customRoomWebSocket', () => ({
@@ -47,6 +56,8 @@ vi.mock('@/services/realtime/customRoomWebSocket', () => ({
 
 const getCustomRoomMock = vi.mocked(getCustomRoom)
 const leaveCustomRoomMock = vi.mocked(leaveCustomRoom)
+const startCustomRoomMock = vi.mocked(startCustomRoom)
+const getMyProfileMock = vi.mocked(getMyProfile)
 const connectCustomRoomWebSocketMock = vi.mocked(connectCustomRoomWebSocket)
 const { setLocale } = useLocale()
 
@@ -54,11 +65,20 @@ describe('CustomRoomPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
+    sessionStorage.clear()
     setLocale('ko')
     routeMock.params.roomId = '100'
     routerPushMock.mockResolvedValue(undefined)
+    routerReplaceMock.mockResolvedValue(undefined)
     getCustomRoomMock.mockResolvedValue(createRoomResponse())
     leaveCustomRoomMock.mockResolvedValue(createRoomResponse())
+    startCustomRoomMock.mockResolvedValue(createStartResponse())
+    getMyProfileMock.mockResolvedValue({
+      userId: 1,
+      email: 'host@example.com',
+      nickname: 'Host',
+      createdAt: '2026-06-12T10:00:00',
+    })
     customRoomSocketMock.handlers = undefined
     customRoomSocketMock.close.mockClear()
     connectCustomRoomWebSocketMock.mockImplementation((_roomId, handlers) => {
@@ -98,6 +118,7 @@ describe('CustomRoomPage', () => {
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).toContain('Guest')
     expect(wrapper.text()).toContain('방장')
+    expect(wrapper.get('[data-testid="custom-room-start-button"]').text()).toContain('연결 대기')
     expect(connectCustomRoomWebSocketMock).toHaveBeenCalledWith(100, expect.any(Object))
   })
 
@@ -189,6 +210,110 @@ describe('CustomRoomPage', () => {
     expect(wrapper.get('main').attributes('data-custom-room-participant-count')).toBe('1')
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).not.toContain('Guest')
+  })
+
+  it('starts a custom room by HTTP command without moving routes before ROOM_STARTED', async () => {
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onOpen?.(new Event('open'))
+    await flushPromises()
+
+    await wrapper.get('[data-testid="custom-room-start-button"]').trigger('click')
+    await flushPromises()
+
+    expect(startCustomRoomMock).toHaveBeenCalledWith(100, expect.any(AbortSignal))
+    expect(wrapper.get('main').attributes('data-custom-room-start-status')).toBe('waiting')
+    expect(wrapper.text()).toContain('게임 시작 이벤트를 기다리는 중입니다.')
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('does not show the start button to non-owner participants', async () => {
+    getMyProfileMock.mockResolvedValueOnce({
+      userId: 2,
+      email: 'guest@example.com',
+      nickname: 'Guest',
+      createdAt: '2026-06-12T10:00:00',
+    })
+
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="custom-room-start-button"]').exists()).toBe(false)
+  })
+
+  it('keeps start disabled until two participants and websocket open are ready', async () => {
+    getCustomRoomMock.mockResolvedValueOnce(
+      createRoomResponse({
+        participants: [
+          {
+            userId: 1,
+            nickname: 'Host',
+            role: 'OWNER',
+          },
+        ],
+      }),
+    )
+
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    const startButton = wrapper.get('[data-testid="custom-room-start-button"]')
+    expect(startButton.attributes('disabled')).toBeDefined()
+    expect(startButton.text()).toContain('참가자 대기')
+  })
+
+  it('stores ROOM_STARTED payload and moves to GamePlay route', async () => {
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onOpen?.(new Event('open'))
+    customRoomSocketMock.handlers?.onMessage?.(
+      {
+        type: 'ROOM_STARTED',
+        payload: createStartResponse(),
+      },
+      new MessageEvent('message', { data: '{}' }),
+    )
+    await flushPromises()
+
+    expect(readCustomGameStartPayload(200)).toMatchObject({
+      roomId: 100,
+      gameRoomId: 200,
+      gameMode: 'CUSTOM',
+      myUserId: 1,
+      opponentUserId: 2,
+    })
+    expect(localStorage.getItem('league-of-star.currentCustomRoomId')).toBeNull()
+    expect(customRoomSocketMock.close).toHaveBeenCalledWith(1000, 'custom room page closed')
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: '200',
+      },
+    })
+    expect(wrapper.get('main').attributes('data-custom-room-start-status')).toBe('started')
+  })
+
+  it('shows an error when ROOM_STARTED payload is invalid', async () => {
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onMessage?.(
+      {
+        type: 'ROOM_STARTED',
+        payload: {
+          ...createStartResponse(),
+          gameMode: 'MATCH',
+        },
+      } as unknown as CustomRoomWebSocketServerMessage,
+      new MessageEvent('message', { data: '{}' }),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-custom-room-start-status')).toBe('error')
+    expect(wrapper.text()).toContain('게임 시작 정보를 확인할 수 없습니다.')
+    expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
   it('shows closed state from ROOM_CLOSED without calling leave API', async () => {
@@ -299,5 +424,26 @@ function createRoomResponse(overrides: Partial<CustomRoomResponse> = {}): Custom
       },
     ],
     ...overrides,
+  }
+}
+
+function createStartResponse() {
+  return {
+    roomId: 100,
+    gameRoomId: 200,
+    gameMode: 'CUSTOM' as const,
+    serverTime: 10_000,
+    startAt: 13_000,
+    webSocketUrl: '/ws/game/200',
+    scenario: {
+      starCoreMaxHp: 10000,
+      durationMs: 12000,
+      hpTimeline: [
+        {
+          timeMs: 0,
+          hp: 10000,
+        },
+      ],
+    },
   }
 }
