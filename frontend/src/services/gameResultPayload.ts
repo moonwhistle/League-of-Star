@@ -141,7 +141,7 @@ function isGameResult(value: unknown): value is GameResult {
 }
 
 function isOptionalGameMode(value: unknown): value is GameMode | undefined {
-  return value === undefined || value === 'MATCH' || value === 'PRACTICE'
+  return value === undefined || value === 'MATCH' || value === 'PRACTICE' || value === 'CUSTOM'
 }
 
 function isOptionalPracticeResult(value: unknown): value is PracticeResult | null | undefined {

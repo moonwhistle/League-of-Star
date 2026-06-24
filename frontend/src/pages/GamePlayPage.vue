@@ -5,6 +5,7 @@
     :data-game-start-payload-ready="gameStartPayload !== null"
     :data-game-waiting-payload-ready="gameWaitingPayload !== null"
     :data-game-practice-payload-ready="practiceGameStartPayload !== null"
+    :data-game-custom-payload-ready="customGameStartPayload !== null"
     :data-game-play-state-ready="playState !== null"
     :data-game-mode="playState?.mode ?? ''"
     :data-game-room-id="playState?.gameRoomId ?? ''"
@@ -143,6 +144,7 @@ import {
 } from '@/services/gameResultPayload'
 import { readGameStartPayload } from '@/services/gameStartPayload'
 import { readGameWaitingPayload } from '@/services/gameWaitingPayload'
+import { readCustomGameStartPayload } from '@/services/customGameStartPayload'
 import {
   readPracticeGameStartPayload,
   savePracticeGameStartPayloadFromResponse,
@@ -159,6 +161,7 @@ const threeCanvas = shallowRef(null)
 const gameStartPayload = shallowRef(readGameStartPayload('__missing__'))
 const gameWaitingPayload = shallowRef(readGameWaitingPayload('__missing__'))
 const practiceGameStartPayload = shallowRef(readPracticeGameStartPayload('__missing__'))
+const customGameStartPayload = shallowRef(readCustomGameStartPayload('__missing__'))
 const nowMs = shallowRef(Date.now())
 const gameSocketStatus = shallowRef('idle')
 const gameSocketLastEvent = shallowRef('')
@@ -209,6 +212,17 @@ const playState = computed(() => {
       durationMs: practiceGameStartPayload.value.scenario.durationMs,
       scenario: practiceGameStartPayload.value.scenario,
       webSocketUrl: practiceGameStartPayload.value.webSocketUrl,
+    }
+  }
+
+  if (customGameStartPayload.value !== null) {
+    return {
+      mode: 'CUSTOM',
+      gameRoomId: customGameStartPayload.value.gameRoomId,
+      startAt: customGameStartPayload.value.startAt,
+      durationMs: customGameStartPayload.value.scenario.durationMs,
+      scenario: customGameStartPayload.value.scenario,
+      webSocketUrl: customGameStartPayload.value.webSocketUrl,
     }
   }
 
@@ -529,6 +543,7 @@ function resetPlayRuntimeForPractice() {
   disposeThreeScene()
   gameStartPayload.value = null
   gameWaitingPayload.value = null
+  customGameStartPayload.value = null
   gameSocketStatus.value = 'idle'
   gameSocketLastEvent.value = ''
   gameSocketErrorMessage.value = ''
@@ -554,6 +569,7 @@ function initializePlayFromStorage(gameRoomId = '') {
     gameStartPayload.value = payload
     gameWaitingPayload.value = waitingPayload
     practiceGameStartPayload.value = null
+    customGameStartPayload.value = null
     startPlayRuntime(gameRoomId, waitingPayload.game.webSocketUrl)
     return true
   }
@@ -564,7 +580,19 @@ function initializePlayFromStorage(gameRoomId = '') {
     gameStartPayload.value = null
     gameWaitingPayload.value = null
     practiceGameStartPayload.value = practicePayload
+    customGameStartPayload.value = null
     startPlayRuntime(gameRoomId, practicePayload.webSocketUrl)
+    return true
+  }
+
+  const customPayload = readCustomGameStartPayload(gameRoomId)
+
+  if (customPayload !== null) {
+    gameStartPayload.value = null
+    gameWaitingPayload.value = null
+    practiceGameStartPayload.value = null
+    customGameStartPayload.value = customPayload
+    startPlayRuntime(gameRoomId, customPayload.webSocketUrl)
     return true
   }
 
@@ -818,6 +846,10 @@ function syncAppliedActionsFromGameResult(payload = {}) {
 }
 
 function isOpponentUserId(userId = 0) {
+  if (playState.value?.mode === 'CUSTOM') {
+    return Number(customGameStartPayload.value?.opponentUserId) === Number(userId)
+  }
+
   const opponentUserId = Reflect.get(Object(gameWaitingPayload.value?.opponent), 'userId')
 
   return Number(opponentUserId) === Number(userId)

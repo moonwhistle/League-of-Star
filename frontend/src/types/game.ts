@@ -10,7 +10,7 @@ export type GameRecordResult = 'WIN' | 'LOSS' | 'DRAW'
 
 export type GameRecordSeriesType = 'RANK' | 'PLACEMENT' | 'PROMOTION'
 
-export type GameMode = 'MATCH' | 'PRACTICE'
+export type GameMode = 'MATCH' | 'PRACTICE' | 'CUSTOM'
 
 export type PracticeResult = 'SUCCESS' | 'FAILED'
 

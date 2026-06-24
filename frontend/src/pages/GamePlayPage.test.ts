@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { saveCustomGameStartPayload } from '@/services/customGameStartPayload'
 import { readGameResultPayload } from '@/services/gameResultPayload'
 import { buildGameStartPayloadKey, saveGameStartPayload } from '@/services/gameStartPayload'
 import { buildGameWaitingPayloadKey, saveGameWaitingPayload } from '@/services/gameWaitingPayload'
@@ -232,6 +233,26 @@ describe('GamePlayPage', () => {
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
+  it('reads the stored custom payload without a game waiting payload', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:05.000Z'))
+    saveValidCustomPayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-start-payload-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-waiting-payload-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-practice-payload-ready')).toBe('false')
+    expect(wrapper.get('main').attributes('data-game-custom-payload-ready')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-mode')).toBe('CUSTOM')
+    expect(wrapper.get('main').attributes('data-game-play-state-ready')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-room-id')).toBe('100')
+    expect(wrapper.get('main').attributes('data-game-websocket-url')).toBe('/ws/game/100')
+    expect(gameWebSocketMock.connect).toHaveBeenCalledWith('/ws/game/100', expect.any(Object))
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
   it('keeps the galaxy background only before the server startAt', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-01T00:00:05.000Z'))
@@ -370,6 +391,39 @@ describe('GamePlayPage', () => {
     expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('resultReceived')
     expect(wrapper.get('main').attributes('data-game-result-received')).toBe('true')
     expect(readGameResultPayload(100)?.winnerUserId).toBe(1)
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gameResult,
+      params: {
+        gameRoomId: '100',
+      },
+    })
+  })
+
+  it('stores custom GAME_RESULT and moves to the result route', async () => {
+    saveValidCustomPayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+    const handlers = getGameWebSocketHandlers()
+
+    handlers.onMessage?.(
+      {
+        type: 'GAME_RESULT',
+        payload: {
+          ...createGameResultPayload({
+            winnerUserId: 1,
+            result: 'PLAYER1_WIN',
+          }),
+          gameMode: 'CUSTOM',
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-mode')).toBe('CUSTOM')
+    expect(wrapper.get('main').attributes('data-game-socket-status')).toBe('resultReceived')
+    expect(readGameResultPayload(100)?.gameMode).toBe('CUSTOM')
     expect(routerReplaceMock).toHaveBeenCalledWith({
       name: ROUTE_NAMES.gameResult,
       params: {
@@ -1141,6 +1195,37 @@ describe('GamePlayPage', () => {
     )
   })
 
+  it('uses custom opponentUserId for opponent LIGHTNING impact', async () => {
+    saveValidCustomPayload()
+
+    const wrapper = mount(GamePlayPage)
+    await flushPromises()
+
+    getGameWebSocketHandlers().onMessage?.(
+      {
+        type: 'LIGHTNING_APPLIED',
+        payload: {
+          gameRoomId: 100,
+          userId: 2,
+          serverReceiveTime: Date.now(),
+          lightningTimeMs: 2000,
+          starCoreHpAtLightning: 8667,
+          damage: 1200,
+          afterHp: 7467,
+          isKill: false,
+          cooldownUntil: Date.now() + 2000,
+        },
+      },
+      new MessageEvent('message'),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('main').attributes('data-game-mode')).toBe('CUSTOM')
+    expect(wrapper.get('.lightning-impact').attributes('data-lightning-impact-owner')).toBe(
+      'opponent',
+    )
+  })
+
   it('waits for GAME_RESULT winnerUserId before treating a kill LIGHTNING as a result', async () => {
     saveValidPlayPayloads()
 
@@ -1384,6 +1469,36 @@ function saveValidPracticePayload(options: { startAt?: number } = {}): void {
         },
       ],
     },
+    receivedAt: '2026-06-01T00:00:00.000Z',
+  })
+}
+
+function saveValidCustomPayload(options: { startAt?: number } = {}): void {
+  const startAt = options.startAt ?? Date.now() - 2000
+
+  saveCustomGameStartPayload({
+    roomId: 10,
+    gameRoomId: 100,
+    gameMode: 'CUSTOM',
+    serverTime: Date.now() - 5000,
+    startAt,
+    webSocketUrl: '/ws/game/100',
+    scenario: {
+      starCoreMaxHp: 10000,
+      durationMs: 15000,
+      hpTimeline: [
+        {
+          timeMs: 0,
+          hp: 10000,
+        },
+        {
+          timeMs: 15000,
+          hp: 0,
+        },
+      ],
+    },
+    myUserId: 1,
+    opponentUserId: 2,
     receivedAt: '2026-06-01T00:00:00.000Z',
   })
 }
