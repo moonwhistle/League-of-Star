@@ -1,10 +1,12 @@
 package com.sang.leagueofstar.game.record.service;
 
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
+import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 
 public record GameRecordRankSettlementCommand(
         Long gameRoomId,
+        GameMode gameMode,
         GameResult result,
         Long winnerId
 ) {
@@ -15,6 +17,7 @@ public record GameRecordRankSettlementCommand(
     public static GameRecordRankSettlementCommand from(GameRoom gameRoom) {
         return new GameRecordRankSettlementCommand(
                 gameRoom.getId(),
+                gameRoom.getGameMode(),
                 gameRoom.getResult(),
                 gameRoom.getWinnerId()
         );

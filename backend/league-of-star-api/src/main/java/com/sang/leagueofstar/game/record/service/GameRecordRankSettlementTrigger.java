@@ -48,7 +48,9 @@ public class GameRecordRankSettlementTrigger {
     private void settleSafely(GameRecordRankSettlementCommand command) {
         try {
             gameRecordRankSettlementService.settleFinishedGameRoom(command.gameRoomId());
-            finishedGameMatchStatusCleanupService.cleanupIfSettled(command.gameRoomId());
+            if (command.gameMode().isMatch()) {
+                finishedGameMatchStatusCleanupService.cleanupIfSettled(command.gameRoomId());
+            }
         } catch (RuntimeException e) {
             log.warn(
                     "Failed to settle game record/rank: gameRoomId={}, result={}, winnerId={}, recordCount={}",

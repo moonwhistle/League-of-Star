@@ -168,4 +168,19 @@ class FinishedGameMatchStatusCleanupServiceTest {
         verify(gameRecordRankSettlementService, never()).countRecordsByGameRoomId(GAME_ROOM_ID);
         verify(matchUserStatusCommandService, never()).removeFinishedGameStatuses(USER_A_ID, USER_B_ID);
     }
+
+    @Test
+    @DisplayName("cleanupIfSettled - CUSTOM gameRoom이면 match status cleanup 대상으로 보지 않는다")
+    void cleanupIfSettled_CustomRoom_NoCleanup() {
+        // given
+        given(gameRoomReadService.getMode(GAME_ROOM_ID)).willReturn(GameMode.CUSTOM);
+
+        // when
+        cleanupService.cleanupIfSettled(GAME_ROOM_ID);
+
+        // then
+        verify(gameRoomReadService, never()).getStatus(GAME_ROOM_ID);
+        verify(gameRecordRankSettlementService, never()).countRecordsByGameRoomId(GAME_ROOM_ID);
+        verify(matchUserStatusCommandService, never()).removeFinishedGameStatuses(USER_A_ID, USER_B_ID);
+    }
 }

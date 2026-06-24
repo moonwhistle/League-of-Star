@@ -213,11 +213,11 @@ Custom Game record 저장 기준:
 
 ### 5. Match Status Cleanup / Summary 정리
 
-- [ ] match status cleanup은 `MATCH`에서만 실행되도록 수정.
-- [ ] `CUSTOM`은 matching 상태 cleanup을 시도하지 않음.
-- [ ] Summary API가 `CUSTOM` record 0개일 때 `PENDING`을 반환하는지 확인.
-- [ ] Summary API가 `CUSTOM` record 2개일 때 `DONE`을 반환하는지 확인.
-- [ ] Custom summary에서 LP 변화 0, rank before/after 동일 값이 내려가는지 확인.
+- [x] match status cleanup은 `MATCH`에서만 실행되도록 수정.
+- [x] `CUSTOM`은 matching 상태 cleanup을 시도하지 않음.
+- [x] Summary API가 `CUSTOM` record 0개일 때 `PENDING`을 반환하는지 확인.
+- [x] Summary API가 `CUSTOM` record 2개일 때 `DONE`을 반환하는지 확인.
+- [x] Custom summary에서 LP 변화 0, rank before/after 동일 값이 내려가는지 확인.
 
 ### 6. Test 구현
 

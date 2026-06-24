@@ -107,6 +107,20 @@ class GameRecordRankSettlementTriggerTest {
         verifyNoInteractions(gameRecordRankSettlementService, finishedGameMatchStatusCleanupService);
     }
 
+    @Test
+    @DisplayName("settleFinishedGameRoomAfterCommit - CUSTOM gameRoom이면 record 정산만 하고 match status cleanup은 요청하지 않는다")
+    void settleFinishedGameRoomAfterCommit_CustomRoom_SettleWithoutMatchStatusCleanup() {
+        // given
+        GameRoom gameRoom = finishedCustomGameRoom();
+
+        // when
+        trigger.settleFinishedGameRoomAfterCommit(gameRoom);
+
+        // then
+        verify(gameRecordRankSettlementService).settleFinishedGameRoom(GAME_ROOM_ID);
+        verify(finishedGameMatchStatusCleanupService, never()).cleanupIfSettled(GAME_ROOM_ID);
+    }
+
     private GameRoom finishedGameRoom() {
         GameRoom gameRoom = GameRoom.builder()
                 .id(GAME_ROOM_ID)
@@ -121,6 +135,15 @@ class GameRecordRankSettlementTriggerTest {
                 .gameMode(GameMode.PRACTICE)
                 .build();
         gameRoom.addParticipant(WINNER_ID);
+        gameRoom.finish(GameResult.PLAYER1_WIN, WINNER_ID);
+        return gameRoom;
+    }
+
+    private GameRoom finishedCustomGameRoom() {
+        GameRoom gameRoom = GameRoom.builder()
+                .id(GAME_ROOM_ID)
+                .gameMode(GameMode.CUSTOM)
+                .build();
         gameRoom.finish(GameResult.PLAYER1_WIN, WINNER_ID);
         return gameRoom;
     }

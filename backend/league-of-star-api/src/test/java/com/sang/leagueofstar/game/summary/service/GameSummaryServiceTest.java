@@ -216,6 +216,70 @@ class GameSummaryServiceTest {
     }
 
     @Test
+    @DisplayName("getSummary - CUSTOM record count 0이면 PENDING을 반환한다")
+    void getSummary_CustomRecordCountZero_ReturnPending() {
+        // given
+        given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(finishedCustomRoom(
+                GameResult.PLAYER1_WIN,
+                FIRST_USER_ID
+        ));
+        given(gameRecordReadService.countByGameRoomId(GAME_ID)).willReturn(0L);
+
+        // when
+        GameSummaryResponse response = gameSummaryService.getSummary(GAME_ID, FIRST_USER_ID);
+
+        // then
+        assertPending(response);
+        verify(gameRecordReadService, never()).findByGameRoomId(GAME_ID);
+        verify(userReadService, never()).findByIds(List.of(FIRST_USER_ID, SECOND_USER_ID));
+    }
+
+    @Test
+    @DisplayName("getSummary - CUSTOM record 2행이면 LP 변화 없는 DONE summary를 반환한다")
+    void getSummary_CustomSettled_ReturnDoneWithoutRankChange() {
+        // given
+        Rank firstRank = rank(Tier.GOLD, Division.IV);
+        Rank secondRank = rank(Tier.SILVER, Division.I);
+        given(gameRoomReadService.getSummaryReadModel(GAME_ID)).willReturn(finishedCustomRoom(
+                GameResult.PLAYER1_WIN,
+                FIRST_USER_ID
+        ));
+        given(gameRecordReadService.countByGameRoomId(GAME_ID)).willReturn(2L);
+        given(gameRecordReadService.findByGameRoomId(GAME_ID)).willReturn(List.of(
+                customRecord(FIRST_USER_ID, SECOND_USER_ID, GameRecordResult.WIN, 40, firstRank),
+                customRecord(SECOND_USER_ID, FIRST_USER_ID, GameRecordResult.LOSS, 61, secondRank)
+        ));
+        given(userReadService.findByIds(List.of(FIRST_USER_ID, SECOND_USER_ID))).willReturn(List.of(
+                user(FIRST_USER_ID, "moon"),
+                user(SECOND_USER_ID, "other")
+        ));
+
+        // when
+        GameSummaryDoneResponse response = (GameSummaryDoneResponse) gameSummaryService.getSummary(
+                GAME_ID,
+                FIRST_USER_ID
+        );
+
+        // then
+        assertThat(response.summaryStatus()).isEqualTo(GameSummaryStatus.DONE);
+        assertThat(response.gameResult()).isEqualTo(GameResult.PLAYER1_WIN);
+        assertThat(response.winnerUserId()).isEqualTo(FIRST_USER_ID);
+        assertThat(response.me().seriesType()).isEqualTo(GameRecordSeriesType.CUSTOM);
+        assertThat(response.me().rankSeriesId()).isNull();
+        assertThat(response.me().lpBefore()).isEqualTo(40);
+        assertThat(response.me().lpAfter()).isEqualTo(40);
+        assertThat(response.me().lpChange()).isZero();
+        assertThat(response.me().rankBefore()).isEqualTo("GOLD_IV");
+        assertThat(response.me().rankAfter()).isEqualTo("GOLD_IV");
+        assertThat(response.opponent().seriesType()).isEqualTo(GameRecordSeriesType.CUSTOM);
+        assertThat(response.opponent().lpBefore()).isEqualTo(61);
+        assertThat(response.opponent().lpAfter()).isEqualTo(61);
+        assertThat(response.opponent().lpChange()).isZero();
+        assertThat(response.opponent().rankBefore()).isEqualTo("SILVER_I");
+        assertThat(response.opponent().rankAfter()).isEqualTo("SILVER_I");
+    }
+
+    @Test
     @DisplayName("getSummary - record count 1이면 PENDING을 반환한다")
     void getSummary_RecordCountOne_ReturnPendingAndWarn(CapturedOutput output) {
         // given
@@ -421,6 +485,18 @@ class GameSummaryServiceTest {
         );
     }
 
+    private GameRoomSummaryReadModel finishedCustomRoom(GameResult result, Long winnerId) {
+        return new GameRoomSummaryReadModel(
+                GAME_ID,
+                GameMode.CUSTOM,
+                GameStatus.FINISHED,
+                result,
+                winnerId,
+                FINISHED_AT,
+                List.of(FIRST_USER_ID, SECOND_USER_ID)
+        );
+    }
+
     private GameRecord record(
             Long userId,
             Long opponentId,
@@ -441,6 +517,27 @@ class GameSummaryServiceTest {
                 lpAfter,
                 rankBefore,
                 rankAfter
+        );
+    }
+
+    private GameRecord customRecord(
+            Long userId,
+            Long opponentId,
+            GameRecordResult result,
+            int lp,
+            Rank rank
+    ) {
+        return GameRecord.create(
+                GAME_ID,
+                userId,
+                opponentId,
+                null,
+                GameRecordSeriesType.CUSTOM,
+                result,
+                lp,
+                lp,
+                rank,
+                rank
         );
     }
 
