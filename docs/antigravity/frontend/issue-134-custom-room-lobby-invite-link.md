@@ -227,12 +227,12 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 3. Custom Room Service / Type 구현
 
-- [ ] `CustomRoomResponse`, `CustomRoomListResponse`, `CustomRoomParticipant` type을 추가한다.
-- [ ] `getCustomRooms(signal?)`를 구현한다.
-- [ ] `createCustomRoom(signal?)`를 구현한다.
-- [ ] `getCustomRoom(roomId, signal?)`를 구현한다.
-- [ ] `getCustomRoomInvitePreview(inviteCode, signal?)`를 구현한다.
-- [ ] 새 외부 패키지를 추가하지 않는다.
+- [x] `CustomRoomResponse`, `CustomRoomListResponse`, `CustomRoomParticipant` type을 추가한다.
+- [x] `getCustomRooms(signal?)`를 구현한다.
+- [x] `createCustomRoom(signal?)`를 구현한다.
+- [x] `getCustomRoom(roomId, signal?)`를 구현한다.
+- [x] `getCustomRoomInvitePreview(inviteCode, signal?)`를 구현한다.
+- [x] 새 외부 패키지를 추가하지 않는다.
 
 ### 4. Route / MatchPage 연결
 
