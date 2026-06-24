@@ -190,10 +190,15 @@ const startAbortController = shallowRef<AbortController>()
 const profileAbortController = shallowRef<AbortController>()
 const roomSocketConnection = shallowRef<CustomRoomWebSocketConnection>()
 const expectedSocketClose = ref(false)
+const startFallbackUserId = shallowRef<number>()
 const routeRoomId = computed(() => String(route.params.roomId ?? '').trim())
-const canShowStartButton = computed(
-  () => room.value !== undefined && profile.value?.userId === room.value.ownerUserId,
+const isConfirmedNonOwner = computed(
+  () =>
+    room.value !== undefined &&
+    profile.value !== undefined &&
+    profile.value.userId !== room.value.ownerUserId,
 )
+const canShowStartButton = computed(() => room.value !== undefined && !isConfirmedNonOwner.value)
 const canStartCustomGame = computed(
   () =>
     canShowStartButton.value &&
@@ -279,6 +284,7 @@ async function loadRoom() {
   copyMessage.value = ''
   leaveErrorMessage.value = ''
   startErrorMessage.value = ''
+  startFallbackUserId.value = undefined
   socketErrorMessage.value = ''
   roomErrorMessage.value = ''
   startStatus.value = 'idle'
@@ -364,6 +370,7 @@ async function startRoom() {
   startErrorMessage.value = ''
 
   try {
+    startFallbackUserId.value = profile.value?.userId ?? room.value.ownerUserId
     await startCustomRoom(room.value.roomId, controller.signal)
 
     if (startAbortController.value !== controller) {
@@ -541,7 +548,7 @@ async function handleRoomStarted(payload = {}) {
 }
 
 function resolveCustomParticipantContext() {
-  const myUserId = profile.value?.userId
+  const myUserId = profile.value?.userId ?? startFallbackUserId.value
   const participants = room.value?.participants ?? []
 
   if (typeof myUserId !== 'number' || !Number.isFinite(myUserId)) {

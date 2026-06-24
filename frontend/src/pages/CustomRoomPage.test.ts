@@ -242,6 +242,24 @@ describe('CustomRoomPage', () => {
     expect(wrapper.find('[data-testid="custom-room-start-button"]').exists()).toBe(false)
   })
 
+  it('keeps the start button visible when profile loading fails and relies on backend start validation', async () => {
+    getMyProfileMock.mockRejectedValueOnce(new Error('profile unavailable'))
+
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onOpen?.(new Event('open'))
+    await flushPromises()
+
+    const startButton = wrapper.get('[data-testid="custom-room-start-button"]')
+    expect(startButton.text()).toContain('게임 시작')
+
+    await startButton.trigger('click')
+    await flushPromises()
+
+    expect(startCustomRoomMock).toHaveBeenCalledWith(100, expect.any(AbortSignal))
+  })
+
   it('keeps start disabled until two participants and websocket open are ready', async () => {
     getCustomRoomMock.mockResolvedValueOnce(
       createRoomResponse({
@@ -293,6 +311,39 @@ describe('CustomRoomPage', () => {
       },
     })
     expect(wrapper.get('main').attributes('data-custom-room-start-status')).toBe('started')
+  })
+
+  it('stores ROOM_STARTED payload with owner fallback after starting without profile data', async () => {
+    getMyProfileMock.mockRejectedValueOnce(new Error('profile unavailable'))
+
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onOpen?.(new Event('open'))
+    await flushPromises()
+
+    await wrapper.get('[data-testid="custom-room-start-button"]').trigger('click')
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onMessage?.(
+      {
+        type: 'ROOM_STARTED',
+        payload: createStartResponse(),
+      },
+      new MessageEvent('message', { data: '{}' }),
+    )
+    await flushPromises()
+
+    expect(readCustomGameStartPayload(200)).toMatchObject({
+      myUserId: 1,
+      opponentUserId: 2,
+    })
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: '200',
+      },
+    })
   })
 
   it('shows an error when ROOM_STARTED payload is invalid', async () => {
