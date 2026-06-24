@@ -176,14 +176,14 @@ Custom Room WebSocket server message에 `ROOM_STARTED`를 추가한다.
 
 ### 3. Core Custom Room Start 구현
 
-- [ ] `CustomGameRoomCommandService.startRoom(roomId, ownerUserId, startedAt)` 형태의 command 구현.
-- [ ] custom room을 `findByIdForUpdate`로 조회.
-- [ ] `WAITING` 상태 검증.
-- [ ] 요청자가 방장인지 검증.
-- [ ] participant가 정확히 2명인지 검증.
-- [ ] participant userId 목록을 안정적인 순서로 반환.
-- [ ] custom room을 `STARTED`로 전환.
-- [ ] API 모듈이 custom room repository를 직접 참조하지 않도록 유지.
+- [x] `CustomGameRoomCommandService.startRoom(roomId, ownerUserId, startedAt)` 형태의 command 구현.
+- [x] custom room을 `findByIdForUpdate`로 조회.
+- [x] `WAITING` 상태 검증.
+- [x] 요청자가 방장인지 검증.
+- [x] participant가 정확히 2명인지 검증.
+- [x] participant userId 목록을 안정적인 순서로 반환.
+- [x] custom room을 `STARTED`로 전환.
+- [x] API 모듈이 custom room repository를 직접 참조하지 않도록 유지.
 
 ### 4. Core GameRoom CUSTOM 구현
 
