@@ -218,12 +218,12 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 2. Backend Room Detail API 보강
 
-- [ ] `CustomGamePath`에 room detail path 상수를 추가한다.
-- [ ] `CustomGameRoomController`에 `GET /api/v1/custom-games/rooms/{roomId}`를 추가한다.
-- [ ] 기존 `CustomGameRoomService.getWaitingRoom(roomId)` 흐름을 재사용한다.
-- [ ] API 모듈에서 repository를 직접 참조하지 않는다.
-- [ ] RestDocs/OpenAPI 문서에 room detail API를 추가한다.
-- [ ] room not found / invalid state error 계약을 확인한다.
+- [x] `CustomGamePath`에 room detail path 상수를 추가한다.
+- [x] `CustomGameRoomController`에 `GET /api/v1/custom-games/rooms/{roomId}`를 추가한다.
+- [x] 기존 `CustomGameRoomService.getWaitingRoom(roomId)` 흐름을 재사용한다.
+- [x] API 모듈에서 repository를 직접 참조하지 않는다.
+- [x] RestDocs/OpenAPI 문서에 room detail API를 추가한다.
+- [x] room not found / invalid state error 계약을 확인한다.
 
 ### 3. Custom Room Service / Type 구현
 

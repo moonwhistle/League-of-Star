@@ -91,6 +91,58 @@ class CustomGameRoomControllerTest {
     }
 
     @Test
+    @DisplayName("getRoom - roomId로 room detail을 반환한다")
+    void getRoom() {
+        // given
+        when(customGameRoomService.getWaitingRoom(100L)).thenReturn(roomResponse());
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .when()
+                .get(CustomGamePath.CUSTOM_ROOM_BASE + "/100")
+                .then()
+                .statusCode(200)
+                .body("roomId", equalTo(100))
+                .body("roomName", equalTo("Host's room"))
+                .body("inviteCode", equalTo("AB12CD"))
+                .body("participants[0].nickname", equalTo("Host"));
+
+        verify(customGameRoomService).getWaitingRoom(100L);
+    }
+
+    @Test
+    @DisplayName("getRoom - room이 없으면 404를 반환한다")
+    void getRoom_NotFound() {
+        // given
+        when(customGameRoomService.getWaitingRoom(999L))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .when()
+                .get(CustomGamePath.CUSTOM_ROOM_BASE + "/999")
+                .then()
+                .statusCode(404)
+                .body("code", equalTo("CUSTOM_ROOM_006"));
+    }
+
+    @Test
+    @DisplayName("getRoom - room이 WAITING 상태가 아니면 400을 반환한다")
+    void getRoom_InvalidState() {
+        // given
+        when(customGameRoomService.getWaitingRoom(100L))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .when()
+                .get(CustomGamePath.CUSTOM_ROOM_BASE + "/100")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("CUSTOM_ROOM_002"));
+    }
+
+    @Test
     @DisplayName("getInvitePreview - 초대 코드로 room preview를 반환한다")
     void getInvitePreview() {
         // given

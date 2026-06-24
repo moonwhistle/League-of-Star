@@ -163,6 +163,69 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
     }
 
     @Test
+    @DisplayName("Custom Room detail API 문서화")
+    void getRoom() {
+        // given
+        when(customGameRoomService.getWaitingRoom(100L)).thenReturn(roomResponse());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .when()
+                .get(CustomGamePath.CUSTOM_ROOM_BASE + "/{roomId}", 100L)
+                .then()
+                .statusCode(200)
+                .apply(document("custom-room-detail",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 상세 조회")
+                                .description("""
+                                        roomId로 `WAITING` custom room 상태를 조회합니다.
+
+                                        이 API는 CustomRoomPage 새로고침/직접 진입 복구를 위한 조회 API입니다.
+                                        참가, 나가기, WebSocket 연결, 게임 시작 처리는 하지 않습니다.
+                                        실제 초대 공유 링크는 roomId가 아니라 inviteCode를 사용합니다.
+                                        """)
+                                .pathParameters(
+                                        parameterWithName("roomId").description("custom room ID")
+                                )
+                                .responseFields(roomResponseFields())
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Room detail not found 응답 문서화")
+    void getRoomNotFound() {
+        // given
+        when(customGameRoomService.getWaitingRoom(999L))
+                .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .when()
+                .get(CustomGamePath.CUSTOM_ROOM_BASE + "/{roomId}", 999L)
+                .then()
+                .statusCode(404)
+                .apply(document("custom-room-detail-not-found",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 방 상세 조회")
+                                .description("""
+                                        roomId로 `WAITING` custom room 상태를 조회합니다.
+
+                                        roomId에 해당하는 custom room이 없으면 전역 `ErrorResponse` 형식으로 응답합니다.
+                                        """)
+                                .pathParameters(
+                                        parameterWithName("roomId").description("custom room ID")
+                                )
+                                .responseFields(errorResponseFields("방 없음 응답에서는 null"))
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
     @DisplayName("Custom Room invite preview API 문서화")
     void getInvitePreview() {
         // given
