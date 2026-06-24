@@ -221,16 +221,16 @@ Custom Game record 저장 기준:
 
 ### 6. Test 구현
 
-- [ ] core unit test: `MATCH` 기존 rank 정산 + record 저장 유지.
-- [ ] core unit test: `CUSTOM` rank 정산 미호출 + record 2행 저장.
-- [ ] core unit test: `CUSTOM` record snapshot before/after 동일, `lpChange=0`, `seriesType=CUSTOM`.
-- [ ] core unit test: `PRACTICE` no-op 유지.
-- [ ] core repository/recovery test: `MATCH`, `CUSTOM` 누락 record 후보 조회.
-- [ ] api unit test: Custom LIGHTNING kill 결과 payload `gameMode=CUSTOM`.
-- [ ] api unit test: Custom 자연사 결과 payload `gameMode=CUSTOM`.
-- [ ] api unit test: Practice는 settlement trigger 미등록 유지.
-- [ ] api unit test: Custom은 match status cleanup 미실행.
-- [ ] summary service test: Custom `PENDING/DONE` 흐름 검증.
+- [x] core unit test: `MATCH` 기존 rank 정산 + record 저장 유지.
+- [x] core unit test: `CUSTOM` rank 정산 미호출 + record 2행 저장.
+- [x] core unit test: `CUSTOM` record snapshot before/after 동일, `lpChange=0`, `seriesType=CUSTOM`.
+- [x] core unit test: `PRACTICE` no-op 유지.
+- [x] core repository/recovery test: `MATCH`, `CUSTOM` 누락 record 후보 조회.
+- [x] api unit test: Custom LIGHTNING kill 결과 payload `gameMode=CUSTOM`.
+- [x] api unit test: Custom 자연사 결과 payload `gameMode=CUSTOM`.
+- [x] api unit test: Practice는 settlement trigger 미등록 유지.
+- [x] api unit test: Custom은 match status cleanup 미실행.
+- [x] summary service test: Custom `PENDING/DONE` 흐름 검증.
 
 ### 7. 문서 정합성 구현
 
