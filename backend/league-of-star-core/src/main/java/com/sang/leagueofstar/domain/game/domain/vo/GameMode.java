@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 public enum GameMode {
 
     MATCH("랭크 매치"),
-    PRACTICE("연습 모드");
+    PRACTICE("연습 모드"),
+    CUSTOM("사용자 지정 게임");
 
     private final String description;
 
@@ -18,5 +19,9 @@ public enum GameMode {
 
     public boolean isPractice() {
         return this == PRACTICE;
+    }
+
+    public boolean isCustom() {
+        return this == CUSTOM;
     }
 }

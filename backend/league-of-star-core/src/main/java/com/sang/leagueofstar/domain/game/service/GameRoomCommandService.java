@@ -57,6 +57,22 @@ public class GameRoomCommandService {
         return gameRoomRepository.save(gameRoom);
     }
 
+    public GameRoom createCustomRoom(Long firstUserId, Long secondUserId) {
+        validateParticipants(firstUserId, secondUserId);
+
+        int durationSeconds = createGameDurationSeconds();
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.CUSTOM)
+                .durationSeconds(durationSeconds)
+                .scenarioData(createScenario(durationSeconds))
+                .build();
+
+        gameRoom.addParticipant(firstUserId);
+        gameRoom.addParticipant(secondUserId);
+
+        return gameRoomRepository.save(gameRoom);
+    }
+
     /**
      * READY gameRoom을 중단합니다.
      *

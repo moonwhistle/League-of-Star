@@ -187,12 +187,12 @@ Custom Room WebSocket server message에 `ROOM_STARTED`를 추가한다.
 
 ### 4. Core GameRoom CUSTOM 구현
 
-- [ ] `GameMode.CUSTOM` 추가.
-- [ ] `GameRoom.isCustomMode()` 추가.
-- [ ] `GameRoomCommandService.createCustomRoom(firstUserId, secondUserId)` 구현.
-- [ ] custom game room은 참가자 2명, scenario, duration을 기존 match와 같은 방식으로 생성.
-- [ ] custom game room은 `gameMode=CUSTOM`으로 저장.
-- [ ] `startReadyRoomIfReady()`를 재사용해 `IN_PROGRESS` 전환.
+- [x] `GameMode.CUSTOM` 추가.
+- [x] `GameRoom.isCustomMode()` 추가.
+- [x] `GameRoomCommandService.createCustomRoom(firstUserId, secondUserId)` 구현.
+- [x] custom game room은 참가자 2명, scenario, duration을 기존 match와 같은 방식으로 생성.
+- [x] custom game room은 `gameMode=CUSTOM`으로 저장.
+- [x] `startReadyRoomIfReady()`를 재사용해 `IN_PROGRESS` 전환.
 
 ### 5. Custom Start API 구현
 

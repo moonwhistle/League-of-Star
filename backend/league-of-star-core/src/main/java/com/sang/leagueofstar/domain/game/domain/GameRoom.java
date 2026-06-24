@@ -111,6 +111,10 @@ public class GameRoom extends BaseEntity {
         return this.gameMode.isMatch();
     }
 
+    public boolean isCustomMode() {
+        return this.gameMode.isCustom();
+    }
+
     public void start(LocalDateTime startTime) {
         validateStart();
         this.gameStartTime = startTime;

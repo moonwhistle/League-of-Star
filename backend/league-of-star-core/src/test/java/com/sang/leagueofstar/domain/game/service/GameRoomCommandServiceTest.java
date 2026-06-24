@@ -118,6 +118,51 @@ class GameRoomCommandServiceTest {
     }
 
     @Test
+    @DisplayName("createCustomRoom - CUSTOM 상태의 게임룸과 참가자 2명을 저장한다")
+    void createCustomRoom_Success() {
+        // given
+        given(gameScenarioGenerator.generate(anyInt())).willReturn(SCENARIO);
+        given(gameRoomRepository.save(any(GameRoom.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        GameRoom result = gameRoomCommandService.createCustomRoom(FIRST_USER_ID, SECOND_USER_ID);
+
+        // then
+        ArgumentCaptor<GameRoom> gameRoomCaptor = ArgumentCaptor.forClass(GameRoom.class);
+        verify(gameRoomRepository, times(1)).save(gameRoomCaptor.capture());
+
+        GameRoom capturedGameRoom = gameRoomCaptor.getValue();
+        assertThat(result).isSameAs(capturedGameRoom);
+        assertThat(capturedGameRoom.getGameMode()).isEqualTo(GameMode.CUSTOM);
+        assertThat(capturedGameRoom.getStatus()).isEqualTo(GameStatus.READY);
+        assertThat(capturedGameRoom.isCustomMode()).isTrue();
+        assertThat(capturedGameRoom.getParticipants()).hasSize(GameRoom.MAX_PARTICIPANTS);
+        assertThat(capturedGameRoom.getParticipants())
+                .extracting(GameParticipant::getUserId)
+                .containsExactly(FIRST_USER_ID, SECOND_USER_ID);
+        assertThat(capturedGameRoom.getParticipants())
+                .extracting(GameParticipant::getStatus)
+                .containsExactly(ParticipantStatus.READY, ParticipantStatus.READY);
+    }
+
+    @Test
+    @DisplayName("createCustomRoom - 같은 유저로 게임룸을 생성할 수 없다")
+    void createCustomRoom_SameUser_ThrowException() {
+        assertThatThrownBy(() -> gameRoomCommandService.createCustomRoom(FIRST_USER_ID, FIRST_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
+    @DisplayName("createCustomRoom - 유저 ID가 null이면 게임룸을 생성할 수 없다")
+    void createCustomRoom_NullUser_ThrowException() {
+        assertThatThrownBy(() -> gameRoomCommandService.createCustomRoom(null, SECOND_USER_ID))
+                .isInstanceOfSatisfying(CoreException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.INVALID_GAME_PARTICIPANTS));
+    }
+
+    @Test
     @DisplayName("createReadyRoom - 랜덤 burst HP 시나리오를 생성한다")
     void createReadyRoom_CreateBurstScenario() {
         // given
