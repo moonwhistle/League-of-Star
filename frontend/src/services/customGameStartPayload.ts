@@ -88,9 +88,7 @@ export function buildCustomGameStartPayloadKey(gameRoomId: string | number): str
   return `${CUSTOM_GAME_START_PAYLOAD_KEY_PREFIX}${normalizeGameRoomId(gameRoomId)}`
 }
 
-function isStoredCustomGameStartPayload(
-  payload: unknown,
-): payload is StoredCustomGameStartPayload {
+function isStoredCustomGameStartPayload(payload: unknown): payload is StoredCustomGameStartPayload {
   return (
     isRecord(payload) &&
     isCustomGameStartResponse(payload) &&

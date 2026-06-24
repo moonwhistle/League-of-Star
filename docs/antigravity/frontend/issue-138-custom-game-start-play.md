@@ -183,116 +183,116 @@ Custom Game 결과는 기존 Game WebSocket `GAME_RESULT`로 확정된다.
 
 ### 1. Frontend Custom Game Contract 정리
 
-- [ ] backend issue-130 start API / `ROOM_STARTED` 계약을 재확인한다.
-- [ ] backend issue-132 `GAME_RESULT.gameMode=CUSTOM` / 전적 저장 / rank 제외 계약을 재확인한다.
-- [ ] HTTP start 응답은 command ack이고 route 이동 기준이 아님을 문서화한다.
-- [ ] `ROOM_STARTED`가 GamePlay 진입 source of truth임을 문서화한다.
-- [ ] Custom 결과는 GameResultPage를 사용하고 rank/LP 변화 UI를 숨긴다고 문서화한다.
+- [x] backend issue-130 start API / `ROOM_STARTED` 계약을 재확인한다.
+- [x] backend issue-132 `GAME_RESULT.gameMode=CUSTOM` / 전적 저장 / rank 제외 계약을 재확인한다.
+- [x] HTTP start 응답은 command ack이고 route 이동 기준이 아님을 문서화한다.
+- [x] `ROOM_STARTED`가 GamePlay 진입 source of truth임을 문서화한다.
+- [x] Custom 결과는 GameResultPage를 사용하고 rank/LP 변화 UI를 숨긴다고 문서화한다.
 
 ### 2. Custom Game Start Service / Type 구현
 
-- [ ] `CustomGameStartResponse` type을 추가한다.
-- [ ] `CustomRoomWebSocketServerMessage`에 `ROOM_STARTED` union을 추가한다.
-- [ ] `startCustomRoom(roomId, signal?)` service를 추가한다.
-- [ ] start service가 `POST /api/v1/custom-games/rooms/{roomId}/start`를 호출하도록 구현한다.
-- [ ] roomId를 `encodeURIComponent`로 처리한다.
+- [x] `CustomGameStartResponse` type을 추가한다.
+- [x] `CustomRoomWebSocketServerMessage`에 `ROOM_STARTED` union을 추가한다.
+- [x] `startCustomRoom(roomId, signal?)` service를 추가한다.
+- [x] start service가 `POST /api/v1/custom-games/rooms/{roomId}/start`를 호출하도록 구현한다.
+- [x] roomId를 `encodeURIComponent`로 처리한다.
 
 ### 3. Custom Game Start Payload Storage 구현
 
-- [ ] custom start payload 전용 sessionStorage key를 추가한다.
-- [ ] `ROOM_STARTED` payload validator를 구현한다.
-- [ ] `gameMode`가 `CUSTOM`인지 검증한다.
-- [ ] `gameRoomId`, `serverTime`, `startAt`, `webSocketUrl`, `scenario`를 검증한다.
-- [ ] 현재 사용자 id와 상대 사용자 id를 저장 payload에 포함한다.
-- [ ] 저장 payload에 `receivedAt`을 포함한다.
-- [ ] invalid payload는 저장하지 않고 error 상태로 처리한다.
+- [x] custom start payload 전용 sessionStorage key를 추가한다.
+- [x] `ROOM_STARTED` payload validator를 구현한다.
+- [x] `gameMode`가 `CUSTOM`인지 검증한다.
+- [x] `gameRoomId`, `serverTime`, `startAt`, `webSocketUrl`, `scenario`를 검증한다.
+- [x] 현재 사용자 id와 상대 사용자 id를 저장 payload에 포함한다.
+- [x] 저장 payload에 `receivedAt`을 포함한다.
+- [x] invalid payload는 저장하지 않고 error 상태로 처리한다.
 
 ### 4. CustomRoomPage Start UI 구현
 
-- [ ] CustomRoomPage에서 `getMyProfile()`로 현재 사용자 id를 조회한다.
-- [ ] `ownerUserId === profile.userId`일 때만 start 버튼을 표시한다.
-- [ ] 참가자 2명 미만이면 start 버튼을 비활성화한다.
-- [ ] room socket이 open 상태가 아니면 start 버튼을 비활성화한다.
-- [ ] start API 호출 중 버튼을 비활성화한다.
-- [ ] start 실패 시 backend error message를 표시한다.
-- [ ] HTTP start 성공 후에는 `ROOM_STARTED` 대기 상태를 표시하되 route 이동하지 않는다.
+- [x] CustomRoomPage에서 `getMyProfile()`로 현재 사용자 id를 조회한다.
+- [x] `ownerUserId === profile.userId`일 때만 start 버튼을 표시한다.
+- [x] 참가자 2명 미만이면 start 버튼을 비활성화한다.
+- [x] room socket이 open 상태가 아니면 start 버튼을 비활성화한다.
+- [x] start API 호출 중 버튼을 비활성화한다.
+- [x] start 실패 시 backend error message를 표시한다.
+- [x] HTTP start 성공 후에는 `ROOM_STARTED` 대기 상태를 표시하되 route 이동하지 않는다.
 
 ### 5. ROOM_STARTED Handoff 구현
 
-- [ ] CustomRoomPage에서 `ROOM_STARTED`를 처리한다.
-- [ ] `ROOM_STARTED` payload를 custom start storage에 저장한다.
-- [ ] 저장 성공 시 `league-of-star.currentCustomRoomId`를 제거한다.
-- [ ] Room WebSocket을 정상 종료 처리한다.
-- [ ] `/game/:gameRoomId/play`로 `router.replace` 이동한다.
-- [ ] route 이동 실패 시 error 상태를 표시한다.
+- [x] CustomRoomPage에서 `ROOM_STARTED`를 처리한다.
+- [x] `ROOM_STARTED` payload를 custom start storage에 저장한다.
+- [x] 저장 성공 시 `league-of-star.currentCustomRoomId`를 제거한다.
+- [x] Room WebSocket을 정상 종료 처리한다.
+- [x] `/game/:gameRoomId/play`로 `router.replace` 이동한다.
+- [x] route 이동 실패 시 error 상태를 표시한다.
 
 ### 6. GamePlayPage CUSTOM 연결
 
-- [ ] GamePlayPage에서 custom start payload를 읽는다.
-- [ ] `MATCH`, `PRACTICE`, `CUSTOM` 순서로 play state를 구성하되 route gameRoomId와 payload gameRoomId를 검증한다.
-- [ ] `CUSTOM` play state는 custom payload의 `scenario`, `startAt`, `webSocketUrl`을 사용한다.
-- [ ] 기존 countdown, Three.js scene, HP HUD, LIGHTNING 입력을 재사용한다.
-- [ ] 상대 lightning 판별은 custom payload의 `opponentUserId`를 사용한다.
-- [ ] custom payload가 없거나 invalid면 payload missing 상태로 둔다.
+- [x] GamePlayPage에서 custom start payload를 읽는다.
+- [x] `MATCH`, `PRACTICE`, `CUSTOM` 순서로 play state를 구성하되 route gameRoomId와 payload gameRoomId를 검증한다.
+- [x] `CUSTOM` play state는 custom payload의 `scenario`, `startAt`, `webSocketUrl`을 사용한다.
+- [x] 기존 countdown, Three.js scene, HP HUD, LIGHTNING 입력을 재사용한다.
+- [x] 상대 lightning 판별은 custom payload의 `opponentUserId`를 사용한다.
+- [x] custom payload가 없거나 invalid면 payload missing 상태로 둔다.
 
 ### 7. Custom Result 연결
 
-- [ ] `GameMode` type에 `CUSTOM`을 추가한다.
-- [ ] `gameResultPayload` validator가 `CUSTOM`을 허용하게 한다.
-- [ ] GamePlayPage에서 `GAME_RESULT.gameMode=CUSTOM` 수신 시 result payload를 저장한다.
-- [ ] Custom Game 결과는 GameResultPage로 이동한다.
-- [ ] GameResultPage가 Custom Game Summary API `PENDING/DONE` 흐름을 처리한다.
-- [ ] Custom Game일 때 rank/LP 변화 UI를 숨긴다.
-- [ ] Match 결과 화면의 기존 rank/LP UI는 유지한다.
-- [ ] Practice 결과 오버레이 흐름은 유지한다.
+- [x] `GameMode` type에 `CUSTOM`을 추가한다.
+- [x] `gameResultPayload` validator가 `CUSTOM`을 허용하게 한다.
+- [x] GamePlayPage에서 `GAME_RESULT.gameMode=CUSTOM` 수신 시 result payload를 저장한다.
+- [x] Custom Game 결과는 GameResultPage로 이동한다.
+- [x] GameResultPage가 Custom Game Summary API `PENDING/DONE` 흐름을 처리한다.
+- [x] Custom Game일 때 rank/LP 변화 UI를 숨긴다.
+- [x] Match 결과 화면의 기존 rank/LP UI는 유지한다.
+- [x] Practice 결과 오버레이 흐름은 유지한다.
 
 ### 8. UI / Locale 구현
 
-- [ ] start 버튼 문구를 추가한다.
-- [ ] 참가자 부족 문구를 추가한다.
-- [ ] start 요청 중 문구를 추가한다.
-- [ ] `ROOM_STARTED` 대기 문구를 추가한다.
-- [ ] start 실패 문구를 추가한다.
-- [ ] Custom 결과에서 rank 변화 없음 정책을 설명하는 문구를 추가한다.
-- [ ] 한/영 locale 모두 정리한다.
+- [x] start 버튼 문구를 추가한다.
+- [x] 참가자 부족 문구를 추가한다.
+- [x] start 요청 중 문구를 추가한다.
+- [x] `ROOM_STARTED` 대기 문구를 추가한다.
+- [x] start 실패 문구를 추가한다.
+- [x] Custom 결과에서 rank 변화 없음 정책을 설명하는 문구를 추가한다.
+- [x] 한/영 locale 모두 정리한다.
 
 ### 9. Test 구현
 
-- [ ] customRoomService start path 테스트를 추가한다.
-- [ ] customRoomWebSocket `ROOM_STARTED` parse 테스트를 추가한다.
-- [ ] custom start payload storage 저장/읽기/invalid 테스트를 추가한다.
-- [ ] CustomRoomPage 방장 start 버튼 표시/비표시 테스트를 추가한다.
-- [ ] 참가자 1명일 때 start 비활성화 테스트를 추가한다.
-- [ ] start HTTP 성공 후 route 이동하지 않는 테스트를 추가한다.
-- [ ] `ROOM_STARTED` 수신 후 payload 저장과 GamePlay 이동 테스트를 추가한다.
-- [ ] GamePlayPage custom payload play state 테스트를 추가한다.
-- [ ] `GAME_RESULT.gameMode=CUSTOM` 저장/이동 테스트를 추가한다.
-- [ ] GameResultPage custom 결과에서 rank/LP UI 숨김 테스트를 추가한다.
+- [x] customRoomService start path 테스트를 추가한다.
+- [x] customRoomWebSocket `ROOM_STARTED` parse 테스트를 추가한다.
+- [x] custom start payload storage 저장/읽기/invalid 테스트를 추가한다.
+- [x] CustomRoomPage 방장 start 버튼 표시/비표시 테스트를 추가한다.
+- [x] 참가자 1명일 때 start 비활성화 테스트를 추가한다.
+- [x] start HTTP 성공 후 route 이동하지 않는 테스트를 추가한다.
+- [x] `ROOM_STARTED` 수신 후 payload 저장과 GamePlay 이동 테스트를 추가한다.
+- [x] GamePlayPage custom payload play state 테스트를 추가한다.
+- [x] `GAME_RESULT.gameMode=CUSTOM` 저장/이동 테스트를 추가한다.
+- [x] GameResultPage custom 결과에서 rank/LP UI 숨김 테스트를 추가한다.
 
 ### 10. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 4-10의 결과 화면 정책을 GameResultPage 방향으로 수정한다.
-- [ ] `docs/last-구현.md` 4-10 세부 체크박스를 완료 처리한다.
-- [ ] `docs/last-구현.md` 하단 Section 4-10 체크를 완료 처리한다.
-- [ ] issue-130/132 backend 계약과 issue-138 frontend 문서가 일치하는지 확인한다.
-- [ ] issue-136 후속 범위가 issue-138에서 해소되는지 확인한다.
-- [ ] issue-138 Tasks 완료 상태를 반영한다.
-- [ ] issue-138 PR 섹션을 설계 중심으로 보강한다.
+- [x] `docs/last-구현.md` 4-10의 결과 화면 정책을 GameResultPage 방향으로 수정한다.
+- [x] `docs/last-구현.md` 4-10 세부 체크박스를 완료 처리한다.
+- [x] `docs/last-구현.md` 하단 Section 4-10 체크를 완료 처리한다.
+- [x] issue-130/132 backend 계약과 issue-138 frontend 문서가 일치하는지 확인한다.
+- [x] issue-136 후속 범위가 issue-138에서 해소되는지 확인한다.
+- [x] issue-138 Tasks 완료 상태를 반영한다.
+- [x] issue-138 PR 섹션을 설계 중심으로 보강한다.
 
 ### 11. 검증
 
-- [ ] `npm run test -- customRoomService customRoomWebSocket`을 통과시킨다.
-- [ ] `npm run test -- CustomRoomPage`를 통과시킨다.
-- [ ] `npm run test -- GamePlayPage`를 통과시킨다.
-- [ ] `npm run test -- GameResultPage`를 통과시킨다.
-- [ ] `npm run test -- CustomRoom`을 통과시킨다.
-- [ ] `npm run format`을 통과시킨다.
-- [ ] `npm run lint`를 통과시킨다.
-- [ ] `npm run typecheck`를 통과시킨다.
-- [ ] `npm run test`를 통과시킨다.
-- [ ] `npm run build`를 통과시킨다.
-- [ ] desktop `1440x900` UI overflow를 확인한다.
-- [ ] mobile `390x844` UI overflow를 확인한다.
+- [x] `npm run test -- customRoomService customRoomWebSocket`을 통과시킨다.
+- [x] `npm run test -- CustomRoomPage`를 통과시킨다.
+- [x] `npm run test -- GamePlayPage`를 통과시킨다.
+- [x] `npm run test -- GameResultPage`를 통과시킨다.
+- [x] `npm run test -- CustomRoom`을 통과시킨다.
+- [x] `npm run format`을 통과시킨다.
+- [x] `npm run lint`를 통과시킨다.
+- [x] `npm run typecheck`를 통과시킨다.
+- [x] `npm run test`를 통과시킨다.
+- [x] `npm run build`를 통과시킨다.
+- [x] desktop `1440x900` UI overflow는 Playwright 미설치로 screenshot 검증 대신 DOM/test/build 검증으로 대체한다.
+- [x] mobile `390x844` UI overflow는 Playwright 미설치로 screenshot 검증 대신 DOM/test/build 검증으로 대체한다.
 
 ## Implementation Policy
 
@@ -388,10 +388,10 @@ flowchart TD
   - `npm run format` 통과함.
   - `npm run lint` 통과함.
   - `npm run typecheck` 통과함.
-  - `npm run test` 통과함.
+  - `npm run test` 통과함. 35 files / 323 tests passed 확인함.
   - `npm run build` 통과함.
   - CustomRoomPage, GamePlayPage, GameResultPage 관련 targeted test 통과함.
-  - desktop/mobile UI overflow 확인 완료함.
+  - Playwright가 설치되어 있지 않아 desktop/mobile screenshot overflow 검증은 수행하지 못함. 새 패키지를 추가하지 않는 정책 때문에 DOM/test/build 검증으로 대체함.
 
 ## 📌 Related Issue
 
