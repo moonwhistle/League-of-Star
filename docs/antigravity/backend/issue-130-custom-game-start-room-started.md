@@ -196,13 +196,13 @@ Custom Room WebSocket server message에 `ROOM_STARTED`를 추가한다.
 
 ### 5. Custom Start API 구현
 
-- [ ] `CustomGamePath.START` 상수 추가.
-- [ ] `POST /api/v1/custom-games/rooms/{roomId}/start` controller 구현.
-- [ ] API service에서 core custom room start command와 core game room command를 조합.
-- [ ] `serverTime`, `startAt`, `webSocketUrl`, `scenario` 조립.
-- [ ] game end deadline 등록.
-- [ ] 실패 시 생성된 game room abort 정책 적용.
-- [ ] HTTP 응답 DTO는 command ack 용도로만 정의.
+- [x] `CustomGamePath.START` 상수 추가.
+- [x] `POST /api/v1/custom-games/rooms/{roomId}/start` controller 구현.
+- [x] API service에서 core custom room start command와 core game room command를 조합.
+- [x] `serverTime`, `startAt`, `webSocketUrl`, `scenario` 조립.
+- [x] game end deadline 등록.
+- [x] 실패 시 생성된 game room abort 정책 적용.
+- [x] HTTP 응답 DTO는 command ack 용도로만 정의.
 
 ### 6. ROOM_STARTED WebSocket 구현
 

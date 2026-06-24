@@ -3,11 +3,13 @@ package com.sang.leagueofstar.customgame.controller;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.common.path.customgame.CustomGamePath;
+import com.sang.leagueofstar.customgame.controller.response.CustomGameStartResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListItemResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomParticipantResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
 import com.sang.leagueofstar.customgame.service.CustomGameRoomService;
+import com.sang.leagueofstar.game.start.dto.GameStartScenarioPayload;
 import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.global.restdocs.RestDocsSupport;
 import io.restassured.http.ContentType;
@@ -350,6 +352,73 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
                 ));
     }
 
+    @Test
+    @DisplayName("Custom Game start API 문서화")
+    void startRoom() {
+        // given
+        when(customGameRoomService.startRoom(100L, USER_ID)).thenReturn(startResponse());
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/{roomId}/start", 100L)
+                .then()
+                .statusCode(200)
+                .apply(document("custom-game-start",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 게임 시작")
+                                .description("""
+                                        방장이 `WAITING` custom room을 custom game으로 시작합니다.
+
+                                        Custom Game은 정확히 2명일 때만 시작할 수 있습니다.
+                                        HTTP 200은 command ack이며, 프론트의 실제 play 이동 기준은
+                                        후속 `ROOM_STARTED` WebSocket event입니다.
+                                        """)
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .pathParameters(
+                                        parameterWithName("roomId").description("custom room ID")
+                                )
+                                .responseFields(startResponseFields())
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("Custom Game start incomplete participant 응답 문서화")
+    void startRoomIncompleteParticipants() {
+        // given
+        when(customGameRoomService.startRoom(100L, USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.INCOMPLETE_PARTICIPANTS));
+
+        // when & then
+        spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/{roomId}/start", 100L)
+                .then()
+                .statusCode(400)
+                .apply(document("custom-game-start-incomplete-participants",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Custom Game")
+                                .summary("사용자 지정 게임 시작 실패 - 참가자 부족")
+                                .description("Custom Game은 2인 비랭크 대전이므로 참가자가 정확히 2명일 때만 시작할 수 있습니다.")
+                                .requestHeaders(
+                                        headerWithName("Authorization").description("액세스 토큰 (Bearer)")
+                                )
+                                .pathParameters(
+                                        parameterWithName("roomId").description("custom room ID")
+                                )
+                                .responseFields(errorResponseFields("참가자 부족 응답에서는 null"))
+                                .build()
+                        )
+                ));
+    }
+
     private CustomRoomResponse roomResponse() {
         return new CustomRoomResponse(
                 100L,
@@ -389,6 +458,25 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
         );
     }
 
+    private CustomGameStartResponse startResponse() {
+        return new CustomGameStartResponse(
+                100L,
+                200L,
+                "CUSTOM",
+                1_000L,
+                5_000L,
+                "/ws/game/200",
+                new GameStartScenarioPayload(
+                        10000,
+                        12000L,
+                        List.of(
+                                new GameStartScenarioPayload.HpTimelineStep(0L, 10000),
+                                new GameStartScenarioPayload.HpTimelineStep(12000L, 0)
+                        )
+                )
+        );
+    }
+
     private org.springframework.restdocs.payload.FieldDescriptor[] roomResponseFields() {
         return new org.springframework.restdocs.payload.FieldDescriptor[]{
                 fieldWithPath("roomId").type(JsonFieldType.NUMBER).description("custom room ID"),
@@ -401,6 +489,23 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
                 fieldWithPath("participants[].userId").type(JsonFieldType.NUMBER).description("참가자 userId"),
                 fieldWithPath("participants[].nickname").type(JsonFieldType.STRING).description("참가자 닉네임"),
                 fieldWithPath("participants[].role").type(JsonFieldType.STRING).description("참가자 역할. `OWNER` 또는 `PLAYER`")
+        };
+    }
+
+    private org.springframework.restdocs.payload.FieldDescriptor[] startResponseFields() {
+        return new org.springframework.restdocs.payload.FieldDescriptor[]{
+                fieldWithPath("roomId").type(JsonFieldType.NUMBER).description("custom room ID"),
+                fieldWithPath("gameRoomId").type(JsonFieldType.NUMBER).description("생성된 game room ID"),
+                fieldWithPath("gameMode").type(JsonFieldType.STRING).description("게임 모드. Custom Game은 `CUSTOM`"),
+                fieldWithPath("serverTime").type(JsonFieldType.NUMBER).description("서버 기준 현재 시각 epoch millis"),
+                fieldWithPath("startAt").type(JsonFieldType.NUMBER).description("게임 시작 예정 시각 epoch millis"),
+                fieldWithPath("webSocketUrl").type(JsonFieldType.STRING).description("실제 플레이용 Game WebSocket URL"),
+                fieldWithPath("scenario").type(JsonFieldType.OBJECT).description("게임 HP scenario"),
+                fieldWithPath("scenario.starCoreMaxHp").type(JsonFieldType.NUMBER).description("별 core 최대 HP"),
+                fieldWithPath("scenario.durationMs").type(JsonFieldType.NUMBER).description("scenario 전체 길이 millis"),
+                fieldWithPath("scenario.hpTimeline[]").type(JsonFieldType.ARRAY).description("HP timeline"),
+                fieldWithPath("scenario.hpTimeline[].timeMs").type(JsonFieldType.NUMBER).description("timeline 시간 millis"),
+                fieldWithPath("scenario.hpTimeline[].hp").type(JsonFieldType.NUMBER).description("해당 시점 HP")
         };
     }
 

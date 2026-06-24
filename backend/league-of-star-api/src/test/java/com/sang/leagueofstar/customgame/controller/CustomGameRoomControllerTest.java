@@ -3,11 +3,13 @@ package com.sang.leagueofstar.customgame.controller;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.common.path.customgame.CustomGamePath;
+import com.sang.leagueofstar.customgame.controller.response.CustomGameStartResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListItemResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomParticipantResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
 import com.sang.leagueofstar.customgame.service.CustomGameRoomService;
+import com.sang.leagueofstar.game.start.dto.GameStartScenarioPayload;
 import com.sang.leagueofstar.global.exception.GlobalExceptionHandler;
 import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import io.restassured.module.mockmvc.RestAssuredMockMvc;
@@ -195,6 +197,45 @@ class CustomGameRoomControllerTest {
                 .body("code", equalTo("CUSTOM_ROOM_003"));
     }
 
+    @Test
+    @DisplayName("startRoom - 인증 방장 기준으로 custom game start ack를 반환한다")
+    void startRoom() {
+        // given
+        when(customGameRoomService.startRoom(100L, USER_ID)).thenReturn(startResponse());
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/100/start")
+                .then()
+                .statusCode(200)
+                .body("roomId", equalTo(100))
+                .body("gameRoomId", equalTo(200))
+                .body("gameMode", equalTo("CUSTOM"))
+                .body("webSocketUrl", equalTo("/ws/game/200"))
+                .body("scenario.starCoreMaxHp", equalTo(10000));
+
+        verify(customGameRoomService).startRoom(100L, USER_ID);
+    }
+
+    @Test
+    @DisplayName("startRoom - 참가자가 2명이 아니면 400을 반환한다")
+    void startRoom_IncompleteParticipants() {
+        // given
+        when(customGameRoomService.startRoom(100L, USER_ID))
+                .thenThrow(new CoreException(CoreErrorCode.INCOMPLETE_PARTICIPANTS));
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .when()
+                .post(CustomGamePath.CUSTOM_ROOM_BASE + "/100/start")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("GAME_003"));
+    }
+
     private CustomRoomResponse roomResponse() {
         return new CustomRoomResponse(
                 100L,
@@ -230,6 +271,22 @@ class CustomGameRoomControllerTest {
                 List.of(
                         new CustomRoomParticipantResponse(USER_ID, "Host", "OWNER"),
                         new CustomRoomParticipantResponse(2L, "Guest", "PLAYER")
+                )
+        );
+    }
+
+    private CustomGameStartResponse startResponse() {
+        return new CustomGameStartResponse(
+                100L,
+                200L,
+                "CUSTOM",
+                1_000L,
+                5_000L,
+                "/ws/game/200",
+                new GameStartScenarioPayload(
+                        10000,
+                        12000L,
+                        List.of(new GameStartScenarioPayload.HpTimelineStep(0L, 10000))
                 )
         );
     }

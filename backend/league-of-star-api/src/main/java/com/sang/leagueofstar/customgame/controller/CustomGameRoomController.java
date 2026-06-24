@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.customgame.controller;
 
 import com.sang.leagueofstar.common.path.customgame.CustomGamePath;
+import com.sang.leagueofstar.customgame.controller.response.CustomGameStartResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomListResponse;
 import com.sang.leagueofstar.customgame.controller.response.CustomRoomResponse;
 import com.sang.leagueofstar.customgame.service.CustomGameRoomService;
@@ -51,5 +52,13 @@ public class CustomGameRoomController {
             @AuthUser Long userId
     ) {
         return ResponseEntity.ok(customGameRoomService.leaveRoom(roomId, userId));
+    }
+
+    @PostMapping(CustomGamePath.START)
+    public ResponseEntity<CustomGameStartResponse> startRoom(
+            @PathVariable(CustomGamePath.ROOM_ID) Long roomId,
+            @AuthUser Long userId
+    ) {
+        return ResponseEntity.ok(customGameRoomService.startRoom(roomId, userId));
     }
 }
