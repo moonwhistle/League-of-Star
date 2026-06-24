@@ -31,3 +31,20 @@ export interface CustomRoomListItem {
 export interface CustomRoomListResponse {
   rooms: CustomRoomListItem[]
 }
+
+export type CustomRoomWebSocketServerMessage =
+  | {
+      type: 'ROOM_UPDATED'
+      payload: CustomRoomResponse
+    }
+  | {
+      type: 'ROOM_CLOSED'
+      payload: CustomRoomResponse
+    }
+  | {
+      type: 'ERROR'
+      payload: {
+        code: string
+        reason: string
+      }
+    }
