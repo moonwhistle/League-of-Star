@@ -142,7 +142,7 @@ class UserControllerRestDocsTest extends RestDocsSupport {
                                         fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
                                         fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
                                         fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
-                                        fieldWithPath("errors").type(JsonFieldType.NULL).description("필드 검증 에러 목록. 유저 없음 응답에서는 null")
+                                        fieldWithPath("errors").type(JsonFieldType.VARIES).description("필드 검증 에러 목록. 유저 없음 응답에서는 null")
                                 )
                                 .build()
                         )
@@ -235,7 +235,7 @@ class UserControllerRestDocsTest extends RestDocsSupport {
                                         fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
                                         fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
                                         fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
-                                        fieldWithPath("errors").type(JsonFieldType.NULL).description("필드 검증 에러 목록. 유저 없음 응답에서는 null")
+                                        fieldWithPath("errors").type(JsonFieldType.VARIES).description("필드 검증 에러 목록. 유저 없음 응답에서는 null")
                                 )
                                 .build()
                         )
@@ -273,7 +273,7 @@ class UserControllerRestDocsTest extends RestDocsSupport {
                                         fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
                                         fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
                                         fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
-                                        fieldWithPath("errors").type(JsonFieldType.NULL).description("필드 검증 에러 목록. 랭크 없음 응답에서는 null")
+                                        fieldWithPath("errors").type(JsonFieldType.VARIES).description("필드 검증 에러 목록. 랭크 없음 응답에서는 null")
                                 )
                                 .build()
                         )
@@ -448,7 +448,7 @@ class UserControllerRestDocsTest extends RestDocsSupport {
                                         fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
                                         fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
                                         fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
-                                        fieldWithPath("errors").type(JsonFieldType.NULL).description("필드 검증 에러 목록. 유저 없음 응답에서는 null")
+                                        fieldWithPath("errors").type(JsonFieldType.VARIES).description("필드 검증 에러 목록. 유저 없음 응답에서는 null")
                                 )
                                 .build()
                         )

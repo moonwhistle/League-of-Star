@@ -368,6 +368,7 @@ flowchart TD
 - DDL 변경 없음.
 - 새 패키지 추가 없음.
 - `./gradlew build` 실행으로 OpenAPI 산출물 `openapi3.yaml`이 재생성됨.
+- Qodo 리뷰로 확인된 OpenAPI `ErrorResponse.errors` required/properties 불일치를 RestDocs descriptor 기준으로 수정함.
 - 검증 결과:
   - `./gradlew :league-of-star-core:test --tests '*GameRecord*'` 통과함.
   - `./gradlew :league-of-star-api:test --tests '*GameLightningServiceTest' --tests '*GameEndSettlementServiceTest' --tests '*GameRecord*' --tests '*GameSummary*'` 통과함.

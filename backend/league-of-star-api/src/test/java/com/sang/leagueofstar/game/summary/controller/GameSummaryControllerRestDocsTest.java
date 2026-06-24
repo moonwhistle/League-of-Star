@@ -271,7 +271,7 @@ class GameSummaryControllerRestDocsTest extends RestDocsSupport {
                                 fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
                                 fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
                                 fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
-                                fieldWithPath("errors").type(JsonFieldType.NULL)
+                                fieldWithPath("errors").type(JsonFieldType.VARIES)
                                         .description("필드 검증 에러 목록. summary 조회 실패에서는 null")
                         )
                         .build()
