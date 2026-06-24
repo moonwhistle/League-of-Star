@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useLocale } from '@/composables/useLocale'
@@ -137,9 +137,13 @@ const inviteLink = computed(() => {
   return `${window.location.origin}/custom-games/join/${encodeURIComponent(inviteCode)}`
 })
 
-onMounted(() => {
-  void loadRoom()
-})
+watch(
+  routeRoomId,
+  () => {
+    void loadRoom()
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   abortRoomRequest()

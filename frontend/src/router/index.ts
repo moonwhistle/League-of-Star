@@ -63,6 +63,14 @@ export const router = createRouter({
       },
     },
     {
+      path: ROUTE_PATHS.customRoomInvite,
+      name: ROUTE_NAMES.customRoomInvite,
+      component: () => import('@/pages/CustomRoomsPage.vue'),
+      meta: {
+        requiresAuth: true,
+      },
+    },
+    {
       path: ROUTE_PATHS.gameWaiting,
       name: ROUTE_NAMES.gameWaiting,
       component: () => import('@/pages/GameWaitingPage.vue'),

@@ -317,6 +317,7 @@ GET /api/v1/custom-games/rooms/{roomId}
 - roomId는 내부 route/detail 조회에 사용한다.
 - 외부 공유 링크는 inviteCode를 사용한다.
 - 초대 링크를 복사할 수 있게 하되, 초대 링크 route의 실제 참가 처리는 후속 이슈로 둔다.
+- 초대 링크 route는 SPA에서 깨지지 않게 preview만 수행하고, join API는 호출하지 않는다.
 - HTTP 응답을 WebSocket 이벤트처럼 해석하지 않는다.
 - 실시간 참가자 목록 변경은 이번 이슈에서 자동 반영하지 않는다.
 - 수동 새로고침은 room detail API를 다시 호출한다.
@@ -387,6 +388,9 @@ flowchart TD
 
 - 초대 링크는 inviteCode 기준으로 생성함.
   roomId는 내부 상세 route와 API 조회에만 사용한다. 외부에 공유되는 링크는 inviteCode를 사용해야 방 식별 정책이 일관되고, 후속 초대 참가 이슈에서 그대로 join 흐름으로 이어갈 수 있음.
+
+- 초대 링크가 SPA 안에서 깨지지 않게 preview route를 추가함.
+  `/custom-games/join/:inviteCode`는 이름만 join route지만 이번 PR에서는 참가 API를 호출하지 않는다. 링크로 들어오면 초대 코드 preview API로 방을 확인한 뒤 상세 화면으로 이동한다. 이렇게 해야 복사한 링크가 404가 되지 않으면서도, 실제 참가 등록은 후속 4-9 정책으로 남길 수 있음.
 
 - WebSocket을 일부러 연결하지 않음.
   이번 화면은 “방을 확인하는 단계”다. 실시간 참가자 변경, 퇴장, 시작 이벤트를 받기 시작하면 join/leave/start 정책까지 같이 들어와야 한다. 그래서 이번 PR은 HTTP 조회 기반으로 두고, Room WebSocket은 후속 이슈에서 참가 처리와 함께 연결함.

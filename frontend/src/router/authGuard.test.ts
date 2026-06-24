@@ -23,6 +23,7 @@ const protectedRouteNames = [
   ROUTE_NAMES.profile,
   ROUTE_NAMES.customRooms,
   ROUTE_NAMES.customRoom,
+  ROUTE_NAMES.customRoomInvite,
   ROUTE_NAMES.gameWaiting,
   ROUTE_NAMES.gamePlay,
   ROUTE_NAMES.gameResult,
