@@ -4,8 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
-import { getCustomRoom } from '@/services/customRoomService'
-import type { CustomRoomResponse } from '@/types/customRoom'
+import { getCustomRoom, leaveCustomRoom } from '@/services/customRoomService'
+import { connectCustomRoomWebSocket } from '@/services/realtime/customRoomWebSocket'
+import type { CustomRoomResponse, CustomRoomWebSocketServerMessage } from '@/types/customRoom'
 
 import CustomRoomPage from './CustomRoomPage.vue'
 
@@ -15,6 +16,18 @@ const routeMock = vi.hoisted(() => ({
   },
 }))
 const routerPushMock = vi.hoisted(() => vi.fn())
+const customRoomSocketMock = vi.hoisted(() => ({
+  handlers: undefined as
+    | {
+        onOpen?: (event: Event) => void
+        onMessage?: (message: CustomRoomWebSocketServerMessage, event: MessageEvent<string>) => void
+        onError?: (error: Event | unknown) => void
+        onClose?: (event: CloseEvent) => void
+      }
+    | undefined,
+  close: vi.fn(),
+  socket: new EventTarget() as WebSocket,
+}))
 
 vi.mock('vue-router', () => ({
   useRoute: () => routeMock,
@@ -25,9 +38,16 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/services/customRoomService', () => ({
   getCustomRoom: vi.fn(),
+  leaveCustomRoom: vi.fn(),
+}))
+
+vi.mock('@/services/realtime/customRoomWebSocket', () => ({
+  connectCustomRoomWebSocket: vi.fn(),
 }))
 
 const getCustomRoomMock = vi.mocked(getCustomRoom)
+const leaveCustomRoomMock = vi.mocked(leaveCustomRoom)
+const connectCustomRoomWebSocketMock = vi.mocked(connectCustomRoomWebSocket)
 const { setLocale } = useLocale()
 
 describe('CustomRoomPage', () => {
@@ -37,6 +57,17 @@ describe('CustomRoomPage', () => {
     routeMock.params.roomId = '100'
     routerPushMock.mockResolvedValue(undefined)
     getCustomRoomMock.mockResolvedValue(createRoomResponse())
+    leaveCustomRoomMock.mockResolvedValue(createRoomResponse())
+    customRoomSocketMock.handlers = undefined
+    customRoomSocketMock.close.mockClear()
+    connectCustomRoomWebSocketMock.mockImplementation((_roomId, handlers) => {
+      customRoomSocketMock.handlers = handlers
+      return {
+        socket: customRoomSocketMock.socket,
+        setHandlers: vi.fn(),
+        close: customRoomSocketMock.close,
+      }
+    })
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: {
@@ -65,6 +96,7 @@ describe('CustomRoomPage', () => {
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).toContain('Guest')
     expect(wrapper.text()).toContain('방장')
+    expect(connectCustomRoomWebSocketMock).toHaveBeenCalledWith(100, expect.any(Object))
   })
 
   it('builds and copies invite links from inviteCode', async () => {
@@ -132,9 +164,99 @@ describe('CustomRoomPage', () => {
 
     expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.customRooms })
   })
+
+  it('updates room participants from ROOM_UPDATED messages', async () => {
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onMessage?.(
+      {
+        type: 'ROOM_UPDATED',
+        payload: createRoomResponse({
+          participants: [
+            {
+              userId: 1,
+              nickname: 'Host',
+              role: 'OWNER',
+            },
+          ],
+        }),
+      },
+      new MessageEvent('message', { data: '{}' }),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-custom-room-participant-count')).toBe('1')
+    expect(wrapper.text()).toContain('Host')
+    expect(wrapper.text()).not.toContain('Guest')
+  })
+
+  it('shows closed state from ROOM_CLOSED without calling leave API', async () => {
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onMessage?.(
+      {
+        type: 'ROOM_CLOSED',
+        payload: createRoomResponse({
+          status: 'CLOSED',
+          participants: [],
+        }),
+      },
+      new MessageEvent('message', { data: '{}' }),
+    )
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-custom-room-status')).toBe('closed')
+    expect(wrapper.text()).toContain('방이 닫혔습니다.')
+    expect(leaveCustomRoomMock).not.toHaveBeenCalled()
+
+    await wrapper.get('.custom-room-state--closed button').trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
+  it('leaves the room by HTTP command and moves to public rooms', async () => {
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="custom-room-leave-button"]').trigger('click')
+    await flushPromises()
+
+    expect(leaveCustomRoomMock).toHaveBeenCalledWith(100, expect.any(AbortSignal))
+    expect(customRoomSocketMock.close).toHaveBeenCalledWith(1000, 'custom room page closed')
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.customRooms })
+  })
+
+  it('renders leave failures without moving route', async () => {
+    leaveCustomRoomMock.mockRejectedValueOnce(
+      new ApiClientError(400, { message: '참가자가 아닙니다.' }),
+    )
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="custom-room-leave-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-custom-room-leave-status')).toBe('error')
+    expect(wrapper.text()).toContain('참가자가 아닙니다.')
+    expect(routerPushMock).not.toHaveBeenCalledWith({ name: ROUTE_NAMES.customRooms })
+  })
+
+  it('shows socket errors without calling leave API', async () => {
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onError?.(new Error('socket failed'))
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('error')
+    expect(wrapper.text()).toContain('socket failed')
+    expect(leaveCustomRoomMock).not.toHaveBeenCalled()
+  })
 })
 
-function createRoomResponse(): CustomRoomResponse {
+function createRoomResponse(overrides: Partial<CustomRoomResponse> = {}): CustomRoomResponse {
   return {
     roomId: 100,
     roomName: "Host's room",
@@ -154,5 +276,6 @@ function createRoomResponse(): CustomRoomResponse {
         role: 'PLAYER',
       },
     ],
+    ...overrides,
   }
 }
