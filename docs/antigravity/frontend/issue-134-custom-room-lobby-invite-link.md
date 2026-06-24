@@ -257,14 +257,14 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 6. CustomRoomPage 구현
 
-- [ ] route `roomId`로 room detail API를 호출한다.
-- [ ] 방 이름, 상태, 현재 인원, 최대 인원을 표시한다.
-- [ ] 참가자 목록과 방장 badge를 표시한다.
-- [ ] `inviteCode` 기반 초대 링크를 생성한다.
-- [ ] 초대 링크 복사 버튼을 구현한다.
-- [ ] clipboard 실패 시 fallback error message를 표시한다.
-- [ ] WebSocket이 없으므로 수동 새로고침 버튼을 제공한다.
-- [ ] 공개 대기실 복귀 액션을 제공한다.
+- [x] route `roomId`로 room detail API를 호출한다.
+- [x] 방 이름, 상태, 현재 인원, 최대 인원을 표시한다.
+- [x] 참가자 목록과 방장 badge를 표시한다.
+- [x] `inviteCode` 기반 초대 링크를 생성한다.
+- [x] 초대 링크 복사 버튼을 구현한다.
+- [x] clipboard 실패 시 fallback error message를 표시한다.
+- [x] WebSocket이 없으므로 수동 새로고침 버튼을 제공한다.
+- [x] 공개 대기실 복귀 액션을 제공한다.
 
 ### 7. UI / Locale 구현
 
