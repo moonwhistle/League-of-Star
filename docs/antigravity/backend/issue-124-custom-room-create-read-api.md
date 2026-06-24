@@ -367,6 +367,7 @@ GET /api/v1/custom-games/rooms/invites/{inviteCode}
 - 공개 room list API는 모든 `WAITING` custom room을 노출한다.
 - roomName은 저장하지 않고 owner nickname 기준으로 응답에서 만든다.
 - invite preview API는 참가 처리를 하지 않는다.
+- 후속 참가 UI에서는 preview/detail을 염탐 화면으로 쓰지 않고, 방 선택을 join command로 연결한다.
 - inviteCode는 roomId 노출을 피하기 위한 public join key다.
 - 방장은 `WAITING` custom room을 1개만 가질 수 있다.
 - 방장별 `WAITING` room 중복 생성은 DB unique 제약으로 최종 방어한다.

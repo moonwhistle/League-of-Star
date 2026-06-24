@@ -6,6 +6,8 @@ import {
   getCustomRoom,
   getCustomRoomInvitePreview,
   getCustomRooms,
+  joinCustomRoom,
+  leaveCustomRoom,
 } from './customRoomService'
 
 vi.mock('./apiClient', () => ({
@@ -58,7 +60,7 @@ describe('customRoomService', () => {
     })
   })
 
-  it('requests custom room detail by roomId without authentication', async () => {
+  it('requests custom room detail by roomId with authentication', async () => {
     const abortController = new AbortController()
     const response = createRoomResponse()
     requestJsonMock.mockResolvedValue(response)
@@ -68,7 +70,6 @@ describe('customRoomService', () => {
     expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/custom-games/rooms/100', {
       method: 'GET',
       signal: abortController.signal,
-      auth: false,
     })
   })
 
@@ -80,7 +81,6 @@ describe('customRoomService', () => {
     expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/custom-games/rooms/room%2Fwith%20space', {
       method: 'GET',
       signal: undefined,
-      auth: false,
     })
   })
 
@@ -99,6 +99,37 @@ describe('customRoomService', () => {
         method: 'GET',
         signal: abortController.signal,
         auth: false,
+      },
+    )
+  })
+
+  it('joins a custom room by encoded inviteCode with authentication', async () => {
+    const abortController = new AbortController()
+    const response = createRoomResponse()
+    requestJsonMock.mockResolvedValue(response)
+
+    await expect(joinCustomRoom('AB/12 CD', abortController.signal)).resolves.toEqual(response)
+
+    expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/custom-games/rooms/AB%2F12%20CD/join', {
+      method: 'POST',
+      signal: abortController.signal,
+    })
+  })
+
+  it('leaves a custom room by encoded roomId with authentication', async () => {
+    const abortController = new AbortController()
+    const response = createRoomResponse()
+    requestJsonMock.mockResolvedValue(response)
+
+    await expect(leaveCustomRoom('room/with space', abortController.signal)).resolves.toEqual(
+      response,
+    )
+
+    expect(requestJsonMock).toHaveBeenCalledWith(
+      '/api/v1/custom-games/rooms/room%2Fwith%20space/leave',
+      {
+        method: 'POST',
+        signal: abortController.signal,
       },
     )
   })

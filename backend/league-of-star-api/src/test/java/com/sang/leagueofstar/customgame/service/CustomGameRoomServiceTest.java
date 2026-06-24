@@ -13,6 +13,7 @@ import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRole;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomCommandService;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomReadService;
+import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomJoinResult;
 import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomStartResult;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
 import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
@@ -200,13 +201,14 @@ class CustomGameRoomServiceTest {
                 .willReturn(List.of(user(OWNER_USER_ID, "Host"), user(PLAYER_USER_ID, "Guest")));
 
         // when
-        CustomRoomResponse response = customGameRoomService.getWaitingRoom(100L);
+        CustomRoomResponse response = customGameRoomService.getWaitingRoom(100L, PLAYER_USER_ID);
 
         // then
         assertThat(response.roomId()).isEqualTo(100L);
         assertThat(response.roomName()).isEqualTo("Host's room");
         assertThat(response.participants()).extracting("nickname")
                 .containsExactly("Host", "Guest");
+        then(customGameRoomReadService).should().validateWaitingParticipant(100L, PLAYER_USER_ID);
         then(customGameRoomReadService).should().getWaitingRoom(100L);
         then(customGameRoomReadService).should().getParticipants(100L);
     }
@@ -216,7 +218,8 @@ class CustomGameRoomServiceTest {
     void joinRoom_ReturnRoomResponse() {
         // given
         CustomGameRoom room = room(100L, OWNER_USER_ID, "AB12CD");
-        given(customGameRoomCommandService.joinRoom("AB12CD", PLAYER_USER_ID)).willReturn(room);
+        given(customGameRoomCommandService.joinRoom("AB12CD", PLAYER_USER_ID))
+                .willReturn(new CustomGameRoomJoinResult(room, List.of()));
         given(customGameRoomReadService.getParticipants(100L)).willReturn(List.of(
                 participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
                 participant(100L, PLAYER_USER_ID, CustomRoomParticipantRole.PLAYER)
@@ -240,6 +243,68 @@ class CustomGameRoomServiceTest {
         then(userReadService).should(times(1)).findAllByIdsOrThrow(anyCollection());
         then(userReadService).should(never()).findById(OWNER_USER_ID);
         then(userReadService).should(never()).findById(PLAYER_USER_ID);
+    }
+
+    @Test
+    @DisplayName("joinRoom - 기존 참가 room이 있으면 기존 room event를 예약한 뒤 새 room update를 예약한다")
+    void joinRoom_DepartedRoom_NotifyOldAndNewRooms() {
+        // given
+        CustomGameRoom departedRoom = room(99L, 3L, "OLD123");
+        CustomGameRoom joinedRoom = room(100L, OWNER_USER_ID, "AB12CD");
+        given(customGameRoomCommandService.joinRoom("AB12CD", PLAYER_USER_ID))
+                .willReturn(new CustomGameRoomJoinResult(joinedRoom, List.of(departedRoom)));
+        given(customGameRoomReadService.getParticipants(99L)).willReturn(List.of(
+                participant(99L, 3L, CustomRoomParticipantRole.OWNER)
+        ));
+        given(customGameRoomReadService.getParticipants(100L)).willReturn(List.of(
+                participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
+                participant(100L, PLAYER_USER_ID, CustomRoomParticipantRole.PLAYER)
+        ));
+        given(userReadService.findAllByIdsOrThrow(anyCollection()))
+                .willReturn(List.of(user(3L, "OldHost")))
+                .willReturn(List.of(user(OWNER_USER_ID, "Host"), user(PLAYER_USER_ID, "Guest")));
+
+        // when
+        CustomRoomResponse response = customGameRoomService.joinRoom("AB12CD", PLAYER_USER_ID);
+
+        // then
+        assertThat(response.roomId()).isEqualTo(100L);
+        ArgumentCaptor<CustomRoomResponse> departedResponseCaptor =
+                ArgumentCaptor.forClass(CustomRoomResponse.class);
+        then(customRoomWebSocketNotifier).should()
+                .notifyParticipantLeftAfterCommit(departedResponseCaptor.capture(), org.mockito.ArgumentMatchers.eq(PLAYER_USER_ID));
+        assertThat(departedResponseCaptor.getValue().roomId()).isEqualTo(99L);
+        then(customRoomWebSocketNotifier).should().notifyRoomUpdatedAfterCommit(response);
+    }
+
+    @Test
+    @DisplayName("joinRoom - 기존 방장이 이동해 room이 닫히면 ROOM_CLOSED를 예약한다")
+    void joinRoom_DepartedOwnerRoom_NotifyClosedRoom() {
+        // given
+        CustomGameRoom departedRoom = room(99L, PLAYER_USER_ID, "OLD123");
+        departedRoom.close(LocalDateTime.now());
+        CustomGameRoom joinedRoom = room(100L, OWNER_USER_ID, "AB12CD");
+        given(customGameRoomCommandService.joinRoom("AB12CD", PLAYER_USER_ID))
+                .willReturn(new CustomGameRoomJoinResult(joinedRoom, List.of(departedRoom)));
+        given(customGameRoomReadService.getParticipants(99L)).willReturn(List.of());
+        given(customGameRoomReadService.getParticipants(100L)).willReturn(List.of(
+                participant(100L, OWNER_USER_ID, CustomRoomParticipantRole.OWNER),
+                participant(100L, PLAYER_USER_ID, CustomRoomParticipantRole.PLAYER)
+        ));
+        given(userReadService.findAllByIdsOrThrow(anyCollection()))
+                .willReturn(List.of(user(PLAYER_USER_ID, "Guest")))
+                .willReturn(List.of(user(OWNER_USER_ID, "Host"), user(PLAYER_USER_ID, "Guest")));
+
+        // when
+        CustomRoomResponse response = customGameRoomService.joinRoom("AB12CD", PLAYER_USER_ID);
+
+        // then
+        ArgumentCaptor<CustomRoomResponse> departedResponseCaptor =
+                ArgumentCaptor.forClass(CustomRoomResponse.class);
+        then(customRoomWebSocketNotifier).should().notifyRoomClosedAfterCommit(departedResponseCaptor.capture());
+        assertThat(departedResponseCaptor.getValue().roomId()).isEqualTo(99L);
+        assertThat(departedResponseCaptor.getValue().status()).isEqualTo("CLOSED");
+        then(customRoomWebSocketNotifier).should().notifyRoomUpdatedAfterCommit(response);
     }
 
     @Test

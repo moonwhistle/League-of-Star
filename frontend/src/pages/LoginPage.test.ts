@@ -121,6 +121,48 @@ describe('LoginPage', () => {
     expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
   })
 
+  it('moves to a safe internal redirect path after login success', async () => {
+    routeQueryMock.value = {
+      redirect: '/custom-games/join/AB12CD',
+    }
+    loginMock.mockResolvedValue({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      userId: 1,
+      nickname: 'starcaster',
+    })
+
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('#login-email').setValue('test@example.com')
+    await wrapper.get('#login-password').setValue('password123')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(routerPushMock).toHaveBeenCalledWith('/custom-games/join/AB12CD')
+  })
+
+  it('ignores unsafe external redirect paths after login success', async () => {
+    routeQueryMock.value = {
+      redirect: 'https://example.test/custom-games/join/AB12CD',
+    }
+    loginMock.mockResolvedValue({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      userId: 1,
+      nickname: 'starcaster',
+    })
+
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('#login-email').setValue('test@example.com')
+    await wrapper.get('#login-password').setValue('password123')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.match })
+  })
+
   it('shows an error message after login failure', async () => {
     loginMock.mockRejectedValue(new ApiClientError(401, { message: 'Invalid credentials.' }))
 

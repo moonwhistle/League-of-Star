@@ -94,10 +94,11 @@ class CustomGameRoomControllerTest {
     @DisplayName("getRoom - roomId로 room detail을 반환한다")
     void getRoom() {
         // given
-        when(customGameRoomService.getWaitingRoom(100L)).thenReturn(roomResponse());
+        when(customGameRoomService.getWaitingRoom(100L, USER_ID)).thenReturn(roomResponse());
 
         // when & then
         RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
                 .when()
                 .get(CustomGamePath.CUSTOM_ROOM_BASE + "/100")
                 .then()
@@ -107,18 +108,19 @@ class CustomGameRoomControllerTest {
                 .body("inviteCode", equalTo("AB12CD"))
                 .body("participants[0].nickname", equalTo("Host"));
 
-        verify(customGameRoomService).getWaitingRoom(100L);
+        verify(customGameRoomService).getWaitingRoom(100L, USER_ID);
     }
 
     @Test
     @DisplayName("getRoom - room이 없으면 404를 반환한다")
     void getRoom_NotFound() {
         // given
-        when(customGameRoomService.getWaitingRoom(999L))
+        when(customGameRoomService.getWaitingRoom(999L, USER_ID))
                 .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
 
         // when & then
         RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
                 .when()
                 .get(CustomGamePath.CUSTOM_ROOM_BASE + "/999")
                 .then()
@@ -130,11 +132,12 @@ class CustomGameRoomControllerTest {
     @DisplayName("getRoom - room이 WAITING 상태가 아니면 400을 반환한다")
     void getRoom_InvalidState() {
         // given
-        when(customGameRoomService.getWaitingRoom(100L))
+        when(customGameRoomService.getWaitingRoom(100L, USER_ID))
                 .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_INVALID_STATE));
 
         // when & then
         RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
                 .when()
                 .get(CustomGamePath.CUSTOM_ROOM_BASE + "/100")
                 .then()

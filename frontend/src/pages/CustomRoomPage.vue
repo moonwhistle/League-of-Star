@@ -10,6 +10,10 @@
     :data-custom-room-participant-count="room?.participants.length ?? 0"
     :data-custom-room-copy-status="copyStatus"
     :data-custom-room-copy-message="copyMessage"
+    :data-custom-room-socket-status="socketStatus"
+    :data-custom-room-socket-error-message="socketErrorMessage"
+    :data-custom-room-leave-status="leaveStatus"
+    :data-custom-room-leave-error-message="leaveErrorMessage"
     data-testid="custom-room-page"
   >
     <section class="custom-room-shell">
@@ -19,15 +23,33 @@
           <h1>{{ room?.roomName ?? t('customRoom.title') }}</h1>
         </div>
         <nav class="custom-room-actions" :aria-label="t('customRoom.pageLabel')">
-          <button type="button" @click="returnToRooms">{{ t('customRoom.returnToRooms') }}</button>
           <button type="button" :disabled="roomStatus === 'loading'" @click="loadRoom">
             {{ t('customRoom.refresh') }}
+          </button>
+          <button
+            v-if="roomStatus === 'success'"
+            type="button"
+            data-testid="custom-room-leave-button"
+            :disabled="leaveStatus === 'loading'"
+            @click="leaveRoom"
+          >
+            {{ leaveStatus === 'loading' ? t('customRoom.leaving') : t('customRoom.leave') }}
           </button>
         </nav>
       </header>
 
       <section v-if="roomStatus === 'loading'" class="custom-room-state">
         {{ t('customRoom.loading') }}
+      </section>
+      <section
+        v-else-if="roomStatus === 'closed'"
+        class="custom-room-state custom-room-state--closed"
+      >
+        <div>
+          <strong>{{ t('customRoom.closedTitle') }}</strong>
+          <p>{{ t('customRoom.closedDescription') }}</p>
+          <button type="button" @click="returnToMatch">{{ t('customRoom.returnToMatch') }}</button>
+        </div>
       </section>
       <section
         v-else-if="roomStatus === 'error'"
@@ -72,6 +94,12 @@
             <p v-if="copyMessage !== ''" class="custom-room-copy-message" role="status">
               {{ copyMessage }}
             </p>
+            <p v-if="socketErrorMessage !== ''" class="custom-room-alert" role="alert">
+              {{ socketErrorMessage }}
+            </p>
+            <p v-if="leaveErrorMessage !== ''" class="custom-room-alert" role="alert">
+              {{ leaveErrorMessage }}
+            </p>
           </section>
         </section>
 
@@ -104,23 +132,37 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
-import { getCustomRoom } from '@/services/customRoomService'
-import type { CustomRoomResponse } from '@/types/customRoom'
+import { getCustomRoom, leaveCustomRoom } from '@/services/customRoomService'
+import {
+  connectCustomRoomWebSocket,
+  type CustomRoomWebSocketConnection,
+} from '@/services/realtime/customRoomWebSocket'
+import { clearCurrentCustomRoom, rememberCurrentCustomRoom } from '@/services/customRoomSession'
+import type { CustomRoomResponse, CustomRoomWebSocketServerMessage } from '@/types/customRoom'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
 
-type LoadStatus = 'idle' | 'loading' | 'success' | 'error'
+type LoadStatus = 'idle' | 'loading' | 'success' | 'error' | 'closed'
 type CopyStatus = 'idle' | 'success' | 'error'
+type LeaveStatus = 'idle' | 'loading' | 'success' | 'error'
+type SocketStatus = 'idle' | 'connecting' | 'open' | 'error' | 'closed'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useLocale()
 const roomStatus = ref<LoadStatus>('idle')
 const copyStatus = ref<CopyStatus>('idle')
+const leaveStatus = ref<LeaveStatus>('idle')
+const socketStatus = ref<SocketStatus>('idle')
 const roomErrorMessage = ref('')
 const copyMessage = ref('')
+const leaveErrorMessage = ref('')
+const socketErrorMessage = ref('')
 const room = shallowRef<CustomRoomResponse>()
 const roomAbortController = shallowRef<AbortController>()
+const leaveAbortController = shallowRef<AbortController>()
+const roomSocketConnection = shallowRef<CustomRoomWebSocketConnection>()
+const expectedSocketClose = ref(false)
 const routeRoomId = computed(() => String(route.params.roomId ?? '').trim())
 const inviteLink = computed(() => {
   const inviteCode = room.value?.inviteCode.trim() ?? ''
@@ -142,21 +184,27 @@ watch(
 
 onUnmounted(() => {
   abortRoomRequest()
+  abortLeaveRequest()
+  closeRoomSocket()
 })
 
 async function loadRoom() {
   copyStatus.value = 'idle'
   copyMessage.value = ''
+  leaveErrorMessage.value = ''
+  socketErrorMessage.value = ''
   roomErrorMessage.value = ''
 
   if (routeRoomId.value === '') {
     room.value = undefined
     roomStatus.value = 'error'
     roomErrorMessage.value = t('customRoom.roomIdMissing')
+    closeRoomSocket(false)
     return
   }
 
   abortRoomRequest()
+  closeRoomSocket()
   const controller = new AbortController()
   roomAbortController.value = controller
   roomStatus.value = 'loading'
@@ -169,7 +217,9 @@ async function loadRoom() {
     }
 
     room.value = response
+    rememberCurrentCustomRoom(response.roomId)
     roomStatus.value = 'success'
+    connectRoomSocket(response.roomId)
   } catch (error) {
     if (controller.signal.aborted) {
       return
@@ -178,6 +228,39 @@ async function loadRoom() {
     room.value = undefined
     roomStatus.value = 'error'
     roomErrorMessage.value = errorMessage(error, t('customRoom.errorFallback'))
+    closeRoomSocket()
+  }
+}
+
+async function leaveRoom() {
+  if (room.value === undefined || leaveStatus.value === 'loading') {
+    return
+  }
+
+  abortLeaveRequest()
+  const controller = new AbortController()
+  leaveAbortController.value = controller
+  leaveStatus.value = 'loading'
+  leaveErrorMessage.value = ''
+
+  try {
+    await leaveCustomRoom(room.value.roomId, controller.signal)
+
+    if (leaveAbortController.value !== controller) {
+      return
+    }
+
+    leaveStatus.value = 'success'
+    clearCurrentCustomRoom()
+    closeRoomSocket()
+    await router.push({ name: ROUTE_NAMES.customRooms })
+  } catch (error) {
+    if (controller.signal.aborted) {
+      return
+    }
+
+    leaveStatus.value = 'error'
+    leaveErrorMessage.value = errorMessage(error, t('customRoom.leaveFailed'))
   }
 }
 
@@ -199,12 +282,106 @@ async function copyInviteLink() {
   }
 }
 
-function returnToRooms() {
-  void router.push({ name: ROUTE_NAMES.customRooms })
+function returnToMatch() {
+  void router.push({ name: ROUTE_NAMES.match })
 }
 
 function abortRoomRequest() {
   roomAbortController.value?.abort()
+}
+
+function abortLeaveRequest() {
+  leaveAbortController.value?.abort()
+}
+
+function connectRoomSocket(roomId: number) {
+  closeRoomSocket()
+  socketStatus.value = 'connecting'
+  socketErrorMessage.value = ''
+  expectedSocketClose.value = false
+
+  try {
+    let connection: CustomRoomWebSocketConnection | undefined
+    connection = connectCustomRoomWebSocket(roomId, {
+      onOpen: () => {
+        if (connection === undefined || roomSocketConnection.value?.socket !== connection.socket) {
+          return
+        }
+
+        socketStatus.value = 'open'
+      },
+      onMessage: (message) => {
+        if (connection === undefined || roomSocketConnection.value?.socket !== connection.socket) {
+          return
+        }
+
+        handleRoomSocketMessage(message)
+      },
+      onError: (error) => {
+        if (connection === undefined || roomSocketConnection.value?.socket !== connection.socket) {
+          return
+        }
+
+        socketStatus.value = 'error'
+        socketErrorMessage.value = socketErrorMessageFrom(error)
+      },
+      onClose: (event) => {
+        if (roomSocketConnection.value?.socket !== event.target) {
+          return
+        }
+
+        socketStatus.value = 'closed'
+        if (!expectedSocketClose.value && roomStatus.value === 'success') {
+          socketErrorMessage.value = t('customRoom.socketError')
+        }
+      },
+    })
+
+    roomSocketConnection.value = connection
+  } catch (error) {
+    socketStatus.value = 'error'
+    socketErrorMessage.value = socketErrorMessageFrom(error)
+  }
+}
+
+function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
+  if (message.type === 'ROOM_UPDATED') {
+    room.value = message.payload
+    roomStatus.value = 'success'
+    socketErrorMessage.value = ''
+    return
+  }
+
+  if (message.type === 'ROOM_CLOSED') {
+    room.value = message.payload
+    clearCurrentCustomRoom()
+    roomStatus.value = 'closed'
+    socketStatus.value = 'closed'
+    socketErrorMessage.value = ''
+    closeRoomSocket(false)
+    return
+  }
+
+  socketStatus.value = 'error'
+  socketErrorMessage.value = message.payload.reason || t('customRoom.socketError')
+}
+
+function closeRoomSocket(resetStatus = true) {
+  const connection = roomSocketConnection.value
+  roomSocketConnection.value = undefined
+  expectedSocketClose.value = true
+  if (resetStatus) {
+    socketStatus.value = 'idle'
+  }
+  connection?.close(1000, 'custom room page closed')
+}
+
+function socketErrorMessageFrom(error: unknown) {
+  if (error instanceof Error && error.message.trim() !== '') {
+    return error.message
+  }
+
+  return t('customRoom.socketError')
 }
 
 function errorMessage(error: unknown, fallback: string) {
@@ -318,6 +495,32 @@ function errorMessage(error: unknown, fallback: string) {
   color: #fecaca;
 }
 
+.custom-room-state--closed {
+  text-align: center;
+}
+
+.custom-room-state--closed strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #f8fbff;
+  font-size: 20px;
+}
+
+.custom-room-state--closed p {
+  margin: 0 0 16px;
+}
+
+.custom-room-state--closed button {
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #f8fbff;
+  background: rgba(255, 255, 255, 0.08);
+  font: inherit;
+  cursor: pointer;
+}
+
 .custom-room-grid {
   align-items: stretch;
   margin-top: 18px;
@@ -385,6 +588,11 @@ function errorMessage(error: unknown, fallback: string) {
 .custom-room-copy-message {
   margin: 12px 0 0;
   color: rgba(248, 251, 255, 0.72);
+}
+
+.custom-room-alert {
+  margin: 12px 0 0;
+  color: #fecaca;
 }
 
 .custom-room-participants {

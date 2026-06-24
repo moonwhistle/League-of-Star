@@ -26,7 +26,6 @@ export function getCustomRoom(
   return requestJson<CustomRoomResponse>(`${CUSTOM_ROOM_BASE_PATH}/${encodeURIComponent(roomId)}`, {
     method: 'GET',
     signal,
-    auth: false,
   })
 }
 
@@ -40,6 +39,32 @@ export function getCustomRoomInvitePreview(
       method: 'GET',
       signal,
       auth: false,
+    },
+  )
+}
+
+export function joinCustomRoom(
+  inviteCode: string,
+  signal?: AbortSignal,
+): Promise<CustomRoomResponse> {
+  return requestJson<CustomRoomResponse>(
+    `${CUSTOM_ROOM_BASE_PATH}/${encodeURIComponent(inviteCode)}/join`,
+    {
+      method: 'POST',
+      signal,
+    },
+  )
+}
+
+export function leaveCustomRoom(
+  roomId: number | string,
+  signal?: AbortSignal,
+): Promise<CustomRoomResponse> {
+  return requestJson<CustomRoomResponse>(
+    `${CUSTOM_ROOM_BASE_PATH}/${encodeURIComponent(roomId)}/leave`,
+    {
+      method: 'POST',
+      signal,
     },
   )
 }

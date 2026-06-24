@@ -4,21 +4,25 @@ import com.sang.leagueofstar.game.end.common.constant.GameEndConstants;
 import com.sang.leagueofstar.game.end.domain.GameEndDeadlineRegistration;
 import com.sang.leagueofstar.redis.AbstractRedisTest;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
-import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Execution(ExecutionMode.SAME_THREAD)
+@ResourceLock(GameEndConstants.GAME_END_PENDING_KEY)
 class RedisGameEndScheduleStoreIntegrationTest extends AbstractRedisTest {
 
     private static final Long GAME_ROOM_ID = 100L;
@@ -29,15 +33,18 @@ class RedisGameEndScheduleStoreIntegrationTest extends AbstractRedisTest {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @BeforeEach
+    void setUp() {
+        cleanupPendingDeadlines();
+    }
+
     @AfterEach
     void tearDown() {
-        RedisConnection connection = Objects.requireNonNull(stringRedisTemplate.getConnectionFactory())
-                .getConnection();
-        try {
-            connection.serverCommands().flushAll();
-        } finally {
-            connection.close();
-        }
+        cleanupPendingDeadlines();
+    }
+
+    private void cleanupPendingDeadlines() {
+        stringRedisTemplate.delete(GameEndConstants.GAME_END_PENDING_KEY);
     }
 
     @Test

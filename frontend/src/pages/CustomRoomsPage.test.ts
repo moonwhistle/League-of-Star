@@ -4,24 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
-import {
-  createCustomRoom,
-  getCustomRoomInvitePreview,
-  getCustomRooms,
-} from '@/services/customRoomService'
+import { createCustomRoom, getCustomRoom, getCustomRooms } from '@/services/customRoomService'
 import type { CustomRoomResponse } from '@/types/customRoom'
 
 import CustomRoomsPage from './CustomRoomsPage.vue'
 
 const routerPushMock = vi.hoisted(() => vi.fn())
-const routeMock = vi.hoisted(() => ({
-  params: {
-    inviteCode: '',
-  },
-}))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => routeMock,
   useRouter: () => ({
     push: routerPushMock,
   }),
@@ -29,21 +19,22 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/services/customRoomService', () => ({
   createCustomRoom: vi.fn(),
-  getCustomRoomInvitePreview: vi.fn(),
+  getCustomRoom: vi.fn(),
   getCustomRooms: vi.fn(),
 }))
 
 const getCustomRoomsMock = vi.mocked(getCustomRooms)
 const createCustomRoomMock = vi.mocked(createCustomRoom)
-const getCustomRoomInvitePreviewMock = vi.mocked(getCustomRoomInvitePreview)
+const getCustomRoomMock = vi.mocked(getCustomRoom)
 const { setLocale } = useLocale()
 
 describe('CustomRoomsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     setLocale('ko')
-    routeMock.params.inviteCode = ''
     routerPushMock.mockResolvedValue(undefined)
+    getCustomRoomMock.mockResolvedValue(createRoomResponse({ roomId: 99 }))
     getCustomRoomsMock.mockResolvedValue({
       rooms: [
         {
@@ -58,7 +49,34 @@ describe('CustomRoomsPage', () => {
       ],
     })
     createCustomRoomMock.mockResolvedValue(createRoomResponse({ roomId: 101 }))
-    getCustomRoomInvitePreviewMock.mockResolvedValue(createRoomResponse({ roomId: 102 }))
+  })
+
+  it('redirects to the current joined room instead of showing the public list', async () => {
+    localStorage.setItem('league-of-star.currentCustomRoomId', '99')
+
+    mount(CustomRoomsPage)
+    await flushPromises()
+
+    expect(getCustomRoomMock).toHaveBeenCalledWith('99')
+    expect(getCustomRoomsMock).not.toHaveBeenCalled()
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.customRoom,
+      params: {
+        roomId: '99',
+      },
+    })
+  })
+
+  it('clears stale current room state and loads the public list', async () => {
+    localStorage.setItem('league-of-star.currentCustomRoomId', '99')
+    getCustomRoomMock.mockRejectedValueOnce(new Error('not participant'))
+
+    const wrapper = mount(CustomRoomsPage)
+    await flushPromises()
+
+    expect(localStorage.getItem('league-of-star.currentCustomRoomId')).toBeNull()
+    expect(getCustomRoomsMock).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(wrapper.get('main').attributes('data-custom-rooms-status')).toBe('success')
   })
 
   it('loads and renders public custom rooms on mount', async () => {
@@ -73,16 +91,16 @@ describe('CustomRoomsPage', () => {
     expect(wrapper.text()).toContain('방장 #1')
   })
 
-  it('moves to the selected room detail without joining the room', async () => {
+  it('moves to the invite join route when selecting a public room', async () => {
     const wrapper = mount(CustomRoomsPage)
     await flushPromises()
 
     await wrapper.get('.custom-rooms-list button').trigger('click')
 
     expect(routerPushMock).toHaveBeenCalledWith({
-      name: ROUTE_NAMES.customRoom,
+      name: ROUTE_NAMES.customRoomInvite,
       params: {
-        roomId: '100',
+        inviteCode: 'AB12CD',
       },
     })
     expect(createCustomRoomMock).not.toHaveBeenCalled()
@@ -109,6 +127,7 @@ describe('CustomRoomsPage', () => {
     await flushPromises()
 
     expect(createCustomRoomMock).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(localStorage.getItem('league-of-star.currentCustomRoomId')).toBe('101')
     expect(routerPushMock).toHaveBeenCalledWith({
       name: ROUTE_NAMES.customRoom,
       params: {
@@ -117,7 +136,7 @@ describe('CustomRoomsPage', () => {
     })
   })
 
-  it('finds an invite code after trimming and uppercasing it', async () => {
+  it('moves to the invite join route after trimming and uppercasing invite code', async () => {
     const wrapper = mount(CustomRoomsPage)
     await flushPromises()
 
@@ -125,32 +144,12 @@ describe('CustomRoomsPage', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(getCustomRoomInvitePreviewMock).toHaveBeenCalledWith('AB12CD', expect.any(AbortSignal))
     expect(routerPushMock).toHaveBeenCalledWith({
-      name: ROUTE_NAMES.customRoom,
+      name: ROUTE_NAMES.customRoomInvite,
       params: {
-        roomId: '102',
+        inviteCode: 'AB12CD',
       },
     })
-  })
-
-  it('resolves invite link route params with preview without joining the room', async () => {
-    routeMock.params.inviteCode = ' star12 '
-
-    const wrapper = mount(CustomRoomsPage)
-    await flushPromises()
-
-    expect(
-      wrapper.get<HTMLInputElement>('[data-testid="custom-room-invite-input"]').element.value,
-    ).toBe('STAR12')
-    expect(getCustomRoomInvitePreviewMock).toHaveBeenCalledWith('STAR12', expect.any(AbortSignal))
-    expect(routerPushMock).toHaveBeenCalledWith({
-      name: ROUTE_NAMES.customRoom,
-      params: {
-        roomId: '102',
-      },
-    })
-    expect(createCustomRoomMock).not.toHaveBeenCalled()
   })
 
   it('does not request invite preview when invite code is blank', async () => {
@@ -160,27 +159,8 @@ describe('CustomRoomsPage', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(getCustomRoomInvitePreviewMock).not.toHaveBeenCalled()
     expect(wrapper.get('main').attributes('data-custom-room-invite-status')).toBe('error')
     expect(wrapper.text()).toContain('초대 코드를 입력해 주세요.')
-  })
-
-  it('renders invite preview failure state without moving route', async () => {
-    getCustomRoomInvitePreviewMock.mockRejectedValueOnce(
-      new ApiClientError(404, { message: '초대 코드에 해당하는 방이 없습니다.' }),
-    )
-    const wrapper = mount(CustomRoomsPage)
-    await flushPromises()
-
-    await wrapper.get('[data-testid="custom-room-invite-input"]').setValue('NONE')
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(wrapper.get('main').attributes('data-custom-room-invite-status')).toBe('error')
-    expect(wrapper.text()).toContain('초대 코드에 해당하는 방이 없습니다.')
-    expect(routerPushMock).not.toHaveBeenCalledWith(
-      expect.objectContaining({ name: ROUTE_NAMES.customRoom }),
-    )
   })
 
   it('renders backend error messages for room list and create failures', async () => {
