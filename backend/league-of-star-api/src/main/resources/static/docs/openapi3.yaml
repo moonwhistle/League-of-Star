@@ -35,14 +35,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 ranking-list-rank-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 716843000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 33, 422140000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"RANK_001\",\n  \"message\"\
                     \ : \"유저의 랭크 정보를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
                 ranking-list-user-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 728140000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 33, 433486000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"USER_001\",\n  \"message\"\
                     \ : \"해당 유저를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "400":
@@ -50,10 +50,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 ranking-list-invalid-limit:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 701535000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 33, 411387000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"COMMON_003\",\n  \"\
                     message\" : \"입력값이 유효하지 않습니다\",\n  \"errors\" : null\n}"
         "200":
@@ -239,10 +239,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 custom-room-create-active-exists:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 33, 13176000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 27, 372025000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"CUSTOM_ROOM_007\",\n\
                     \  \"message\" : \"이미 대기 중인 사용자 지정 방이 있습니다.\",\n  \"errors\" :\
                     \ null\n}"
@@ -284,10 +284,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 game-practice-start-active-room:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 35, 454360000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 29, 54347000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"GAME_PRACTICE_001\"\
                     ,\n  \"message\" : \"이미 진행 중인 게임이 있습니다.\",\n  \"errors\" : null\n\
                     }"
@@ -431,10 +431,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 game-summary-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 38112000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 29, 618920000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"GAME_005\",\n  \"message\"\
                     \ : \"게임방을 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "409":
@@ -442,10 +442,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 game-summary-not-finished:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 110296000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 29, 668413000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"GAME_SUMMARY_001\",\n\
                     \  \"message\" : \"종료된 게임의 결과만 조회할 수 있습니다.\",\n  \"errors\" :\
                     \ null\n}"
@@ -454,10 +454,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 game-summary-forbidden:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 96301000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 29, 651209000\
                     \ ],\n  \"status\" : 403,\n  \"code\" : \"AUTH_002\",\n  \"message\"\
                     \ : \"해당 리소스에 대한 접근 권한이 없습니다.\",\n  \"errors\" : null\n}"
   /api/v1/match/{matchId}/accept:
@@ -492,10 +492,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 match-accept-failure:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 937306000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 30, 424553000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"MATCH_011\",\n  \"message\"\
                     \ : \"이미 응답 시간이 초과된 매칭입니다.\",\n  \"errors\" : null\n}"
         "200":
@@ -531,10 +531,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 match-reject-failure:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 36, 898080000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 30, 392980000\
                     \ ],\n  \"status\" : 409,\n  \"code\" : \"MATCH_008\",\n  \"message\"\
                     \ : \"이미 수락한 매칭입니다.\",\n  \"errors\" : null\n}"
   /api/v1/notifications/match/stream:
@@ -604,10 +604,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 user-game-records-user-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 934906000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 33, 628402000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"USER_001\",\n  \"message\"\
                     \ : \"해당 유저를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "400":
@@ -618,7 +618,7 @@ paths:
                 $ref: '#/components/schemas/api-v1-users-me-game-records396781695'
               examples:
                 user-game-records-invalid-page:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 950930000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 33, 645017000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"COMMON_003\",\n  \"\
                     message\" : \"입력값이 유효하지 않습니다\",\n  \"errors\" : [ {\n    \"field\"\
                     \ : \"page\",\n    \"value\" : \"4\",\n    \"reason\" : \"must\
@@ -666,10 +666,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 user-profile-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 994628000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 33, 690852000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"USER_001\",\n  \"message\"\
                     \ : \"해당 유저를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "200":
@@ -707,14 +707,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 user-rank-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 964451000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 33, 659226000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"RANK_001\",\n  \"message\"\
                     \ : \"유저의 랭크 정보를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
                 user-rank-user-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 39, 985111000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 33, 681785000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"USER_001\",\n  \"message\"\
                     \ : \"해당 유저를 찾을 수 없습니다.\",\n  \"errors\" : null\n}"
         "200":
@@ -766,10 +766,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 custom-room-invite-preview-not-found:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 32, 992295000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 27, 356174000\
                     \ ],\n  \"status\" : 404,\n  \"code\" : \"CUSTOM_ROOM_006\",\n\
                     \  \"message\" : \"사용자 지정 방을 찾을 수 없습니다.\",\n  \"errors\" : null\n\
                     }"
@@ -800,10 +800,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 custom-room-join-full:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 32, 937874000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 27, 314029000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"CUSTOM_ROOM_001\",\n\
                     \  \"message\" : \"사용자 지정 방 인원이 초과되었습니다.\",\n  \"errors\" : null\n\
                     }"
@@ -865,10 +865,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 custom-room-leave-invalid-participant:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 33, 101148000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 27, 434982000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"CUSTOM_ROOM_003\",\n\
                     \  \"message\" : \"사용자 지정 방 참여자 정보가 올바르지 않습니다.\",\n  \"errors\"\
                     \ : null\n}"
@@ -899,10 +899,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/api-v1-rankings2042838415'
+                $ref: '#/components/schemas/api-v1-custom-games-rooms2042838415'
               examples:
                 custom-game-start-incomplete-participants:
-                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 12, 0, 33, 127354000\
+                  value: "{\n  \"timestamp\" : [ 2026, 6, 24, 14, 20, 27, 453083000\
                     \ ],\n  \"status\" : 400,\n  \"code\" : \"GAME_003\",\n  \"message\"\
                     \ : \"참여자 인원 또는 상태가 올바르지 않습니다.\",\n  \"errors\" : null\n}"
         "200":
@@ -938,6 +938,14 @@ components:
         email:
           type: string
           description: 사용자 이메일
+    api-v1-auth-refresh132229249:
+      required:
+      - refreshToken
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: 기존 리프레시 토큰
     api-v1-users-me-rank-2066775793:
       required:
       - division
@@ -982,14 +990,6 @@ components:
         userId:
           type: number
           description: 사용자 ID
-    api-v1-auth-refresh132229249:
-      required:
-      - refreshToken
-      type: object
-      properties:
-        refreshToken:
-          type: string
-          description: 기존 리프레시 토큰
     api-v1-users-me-game-records1935318520:
       required:
       - hasNext
@@ -1196,7 +1196,7 @@ components:
         refreshToken:
           type: string
           description: 무효화할 리프레시 토큰
-    api-v1-rankings2042838415:
+    api-v1-custom-games-rooms2042838415:
       required:
       - code
       - errors

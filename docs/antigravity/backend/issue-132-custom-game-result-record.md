@@ -234,25 +234,25 @@ Custom Game record 저장 기준:
 
 ### 7. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 4-7 Backend 체크리스트를 구현 결과와 맞게 갱신.
-- [ ] `docs/last-구현.md` 4-7 Policy 체크리스트를 `MATCH/CUSTOM/PRACTICE` 정책과 맞춤.
-- [ ] `docs/last-구현.md` 4-7 Acceptance Criteria 체크 갱신.
-- [ ] issue-132 Tasks 완료 항목 체크.
-- [ ] issue-132 Backend Contract와 구현 코드의 payload/settlement 정책 대조.
-- [ ] issue-130의 후속 범위 문구와 issue-132 구현 범위가 일치하는지 확인.
-- [ ] issue-120 Practice 정책과 충돌하지 않는지 확인.
-- [ ] Summary API 문서 보강 필요 여부 확인.
-- [ ] PR Message 섹션 설계 중심으로 보강.
+- [x] `docs/last-구현.md` 4-7 Backend 체크리스트를 구현 결과와 맞게 갱신.
+- [x] `docs/last-구현.md` 4-7 Policy 체크리스트를 `MATCH/CUSTOM/PRACTICE` 정책과 맞춤.
+- [x] `docs/last-구현.md` 4-7 Acceptance Criteria 체크 갱신.
+- [x] issue-132 Tasks 완료 항목 체크.
+- [x] issue-132 Backend Contract와 구현 코드의 payload/settlement 정책 대조.
+- [x] issue-130의 후속 범위 문구와 issue-132 구현 범위가 일치하는지 확인.
+- [x] issue-120 Practice 정책과 충돌하지 않는지 확인.
+- [x] Summary API 문서 보강 필요 여부 확인.
+- [x] PR Message 섹션 설계 중심으로 보강.
 
 ### 8. 검증
 
-- [ ] `./gradlew :league-of-star-core:test --tests '*GameRecord*'`
-- [ ] `./gradlew :league-of-star-api:test --tests '*GameLightningServiceTest' --tests '*GameEndSettlementServiceTest' --tests '*GameRecord*' --tests '*GameSummary*'`
-- [ ] `./gradlew :league-of-star-core:test`
-- [ ] `./gradlew :league-of-star-api:test`
-- [ ] `./gradlew test`
-- [ ] `./gradlew build`
-- [ ] `git diff --check`
+- [x] `./gradlew :league-of-star-core:test --tests '*GameRecord*'`
+- [x] `./gradlew :league-of-star-api:test --tests '*GameLightningServiceTest' --tests '*GameEndSettlementServiceTest' --tests '*GameRecord*' --tests '*GameSummary*'`
+- [x] `./gradlew :league-of-star-core:test`
+- [x] `./gradlew :league-of-star-api:test`
+- [x] `./gradlew test`
+- [x] `./gradlew build`
+- [x] `git diff --check`
 
 ## Implementation Policy
 
@@ -294,21 +294,25 @@ Custom Game record 저장 기준:
 
 ## 📌 Summary
 
-Custom Game이 끝났을 때 결과는 기존 Game WebSocket `GAME_RESULT`로 내려주고, 전적은 남기되 랭크와 LP는 바뀌지 않게 구현함.
+Custom Game이 끝났을 때 결과는 기존 Game WebSocket `GAME_RESULT`로 즉시 알려주고, 전적은 남기되 랭크와 LP는 바뀌지 않게 구현함.
 
-Custom Game은 Match처럼 두 명이 겨루는 게임이지만, 랭크 게임은 아니다. 그래서 게임 진행과 결과 판정은 기존 시스템을 재사용하고, 정산 단계에서만 `gameMode=CUSTOM`을 보고 전적 저장과 랭크 반영 책임을 분리함.
+사용자 입장에서 Custom Game은 친구와 하는 2인 게임이다. 게임 방식은 ranked match와 같지만 랭크 게임은 아니므로, “누가 이겼는지”는 즉시 보여주고 “내 랭크 점수”는 절대 건드리지 않게 분리함. 서버는 `gameMode=CUSTOM`을 기준으로 전적 저장과 랭크 정산 책임을 나눔.
 
 ```mermaid
 flowchart TD
-    A["Custom Game 진행"] --> B{"종료"}
-    B -->|LIGHTNING 처치| C["GAME_RESULT<br/>gameMode=CUSTOM<br/>reason=LIGHTNING_KILL"]
-    B -->|자연사 무승부| D["GAME_RESULT<br/>gameMode=CUSTOM<br/>reason=NATURAL_DEATH_DRAW"]
-    C --> E["record settlement"]
-    D --> E
-    E --> F{"gameMode"}
-    F -->|MATCH| G["전적 저장 + rank/LP 반영"]
-    F -->|CUSTOM| H["전적 저장 + rank/LP 미반영"]
-    F -->|PRACTICE| I["전적/랭크 미반영"]
+    A["Custom Room에서 2명 게임 시작"] --> B["기존 Game WebSocket으로 플레이"]
+    B --> C{"게임 종료"}
+    C -->|LIGHTNING 처치| D["GAME_RESULT<br/>gameMode=CUSTOM<br/>reason=LIGHTNING_KILL"]
+    C -->|자연사 무승부| E["GAME_RESULT<br/>gameMode=CUSTOM<br/>reason=NATURAL_DEATH_DRAW"]
+    D --> F["사용자는 결과를 즉시 확인"]
+    E --> F
+    D --> G["record settlement trigger"]
+    E --> G
+    G --> H{"gameMode"}
+    H -->|MATCH| I["전적 저장<br/>rank/LP 반영<br/>match status cleanup"]
+    H -->|CUSTOM| J["전적 저장<br/>rank/LP 미반영<br/>match status cleanup 제외"]
+    H -->|PRACTICE| K["전적/랭크 미반영"]
+    J --> L["Summary API<br/>PENDING/DONE 조회 가능"]
 ```
 
 핵심 정책:
@@ -317,6 +321,8 @@ flowchart TD
 - Custom Game은 `gameMode=CUSTOM`으로 구분함.
 - Custom Game result reason은 기존 reason을 재사용함.
 - Custom Game은 전적에는 남지만 랭크/LP에는 반영되지 않음.
+- Custom Game은 match queue를 타지 않으므로 match status cleanup 대상이 아님.
+- Summary API는 `MATCH`, `CUSTOM` 결과 조회를 지원하고 `PRACTICE`는 계속 거부함.
 - Practice는 계속 전적/랭크 모두 미반영임.
 
 백엔드와의 구현 계약:
@@ -326,32 +332,50 @@ flowchart TD
 - Custom Game record는 현재 rank/lp snapshot을 before/after 동일하게 저장함.
 - Custom Game에서는 `RankCommandService.applyRecordResults()`를 호출하지 않음.
 - recovery는 Custom Game record 누락을 복구하되 rank/LP는 변경하지 않음.
+- `MATCH`만 정산 완료 후 matching status cleanup을 수행함.
+- `CUSTOM`은 `game_records` 저장 후 Summary API에서 `PENDING/DONE` 흐름으로 조회 가능함.
 
 ## 📚 Changes
 
 - 게임 진행 로직은 새로 만들지 않고 기존 시스템을 재사용함.
-  Custom Game도 별 HP 시나리오, LIGHTNING 판정, 자연사 종료, Game WebSocket result 전송은 기존 game domain이 이미 책임지고 있다. 새 흐름을 만들면 Match와 Custom의 판정 규칙이 어긋날 수 있으므로, `gameMode`만 다르게 두고 같은 게임 엔진을 사용함.
+  Custom Game도 별 HP 시나리오, LIGHTNING 판정, 자연사 종료, Game WebSocket result 전송은 기존 game domain이 이미 책임지고 있다. 같은 게임인데 Custom 전용 엔진을 따로 만들면 Match와 Custom의 판정 규칙이 달라질 수 있다. 그래서 게임 진행은 그대로 재사용하고, 종료 후 정산 단계에서만 `gameMode`를 보고 갈라지게 함.
 
 - 정산 정책만 `gameMode`로 분리함.
-  Match는 랭크 게임이므로 전적과 랭크가 함께 움직인다. Custom은 친구와 하는 비랭크 게임이므로 전적은 남기되 랭크 점수는 바꾸지 않는다. Practice는 혼자 확인하는 모드라 전적도 남기지 않는다.
+  Match는 랭크 게임이므로 전적과 랭크가 함께 움직인다. Custom은 친구와 하는 비랭크 게임이므로 전적은 남기되 랭크 점수는 바꾸지 않는다. Practice는 혼자 확인하는 모드라 전적도 남기지 않는다. 이 차이를 controller나 WebSocket handler가 아니라 core settlement policy에서 처리하게 해서, 같은 종료 이벤트가 들어와도 모드별 정책이 한 곳에서 일관되게 적용되도록 함.
 
 - Custom record에는 현재 rank snapshot을 그대로 저장함.
-  `game_records`는 rank before/after를 필수로 가지고 있고 Summary API도 이 구조를 사용한다. DDL을 바꾸지 않고 기존 응답 구조를 유지하기 위해 Custom record에는 현재 rank/lp를 before/after에 동일하게 저장함. 그래서 화면에서는 LP 변화가 0으로 보이고, 랭크도 바뀌지 않는다.
+  `game_records`는 rank before/after를 필수로 가지고 있고 Summary API도 이 구조를 사용한다. Custom 전용 nullable 컬럼이나 별도 테이블을 만들 수도 있지만, 그러면 DDL과 조회 응답을 크게 바꿔야 한다. 이번 이슈에서는 기존 구조를 유지하기 위해 현재 rank/lp를 before/after에 동일하게 저장함. 그래서 화면에서는 LP 변화가 0으로 보이고, 랭크도 바뀌지 않는다.
 
 - Custom에서는 rank service를 호출하지 않음.
-  `RankCommandService.applyRecordResults()`는 LP, rank, 승패무 누적, rank series를 변경할 수 있는 진짜 랭크 정산이다. Custom은 이 책임을 타면 안 되므로 record 저장만 하고 rank 정산 호출을 차단함.
+  `RankCommandService.applyRecordResults()`는 LP, rank, 승패무 누적, rank series를 변경할 수 있는 진짜 랭크 정산이다. Custom은 전적은 남겨야 하지만 랭크를 바꾸면 안 된다. 그래서 Custom 경로에서는 현재 rank snapshot만 읽고, rank command service는 호출하지 않게 함.
 
 - recovery도 Custom을 복구 대상으로 포함함.
-  WebSocket 결과는 이미 나갔는데 record 저장만 실패할 수 있다. 이 경우 Custom도 전적이 남아야 하므로 recovery 후보에 포함한다. 다만 복구 시에도 rank/LP는 변경하지 않는다.
+  WebSocket 결과는 이미 나갔는데 record 저장만 실패할 수 있다. 이 경우 사용자는 게임 결과를 봤지만 나중에 전적이 비는 문제가 생긴다. Custom도 전적이 남아야 하므로 recovery 후보에 포함한다. 다만 복구 시에도 Custom settlement policy를 타기 때문에 rank/LP는 변경하지 않는다.
+
+- match status cleanup은 `MATCH`에만 남김.
+  Match는 매칭 큐 상태가 `IN_GAME`으로 바뀌기 때문에 게임이 끝나고 전적 정산까지 끝나면 해당 상태를 정리해야 한다. Custom Game은 custom room에서 시작되며 match queue 상태를 만들지 않는다. 따라서 Custom 종료 후 match status cleanup을 실행하면 존재하지 않는 매칭 상태를 정리하려는 잘못된 책임이 섞인다. trigger와 cleanup service 양쪽에서 `MATCH`만 cleanup하도록 방어함.
+
+- Summary API는 Custom 결과를 기존 `PENDING/DONE` 흐름으로 조회하게 둠.
+  Summary API는 “방금 끝난 게임의 전적 저장 상태와 변화량”을 보여주는 API다. Custom은 전적이 저장되므로 Summary API 대상이 맞다. 다만 Practice는 전적을 저장하지 않으므로 계속 Summary API 대상에서 제외함. Custom record가 아직 0개이면 `PENDING`, 2개면 `DONE`으로 내려가게 테스트로 고정함.
 
 ## 📝 Note
 
 - 이번 PR에서 Custom Game 결과 화면 프론트 구현은 제외함.
 - Custom Room start 프론트 연결은 제외함.
 - Custom 전용 result reason 추가는 제외함.
+- Custom Room WebSocket `ROOM_STARTED` 구현은 issue-130 범위이며, 이번 PR은 그 이후 Game WebSocket 결과/전적 정산 정책만 다룸.
+- Practice Mode는 계속 WebSocket `GAME_RESULT`만 사용하고 Summary API를 호출하지 않음.
 - DDL 변경 없음.
 - 새 패키지 추가 없음.
-- 검증 결과를 여기에 기록함.
+- `./gradlew build` 실행으로 OpenAPI 산출물 `openapi3.yaml`이 재생성됨.
+- 검증 결과:
+  - `./gradlew :league-of-star-core:test --tests '*GameRecord*'` 통과함.
+  - `./gradlew :league-of-star-api:test --tests '*GameLightningServiceTest' --tests '*GameEndSettlementServiceTest' --tests '*GameRecord*' --tests '*GameSummary*'` 통과함.
+  - `./gradlew :league-of-star-core:test` 통과함.
+  - `./gradlew :league-of-star-api:test` 통과함.
+  - `./gradlew test` 통과함.
+  - `./gradlew build` 통과함.
+  - `git diff --check` 통과함.
 
 ## 📌 Related Issue
 
