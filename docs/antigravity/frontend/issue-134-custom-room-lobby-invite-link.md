@@ -245,15 +245,15 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 5. CustomRoomsPage 구현
 
-- [ ] mount 시 공개 대기실 목록을 조회한다.
-- [ ] loading / empty / success / error state를 구현한다.
-- [ ] 목록에서 roomName, 현재 인원, 최대 인원, 방장 정보를 표시한다.
-- [ ] 목록 row 클릭 시 상세 route로 이동한다.
-- [ ] 새 방 만들기 버튼을 create room API와 연결한다.
-- [ ] 방 생성 성공 시 상세 route로 이동한다.
-- [ ] 초대 코드 입력 UI를 구현한다.
-- [ ] 초대 코드 preview 성공 시 상세 route로 이동한다.
-- [ ] 초대 코드 preview 실패 state를 구현한다.
+- [x] mount 시 공개 대기실 목록을 조회한다.
+- [x] loading / empty / success / error state를 구현한다.
+- [x] 목록에서 roomName, 현재 인원, 최대 인원, 방장 정보를 표시한다.
+- [x] 목록 row 클릭 시 상세 route로 이동한다.
+- [x] 새 방 만들기 버튼을 create room API와 연결한다.
+- [x] 방 생성 성공 시 상세 route로 이동한다.
+- [x] 초대 코드 입력 UI를 구현한다.
+- [x] 초대 코드 preview 성공 시 상세 route로 이동한다.
+- [x] 초대 코드 preview 실패 state를 구현한다.
 
 ### 6. CustomRoomPage 구현
 
