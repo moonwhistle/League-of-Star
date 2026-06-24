@@ -167,19 +167,19 @@ Custom Game record 저장 기준:
 - Custom Game record 화면에서 mode badge 표시.
 - `game_records` DDL 변경.
 - Practice record 저장.
-- rank/LP 정책 변경.
+- Match 기존 rank/LP 정책 변경.
 - 새 외부 패키지 추가.
 
 ## Tasks
 
 ### 1. Backend Contract 정리
 
-- [ ] Custom Game 결과 source of truth가 `GAME_RESULT` WebSocket event임을 문서화.
-- [ ] `GAME_RESULT.gameMode=CUSTOM` payload shape 확정.
-- [ ] Custom Game result reason은 기존 `LIGHTNING_KILL`, `NATURAL_DEATH_DRAW` 재사용으로 확정.
-- [ ] `MATCH/CUSTOM/PRACTICE` record/rank 정책 표 정리.
-- [ ] Summary API에서 Custom Game을 지원하고 Practice는 제외하는 정책 정리.
-- [ ] issue-130 후속 범위와 충돌하지 않는지 확인.
+- [x] Custom Game 결과 source of truth가 `GAME_RESULT` WebSocket event임을 문서화.
+- [x] `GAME_RESULT.gameMode=CUSTOM` payload shape 확정.
+- [x] Custom Game result reason은 기존 `LIGHTNING_KILL`, `NATURAL_DEATH_DRAW` 재사용으로 확정.
+- [x] `MATCH/CUSTOM/PRACTICE` record/rank 정책 표 정리.
+- [x] Summary API에서 Custom Game을 지원하고 Practice는 제외하는 정책 정리.
+- [x] issue-130 후속 범위와 충돌하지 않는지 확인.
 
 ### 2. Core Record Settlement Policy 구현
 
