@@ -49,6 +49,14 @@ flowchart TD
 
 이번 이슈는 기존 Custom Room API를 프론트에 연결한다. 다만 `/custom-games/rooms/:roomId` route에서 새로고침/직접 진입 시 방 상세를 다시 불러와야 하므로, roomId 단건 조회 API를 최소 보강한다.
 
+기존 backend custom room 이슈와의 정합성:
+
+- issue-124는 방 생성, 공개 목록, 초대 코드 preview까지만 담당한다. 이번 프론트 이슈는 이 세 API를 화면에 연결한다.
+- issue-126은 실제 join/leave command를 담당한다. 이번 프론트 이슈는 방을 보는 단계만 담당하므로 join/leave API를 호출하지 않는다.
+- issue-128은 Custom Room WebSocket 동기화를 담당한다. 해당 WebSocket은 room participant만 연결할 수 있으므로, 아직 참가 처리를 하지 않는 이번 preview/detail 화면에서는 연결하지 않는다.
+- issue-130은 방장 start와 `ROOM_STARTED` handoff를 담당한다. 이번 프론트 이슈는 start 버튼과 play 이동을 포함하지 않는다.
+- issue-132는 Custom Game 결과와 전적/랭크 정책을 담당한다. 이번 프론트 이슈는 게임 시작 전 대기실 탐색 범위라 결과 정책을 호출하지 않는다.
+
 ### Custom Room Create API
 
 ```http
@@ -202,11 +210,11 @@ GET /api/v1/custom-games/rooms/{roomId}
 
 ### 1. Frontend Custom Room Contract 정리
 
-- [ ] 기존 issue-124/126/128/130/132 custom room backend 계약을 재확인한다.
-- [ ] 공개 목록, 방 생성, 초대 코드 preview, room detail API 역할을 문서화한다.
-- [ ] roomId는 내부 상세 조회 route에만 사용하고, 초대 링크는 inviteCode를 사용함을 문서화한다.
-- [ ] 이번 이슈에서 join/leave/WebSocket/start/GamePlay를 제외함을 문서화한다.
-- [ ] `last-구현.md` 4-8 범위와 정합성을 확인한다.
+- [x] 기존 issue-124/126/128/130/132 custom room backend 계약을 재확인한다.
+- [x] 공개 목록, 방 생성, 초대 코드 preview, room detail API 역할을 문서화한다.
+- [x] roomId는 내부 상세 조회 route에만 사용하고, 초대 링크는 inviteCode를 사용함을 문서화한다.
+- [x] 이번 이슈에서 join/leave/WebSocket/start/GamePlay를 제외함을 문서화한다.
+- [x] `last-구현.md` 4-8 범위와 정합성을 확인한다.
 
 ### 2. Backend Room Detail API 보강
 
