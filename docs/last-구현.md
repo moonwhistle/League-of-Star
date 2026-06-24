@@ -672,6 +672,7 @@ Backend:
 - [x] room이 `WAITING`일 때만 참가를 허용한다.
 - [x] 정원이 2명이면 참가를 거부한다.
 - [x] 이미 참가한 사용자의 join은 idempotent하게 최신 room state를 반환한다.
+- [x] 다른 `WAITING` custom room에 참가 중인 사용자의 초대 join은 기존 room 자동 이탈 후 새 room 참가로 처리한다.
 - [x] 방장이 나가면 room을 `CLOSED`로 전환한다.
 - [x] 일반 참가자가 나가면 participant row를 삭제한다.
 - [x] RestDocs와 ErrorResponse를 정리한다.
@@ -679,6 +680,7 @@ Backend:
 Policy:
 
 - [x] join/leave는 room lifecycle command다.
+- [x] 초대 join은 사용자의 명시적 방 이동으로 간주해 기존 대기방을 자동 이탈시킨다.
 - [x] join/leave 이후 실시간 broadcast는 4-5 Room WebSocket 이슈에서 연결한다.
 - [x] started/closed room에는 새 참가를 허용하지 않는다.
 - [x] 대기실은 1명 또는 2명 상태를 허용하되, game start는 4-6의 2명 필수 정책을 따른다.
@@ -854,6 +856,8 @@ Frontend:
 - [x] `/custom-games/join/:inviteCode` route를 추가한다.
 - [x] 로그인하지 않은 사용자는 로그인 후 초대 링크로 복귀하게 한다.
 - [x] join API를 호출하고 성공 시 `/custom-games/rooms/:roomId`로 이동한다.
+- [x] 공개 대기실 목록에서 방을 선택하면 상세 preview가 아니라 join route로 이동한다.
+- [x] 참가 중인 방이 있으면 공개 목록으로 빠지지 않고 자기 방으로 되돌린다.
 - [x] CustomRoomPage에서 Room WebSocket을 연결한다.
 - [x] `ROOM_UPDATED`로 참가자 목록을 갱신한다.
 - [x] `ROOM_CLOSED`로 방 닫힘 상태를 표시하고 `/match` 복귀 액션을 제공한다.
@@ -863,6 +867,7 @@ Policy:
 
 - [x] Room WebSocket은 방 페이지에서만 연결한다.
 - [x] HTTP join/leave는 command이고, 최종 room 상태 반영은 WebSocket event를 우선한다.
+- [x] CustomRoomPage에서 공개 목록으로 돌아가는 동작은 제공하지 않고, 나가기 버튼으로만 참가를 해제한다.
 - [x] 친구 목록 기반 초대는 이번 범위에서 제외한다.
 
 Acceptance Criteria:

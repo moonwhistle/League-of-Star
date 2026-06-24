@@ -166,10 +166,11 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
     @DisplayName("Custom Room detail API 문서화")
     void getRoom() {
         // given
-        when(customGameRoomService.getWaitingRoom(100L)).thenReturn(roomResponse());
+        when(customGameRoomService.getWaitingRoom(100L, USER_ID)).thenReturn(roomResponse());
 
         // when & then
         spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
                 .when()
                 .get(CustomGamePath.CUSTOM_ROOM_BASE + "/{roomId}", 100L)
                 .then()
@@ -179,9 +180,10 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
                                 .tag("Custom Game")
                                 .summary("사용자 지정 방 상세 조회")
                                 .description("""
-                                        roomId로 `WAITING` custom room 상태를 조회합니다.
+                                        roomId로 참가 중인 `WAITING` custom room 상태를 조회합니다.
 
                                         이 API는 CustomRoomPage 새로고침/직접 진입 복구를 위한 조회 API입니다.
+                                        참가자는 초대 join API를 통해 먼저 방에 들어와야 하며, 이 API는 참가자만 상세 상태를 볼 수 있습니다.
                                         참가, 나가기, WebSocket 연결, 게임 시작 처리는 하지 않습니다.
                                         실제 초대 공유 링크는 roomId가 아니라 inviteCode를 사용합니다.
                                         """)
@@ -198,11 +200,12 @@ class CustomGameRoomControllerRestDocsTest extends RestDocsSupport {
     @DisplayName("Custom Room detail not found 응답 문서화")
     void getRoomNotFound() {
         // given
-        when(customGameRoomService.getWaitingRoom(999L))
+        when(customGameRoomService.getWaitingRoom(999L, USER_ID))
                 .thenThrow(new CoreException(CoreErrorCode.CUSTOM_ROOM_NOT_FOUND));
 
         // when & then
         spec.contentType(ContentType.JSON)
+                .header("Authorization", "Bearer access-token")
                 .when()
                 .get(CustomGamePath.CUSTOM_ROOM_BASE + "/{roomId}", 999L)
                 .then()

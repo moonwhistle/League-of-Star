@@ -23,7 +23,6 @@
           <h1>{{ room?.roomName ?? t('customRoom.title') }}</h1>
         </div>
         <nav class="custom-room-actions" :aria-label="t('customRoom.pageLabel')">
-          <button type="button" @click="returnToRooms">{{ t('customRoom.returnToRooms') }}</button>
           <button type="button" :disabled="roomStatus === 'loading'" @click="loadRoom">
             {{ t('customRoom.refresh') }}
           </button>
@@ -138,6 +137,7 @@ import {
   connectCustomRoomWebSocket,
   type CustomRoomWebSocketConnection,
 } from '@/services/realtime/customRoomWebSocket'
+import { clearCurrentCustomRoom, rememberCurrentCustomRoom } from '@/services/customRoomSession'
 import type { CustomRoomResponse, CustomRoomWebSocketServerMessage } from '@/types/customRoom'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
@@ -216,6 +216,7 @@ async function loadRoom() {
     }
 
     room.value = response
+    rememberCurrentCustomRoom(response.roomId)
     roomStatus.value = 'success'
     connectRoomSocket(response.roomId)
   } catch (error) {
@@ -249,6 +250,7 @@ async function leaveRoom() {
     }
 
     leaveStatus.value = 'success'
+    clearCurrentCustomRoom()
     closeRoomSocket()
     await router.push({ name: ROUTE_NAMES.customRooms })
   } catch (error) {
@@ -277,10 +279,6 @@ async function copyInviteLink() {
     copyStatus.value = 'error'
     copyMessage.value = t('customRoom.copyFailed')
   }
-}
-
-function returnToRooms() {
-  void router.push({ name: ROUTE_NAMES.customRooms })
 }
 
 function returnToMatch() {
@@ -351,6 +349,7 @@ function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
 
   if (message.type === 'ROOM_CLOSED') {
     room.value = message.payload
+    clearCurrentCustomRoom()
     roomStatus.value = 'closed'
     socketStatus.value = 'closed'
     socketErrorMessage.value = ''

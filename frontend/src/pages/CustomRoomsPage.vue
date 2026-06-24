@@ -100,8 +100,8 @@
                 }}</span
               >
             </div>
-            <button type="button" @click="openRoom(room.roomId)">
-              {{ t('customRooms.openRoom') }}
+            <button type="button" @click="joinRoom(room.inviteCode)">
+              {{ t('customRooms.joinRoom') }}
             </button>
           </li>
         </ol>
@@ -117,11 +117,12 @@ import { useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { createCustomRoom, getCustomRoom, getCustomRooms } from '@/services/customRoomService'
 import {
-  createCustomRoom,
-  getCustomRoomInvitePreview,
-  getCustomRooms,
-} from '@/services/customRoomService'
+  clearCurrentCustomRoom,
+  getCurrentCustomRoomId,
+  rememberCurrentCustomRoom,
+} from '@/services/customRoomSession'
 import type { CustomRoomListItem } from '@/types/customRoom'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
@@ -141,16 +142,14 @@ const inviteCodeInput = ref('')
 const normalizedInviteCode = computed(() => inviteCodeInput.value.trim().toUpperCase())
 const roomsAbortController = shallowRef<AbortController>()
 const createAbortController = shallowRef<AbortController>()
-const inviteAbortController = shallowRef<AbortController>()
 
 onMounted(() => {
-  void loadRooms()
+  void restoreCurrentRoomOrLoadRooms()
 })
 
 onUnmounted(() => {
   abortRoomsRequest()
   abortCreateRequest()
-  abortInviteRequest()
 })
 
 async function loadRooms() {
@@ -180,6 +179,24 @@ async function loadRooms() {
   }
 }
 
+async function restoreCurrentRoomOrLoadRooms() {
+  const currentRoomId = getCurrentCustomRoomId()
+
+  if (currentRoomId === null) {
+    await loadRooms()
+    return
+  }
+
+  try {
+    const response = await getCustomRoom(currentRoomId)
+    rememberCurrentCustomRoom(response.roomId)
+    await openJoinedRoom(response.roomId)
+  } catch {
+    clearCurrentCustomRoom()
+    await loadRooms()
+  }
+}
+
 async function createRoom() {
   abortCreateRequest()
   const controller = new AbortController()
@@ -195,7 +212,8 @@ async function createRoom() {
     }
 
     createStatus.value = 'success'
-    await openRoom(response.roomId)
+    rememberCurrentCustomRoom(response.roomId)
+    await openJoinedRoom(response.roomId)
   } catch (error) {
     if (controller.signal.aborted) {
       return
@@ -215,45 +233,28 @@ async function findInviteRoom() {
     return
   }
 
-  await findInviteRoomByCode(normalizedInviteCode.value)
-}
-
-async function findInviteRoomByCode(inviteCode: string) {
-  inviteCodeInput.value = inviteCode
-  inviteErrorMessage.value = ''
-  abortInviteRequest()
-  const controller = new AbortController()
-  inviteAbortController.value = controller
-  inviteStatus.value = 'loading'
-
-  try {
-    const response = await getCustomRoomInvitePreview(inviteCode, controller.signal)
-
-    if (inviteAbortController.value !== controller) {
-      return
-    }
-
-    inviteStatus.value = 'success'
-    await openRoom(response.roomId)
-  } catch (error) {
-    if (controller.signal.aborted) {
-      return
-    }
-
-    inviteStatus.value = 'error'
-    inviteErrorMessage.value = errorMessage(error, t('customRooms.inviteFailed'))
-  }
+  inviteStatus.value = 'success'
+  await joinRoom(normalizedInviteCode.value)
 }
 
 function returnToMatch() {
   void router.push({ name: ROUTE_NAMES.match })
 }
 
-function openRoom(roomId: number | string) {
+function openJoinedRoom(roomId: number | string) {
   return router.push({
     name: ROUTE_NAMES.customRoom,
     params: {
       roomId: String(roomId),
+    },
+  })
+}
+
+function joinRoom(inviteCode: string) {
+  return router.push({
+    name: ROUTE_NAMES.customRoomInvite,
+    params: {
+      inviteCode,
     },
   })
 }
@@ -264,10 +265,6 @@ function abortRoomsRequest() {
 
 function abortCreateRequest() {
   createAbortController.value?.abort()
-}
-
-function abortInviteRequest() {
-  inviteAbortController.value?.abort()
 }
 
 function errorMessage(error: unknown, fallback: string) {

@@ -78,6 +78,8 @@ interface CustomRoomResponse {
 - `/custom-games/join/:inviteCode` 진입 시 호출한다.
 - 성공하면 응답의 `roomId`로 `/custom-games/rooms/:roomId` 이동한다.
 - 이미 참가한 사용자의 join은 멱등 응답이므로 동일하게 상세 화면으로 이동한다.
+- 다른 `WAITING` custom room에 참가 중인 사용자의 초대 join은 백엔드가 기존 room 이탈 후 새 room 참가로 처리한다.
+- 공개 대기실 목록에서 방을 선택하는 동작도 상세 preview가 아니라 초대 join route로 이동한다.
 - HTTP 200은 join command 성공이다. 다른 참가자 화면의 최종 갱신 기준은 `ROOM_UPDATED`다.
 
 ### Custom Room Leave API
@@ -279,6 +281,8 @@ type CustomRoomWebSocketServerMessage =
 - HTTP join/leave 응답은 command 결과다.
 - 다른 참가자의 최종 화면 동기화는 `ROOM_UPDATED`, `ROOM_CLOSED` event 기준이다.
 - Room WebSocket은 `/custom-games/rooms/:roomId` 페이지에서만 연결한다.
+- CustomRoomPage는 참가자만 접근하는 화면이며, 공개 목록으로 돌아가는 버튼을 제공하지 않는다.
+- 사용자가 방을 벗어나는 동작은 나가기 버튼의 leave API로만 수행한다.
 - WebSocket disconnect/error는 DB leave가 아니다.
 - leave API는 사용자가 나가기 버튼을 누른 경우에만 호출한다.
 - `ROOM_CLOSED` 수신 시 leave API를 추가 호출하지 않는다.
@@ -333,7 +337,9 @@ flowchart TD
 백엔드와의 구현 계약:
 
 - `POST /api/v1/custom-games/rooms/{inviteCode}/join`은 인증 사용자를 room participant로 추가함.
+- 사용자가 다른 `WAITING` custom room에 참가 중이면 join command 안에서 기존 room을 먼저 이탈시키고 새 room에 참가시킴.
 - `POST /api/v1/custom-games/rooms/{roomId}/leave`는 인증 사용자를 room에서 제거하거나 room을 닫음.
+- `GET /api/v1/custom-games/rooms/{roomId}`는 참가자만 상세 상태를 볼 수 있음.
 - `/ws/custom-games/rooms/{roomId}?token={accessToken}`은 참가자만 연결 가능함.
 - `ROOM_UPDATED` payload는 room state source of truth임.
 - `ROOM_CLOSED` payload는 방 닫힘 source of truth임.
@@ -342,6 +348,15 @@ flowchart TD
 
 - 초대 링크를 preview에서 실제 참가 흐름으로 확장함.
   issue-134에서는 링크가 깨지지 않게 preview만 수행했다. 이번 PR에서는 사용자가 명확히 초대 링크로 들어온 경우 join API를 호출해 실제 참가자로 등록함.
+
+- 공개 대기실의 방 선택을 “보기”가 아니라 “참가”로 바꿈.
+  참가하지 않은 사용자가 방 상세를 볼 수 있으면 다른 방 상태를 엿보는 흐름이 생긴다. 그래서 목록에서 방을 누르면 바로 join route로 보내고, 상세 페이지는 참가자만 보는 화면으로 둠.
+
+- 초대 join 시 기존 방 자동 이탈 정책을 프론트 흐름에 반영함.
+  사용자가 초대 링크를 누르는 것은 새 방으로 이동하겠다는 명시적인 선택이다. 백엔드가 기존 `WAITING` room 이탈과 새 room 참가를 한 command 안에서 처리하므로, 프론트는 실패/성공 결과만 화면에 반영함.
+
+- 방 상세 조회를 참가자 전용으로 강화함.
+  roomId를 주소로 직접 입력해서 다른 방을 들여다보면 start, leave, WebSocket 상태가 꼬일 수 있다. 그래서 상세 조회는 인증 사용자와 participant 검증을 통과해야만 성공하고, 프론트의 `getCustomRoom`도 인증 요청으로 바꿈.
 
 - HTTP command와 WebSocket 동기화를 분리함.
   join/leave HTTP 응답은 요청한 사용자에게 command 성공을 알려준다. 다른 참가자 화면까지 맞추는 기준은 backend가 commit 이후 발행하는 `ROOM_UPDATED`, `ROOM_CLOSED` event로 둠.
@@ -355,6 +370,9 @@ flowchart TD
 - Room WebSocket 연결 위치를 방 상세 화면으로 제한함.
   공개 대기실 목록이나 초대 참가 route에서 WebSocket을 열면 사용자가 아직 방 상태를 보고 있지 않은데도 세션이 생긴다. 방 상세 화면에서만 연결하면 “현재 이 방을 보고 있는 사용자”에게만 실시간 동기화 책임을 부여할 수 있음.
 
+- 현재 참가 중인 방이 있으면 공개 목록으로 빠지지 않게 함.
+  create/join/detail 성공 시 현재 custom room id를 localStorage에 저장하고, 목록 페이지 진입 시 백엔드 detail 조회로 아직 참가 중인지 확인한다. 유효하면 자기 방으로 되돌리고, 유효하지 않으면 stale 값만 지운 뒤 목록을 보여줌. 실제 권한 판단은 백엔드 참가자 검증을 따른다.
+
 - start/GamePlay 이동을 이번 PR에 섞지 않음.
   참가/나가기는 room membership 문제이고, start는 같은 gameRoom/scenario로 두 사용자를 이동시키는 문제다. 둘을 한 PR에 섞으면 어느 event가 화면 전환 기준인지 흐려지므로 `ROOM_STARTED` 처리는 후속 4-10에서 다룸.
 
@@ -367,10 +385,11 @@ flowchart TD
   - `npm run format` 통과함.
   - `npm run lint` 통과함.
   - `npm run typecheck` 통과함.
-  - `npm run test` 통과함. 33 files / 300 tests passed 확인함.
+  - `npm run test` 통과함. 34 files / 303 tests passed 확인함.
   - `npm run build` 통과함.
-  - Chrome headless UI 확인 완료함. `/custom-games/rooms`, `/custom-games/join/STAR12`, `/custom-games/rooms/101`에서 desktop `1440x900`, mobile `390x844` 모두 horizontal overflow 없음, text overflow 후보 없음.
-  - 8081 목서버 기준 초대 링크 참가 후 `/custom-games/rooms/101` 이동, WebSocket `open`, 참가자 수 2명 표시 확인함.
+  - backend `./gradlew test` 통과함.
+  - Chrome headless UI 확인 완료함. `/custom-games/rooms`, `/custom-games/join/NOVA99`, `/custom-games/rooms/102`에서 desktop `1440x900`, mobile `390x844` 모두 horizontal overflow 없음, text overflow 후보 없음.
+  - 8081 목서버 기준 초대 링크 참가 후 `/custom-games/rooms/102` 이동, WebSocket `open`, 참가자 수 2명 표시, 방 상세 내 `대기실 목록` escape 없음 확인함.
 
 ## 📌 Related Issue
 

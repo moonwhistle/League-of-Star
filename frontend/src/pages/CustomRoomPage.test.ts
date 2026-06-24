@@ -53,6 +53,7 @@ const { setLocale } = useLocale()
 describe('CustomRoomPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     setLocale('ko')
     routeMock.params.roomId = '100'
     routerPushMock.mockResolvedValue(undefined)
@@ -90,6 +91,7 @@ describe('CustomRoomPage', () => {
     expect(wrapper.get('main').attributes('data-custom-room-status')).toBe('success')
     expect(wrapper.get('main').attributes('data-custom-room-id')).toBe('100')
     expect(wrapper.get('main').attributes('data-custom-room-participant-count')).toBe('2')
+    expect(localStorage.getItem('league-of-star.currentCustomRoomId')).toBe('100')
     expect(wrapper.text()).toContain("Host's room")
     expect(wrapper.text()).toContain('현재 인원')
     expect(wrapper.text()).toContain('2/2')
@@ -156,13 +158,11 @@ describe('CustomRoomPage', () => {
     expect(wrapper.text()).toContain('방 ID가 올바르지 않습니다.')
   })
 
-  it('moves back to the custom rooms route from the header action', async () => {
+  it('does not render a room list escape action while participating in a room', async () => {
     const wrapper = mount(CustomRoomPage)
     await flushPromises()
 
-    await wrapper.get('.custom-room-actions button').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.customRooms })
+    expect(wrapper.text()).not.toContain('대기실 목록')
   })
 
   it('updates room participants from ROOM_UPDATED messages', async () => {
@@ -208,6 +208,7 @@ describe('CustomRoomPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-custom-room-status')).toBe('closed')
+    expect(localStorage.getItem('league-of-star.currentCustomRoomId')).toBeNull()
     expect(wrapper.text()).toContain('방이 닫혔습니다.')
     expect(leaveCustomRoomMock).not.toHaveBeenCalled()
 
@@ -224,6 +225,7 @@ describe('CustomRoomPage', () => {
     await flushPromises()
 
     expect(leaveCustomRoomMock).toHaveBeenCalledWith(100, expect.any(AbortSignal))
+    expect(localStorage.getItem('league-of-star.currentCustomRoomId')).toBeNull()
     expect(customRoomSocketMock.close).toHaveBeenCalledWith(1000, 'custom room page closed')
     expect(routerPushMock).toHaveBeenCalledWith({ name: ROUTE_NAMES.customRooms })
   })

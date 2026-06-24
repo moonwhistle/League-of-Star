@@ -8,6 +8,7 @@ import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRo
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameParticipantRepository;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameRoomRepository;
+import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomJoinResult;
 import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomStartResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -192,12 +193,17 @@ class CustomGameRoomCommandServiceTest {
         given(customGameParticipantRepository.existsByCustomRoomIdAndUserId(ROOM_ID, PLAYER_USER_ID))
                 .willReturn(false);
         given(customGameParticipantRepository.countByCustomRoomId(ROOM_ID)).willReturn(1L);
+        given(customGameRoomRepository.findByParticipantUserIdAndStatusForUpdate(
+                PLAYER_USER_ID,
+                CustomRoomStatus.WAITING
+        )).willReturn(List.of());
 
         // when
-        CustomGameRoom result = customGameRoomCommandService.joinRoom(INVITE_CODE, PLAYER_USER_ID);
+        CustomGameRoomJoinResult result = customGameRoomCommandService.joinRoom(INVITE_CODE, PLAYER_USER_ID);
 
         // then
-        assertThat(result).isSameAs(room);
+        assertThat(result.joinedRoom()).isSameAs(room);
+        assertThat(result.departedRooms()).isEmpty();
         ArgumentCaptor<CustomGameParticipant> participantCaptor = ArgumentCaptor.forClass(CustomGameParticipant.class);
         verify(customGameParticipantRepository).save(participantCaptor.capture());
         assertThat(participantCaptor.getValue().getCustomRoomId()).isEqualTo(ROOM_ID);
@@ -215,11 +221,68 @@ class CustomGameRoomCommandServiceTest {
                 .willReturn(true);
 
         // when
-        CustomGameRoom result = customGameRoomCommandService.joinRoom(INVITE_CODE, PLAYER_USER_ID);
+        CustomGameRoomJoinResult result = customGameRoomCommandService.joinRoom(INVITE_CODE, PLAYER_USER_ID);
 
         // then
-        assertThat(result).isSameAs(room);
+        assertThat(result.joinedRoom()).isSameAs(room);
+        assertThat(result.departedRooms()).isEmpty();
         verify(customGameParticipantRepository, never()).save(any(CustomGameParticipant.class));
+    }
+
+    @Test
+    @DisplayName("joinRoom - 다른 WAITING room에 일반 참가자로 있으면 기존 참가를 제거하고 새 room에 참가한다")
+    void joinRoom_DepartOtherRoomAsPlayer() {
+        // given
+        Long otherRoomId = 200L;
+        CustomGameRoom targetRoom = room(ROOM_ID, OWNER_USER_ID);
+        CustomGameRoom otherRoom = room(otherRoomId, 3L);
+        given(customGameRoomRepository.findByInviteCodeForUpdate(INVITE_CODE)).willReturn(Optional.of(targetRoom));
+        given(customGameParticipantRepository.existsByCustomRoomIdAndUserId(ROOM_ID, PLAYER_USER_ID))
+                .willReturn(false);
+        given(customGameParticipantRepository.countByCustomRoomId(ROOM_ID)).willReturn(1L);
+        given(customGameRoomRepository.findByParticipantUserIdAndStatusForUpdate(
+                PLAYER_USER_ID,
+                CustomRoomStatus.WAITING
+        )).willReturn(List.of(otherRoom));
+
+        // when
+        CustomGameRoomJoinResult result = customGameRoomCommandService.joinRoom(INVITE_CODE, PLAYER_USER_ID);
+
+        // then
+        assertThat(result.joinedRoom()).isSameAs(targetRoom);
+        assertThat(result.departedRooms()).containsExactly(otherRoom);
+        assertThat(otherRoom.isWaiting()).isTrue();
+        verify(customGameParticipantRepository).deleteByCustomRoomIdAndUserId(otherRoomId, PLAYER_USER_ID);
+        verify(customGameParticipantRepository, never()).deleteByCustomRoomId(otherRoomId);
+        verify(customGameParticipantRepository).save(any(CustomGameParticipant.class));
+    }
+
+    @Test
+    @DisplayName("joinRoom - 다른 WAITING room의 방장이면 기존 room을 닫고 새 room에 참가한다")
+    void joinRoom_DepartOtherRoomAsOwner() {
+        // given
+        Long otherRoomId = 200L;
+        CustomGameRoom targetRoom = room(ROOM_ID, OWNER_USER_ID);
+        CustomGameRoom otherRoom = room(otherRoomId, PLAYER_USER_ID);
+        given(customGameRoomRepository.findByInviteCodeForUpdate(INVITE_CODE)).willReturn(Optional.of(targetRoom));
+        given(customGameParticipantRepository.existsByCustomRoomIdAndUserId(ROOM_ID, PLAYER_USER_ID))
+                .willReturn(false);
+        given(customGameParticipantRepository.countByCustomRoomId(ROOM_ID)).willReturn(1L);
+        given(customGameRoomRepository.findByParticipantUserIdAndStatusForUpdate(
+                PLAYER_USER_ID,
+                CustomRoomStatus.WAITING
+        )).willReturn(List.of(otherRoom));
+
+        // when
+        CustomGameRoomJoinResult result = customGameRoomCommandService.joinRoom(INVITE_CODE, PLAYER_USER_ID);
+
+        // then
+        assertThat(result.joinedRoom()).isSameAs(targetRoom);
+        assertThat(result.departedRooms()).containsExactly(otherRoom);
+        assertThat(otherRoom.isClosed()).isTrue();
+        verify(customGameParticipantRepository).deleteByCustomRoomId(otherRoomId);
+        verify(customGameParticipantRepository, never()).deleteByCustomRoomIdAndUserId(otherRoomId, PLAYER_USER_ID);
+        verify(customGameParticipantRepository).save(any(CustomGameParticipant.class));
     }
 
     @Test

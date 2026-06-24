@@ -14,6 +14,7 @@ import com.sang.leagueofstar.domain.customgame.domain.CustomGameParticipant;
 import com.sang.leagueofstar.domain.customgame.domain.CustomGameRoom;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomCommandService;
 import com.sang.leagueofstar.domain.customgame.service.CustomGameRoomReadService;
+import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomJoinResult;
 import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomStartResult;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
 import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
@@ -87,9 +88,20 @@ public class CustomGameRoomService {
         return toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
     }
 
+    public CustomRoomResponse getWaitingRoom(Long roomId, Long userId) {
+        customGameRoomReadService.validateWaitingParticipant(roomId, userId);
+        return getWaitingRoom(roomId);
+    }
+
     public CustomRoomResponse joinRoom(String inviteCode, Long userId) {
-        CustomGameRoom room = customGameRoomCommandService.joinRoom(inviteCode, userId);
-        CustomRoomResponse response = toRoomResponse(room, customGameRoomReadService.getParticipants(room.getId()));
+        CustomGameRoomJoinResult joinResult = customGameRoomCommandService.joinRoom(inviteCode, userId);
+        notifyDepartedRoomsAfterCommit(joinResult.departedRooms(), userId);
+
+        CustomGameRoom joinedRoom = joinResult.joinedRoom();
+        CustomRoomResponse response = toRoomResponse(
+                joinedRoom,
+                customGameRoomReadService.getParticipants(joinedRoom.getId())
+        );
         customRoomWebSocketNotifier.notifyRoomUpdatedAfterCommit(response);
         return response;
     }
@@ -156,6 +168,20 @@ public class CustomGameRoomService {
             throw new ApiException(ApiErrorCode.GAME_CUSTOM_START_FAILED);
         }
         return gameRoom;
+    }
+
+    private void notifyDepartedRoomsAfterCommit(List<CustomGameRoom> departedRooms, Long userId) {
+        departedRooms.forEach(room -> {
+            CustomRoomResponse response = toRoomResponse(
+                    room,
+                    customGameRoomReadService.getParticipants(room.getId())
+            );
+            if (room.isClosed()) {
+                customRoomWebSocketNotifier.notifyRoomClosedAfterCommit(response);
+                return;
+            }
+            customRoomWebSocketNotifier.notifyParticipantLeftAfterCommit(response, userId);
+        });
     }
 
     private void registerEndDeadline(Long gameRoomId, long startAtMillis, long durationMs) {

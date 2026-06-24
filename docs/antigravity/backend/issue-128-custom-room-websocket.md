@@ -415,6 +415,7 @@ flowchart TD
 - handshake에서 core read service로 room participant 여부를 검증함.
 - 연결 성공 시 현재 room state를 `ROOM_UPDATED`로 1회 전송함.
 - join/leave command commit 이후 `ROOM_UPDATED` 또는 `ROOM_CLOSED`를 broadcast함.
+- 초대 join이 기존 room 자동 이탈을 동반하면 기존 room에는 `ROOM_UPDATED` 또는 `ROOM_CLOSED`, 새 room에는 `ROOM_UPDATED`를 commit 이후 전달함.
 - event payload는 HTTP room 응답과 같은 `CustomRoomResponse`를 재사용함.
 - 허용 origin은 `app.websocket.allowed-origin-patterns` 설정값을 사용함.
 

@@ -60,7 +60,7 @@ describe('customRoomService', () => {
     })
   })
 
-  it('requests custom room detail by roomId without authentication', async () => {
+  it('requests custom room detail by roomId with authentication', async () => {
     const abortController = new AbortController()
     const response = createRoomResponse()
     requestJsonMock.mockResolvedValue(response)
@@ -70,7 +70,6 @@ describe('customRoomService', () => {
     expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/custom-games/rooms/100', {
       method: 'GET',
       signal: abortController.signal,
-      auth: false,
     })
   })
 
@@ -82,7 +81,6 @@ describe('customRoomService', () => {
     expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/custom-games/rooms/room%2Fwith%20space', {
       method: 'GET',
       signal: undefined,
-      auth: false,
     })
   })
 

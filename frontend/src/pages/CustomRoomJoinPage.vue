@@ -28,6 +28,7 @@ import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
 import { joinCustomRoom } from '@/services/customRoomService'
+import { rememberCurrentCustomRoom } from '@/services/customRoomSession'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
 
@@ -75,6 +76,7 @@ async function joinRoom(inviteCode: string) {
     }
 
     joinStatus.value = 'success'
+    rememberCurrentCustomRoom(response.roomId)
     await router.push({
       name: ROUTE_NAMES.customRoom,
       params: {

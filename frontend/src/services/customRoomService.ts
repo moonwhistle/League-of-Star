@@ -26,7 +26,6 @@ export function getCustomRoom(
   return requestJson<CustomRoomResponse>(`${CUSTOM_ROOM_BASE_PATH}/${encodeURIComponent(roomId)}`, {
     method: 'GET',
     signal,
-    auth: false,
   })
 }
 

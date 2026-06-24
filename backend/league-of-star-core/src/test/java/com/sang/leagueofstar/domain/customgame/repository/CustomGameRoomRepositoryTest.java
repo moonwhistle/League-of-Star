@@ -135,17 +135,55 @@ class CustomGameRoomRepositoryTest {
     }
 
     @Test
+    @DisplayName("participant userId가 속한 WAITING room을 잠금 조회한다")
+    void findByParticipantUserIdAndStatusForUpdate_ReturnWaitingRooms() {
+        // given
+        CustomGameRoom waitingRoom = customGameRoomRepository.saveAndFlush(CustomGameRoom.create(1L, "AB12CD"));
+        CustomGameRoom startedRoom = CustomGameRoom.create(2L, "EF34GH");
+        startedRoom.markStarted(LocalDateTime.now());
+        customGameRoomRepository.saveAndFlush(startedRoom);
+        customGameParticipantRepository.save(CustomGameParticipant.create(
+                waitingRoom.getId(),
+                3L,
+                CustomRoomParticipantRole.PLAYER
+        ));
+        customGameParticipantRepository.save(CustomGameParticipant.create(
+                startedRoom.getId(),
+                3L,
+                CustomRoomParticipantRole.PLAYER
+        ));
+        customGameParticipantRepository.flush();
+
+        // when
+        List<CustomGameRoom> result = customGameRoomRepository.findByParticipantUserIdAndStatusForUpdate(
+                3L,
+                CustomRoomStatus.WAITING
+        );
+
+        // then
+        assertThat(result).extracting(CustomGameRoom::getId)
+                .containsExactly(waitingRoom.getId());
+    }
+
+    @Test
     @DisplayName("for update 조회 메서드는 PESSIMISTIC_WRITE lock을 사용한다")
     void forUpdateMethods_UsePessimisticWriteLock() throws NoSuchMethodException {
         // given
         Method findByInviteCodeForUpdate =
                 CustomGameRoomRepository.class.getMethod("findByInviteCodeForUpdate", String.class);
         Method findByIdForUpdate = CustomGameRoomRepository.class.getMethod("findByIdForUpdate", Long.class);
+        Method findByParticipantUserIdAndStatusForUpdate = CustomGameRoomRepository.class.getMethod(
+                "findByParticipantUserIdAndStatusForUpdate",
+                Long.class,
+                CustomRoomStatus.class
+        );
 
         // when & then
         assertThat(findByInviteCodeForUpdate.getAnnotation(Lock.class).value())
                 .isEqualTo(LockModeType.PESSIMISTIC_WRITE);
         assertThat(findByIdForUpdate.getAnnotation(Lock.class).value())
+                .isEqualTo(LockModeType.PESSIMISTIC_WRITE);
+        assertThat(findByParticipantUserIdAndStatusForUpdate.getAnnotation(Lock.class).value())
                 .isEqualTo(LockModeType.PESSIMISTIC_WRITE);
     }
 

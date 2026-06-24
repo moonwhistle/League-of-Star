@@ -171,6 +171,8 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 - API 응답의 nickname은 core user 도메인의 `UserReadService`를 통해 조회한다.
 - API 응답의 `roomName`은 owner nickname으로 만든 표시용 값이며 저장 source가 아니다.
 - HTTP join/leave 응답은 command 결과다.
+- 초대 join은 명시적인 방 이동 의사로 처리한다. 사용자가 다른 `WAITING` custom room에 참가 중이면 기존 room에서 먼저 이탈시키고 새 room에 참가시킨다.
+- 기존 room에서 사용자가 방장이면 기존 room은 `CLOSED`로 전환하고, 일반 참가자면 participant row만 삭제한다.
 - 실시간 room state source는 후속 Room WebSocket event에서 다룬다.
 - GamePlay 진입 source는 이번 이슈에서 만들지 않는다.
 
@@ -320,6 +322,7 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 - join/leave는 `WAITING` room에서만 허용한다.
 - join은 inviteCode를 사용하고 leave는 roomId를 사용한다.
 - 이미 참가한 사용자 join은 멱등 처리한다.
+- 다른 `WAITING` room에 참가 중인 사용자의 초대 join은 기존 room 자동 이탈 후 새 room 참가로 처리한다.
 - 일반 참가자 leave는 participant row 삭제로 처리한다.
 - 방장 leave는 room `CLOSED` 전환으로 처리한다.
 - join 정원 검증은 room row lock으로 동시성을 방어한다.
@@ -332,6 +335,8 @@ Request body는 없다. 인증 사용자 식별은 기존 `@AuthUser Long userId
 
 - 인증 사용자가 inviteCode로 `WAITING` custom room에 참가할 수 있다.
 - 이미 참가한 사용자가 join해도 중복 participant가 생기지 않고 현재 room state가 반환된다.
+- 다른 `WAITING` room에 참가 중인 사용자가 초대 join하면 기존 room에서 제거되고 새 room에 참가한다.
+- 기존 room의 방장이 초대 join으로 이동하면 기존 room은 `CLOSED`가 된다.
 - 정원이 찬 room에 새 사용자가 join하면 실패한다.
 - `STARTED`, `CLOSED` room에는 join/leave할 수 없다.
 - 일반 참가자가 leave하면 participant 목록에서 제거된다.

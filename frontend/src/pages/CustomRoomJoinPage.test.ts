@@ -33,6 +33,7 @@ const { setLocale } = useLocale()
 describe('CustomRoomJoinPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     setLocale('ko')
     routeMock.params.inviteCode = 'ab12cd'
     routerPushMock.mockResolvedValue(undefined)
@@ -44,6 +45,7 @@ describe('CustomRoomJoinPage', () => {
     await flushPromises()
 
     expect(joinCustomRoomMock).toHaveBeenCalledWith('AB12CD', expect.any(AbortSignal))
+    expect(localStorage.getItem('league-of-star.currentCustomRoomId')).toBe('100')
     expect(routerPushMock).toHaveBeenCalledWith({
       name: ROUTE_NAMES.customRoom,
       params: {

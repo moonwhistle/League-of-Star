@@ -22,6 +22,23 @@ public interface CustomGameRoomRepository extends JpaRepository<CustomGameRoom, 
     List<CustomGameRoom> findByStatusOrderByIdAsc(CustomRoomStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select room
+            from CustomGameRoom room
+            where room.status = :status
+              and room.id in (
+                  select participant.customRoomId
+                  from CustomGameParticipant participant
+                  where participant.userId = :userId
+              )
+            order by room.id asc
+            """)
+    List<CustomGameRoom> findByParticipantUserIdAndStatusForUpdate(
+            @Param("userId") Long userId,
+            @Param("status") CustomRoomStatus status
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select room from CustomGameRoom room where room.inviteCode = :inviteCode")
     Optional<CustomGameRoom> findByInviteCodeForUpdate(@Param("inviteCode") String inviteCode);
 

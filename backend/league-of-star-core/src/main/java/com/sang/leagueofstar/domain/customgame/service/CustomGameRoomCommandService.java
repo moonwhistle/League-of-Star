@@ -8,6 +8,7 @@ import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomParticipantRo
 import com.sang.leagueofstar.domain.customgame.domain.vo.CustomRoomStatus;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameParticipantRepository;
 import com.sang.leagueofstar.domain.customgame.repository.CustomGameRoomRepository;
+import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomJoinResult;
 import com.sang.leagueofstar.domain.customgame.service.dto.CustomGameRoomStartResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -40,20 +41,21 @@ public class CustomGameRoomCommandService {
         return customGameRoom;
     }
 
-    public CustomGameRoom joinRoom(String inviteCode, Long userId) {
+    public CustomGameRoomJoinResult joinRoom(String inviteCode, Long userId) {
         validateInviteCode(inviteCode);
         validateParticipantUserId(userId);
 
         CustomGameRoom customGameRoom = getWaitingRoomByInviteCodeForUpdate(inviteCode);
         Long customRoomId = customGameRoom.getId();
         if (customGameParticipantRepository.existsByCustomRoomIdAndUserId(customRoomId, userId)) {
-            return customGameRoom;
+            return new CustomGameRoomJoinResult(customGameRoom, List.of());
         }
         if (customGameParticipantRepository.countByCustomRoomId(customRoomId) >= CustomGameRoom.MAX_PARTICIPANTS) {
             throw new CoreException(CoreErrorCode.CUSTOM_ROOM_FULL);
         }
+        List<CustomGameRoom> departedRooms = leaveOtherWaitingRooms(userId, customRoomId);
         savePlayerParticipant(customRoomId, userId);
-        return customGameRoom;
+        return new CustomGameRoomJoinResult(customGameRoom, departedRooms);
     }
 
     public CustomGameRoom leaveRoom(Long roomId, Long userId) {
@@ -173,6 +175,25 @@ public class CustomGameRoomCommandService {
         customGameParticipantRepository.save(
                 CustomGameParticipant.create(customRoomId, userId, CustomRoomParticipantRole.PLAYER)
         );
+    }
+
+    private List<CustomGameRoom> leaveOtherWaitingRooms(Long userId, Long targetRoomId) {
+        List<CustomGameRoom> waitingRooms =
+                customGameRoomRepository.findByParticipantUserIdAndStatusForUpdate(userId, CustomRoomStatus.WAITING);
+        List<CustomGameRoom> departedRooms = waitingRooms.stream()
+                .filter(room -> !room.getId().equals(targetRoomId))
+                .toList();
+        departedRooms.forEach(room -> leaveRoomForRoomSwitch(room, userId));
+        return departedRooms;
+    }
+
+    private void leaveRoomForRoomSwitch(CustomGameRoom room, Long userId) {
+        if (room.getOwnerUserId().equals(userId)) {
+            room.close(LocalDateTime.now());
+            customGameParticipantRepository.deleteByCustomRoomId(room.getId());
+            return;
+        }
+        customGameParticipantRepository.deleteByCustomRoomIdAndUserId(room.getId(), userId);
     }
 
     private CustomGameRoom saveRoomWithUniqueRetry(Long ownerUserId) {
