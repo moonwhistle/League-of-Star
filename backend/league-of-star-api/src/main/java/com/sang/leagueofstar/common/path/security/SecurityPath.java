@@ -17,6 +17,7 @@ public final class SecurityPath {
             "/docs/**",
             "/assets/**",
             "/ws/game/**",
+            "/ws/custom-games/rooms/**",
             "/webjars/**",
             "/favicon.ico"
     };

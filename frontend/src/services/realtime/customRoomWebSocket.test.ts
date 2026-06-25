@@ -100,6 +100,52 @@ describe('connectCustomRoomWebSocket', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(SyntaxError))
   })
 
+  it('dispatches ROOM_STARTED messages with the custom game start payload', () => {
+    const onMessage = vi.fn()
+
+    connectCustomRoomWebSocket(100, { onMessage })
+    const socket = MockWebSocket.instances[0]
+
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'ROOM_STARTED',
+        payload: {
+          roomId: 100,
+          gameRoomId: 200,
+          gameMode: 'CUSTOM',
+          serverTime: 10_000,
+          startAt: 13_000,
+          webSocketUrl: '/ws/game/200',
+          scenario: {
+            starCoreMaxHp: 10000,
+            durationMs: 12000,
+            hpTimeline: [{ timeMs: 0, hp: 10000 }],
+          },
+        },
+      }),
+    )
+
+    expect(onMessage).toHaveBeenCalledWith(
+      {
+        type: 'ROOM_STARTED',
+        payload: {
+          roomId: 100,
+          gameRoomId: 200,
+          gameMode: 'CUSTOM',
+          serverTime: 10_000,
+          startAt: 13_000,
+          webSocketUrl: '/ws/game/200',
+          scenario: {
+            starCoreMaxHp: 10000,
+            durationMs: 12000,
+            hpTimeline: [{ timeMs: 0, hp: 10000 }],
+          },
+        },
+      },
+      expect.any(MessageEvent),
+    )
+  })
+
   it('can replace handlers on an existing connection', () => {
     const firstOnMessage = vi.fn()
     const secondOnMessage = vi.fn()

@@ -98,6 +98,43 @@ describe('gameResultPayload', () => {
     })
   })
 
+  it('stores custom GAME_RESULT metadata when the backend includes it', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))
+
+    const payload = saveGameResultPayloadFromMessage({
+      gameRoomId: 100,
+      gameMode: 'CUSTOM',
+      result: 'PLAYER2_WIN',
+      winnerUserId: 2,
+      reason: 'LIGHTNING_KILL',
+      practiceResult: null,
+      finishedAt: 1716192017000,
+      actions: [
+        {
+          userId: 2,
+          serverReceiveTime: 1716192010000,
+          lightningTimeMs: 6000,
+          starCoreHpAtLightning: 1000,
+          damage: 1200,
+          afterHp: 0,
+          isKill: true,
+        },
+      ],
+    })
+
+    expect(payload).toMatchObject({
+      gameMode: 'CUSTOM',
+      result: 'PLAYER2_WIN',
+      winnerUserId: 2,
+      reason: 'LIGHTNING_KILL',
+    })
+    expect(readGameResultPayload(100)).toMatchObject({
+      gameMode: 'CUSTOM',
+      winnerUserId: 2,
+    })
+  })
+
   it('does not store invalid GAME_RESULT messages', () => {
     expect(
       saveGameResultPayloadFromMessage({

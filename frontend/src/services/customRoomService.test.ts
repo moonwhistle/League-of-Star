@@ -8,6 +8,7 @@ import {
   getCustomRooms,
   joinCustomRoom,
   leaveCustomRoom,
+  startCustomRoom,
 } from './customRoomService'
 
 vi.mock('./apiClient', () => ({
@@ -133,6 +134,24 @@ describe('customRoomService', () => {
       },
     )
   })
+
+  it('starts a custom room by encoded roomId with authentication', async () => {
+    const abortController = new AbortController()
+    const response = createStartResponse()
+    requestJsonMock.mockResolvedValue(response)
+
+    await expect(startCustomRoom('room/with space', abortController.signal)).resolves.toEqual(
+      response,
+    )
+
+    expect(requestJsonMock).toHaveBeenCalledWith(
+      '/api/v1/custom-games/rooms/room%2Fwith%20space/start',
+      {
+        method: 'POST',
+        signal: abortController.signal,
+      },
+    )
+  })
 })
 
 function createRoomResponse() {
@@ -150,5 +169,26 @@ function createRoomResponse() {
         role: 'OWNER',
       },
     ],
+  }
+}
+
+function createStartResponse() {
+  return {
+    roomId: 100,
+    gameRoomId: 200,
+    gameMode: 'CUSTOM',
+    serverTime: 10_000,
+    startAt: 13_000,
+    webSocketUrl: '/ws/game/200',
+    scenario: {
+      starCoreMaxHp: 10000,
+      durationMs: 12000,
+      hpTimeline: [
+        {
+          timeMs: 0,
+          hp: 10000,
+        },
+      ],
+    },
   }
 }

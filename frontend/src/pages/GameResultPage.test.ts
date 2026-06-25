@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { saveCustomGameStartPayload } from '@/services/customGameStartPayload'
 import { saveGameResultPayload } from '@/services/gameResultPayload'
 import { saveGameWaitingPayload } from '@/services/gameWaitingPayload'
 import { getGameSummary } from '@/services/gameSummaryService'
@@ -90,7 +91,7 @@ describe('GameResultPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-game-summary-status')).toBe('pending')
-    expect(wrapper.text()).toContain('랭크 정산이 진행 중입니다')
+    expect(wrapper.text()).toContain('최종 결과를 정리하는 중입니다')
 
     await vi.advanceTimersByTimeAsync(249)
     expect(getGameSummaryMock).toHaveBeenCalledTimes(1)
@@ -213,6 +214,66 @@ describe('GameResultPage', () => {
     expect(text).not.toContain('시리즈')
   })
 
+  it('renders custom game summaries without rank or LP changes', async () => {
+    saveValidCustomResultPayload()
+    saveValidCustomStartPayload()
+    getGameSummaryMock.mockResolvedValue(
+      createDoneSummary({
+        gameResult: 'PLAYER1_WIN',
+        winnerUserId: 1,
+        me: createPlayerSummary({
+          result: 'WIN',
+          lpBefore: 100,
+          lpAfter: 100,
+          lpChange: 0,
+          rankBefore: 'GOLD_IV',
+          rankAfter: 'GOLD_IV',
+        }),
+        opponent: createPlayerSummary({
+          userId: 2,
+          nickname: 'Voidwalker',
+          result: 'LOSS',
+          lpBefore: 80,
+          lpAfter: 80,
+          lpChange: 0,
+          rankBefore: 'SILVER_I',
+          rankAfter: 'SILVER_I',
+        }),
+      }),
+    )
+
+    const wrapper = mount(GameResultPage)
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(wrapper.get('main').attributes('data-game-result-mode')).toBe('CUSTOM')
+    expect(wrapper.get('main').attributes('data-game-result-custom')).toBe('true')
+    expect(wrapper.get('main').attributes('data-game-result-outcome')).toBe('win')
+    expect(wrapper.get('h1').text()).toBe('YOU WIN')
+    expect(text).toContain('Starlord')
+    expect(text).toContain('Voidwalker')
+    expect(text).not.toContain('사용자 지정 게임은 전적에만 남고 랭크와 LP는 변하지 않습니다.')
+    expect(text).not.toContain('GOLD_IV')
+    expect(text).not.toContain('SILVER_I')
+    expect(text).not.toContain('100 -> 100')
+    expect(text).not.toContain('80 -> 80')
+  })
+
+  it('uses custom start context as a temporary title before summary is done', async () => {
+    saveValidCustomResultPayload({
+      winnerUserId: 2,
+      result: 'PLAYER2_WIN',
+    })
+    saveValidCustomStartPayload()
+    getGameSummaryMock.mockImplementation(() => new Promise(() => {}))
+
+    const wrapper = mount(GameResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('main').attributes('data-game-result-custom')).toBe('true')
+    expect(wrapper.get('h1').text()).toBe('YOU LOSE')
+  })
+
   it('renders API error messages and allows returning to match', async () => {
     getGameSummaryMock.mockRejectedValue(
       new ApiClientError(403, {
@@ -298,6 +359,58 @@ function saveValidResultPayload(
         isKill: true,
       },
     ],
+    receivedAt: '2026-06-01T00:00:00.000Z',
+  })
+}
+
+function saveValidCustomResultPayload(
+  overrides: {
+    result?: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'
+    winnerUserId?: number | null
+    reason?: string
+  } = {},
+): void {
+  saveGameResultPayload({
+    gameRoomId: 100,
+    gameMode: 'CUSTOM',
+    result: overrides.result ?? 'PLAYER1_WIN',
+    winnerUserId: overrides.winnerUserId ?? 1,
+    reason: overrides.reason ?? 'LIGHTNING_KILL',
+    practiceResult: null,
+    finishedAt: 1716192017000,
+    actions:
+      overrides.winnerUserId === null
+        ? []
+        : [
+            {
+              userId: overrides.winnerUserId ?? 1,
+              serverReceiveTime: 1716192010000,
+              lightningTimeMs: 6000,
+              starCoreHpAtLightning: 1000,
+              damage: 1200,
+              afterHp: 0,
+              isKill: true,
+            },
+          ],
+    receivedAt: '2026-06-01T00:00:00.000Z',
+  })
+}
+
+function saveValidCustomStartPayload(): void {
+  saveCustomGameStartPayload({
+    roomId: 10,
+    gameRoomId: 100,
+    gameMode: 'CUSTOM',
+    serverTime: 1716192000000,
+    startAt: 1716192003000,
+    webSocketUrl: '/ws/game/100',
+    scenario: {
+      starCoreMaxHp: 10000,
+      durationMs: 15000,
+      hpTimeline: [{ timeMs: 0, hp: 10000 }],
+    },
+    myUserId: 1,
+    opponentUserId: 2,
     receivedAt: '2026-06-01T00:00:00.000Z',
   })
 }

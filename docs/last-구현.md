@@ -876,7 +876,7 @@ Acceptance Criteria:
 - [x] 참가자 입장/퇴장이 실시간으로 반영된다.
 - [x] 닫힌 방/가득 찬 방/시작된 방 오류가 사용자에게 표시된다.
 
-### 4-10. [ ] Custom Game 시작 / GamePlay 프론트 연결
+### 4-10. [x] Custom Game 시작 / GamePlay 프론트 연결
 
 담당: Frontend
 
@@ -884,32 +884,32 @@ Acceptance Criteria:
 
 목표:
 
-- [ ] 방장이 시작하면 방장과 참가자가 같은 사용자 지정 게임 화면으로 이동한다.
+- [x] 방장이 시작하면 방장과 참가자가 같은 사용자 지정 게임 화면으로 이동한다.
 
 Frontend:
 
-- [ ] 방장에게만 시작 버튼을 표시한다.
-- [ ] 시작 버튼은 4-6 start API를 호출한다.
-- [ ] start HTTP 응답만으로 route 이동하지 않는다.
-- [ ] `ROOM_STARTED` event 수신 시 custom game start payload를 저장한다.
-- [ ] GamePlayPage가 `gameMode=CUSTOM` payload로 play state를 구성한다.
-- [ ] custom game 시작 전 `3 / 2 / 1` countdown을 표시한다.
-- [ ] custom 결과는 GamePlayPage 내부 오버레이로 표시한다.
-- [ ] 결과 오버레이에 `다시 방으로`, `메인으로` 액션을 제공한다.
+- [x] 방장에게만 시작 버튼을 표시한다.
+- [x] 시작 버튼은 4-6 start API를 호출한다.
+- [x] start HTTP 응답만으로 route 이동하지 않는다.
+- [x] `ROOM_STARTED` event 수신 시 custom game start payload를 저장한다.
+- [x] GamePlayPage가 `gameMode=CUSTOM` payload로 play state를 구성한다.
+- [x] custom game 시작 전 `3 / 2 / 1` countdown을 표시한다.
+- [x] custom 결과는 GameResultPage에서 표시한다.
+- [x] custom 결과 화면에서는 rank/LP 변화 UI를 숨기고 메인 복귀 액션을 제공한다.
 
 Policy:
 
-- [ ] 사용자 지정 게임은 랭크/LP 변화 화면으로 보내지 않는다.
-- [ ] custom 결과는 전적에 남지만 랭크 변화는 표시하지 않는다.
-- [ ] custom 결과 Summary API 사용 여부는 4-7 백엔드 계약을 따른다.
-- [ ] GamePlay WebSocket은 기존 `/ws/game/{gameRoomId}` 정책을 재사용한다.
+- [x] 사용자 지정 게임은 랭크/LP 변화 화면으로 보내지 않는다.
+- [x] custom 결과는 전적에 남지만 랭크 변화는 표시하지 않는다.
+- [x] custom 결과 Summary API 사용 여부는 4-7 백엔드 계약을 따른다.
+- [x] GamePlay WebSocket은 기존 `/ws/game/{gameRoomId}` 정책을 재사용한다.
 
 Acceptance Criteria:
 
-- [ ] 방장과 참가자가 `ROOM_STARTED` 기준으로 같은 게임에 진입한다.
-- [ ] custom game 결과가 GamePlayPage 내부에 표시된다.
-- [ ] custom game 결과가 후속 전적 조회에 남는 정책과 충돌하지 않는다.
-- [ ] 일반 ranked match 결과 route/Summary API 흐름이 깨지지 않는다.
+- [x] 방장과 참가자가 `ROOM_STARTED` 기준으로 같은 게임에 진입한다.
+- [x] custom game 결과가 GameResultPage에 표시된다.
+- [x] custom game 결과가 후속 전적 조회에 남는 정책과 충돌하지 않는다.
+- [x] 일반 ranked match 결과 route/Summary API 흐름이 깨지지 않는다.
 
 ## Section 5. Deferred Account Features
 
@@ -1002,7 +1002,7 @@ Policy:
 18. [x] Section 4-7. Custom Game 랭크 제외 / 전적 기록 / 결과 WebSocket 계약
 19. [x] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
 20. [x] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
-21. [ ] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
+21. [x] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
 22. [ ] Section 5-1/5-2. 비밀번호 찾기
 23. [ ] Section 5-3/5-4. OAuth 로그인
 

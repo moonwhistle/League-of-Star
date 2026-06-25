@@ -12,8 +12,12 @@
     :data-custom-room-copy-message="copyMessage"
     :data-custom-room-socket-status="socketStatus"
     :data-custom-room-socket-error-message="socketErrorMessage"
+    :data-custom-room-socket-close-code="lastSocketCloseCode ?? ''"
     :data-custom-room-leave-status="leaveStatus"
     :data-custom-room-leave-error-message="leaveErrorMessage"
+    :data-custom-room-start-status="startStatus"
+    :data-custom-room-start-error-message="startErrorMessage"
+    :data-custom-room-can-start="canStartCustomGame"
     data-testid="custom-room-page"
   >
     <section class="custom-room-shell">
@@ -23,6 +27,10 @@
           <h1>{{ room?.roomName ?? t('customRoom.title') }}</h1>
         </div>
         <nav class="custom-room-actions" :aria-label="t('customRoom.pageLabel')">
+          <span class="custom-room-connection" :class="socketStatusClass" role="status">
+            <span aria-hidden="true"></span>
+            {{ socketStatusLabel }}
+          </span>
           <button type="button" :disabled="roomStatus === 'loading'" @click="loadRoom">
             {{ t('customRoom.refresh') }}
           </button>
@@ -94,8 +102,11 @@
             <p v-if="copyMessage !== ''" class="custom-room-copy-message" role="status">
               {{ copyMessage }}
             </p>
-            <p v-if="socketErrorMessage !== ''" class="custom-room-alert" role="alert">
-              {{ socketErrorMessage }}
+            <p v-if="startStatus === 'waiting'" class="custom-room-copy-message" role="status">
+              {{ t('customRoom.startWaiting') }}
+            </p>
+            <p v-if="startErrorMessage !== ''" class="custom-room-alert" role="alert">
+              {{ startErrorMessage }}
             </p>
             <p v-if="leaveErrorMessage !== ''" class="custom-room-alert" role="alert">
               {{ leaveErrorMessage }}
@@ -120,6 +131,25 @@
             </li>
           </ol>
         </section>
+
+        <aside
+          v-if="canShowStartButton"
+          class="custom-room-start-panel"
+          :aria-label="t('customRoom.startControl')"
+        >
+          <p>{{ startHelpMessage }}</p>
+          <button
+            class="custom-room-primary-start"
+            :class="{ 'is-waiting': startStatus === 'waiting' }"
+            type="button"
+            data-testid="custom-room-start-button"
+            :disabled="!canStartCustomGame"
+            @click="startRoom"
+          >
+            <span v-if="startStatus !== 'waiting'" aria-hidden="true">▶</span>
+            {{ startButtonLabel }}
+          </button>
+        </aside>
       </template>
     </section>
   </main>
@@ -132,20 +162,32 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
-import { getCustomRoom, leaveCustomRoom } from '@/services/customRoomService'
+import { getAccessToken } from '@/services/authToken'
+import { startCustomRoom, getCustomRoom, leaveCustomRoom } from '@/services/customRoomService'
+import { saveCustomGameStartPayloadFromResponse } from '@/services/customGameStartPayload'
+import { getMyProfile } from '@/services/profileService'
 import {
   connectCustomRoomWebSocket,
   type CustomRoomWebSocketConnection,
 } from '@/services/realtime/customRoomWebSocket'
 import { clearCurrentCustomRoom, rememberCurrentCustomRoom } from '@/services/customRoomSession'
 import type { CustomRoomResponse, CustomRoomWebSocketServerMessage } from '@/types/customRoom'
+import type { UserProfileResponse } from '@/types/user'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
 
 type LoadStatus = 'idle' | 'loading' | 'success' | 'error' | 'closed'
 type CopyStatus = 'idle' | 'success' | 'error'
 type LeaveStatus = 'idle' | 'loading' | 'success' | 'error'
+type StartStatus = 'idle' | 'loading' | 'waiting' | 'started' | 'error'
 type SocketStatus = 'idle' | 'connecting' | 'open' | 'error' | 'closed'
+
+const SOCKET_RECONNECT_DELAY_MS = 800
+const SOCKET_RECONNECT_MAX_ATTEMPTS = 2
+const CLOSE_EVENT_CODES = {
+  normalClosure: 1000,
+  policyViolation: 1008,
+} as const
 
 const route = useRoute()
 const router = useRouter()
@@ -153,17 +195,86 @@ const { t } = useLocale()
 const roomStatus = ref<LoadStatus>('idle')
 const copyStatus = ref<CopyStatus>('idle')
 const leaveStatus = ref<LeaveStatus>('idle')
+const startStatus = ref<StartStatus>('idle')
 const socketStatus = ref<SocketStatus>('idle')
 const roomErrorMessage = ref('')
 const copyMessage = ref('')
 const leaveErrorMessage = ref('')
+const startErrorMessage = ref('')
 const socketErrorMessage = ref('')
 const room = shallowRef<CustomRoomResponse>()
+const profile = shallowRef<UserProfileResponse>()
 const roomAbortController = shallowRef<AbortController>()
 const leaveAbortController = shallowRef<AbortController>()
+const startAbortController = shallowRef<AbortController>()
+const profileAbortController = shallowRef<AbortController>()
 const roomSocketConnection = shallowRef<CustomRoomWebSocketConnection>()
+const socketReconnectTimer = shallowRef<ReturnType<typeof window.setTimeout>>()
 const expectedSocketClose = ref(false)
+const socketReconnectAttempts = ref(0)
+const lastSocketCloseCode = ref<number>()
+const startFallbackUserId = shallowRef<number>()
 const routeRoomId = computed(() => String(route.params.roomId ?? '').trim())
+const currentUserId = computed(() => profile.value?.userId ?? readAccessTokenUserId())
+const isCurrentUserOwner = computed(
+  () =>
+    room.value !== undefined &&
+    currentUserId.value !== undefined &&
+    currentUserId.value === room.value.ownerUserId,
+)
+const canShowStartButton = computed(() => room.value !== undefined && isCurrentUserOwner.value)
+const canStartCustomGame = computed(
+  () =>
+    canShowStartButton.value &&
+    room.value?.status === 'WAITING' &&
+    room.value.participants.length === room.value.maxParticipants &&
+    socketStatus.value === 'open' &&
+    startStatus.value !== 'loading' &&
+    startStatus.value !== 'waiting' &&
+    startStatus.value !== 'started',
+)
+const startButtonLabel = computed(() => {
+  if (startStatus.value === 'loading') {
+    return t('customRoom.starting')
+  }
+
+  if (startStatus.value === 'waiting') {
+    return t('customRoom.startWaitingShort')
+  }
+
+  return t('customRoom.start')
+})
+const startHelpMessage = computed(() => {
+  if (room.value !== undefined && room.value.participants.length < room.value.maxParticipants) {
+    return t('customRoom.startWaitingPlayers')
+  }
+
+  if (socketStatus.value !== 'open') {
+    return t('customRoom.startWaitingSocket')
+  }
+
+  return t('customRoom.startReady')
+})
+const socketStatusLabel = computed(() => {
+  if (socketStatus.value === 'open') {
+    return t('customRoom.socketConnected')
+  }
+
+  if (socketStatus.value === 'connecting') {
+    return t('customRoom.socketConnecting')
+  }
+
+  if (socketStatus.value === 'closed' || socketStatus.value === 'error') {
+    return t('customRoom.socketDisconnected')
+  }
+
+  return t('customRoom.socketIdle')
+})
+const socketStatusClass = computed(() => ({
+  'is-connected': socketStatus.value === 'open',
+  'is-connecting': socketStatus.value === 'connecting' || socketStatus.value === 'idle',
+  'is-disconnected': socketStatus.value === 'closed' || socketStatus.value === 'error',
+}))
 const inviteLink = computed(() => {
   const inviteCode = room.value?.inviteCode.trim() ?? ''
 
@@ -177,6 +288,7 @@ const inviteLink = computed(() => {
 watch(
   routeRoomId,
   () => {
+    void loadProfile()
     void loadRoom()
   },
   { immediate: true },
@@ -185,15 +297,50 @@ watch(
 onUnmounted(() => {
   abortRoomRequest()
   abortLeaveRequest()
+  abortStartRequest()
+  abortProfileRequest()
+  clearSocketReconnectTimer()
   closeRoomSocket()
 })
+
+async function loadProfile() {
+  abortProfileRequest()
+  const controller = new AbortController()
+  profileAbortController.value = controller
+
+  try {
+    const response = await getMyProfile(controller.signal)
+
+    if (profileAbortController.value !== controller) {
+      return false
+    }
+
+    profile.value = response
+    return true
+  } catch {
+    if (!controller.signal.aborted) {
+      profile.value = undefined
+    }
+    return false
+  } finally {
+    if (profileAbortController.value === controller) {
+      profileAbortController.value = undefined
+    }
+  }
+}
 
 async function loadRoom() {
   copyStatus.value = 'idle'
   copyMessage.value = ''
   leaveErrorMessage.value = ''
+  startErrorMessage.value = ''
+  startFallbackUserId.value = undefined
   socketErrorMessage.value = ''
   roomErrorMessage.value = ''
+  startStatus.value = 'idle'
+  socketReconnectAttempts.value = 0
+  lastSocketCloseCode.value = undefined
+  clearSocketReconnectTimer()
 
   if (routeRoomId.value === '') {
     room.value = undefined
@@ -264,6 +411,40 @@ async function leaveRoom() {
   }
 }
 
+async function startRoom() {
+  if (room.value === undefined || !canStartCustomGame.value) {
+    return
+  }
+
+  abortStartRequest()
+  const controller = new AbortController()
+  startAbortController.value = controller
+  startStatus.value = 'loading'
+  startErrorMessage.value = ''
+
+  try {
+    startFallbackUserId.value = currentUserId.value
+    await startCustomRoom(room.value.roomId, controller.signal)
+
+    if (startAbortController.value !== controller) {
+      return
+    }
+
+    startStatus.value = 'waiting'
+  } catch (error) {
+    if (controller.signal.aborted) {
+      return
+    }
+
+    startStatus.value = 'error'
+    startErrorMessage.value = errorMessage(error, t('customRoom.startFailed'))
+  } finally {
+    if (startAbortController.value === controller) {
+      startAbortController.value = undefined
+    }
+  }
+}
+
 async function copyInviteLink() {
   copyStatus.value = 'idle'
   copyMessage.value = ''
@@ -294,10 +475,20 @@ function abortLeaveRequest() {
   leaveAbortController.value?.abort()
 }
 
+function abortStartRequest() {
+  startAbortController.value?.abort()
+}
+
+function abortProfileRequest() {
+  profileAbortController.value?.abort()
+}
+
 function connectRoomSocket(roomId: number) {
+  clearSocketReconnectTimer()
   closeRoomSocket()
   socketStatus.value = 'connecting'
   socketErrorMessage.value = ''
+  lastSocketCloseCode.value = undefined
   expectedSocketClose.value = false
 
   try {
@@ -309,6 +500,7 @@ function connectRoomSocket(roomId: number) {
         }
 
         socketStatus.value = 'open'
+        socketReconnectAttempts.value = 0
       },
       onMessage: (message) => {
         if (connection === undefined || roomSocketConnection.value?.socket !== connection.socket) {
@@ -330,9 +522,13 @@ function connectRoomSocket(roomId: number) {
           return
         }
 
+        roomSocketConnection.value = undefined
+        lastSocketCloseCode.value = event.code
         socketStatus.value = 'closed'
         if (!expectedSocketClose.value && roomStatus.value === 'success') {
           socketErrorMessage.value = t('customRoom.socketError')
+          void refreshRoomSnapshot()
+          scheduleRoomSocketReconnect(event)
         }
       },
     })
@@ -342,6 +538,63 @@ function connectRoomSocket(roomId: number) {
     socketStatus.value = 'error'
     socketErrorMessage.value = socketErrorMessageFrom(error)
   }
+}
+
+async function refreshRoomSnapshot() {
+  if (routeRoomId.value === '' || roomStatus.value !== 'success') {
+    return
+  }
+
+  try {
+    const response = await getCustomRoom(routeRoomId.value)
+    room.value = response
+    roomStatus.value = 'success'
+    rememberCurrentCustomRoom(response.roomId)
+  } catch {
+    // 보조 조회 실패만으로 room 화면을 error로 밀지 않는다. close 안내가 source가 된다.
+  }
+}
+
+function scheduleRoomSocketReconnect(event: CloseEvent) {
+  if (!canReconnectRoomSocket(event)) {
+    return
+  }
+
+  socketReconnectAttempts.value += 1
+  socketReconnectTimer.value = window.setTimeout(() => {
+    socketReconnectTimer.value = undefined
+    const roomId = room.value?.roomId
+    if (roomId === undefined || roomStatus.value !== 'success') {
+      return
+    }
+
+    connectRoomSocket(roomId)
+  }, SOCKET_RECONNECT_DELAY_MS)
+}
+
+function canReconnectRoomSocket(event: CloseEvent) {
+  if (
+    event.code === CLOSE_EVENT_CODES.normalClosure ||
+    event.code === CLOSE_EVENT_CODES.policyViolation
+  ) {
+    return false
+  }
+
+  return (
+    socketReconnectAttempts.value < SOCKET_RECONNECT_MAX_ATTEMPTS &&
+    room.value?.status === 'WAITING' &&
+    startStatus.value !== 'started' &&
+    leaveStatus.value !== 'success'
+  )
+}
+
+function clearSocketReconnectTimer() {
+  if (socketReconnectTimer.value === undefined) {
+    return
+  }
+
+  window.clearTimeout(socketReconnectTimer.value)
+  socketReconnectTimer.value = undefined
 }
 
 function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
@@ -362,11 +615,109 @@ function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
     return
   }
 
+  if (message.type === 'ROOM_STARTED') {
+    void handleRoomStarted(message.payload)
+    return
+  }
+
   socketStatus.value = 'error'
   socketErrorMessage.value = message.payload.reason || t('customRoom.socketError')
 }
 
+async function handleRoomStarted(payload = {}) {
+  if (profile.value === undefined) {
+    await loadProfile()
+  }
+
+  const participantContext = resolveCustomParticipantContext()
+
+  if (participantContext === null) {
+    startStatus.value = 'error'
+    startErrorMessage.value = t('customRoom.startPayloadInvalid')
+    return
+  }
+
+  const storedPayload = saveCustomGameStartPayloadFromResponse(
+    payload,
+    participantContext.myUserId,
+    participantContext.opponentUserId,
+  )
+
+  if (storedPayload === null) {
+    startStatus.value = 'error'
+    startErrorMessage.value = t('customRoom.startPayloadInvalid')
+    return
+  }
+
+  clearCurrentCustomRoom()
+  startStatus.value = 'started'
+  startErrorMessage.value = ''
+  socketErrorMessage.value = ''
+  closeRoomSocket(false)
+
+  try {
+    await router.replace({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: String(storedPayload.gameRoomId),
+      },
+    })
+  } catch {
+    startStatus.value = 'error'
+    startErrorMessage.value = t('customRoom.startTransitionFailed')
+  }
+}
+
+function resolveCustomParticipantContext() {
+  const myUserId = currentUserId.value ?? startFallbackUserId.value
+  const participants = room.value?.participants ?? []
+
+  if (typeof myUserId !== 'number' || !Number.isFinite(myUserId)) {
+    return null
+  }
+
+  const opponent = participants.find((participant) => participant.userId !== myUserId)
+
+  if (opponent === undefined) {
+    return null
+  }
+
+  return {
+    myUserId,
+    opponentUserId: opponent.userId,
+  }
+}
+
+function readAccessTokenUserId() {
+  const accessToken = getAccessToken()
+
+  if (accessToken === null || accessToken.trim() === '') {
+    return undefined
+  }
+
+  const [, payload] = accessToken.split('.')
+
+  if (payload === undefined || payload.trim() === '') {
+    return undefined
+  }
+
+  try {
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      '=',
+    )
+    const parsedPayload = JSON.parse(window.atob(paddedPayload)) as unknown
+    const userId = Number(Reflect.get(Object(parsedPayload), 'userId'))
+
+    return Number.isFinite(userId) ? userId : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function closeRoomSocket(resetStatus = true) {
+  clearSocketReconnectTimer()
   const connection = roomSocketConnection.value
   roomSocketConnection.value = undefined
   expectedSocketClose.value = true
@@ -453,6 +804,49 @@ function errorMessage(error: unknown, fallback: string) {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.custom-room-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 0 12px;
+  color: rgba(248, 251, 255, 0.78);
+  background: rgba(5, 10, 22, 0.54);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.custom-room-connection span {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #facc15;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.45);
+}
+
+.custom-room-connection.is-connected {
+  color: #bbf7d0;
+  border-color: rgba(34, 197, 94, 0.42);
+}
+
+.custom-room-connection.is-connected span {
+  background: #22c55e;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.62);
+}
+
+.custom-room-connection.is-disconnected {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.44);
+}
+
+.custom-room-connection.is-disconnected span {
+  background: #ef4444;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.62);
 }
 
 .custom-room-actions button,
@@ -629,9 +1023,85 @@ function errorMessage(error: unknown, fallback: string) {
   color: #bfdbfe;
 }
 
+.custom-room-start-panel {
+  position: fixed;
+  right: max(32px, env(safe-area-inset-right));
+  bottom: max(32px, env(safe-area-inset-bottom));
+  z-index: 3;
+  width: min(318px, calc(100vw - 64px));
+  min-width: 0;
+}
+
+.custom-room-start-panel p {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  color: rgba(248, 251, 255, 0.78);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.3;
+  background: rgba(18, 27, 48, 0.66);
+  border-right: 3px solid rgba(99, 242, 232, 0.42);
+}
+
+.custom-room-primary-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 18px;
+  color: #f8fbff;
+  font: inherit;
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1.15;
+  background: #162a42;
+  border: 1px solid rgba(99, 242, 232, 0.48);
+  border-radius: 4px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease,
+    filter 140ms ease;
+}
+
+.custom-room-primary-start:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #1b3854;
+  border-color: rgba(99, 242, 232, 0.72);
+  box-shadow:
+    0 0 0 3px rgba(99, 242, 232, 0.12),
+    0 14px 32px rgba(0, 0, 0, 0.34);
+}
+
+.custom-room-primary-start.is-waiting {
+  color: #63f2e8;
+  background: #0b1727;
+  border-color: rgba(165, 107, 255, 0.72);
+  box-shadow:
+    inset 0 4px 12px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(99, 242, 232, 0.12);
+  transform: translateY(1px);
+}
+
+.custom-room-primary-start span {
+  margin-right: 8px;
+  font-size: 0.86rem;
+}
+
+.custom-room-primary-start:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+
 @media (max-width: 720px) {
   .custom-room-page {
-    padding: 18px;
+    padding: 18px 18px 128px;
   }
 
   .custom-room-header,
@@ -646,6 +1116,12 @@ function errorMessage(error: unknown, fallback: string) {
   .custom-room-invite-copy button,
   .custom-room-invite-link {
     width: 100%;
+  }
+
+  .custom-room-start-panel {
+    right: 18px;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    width: calc(100vw - 36px);
   }
 }
 </style>

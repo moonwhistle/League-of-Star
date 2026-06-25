@@ -1,4 +1,8 @@
-import type { CustomRoomListResponse, CustomRoomResponse } from '@/types/customRoom'
+import type {
+  CustomGameStartResponse,
+  CustomRoomListResponse,
+  CustomRoomResponse,
+} from '@/types/customRoom'
 
 import { requestJson } from './apiClient'
 
@@ -62,6 +66,19 @@ export function leaveCustomRoom(
 ): Promise<CustomRoomResponse> {
   return requestJson<CustomRoomResponse>(
     `${CUSTOM_ROOM_BASE_PATH}/${encodeURIComponent(roomId)}/leave`,
+    {
+      method: 'POST',
+      signal,
+    },
+  )
+}
+
+export function startCustomRoom(
+  roomId: number | string,
+  signal?: AbortSignal,
+): Promise<CustomGameStartResponse> {
+  return requestJson<CustomGameStartResponse>(
+    `${CUSTOM_ROOM_BASE_PATH}/${encodeURIComponent(roomId)}/start`,
     {
       method: 'POST',
       signal,
