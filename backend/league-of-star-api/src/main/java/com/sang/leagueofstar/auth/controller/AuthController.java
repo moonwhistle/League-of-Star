@@ -1,12 +1,14 @@
 package com.sang.leagueofstar.auth.controller;
 
 import com.sang.leagueofstar.auth.controller.request.LoginRequest;
+import com.sang.leagueofstar.auth.controller.request.OAuthTokenRequest;
 import com.sang.leagueofstar.auth.controller.request.SignupRequest;
 import com.sang.leagueofstar.auth.controller.request.TokenRefreshRequest;
 import com.sang.leagueofstar.auth.controller.response.LoginResponse;
 import com.sang.leagueofstar.auth.controller.response.SignupResponse;
 import com.sang.leagueofstar.auth.controller.response.TokenRefreshResponse;
 import com.sang.leagueofstar.auth.service.AuthService;
+import com.sang.leagueofstar.auth.service.OAuthLoginService;
 import com.sang.leagueofstar.auth.service.dto.LoginDto;
 import com.sang.leagueofstar.auth.service.dto.TokenDto;
 import com.sang.leagueofstar.common.path.auth.AuthPath;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final OAuthLoginService oauthLoginService;
 
     @PostMapping(AuthPath.SIGN_UP)
     public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
@@ -63,5 +66,16 @@ public class AuthController {
         authService.logout(request.refreshToken());
 
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping(AuthPath.OAUTH2_TOKEN)
+    public ResponseEntity<LoginResponse> exchangeOAuthToken(@Valid @RequestBody OAuthTokenRequest request) {
+        LoginDto result = oauthLoginService.exchangeCode(request.code());
+
+        return ResponseEntity.ok(LoginResponse.of(
+                result.tokens().accessToken(),
+                result.tokens().refreshToken(),
+                result.user()
+        ));
     }
 }

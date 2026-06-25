@@ -38,6 +38,5 @@ jwt:
   refresh-token-expiration-ms: 604800000
 
 oauth2:
-  success-redirect-url: "http://localhost:3000/oauth2/redirect"
-
+  success-redirect-url: "http://localhost:5173/oauth2/redirect"
 

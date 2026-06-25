@@ -22,6 +22,7 @@ public enum ApiErrorCode implements BaseErrorCode {
     AUTH_LOGIN_FAILED(401, "AUTH_008", "이메일 또는 비밀번호가 일치하지 않습니다."),
     AUTH_INVALID_REFRESH_TOKEN(401, "AUTH_009", "유효하지 않은 리프레시 토큰입니다."),
     AUTH_EXPIRED_REFRESH_TOKEN(401, "AUTH_010", "만료된 리프레시 토큰입니다."),
+    AUTH_INVALID_OAUTH_CODE(401, "AUTH_011", "유효하지 않은 OAuth 로그인 코드입니다."),
 
     // Game Practice (GAME_PRACTICE_001 ~ )
     GAME_ACTIVE_ROOM_EXISTS(409, "GAME_PRACTICE_001", "이미 진행 중인 게임이 있습니다."),

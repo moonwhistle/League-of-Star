@@ -15,4 +15,7 @@ public final class AuthPath {
     public static final String PASSWORD_RESET_BASE = "/api/v1/auth/password";
     public static final String RESET_REQUEST = "/reset-request";
     public static final String RESET_SUBMIT = "/reset-submit";
+
+    // OAuth
+    public static final String OAUTH2_TOKEN = "/api/v1/auth/oauth2/token";
 }
