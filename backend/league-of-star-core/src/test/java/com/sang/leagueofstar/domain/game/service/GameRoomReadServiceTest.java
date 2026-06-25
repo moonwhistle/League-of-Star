@@ -184,6 +184,19 @@ class GameRoomReadServiceTest {
     }
 
     @Test
+    @DisplayName("validateGameAccessParticipant - CUSTOM IN_PROGRESS 참가자이면 통과한다")
+    void validateGameAccessParticipant_CustomInProgressParticipant() {
+        // given
+        GameRoom gameRoom = createReadyCustomRoom();
+        gameRoom.start(LocalDateTime.now());
+        given(gameRoomRepository.findById(GAME_ROOM_ID)).willReturn(Optional.of(gameRoom));
+
+        // when & then
+        assertThatCode(() -> gameRoomReadService.validateGameAccessParticipant(GAME_ROOM_ID, FIRST_USER_ID))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("validateGameAccessParticipant - PRACTICE FINISHED이면 예외를 던진다")
     void validateGameAccessParticipant_PracticeFinished_ThrowException() {
         // given
@@ -354,6 +367,15 @@ class GameRoomReadServiceTest {
                 .gameMode(GameMode.PRACTICE)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
+        return gameRoom;
+    }
+
+    private GameRoom createReadyCustomRoom() {
+        GameRoom gameRoom = GameRoom.builder()
+                .gameMode(GameMode.CUSTOM)
+                .build();
+        gameRoom.addParticipant(FIRST_USER_ID);
+        gameRoom.addParticipant(SECOND_USER_ID);
         return gameRoom;
     }
 }

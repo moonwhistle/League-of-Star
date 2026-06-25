@@ -94,7 +94,7 @@ public class GameRoomReadService {
     }
 
     private boolean canAccessGame(GameRoom gameRoom) {
-        if (gameRoom.isPracticeMode()) {
+        if (gameRoom.isPracticeMode() || gameRoom.getGameMode() == GameMode.CUSTOM) {
             return gameRoom.getStatus().isReady() || gameRoom.getStatus().isInProgress();
         }
         return gameRoom.getStatus().isReady();

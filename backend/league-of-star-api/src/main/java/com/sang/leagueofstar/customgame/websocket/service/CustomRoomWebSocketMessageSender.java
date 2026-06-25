@@ -52,14 +52,16 @@ public class CustomRoomWebSocketMessageSender {
     }
 
     private void send(WebSocketSession session, String payload) {
-        if (!session.isOpen()) {
-            return;
-        }
+        synchronized (session) {
+            if (!session.isOpen()) {
+                return;
+            }
 
-        try {
-            session.sendMessage(new TextMessage(payload));
-        } catch (IOException e) {
-            log.warn("Failed to send custom room WebSocket message. sessionId={}", session.getId(), e);
+            try {
+                session.sendMessage(new TextMessage(payload));
+            } catch (IOException e) {
+                log.warn("Failed to send custom room WebSocket message. sessionId={}", session.getId(), e);
+            }
         }
     }
 }

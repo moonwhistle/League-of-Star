@@ -1,5 +1,6 @@
 package com.sang.leagueofstar.domain.rank.domain.vo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -7,6 +8,7 @@ import jakarta.persistence.Enumerated;
 /**
  * 티어와 단계(Division)를 결합한 가치 객체(Value Object)입니다.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record Rank(
         @Enumerated(EnumType.STRING)
         @Column(name = "tier", nullable = false, length = 20) Tier tier,

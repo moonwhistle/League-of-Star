@@ -310,14 +310,16 @@ async function loadProfile() {
     const response = await getMyProfile(controller.signal)
 
     if (profileAbortController.value !== controller) {
-      return
+      return false
     }
 
     profile.value = response
+    return true
   } catch {
     if (!controller.signal.aborted) {
       profile.value = undefined
     }
+    return false
   } finally {
     if (profileAbortController.value === controller) {
       profileAbortController.value = undefined
@@ -621,6 +623,10 @@ function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
 }
 
 async function handleRoomStarted(payload = {}) {
+  if (profile.value === undefined) {
+    await loadProfile()
+  }
+
   const participantContext = resolveCustomParticipantContext()
 
   if (participantContext === null) {

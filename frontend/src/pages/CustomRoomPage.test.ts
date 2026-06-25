@@ -353,6 +353,49 @@ describe('CustomRoomPage', () => {
     })
   })
 
+  it('waits for profile data before storing ROOM_STARTED payload for joined players', async () => {
+    getMyProfileMock
+      .mockImplementationOnce(
+        () =>
+          new Promise(() => {
+            // 참가자 화면에서 최초 프로필 조회가 늦어지는 상황을 재현함.
+          }),
+      )
+      .mockResolvedValueOnce({
+        userId: 2,
+        email: 'guest@example.com',
+        nickname: 'Guest',
+        createdAt: '2026-06-12T10:00:00',
+      })
+
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onOpen?.(new Event('open'))
+    customRoomSocketMock.handlers?.onMessage?.(
+      {
+        type: 'ROOM_STARTED',
+        payload: createStartResponse(),
+      },
+      new MessageEvent('message', { data: '{}' }),
+    )
+    await flushPromises()
+    await flushPromises()
+
+    expect(getMyProfileMock).toHaveBeenCalledTimes(2)
+    expect(readCustomGameStartPayload(200)).toMatchObject({
+      myUserId: 2,
+      opponentUserId: 1,
+    })
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: '200',
+      },
+    })
+    expect(wrapper.get('main').attributes('data-custom-room-start-status')).toBe('started')
+  })
+
   it('shows an error when ROOM_STARTED payload is invalid', async () => {
     const wrapper = mount(CustomRoomPage)
     await flushPromises()

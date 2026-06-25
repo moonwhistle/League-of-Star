@@ -35,8 +35,10 @@ public class GameRoomWebSocketMessageSender {
     }
 
     private void send(WebSocketSession session, String payload) throws IOException {
-        if (session.isOpen()) {
-            session.sendMessage(new TextMessage(payload));
+        synchronized (session) {
+            if (session.isOpen()) {
+                session.sendMessage(new TextMessage(payload));
+            }
         }
     }
 }
