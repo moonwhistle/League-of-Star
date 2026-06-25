@@ -6,21 +6,24 @@ import com.sang.leagueofstar.domain.user.service.UserCommandService;
 import com.sang.leagueofstar.domain.user.service.UserReadService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.sang.leagueofstar.auth.repository.PasswordResetStore;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,8 +35,8 @@ class PasswordResetServiceTest {
     private static final String TEST_TOKEN = "test-uuid-token";
     private static final String NEW_RAW_PASSWORD = "newPassword123";
     private static final String ENCODED_PASSWORD = "encodedPassword123";
+    private static final String FRONTEND_RESET_URL = "http://localhost:5173/password/reset";
 
-    @InjectMocks
     private PasswordResetService passwordResetService;
 
     @Mock
@@ -51,6 +54,18 @@ class PasswordResetServiceTest {
     @Mock
     private EmailService emailService;
 
+    @BeforeEach
+    void setUp() {
+        passwordResetService = new PasswordResetService(
+                userReadService,
+                userCommandService,
+                passwordResetStore,
+                passwordEncoder,
+                emailService,
+                FRONTEND_RESET_URL
+        );
+    }
+
     @Test
     @DisplayName("requestReset - 성공: 유저가 존재하면 토큰을 생성하고 저장하며 이메일을 발송한다")
     void requestReset_Success() {
@@ -67,6 +82,23 @@ class PasswordResetServiceTest {
     }
 
     @Test
+    @DisplayName("requestReset - 메일 링크는 프론트 reset URL과 token query로 생성한다")
+    void requestReset_FrontendResetLink() {
+        // given
+        given(userReadService.existsByEmail(TEST_EMAIL)).willReturn(true);
+        ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
+
+        // when
+        String token = passwordResetService.requestReset(TEST_EMAIL);
+
+        // then
+        verify(emailService).sendTextEmail(eq(TEST_EMAIL), anyString(), contentCaptor.capture());
+        assertThat(contentCaptor.getValue())
+                .contains(FRONTEND_RESET_URL + "?token=" + token)
+                .doesNotContain("/api/v1/auth/password/reset-submit");
+    }
+
+    @Test
     @DisplayName("requestReset - 무시: 존재하지 않는 이메일이면 null을 반환하고 저장하지 않는다")
     void requestReset_NonExistentEmail() {
         // given
@@ -78,6 +110,21 @@ class PasswordResetServiceTest {
         // then
         assertThat(token).isNull();
         verify(passwordResetStore, never()).save(anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("requestReset - 메일 발송 실패는 요청 실패로 전파하지 않는다")
+    void requestReset_EmailFailure_NoThrow() {
+        // given
+        given(userReadService.existsByEmail(TEST_EMAIL)).willReturn(true);
+        willThrow(new RuntimeException("mail down"))
+                .given(emailService)
+                .sendTextEmail(eq(TEST_EMAIL), anyString(), anyString());
+
+        // when & then
+        assertThatCode(() -> passwordResetService.requestReset(TEST_EMAIL))
+                .doesNotThrowAnyException();
+        verify(passwordResetStore).save(anyString(), eq(TEST_EMAIL), anyLong());
     }
 
     @Test
