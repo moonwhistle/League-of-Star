@@ -12,6 +12,7 @@
     :data-custom-room-copy-message="copyMessage"
     :data-custom-room-socket-status="socketStatus"
     :data-custom-room-socket-error-message="socketErrorMessage"
+    :data-custom-room-socket-close-code="lastSocketCloseCode ?? ''"
     :data-custom-room-leave-status="leaveStatus"
     :data-custom-room-leave-error-message="leaveErrorMessage"
     :data-custom-room-start-status="startStatus"
@@ -26,6 +27,10 @@
           <h1>{{ room?.roomName ?? t('customRoom.title') }}</h1>
         </div>
         <nav class="custom-room-actions" :aria-label="t('customRoom.pageLabel')">
+          <span class="custom-room-connection" :class="socketStatusClass" role="status">
+            <span aria-hidden="true"></span>
+            {{ socketStatusLabel }}
+          </span>
           <button type="button" :disabled="roomStatus === 'loading'" @click="loadRoom">
             {{ t('customRoom.refresh') }}
           </button>
@@ -102,9 +107,6 @@
             </p>
             <p v-if="startErrorMessage !== ''" class="custom-room-alert" role="alert">
               {{ startErrorMessage }}
-            </p>
-            <p v-if="socketErrorMessage !== ''" class="custom-room-alert" role="alert">
-              {{ socketErrorMessage }}
             </p>
             <p v-if="leaveErrorMessage !== ''" class="custom-room-alert" role="alert">
               {{ leaveErrorMessage }}
@@ -209,6 +211,7 @@ const roomSocketConnection = shallowRef<CustomRoomWebSocketConnection>()
 const socketReconnectTimer = shallowRef<ReturnType<typeof window.setTimeout>>()
 const expectedSocketClose = ref(false)
 const socketReconnectAttempts = ref(0)
+const lastSocketCloseCode = ref<number>()
 const startFallbackUserId = shallowRef<number>()
 const routeRoomId = computed(() => String(route.params.roomId ?? '').trim())
 const isConfirmedNonOwner = computed(
@@ -250,6 +253,26 @@ const startHelpMessage = computed(() => {
 
   return t('customRoom.startReady')
 })
+const socketStatusLabel = computed(() => {
+  if (socketStatus.value === 'open') {
+    return t('customRoom.socketConnected')
+  }
+
+  if (socketStatus.value === 'connecting') {
+    return t('customRoom.socketConnecting')
+  }
+
+  if (socketStatus.value === 'closed' || socketStatus.value === 'error') {
+    return t('customRoom.socketDisconnected')
+  }
+
+  return t('customRoom.socketIdle')
+})
+const socketStatusClass = computed(() => ({
+  'is-connected': socketStatus.value === 'open',
+  'is-connecting': socketStatus.value === 'connecting' || socketStatus.value === 'idle',
+  'is-disconnected': socketStatus.value === 'closed' || socketStatus.value === 'error',
+}))
 const inviteLink = computed(() => {
   const inviteCode = room.value?.inviteCode.trim() ?? ''
 
@@ -312,6 +335,7 @@ async function loadRoom() {
   roomErrorMessage.value = ''
   startStatus.value = 'idle'
   socketReconnectAttempts.value = 0
+  lastSocketCloseCode.value = undefined
   clearSocketReconnectTimer()
 
   if (routeRoomId.value === '') {
@@ -460,6 +484,7 @@ function connectRoomSocket(roomId: number) {
   closeRoomSocket()
   socketStatus.value = 'connecting'
   socketErrorMessage.value = ''
+  lastSocketCloseCode.value = undefined
   expectedSocketClose.value = false
 
   try {
@@ -494,6 +519,7 @@ function connectRoomSocket(roomId: number) {
         }
 
         roomSocketConnection.value = undefined
+        lastSocketCloseCode.value = event.code
         socketStatus.value = 'closed'
         if (!expectedSocketClose.value && roomStatus.value === 'success') {
           socketErrorMessage.value = t('customRoom.socketError')
@@ -742,6 +768,49 @@ function errorMessage(error: unknown, fallback: string) {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.custom-room-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 0 12px;
+  color: rgba(248, 251, 255, 0.78);
+  background: rgba(5, 10, 22, 0.54);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.custom-room-connection span {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #facc15;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.45);
+}
+
+.custom-room-connection.is-connected {
+  color: #bbf7d0;
+  border-color: rgba(34, 197, 94, 0.42);
+}
+
+.custom-room-connection.is-connected span {
+  background: #22c55e;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.62);
+}
+
+.custom-room-connection.is-disconnected {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.44);
+}
+
+.custom-room-connection.is-disconnected span {
+  background: #ef4444;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.62);
 }
 
 .custom-room-actions button,

@@ -118,6 +118,7 @@ describe('CustomRoomPage', () => {
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).toContain('Guest')
     expect(wrapper.text()).toContain('방장')
+    expect(wrapper.text()).toContain('연결 중')
     expect(wrapper.get('[data-testid="custom-room-start-button"]').text()).toContain('게임 시작')
     expect(wrapper.get('[data-testid="custom-room-start-button"]').classes()).toContain(
       'custom-room-primary-start',
@@ -436,7 +437,10 @@ describe('CustomRoomPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('error')
-    expect(wrapper.text()).toContain('socket failed')
+    expect(wrapper.get('main').attributes('data-custom-room-socket-error-message')).toBe(
+      'socket failed',
+    )
+    expect(wrapper.text()).toContain('연결 끊김')
     expect(leaveCustomRoomMock).not.toHaveBeenCalled()
   })
 
@@ -455,7 +459,8 @@ describe('CustomRoomPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('closed')
-    expect(wrapper.text()).toContain('대기실 실시간 연결이 끊겼습니다.')
+    expect(wrapper.get('main').attributes('data-custom-room-socket-close-code')).toBe('1000')
+    expect(wrapper.text()).toContain('연결 끊김')
     expect(getCustomRoomMock).toHaveBeenCalledTimes(2)
     expect(getCustomRoomMock).toHaveBeenLastCalledWith('100')
     expect(connectCustomRoomWebSocketMock).toHaveBeenCalledTimes(1)
@@ -479,6 +484,8 @@ describe('CustomRoomPage', () => {
       await flushPromises()
 
       expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('closed')
+      expect(wrapper.get('main').attributes('data-custom-room-socket-close-code')).toBe('1006')
+      expect(wrapper.text()).toContain('연결 끊김')
       expect(connectCustomRoomWebSocketMock).toHaveBeenCalledTimes(1)
 
       await vi.advanceTimersByTimeAsync(800)
