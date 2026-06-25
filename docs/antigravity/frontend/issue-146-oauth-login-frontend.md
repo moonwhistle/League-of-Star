@@ -184,103 +184,103 @@ interface LoginResponse {
 
 ### 1. Frontend OAuth Contract 정리
 
-- [ ] backend issue-144 OAuth redirect/token exchange 계약을 재확인한다.
-- [ ] Google 버튼은 backend OAuth entrypoint로 browser redirect한다고 문서화한다.
-- [ ] `/oauth2/redirect`가 auth guard 대상이 아닌 이유를 문서화한다.
-- [ ] token exchange API 성공이 OAuth 로그인 완료 기준임을 문서화한다.
-- [ ] OAuth code는 URL query에서만 읽고 저장하지 않는 정책을 문서화한다.
-- [ ] `Or continue with` 문구 변경과 게임 소개 모달 범위를 문서화한다.
+- [x] backend issue-144 OAuth redirect/token exchange 계약을 재확인한다.
+- [x] Google 버튼은 backend OAuth entrypoint로 browser redirect한다고 문서화한다.
+- [x] `/oauth2/redirect`가 auth guard 대상이 아닌 이유를 문서화한다.
+- [x] token exchange API 성공이 OAuth 로그인 완료 기준임을 문서화한다.
+- [x] OAuth code는 URL query에서만 읽고 저장하지 않는 정책을 문서화한다.
+- [x] `Or continue with` 문구 변경과 게임 소개 모달 범위를 문서화한다.
 
 ### 2. Auth Service / Type 구현
 
-- [ ] `OAuthTokenRequest` type을 추가한다.
-- [ ] 기존 `LoginResponse` type을 OAuth token exchange 응답으로 재사용한다.
-- [ ] `exchangeOAuthToken(request, signal?)` service를 추가한다.
-- [ ] `exchangeOAuthToken`이 `POST /api/v1/auth/oauth2/token`을 호출하게 한다.
-- [ ] `exchangeOAuthToken`을 `auth: false`로 호출한다.
-- [ ] authService contract test를 추가한다.
+- [x] `OAuthTokenRequest` type을 추가한다.
+- [x] 기존 `LoginResponse` type을 OAuth token exchange 응답으로 재사용한다.
+- [x] `exchangeOAuthToken(request, signal?)` service를 추가한다.
+- [x] `exchangeOAuthToken`이 `POST /api/v1/auth/oauth2/token`을 호출하게 한다.
+- [x] `exchangeOAuthToken`을 `auth: false`로 호출한다.
+- [x] authService contract test를 추가한다.
 
 ### 3. OAuth Redirect Route / Page 구현
 
-- [ ] `ROUTE_PATHS.oauth2Redirect = '/oauth2/redirect'`를 추가한다.
-- [ ] `ROUTE_NAMES.oauth2Redirect = 'oauth2-redirect'`를 추가한다.
-- [ ] router에 OAuthRedirectPage route를 추가한다.
-- [ ] OAuthRedirectPage는 `requiresAuth`, `guestOnly` meta를 사용하지 않는다.
-- [ ] OAuthRedirectPage에서 code query를 읽는다.
-- [ ] code가 없으면 API 호출 없이 실패 상태를 표시한다.
-- [ ] code가 있으면 token exchange API를 호출한다.
-- [ ] 성공 시 `setAuthTokens()`를 호출한다.
-- [ ] 성공 시 `/match`로 이동한다.
-- [ ] 실패 시 backend error message 또는 fallback message를 표시한다.
-- [ ] 같은 route instance에서 code query가 바뀌면 최신 code를 사용하게 한다.
+- [x] `ROUTE_PATHS.oauth2Redirect = '/oauth2/redirect'`를 추가한다.
+- [x] `ROUTE_NAMES.oauth2Redirect = 'oauth2-redirect'`를 추가한다.
+- [x] router에 OAuthRedirectPage route를 추가한다.
+- [x] OAuthRedirectPage는 `requiresAuth`, `guestOnly` meta를 사용하지 않는다.
+- [x] OAuthRedirectPage에서 code query를 읽는다.
+- [x] code가 없으면 API 호출 없이 실패 상태를 표시한다.
+- [x] code가 있으면 token exchange API를 호출한다.
+- [x] 성공 시 `setAuthTokens()`를 호출한다.
+- [x] 성공 시 `/match`로 이동한다.
+- [x] 실패 시 backend error message 또는 fallback message를 표시한다.
+- [x] 같은 route instance에서 code query가 바뀌면 최신 code를 사용하게 한다.
 
 ### 4. LoginPage Google OAuth 연결
 
-- [ ] Google 버튼 click handler를 추가한다.
-- [ ] OAuth 시작 URL을 `${API_BASE_URL}/oauth2/authorization/google`로 구성한다.
-- [ ] 버튼 클릭 시 `window.location.assign()`으로 브라우저 이동한다.
-- [ ] OAuth 시작 중 버튼 disabled 상태를 구현한다.
-- [ ] OAuth 시작 중 문구를 locale로 표시한다.
-- [ ] `/login?oauth=failed` query 실패 메시지를 표시한다.
-- [ ] 기존 email/password login submit 상태와 OAuth 시작 상태를 분리한다.
+- [x] Google 버튼 click handler를 추가한다.
+- [x] OAuth 시작 URL을 `${API_BASE_URL}/oauth2/authorization/google`로 구성한다.
+- [x] 버튼 클릭 시 `window.location.assign()`으로 브라우저 이동한다.
+- [x] OAuth 시작 중 버튼 disabled 상태를 구현한다.
+- [x] OAuth 시작 중 문구를 locale로 표시한다.
+- [x] `/login?oauth=failed` query 실패 메시지를 표시한다.
+- [x] 기존 email/password login submit 상태와 OAuth 시작 상태를 분리한다.
 
 ### 5. LoginPage Copy / About Modal 구현
 
-- [ ] 영어 `login.bridgeWith`를 `Or continue with`로 변경한다.
-- [ ] 한국어 `login.bridgeWith`는 기존 자연스러운 문구를 유지한다.
-- [ ] `게임 소개` 버튼에 click handler를 연결한다.
-- [ ] 게임 소개 모달 open/close 상태를 추가한다.
-- [ ] 모달에 `character-cutout.png`를 표시한다.
-- [ ] League of Legends Smite 싸움 오마주 문구를 표시한다.
-- [ ] 움직이는 별을 LIGHTNING으로 잡는 게임임을 설명한다.
-- [ ] 모달 닫기 버튼과 backdrop close를 구현한다.
-- [ ] 모바일 viewport에서 모달 overflow가 없게 스타일링한다.
+- [x] 영어 `login.bridgeWith`를 `Or continue with`로 변경한다.
+- [x] 한국어 `login.bridgeWith`는 기존 자연스러운 문구를 유지한다.
+- [x] `게임 소개` 버튼에 click handler를 연결한다.
+- [x] 게임 소개 모달 open/close 상태를 추가한다.
+- [x] 모달에 `character-cutout.png`를 표시한다.
+- [x] League of Legends Smite 싸움 오마주 문구를 표시한다.
+- [x] 움직이는 별을 LIGHTNING으로 잡는 게임임을 설명한다.
+- [x] 모달 닫기 버튼과 backdrop close를 구현한다.
+- [x] 모바일 viewport에서 모달 overflow가 없게 스타일링한다.
 
 ### 6. Locale / UI 구현
 
-- [ ] OAuth redirect page 한글 locale을 추가한다.
-- [ ] OAuth redirect page 영어 locale을 추가한다.
-- [ ] LoginPage OAuth 시작/실패 한글 locale을 추가한다.
-- [ ] LoginPage OAuth 시작/실패 영어 locale을 추가한다.
-- [ ] 게임 소개 모달 한글 locale을 추가한다.
-- [ ] 게임 소개 모달 영어 locale을 추가한다.
-- [ ] Google 버튼 hover/focus/disabled 상태를 유지한다.
-- [ ] OAuthRedirectPage를 LoginPage와 같은 배경/카드 계열 디자인으로 구현한다.
+- [x] OAuth redirect page 한글 locale을 추가한다.
+- [x] OAuth redirect page 영어 locale을 추가한다.
+- [x] LoginPage OAuth 시작/실패 한글 locale을 추가한다.
+- [x] LoginPage OAuth 시작/실패 영어 locale을 추가한다.
+- [x] 게임 소개 모달 한글 locale을 추가한다.
+- [x] 게임 소개 모달 영어 locale을 추가한다.
+- [x] Google 버튼 hover/focus/disabled 상태를 유지한다.
+- [x] OAuthRedirectPage를 LoginPage와 같은 배경/카드 계열 디자인으로 구현한다.
 
 ### 7. Test 구현
 
-- [ ] authService `exchangeOAuthToken` contract test를 추가한다.
-- [ ] LoginPage Google 버튼 redirect URL 테스트를 추가한다.
-- [ ] LoginPage OAuth 실패 query 메시지 테스트를 추가한다.
-- [ ] LoginPage 영어 locale `Or continue with` 테스트를 추가한다.
-- [ ] LoginPage 게임 소개 모달 open 테스트를 추가한다.
-- [ ] LoginPage 게임 소개 모달 이미지/문구 표시 테스트를 추가한다.
-- [ ] LoginPage 게임 소개 모달 close 테스트를 추가한다.
-- [ ] OAuthRedirectPage code 누락 테스트를 추가한다.
-- [ ] OAuthRedirectPage token exchange 성공 테스트를 추가한다.
-- [ ] OAuthRedirectPage token 저장 + `/match` 이동 테스트를 추가한다.
-- [ ] OAuthRedirectPage invalid code error 표시 테스트를 추가한다.
-- [ ] OAuthRedirectPage 최신 code query 사용 테스트를 추가한다.
-- [ ] router route 등록 테스트 필요 여부를 확인한다.
+- [x] authService `exchangeOAuthToken` contract test를 추가한다.
+- [x] LoginPage Google 버튼 redirect URL 테스트를 추가한다.
+- [x] LoginPage OAuth 실패 query 메시지 테스트를 추가한다.
+- [x] LoginPage 영어 locale `Or continue with` 테스트를 추가한다.
+- [x] LoginPage 게임 소개 모달 open 테스트를 추가한다.
+- [x] LoginPage 게임 소개 모달 이미지/문구 표시 테스트를 추가한다.
+- [x] LoginPage 게임 소개 모달 close 테스트를 추가한다.
+- [x] OAuthRedirectPage code 누락 테스트를 추가한다.
+- [x] OAuthRedirectPage token exchange 성공 테스트를 추가한다.
+- [x] OAuthRedirectPage token 저장 + `/match` 이동 테스트를 추가한다.
+- [x] OAuthRedirectPage invalid code error 표시 테스트를 추가한다.
+- [x] OAuthRedirectPage 최신 code query 사용 테스트를 추가한다.
+- [x] router route 등록 테스트 필요 여부를 확인한다.
 
 ### 8. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 5-4 체크리스트를 구현 결과와 맞게 갱신한다.
-- [ ] issue-146 Tasks 완료 상태를 반영한다.
-- [ ] backend issue-144 계약과 issue-146 frontend 문서가 일치하는지 확인한다.
-- [ ] issue-144 후속 범위가 issue-146에서 해소되는지 확인한다.
-- [ ] PR Message 섹션을 설계 중심으로 보강한다.
+- [x] `docs/last-구현.md` 5-4 체크리스트를 구현 결과와 맞게 갱신한다.
+- [x] issue-146 Tasks 완료 상태를 반영한다.
+- [x] backend issue-144 계약과 issue-146 frontend 문서가 일치하는지 확인한다.
+- [x] issue-144 후속 범위가 issue-146에서 해소되는지 확인한다.
+- [x] PR Message 섹션을 설계 중심으로 보강한다.
 
 ### 9. 검증
 
-- [ ] `npm run test -- authService LoginPage OAuthRedirectPage`
-- [ ] `npm run format`
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
-- [ ] `npm run test`
-- [ ] `npm run build`
-- [ ] desktop `1440x900`에서 LoginPage modal / OAuthRedirectPage overflow 확인.
-- [ ] mobile `390x844`에서 LoginPage modal / OAuthRedirectPage overflow 확인.
+- [x] `npm run test -- LoginPage OAuthRedirectPage authService oauthRedirect`
+- [x] `npm run format`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run test`
+- [x] `npm run build`
+- [x] desktop `1440x900`에서 LoginPage modal / OAuthRedirectPage overflow 확인.
+- [x] mobile `390x844`에서 LoginPage modal / OAuthRedirectPage overflow 확인.
 
 ## Implementation Policy
 
@@ -377,7 +377,14 @@ flowchart TD
 - OAuth 계정 연결/해제 UX는 제외함.
 - 게임 소개 전용 페이지와 튜토리얼은 제외함.
 - 새 패키지는 추가하지 않음.
-- 검증 결과를 여기에 기재함.
+- `npm run test -- LoginPage OAuthRedirectPage authService oauthRedirect` 통과함.
+- `npm run format` 통과함.
+- `npm run lint` 통과함.
+- `npm run typecheck` 통과함.
+- `npm run test` 통과함. 38 files / 353 tests passed.
+- `npm run build` 통과함.
+- headless Chrome 기준 desktop `1440x900`, mobile `390x844`에서 LoginPage 소개 모달과 OAuthRedirectPage horizontal overflow 없음 확인함.
+- headless Chrome 기준 desktop/mobile에서 text overflow 후보 없음 확인함.
 
 ## 📌 Related Issue
 

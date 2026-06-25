@@ -964,7 +964,7 @@ Policy:
 
 - [x] 기존 email/password login을 대체하지 않고 병렬 로그인 수단으로 둔다.
 
-### 5-4. [ ] OAuth 로그인 프론트 구현
+### 5-4. [x] OAuth 로그인 프론트 구현
 
 담당: Frontend
 
@@ -972,13 +972,13 @@ Policy:
 
 Frontend:
 
-- [ ] OAuth 버튼을 실제 redirect 흐름에 연결한다.
-- [ ] callback 처리 route가 필요한지 5-3 계약에 맞춰 구현한다.
-- [ ] OAuth 성공 후 기존 `setAuthTokens` 저장 정책과 연결한다.
+- [x] OAuth 버튼을 실제 redirect 흐름에 연결한다.
+- [x] callback 처리 route가 필요한지 5-3 계약에 맞춰 구현한다.
+- [x] OAuth 성공 후 기존 `setAuthTokens` 저장 정책과 연결한다.
 
 Policy:
 
-- [ ] email/password login UI와 병렬 로그인 수단으로 제공한다.
+- [x] email/password login UI와 병렬 로그인 수단으로 제공한다.
 
 ## 추천 진행 순서
 
@@ -1005,7 +1005,7 @@ Policy:
 21. [x] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
 22. [x] Section 5-1/5-2. 비밀번호 찾기
 23. [x] Section 5-3. OAuth 로그인 백엔드 계약
-24. [ ] Section 5-4. OAuth 로그인 프론트 구현
+24. [x] Section 5-4. OAuth 로그인 프론트 구현
 
 ## 판단 기준
 
