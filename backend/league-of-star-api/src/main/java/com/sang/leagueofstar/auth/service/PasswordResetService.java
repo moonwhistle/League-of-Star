@@ -21,7 +21,6 @@ public class PasswordResetService {
 
     private static final String DEFAULT_FRONTEND_RESET_URL = "http://localhost:5173/password/reset";
     private static final long RESET_TOKEN_TTL_MINUTES = 10;
-    private static final String RESET_LINK_TAG = "[PASSWORD RESET LINK]";
 
     private static final String RESET_SUBJECT = "[League of Star] 비밀번호 재설정 안내";
     private static final String RESET_CONTENT_TEMPLATE = "안녕하세요. 비밀번호 재설정을 위해 아래 링크를 클릭해 주세요.\n\n%s\n\n링크는 10분 동안 유효합니다.";
@@ -63,7 +62,7 @@ public class PasswordResetService {
         String resetLink = buildResetLink(token);
         sendResetEmail(email, resetLink);
 
-        log.info("{} {}", RESET_LINK_TAG, resetLink);
+        log.info("Password reset email requested. email={}", email);
 
         return token;
     }
