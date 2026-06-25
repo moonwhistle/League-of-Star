@@ -350,6 +350,8 @@ flowchart TD
 - `ROOM_STARTED`가 Custom GamePlay 진입 source of truth임.
 - Custom Game은 기존 Game WebSocket과 LIGHTNING 흐름을 재사용함.
 - Custom Game 결과는 GameResultPage에서 보여주되 rank/LP 변화 UI는 숨김.
+- Custom Game은 전적에는 남기지만 rank/LP 값은 변경하지 않음.
+- WebSocket 메시지는 같은 session에 동시에 send하지 않도록 직렬화해 연결 안정성을 확보함.
 
 백엔드와의 구현 계약:
 
@@ -358,6 +360,7 @@ flowchart TD
 - start 성공 시 backend가 Room WebSocket으로 `ROOM_STARTED`를 broadcast함.
 - `ROOM_STARTED` payload에는 `gameRoomId`, `gameMode=CUSTOM`, `serverTime`, `startAt`, `webSocketUrl`, `scenario`가 포함됨.
 - 실제 플레이는 `/ws/game/{gameRoomId}` Game WebSocket으로 진행됨.
+- Custom Game은 start 직후 `IN_PROGRESS`가 되므로 Game WebSocket handshake에서 `CUSTOM READY/IN_PROGRESS` 접근을 허용함.
 - Custom Game 결과는 기존 `GAME_RESULT`에 `gameMode=CUSTOM`으로 내려옴.
 - Custom Game은 전적에는 남고 rank/LP에는 반영되지 않음.
 
@@ -373,14 +376,24 @@ flowchart TD
   Custom Game도 별을 공격하고 LIGHTNING으로 결과를 만드는 게임이므로 countdown, HP HUD, Three.js scene, Game WebSocket, LIGHTNING 입력을 그대로 사용한다. 차이는 시작 source가 `ROOM_STARTED`라는 점과 결과 정산 정책이 rank 제외라는 점임.
 
 - Custom 결과는 GameResultPage로 연결함.
-  Custom Game은 전적에 저장되므로 Summary API로 저장 완료 상태를 확인할 수 있다. GameResultPage를 재사용하면 사용자는 같은 결과 흐름을 보면서도 custom에서는 rank/LP 변화가 없다는 점만 명확히 볼 수 있음.
+  Custom Game은 전적에 저장되므로 Summary API로 저장 완료 상태를 확인할 수 있다. GameResultPage를 재사용하면 사용자는 같은 결과 흐름을 보면서도 custom에서는 rank/LP 변화 영역만 보지 않게 됨.
 
 - Match와 Practice 결과 정책을 그대로 유지함.
   Match는 기존처럼 Summary API와 rank/LP 변화 UI를 사용한다. Practice는 전적을 저장하지 않으므로 기존 GamePlayPage 내부 결과 오버레이를 유지한다. Custom만 “전적 저장은 하되 rank/LP 변화는 숨기는” 중간 정책으로 처리함.
 
+- WebSocket 연결 안정성을 보강함.
+  실제 2브라우저 테스트에서 Room/Game WebSocket 메시지가 짧은 시간에 겹치면 같은 session에 동시 send가 들어갈 수 있음을 확인했다. Tomcat WebSocket은 같은 session의 동시 `sendMessage`에 취약하므로 Room WebSocket과 Game WebSocket sender 모두 session 단위로 send를 직렬화함. 이 방식은 구현이 단순하고 현재 단일 인스턴스 local session registry 구조에 맞다. 대신 대규모 fan-out에서는 session별 큐/비동기 sender로 확장할 여지가 있음.
+
+- Custom GamePlay WebSocket 접근 정책을 mode 기준으로 보정함.
+  Match는 waiting/RTT 흐름을 거쳐 `READY` 상태에서 Game WebSocket을 넘겨받는 구조지만, Custom은 `ROOM_STARTED` 후 바로 `IN_PROGRESS` 게임으로 이동한다. 그래서 Match 정책을 건드리지 않고 `CUSTOM`과 `PRACTICE`만 `READY/IN_PROGRESS` 접근을 허용함.
+
+- 결과 화면 문구를 mode 중립적으로 정리함.
+  Custom 결과 화면에서 “사용자 지정 게임은 전적에만 남고...” 같은 설명 문구를 제거하고, pending 문구도 “랭크 정산” 대신 “최종 결과 정리”로 바꿈. 사용자 지정 결과도 일반 결과 화면과 같은 톤으로 보이되 rank/LP 계산 영역만 제외되게 하기 위함임.
+
 ## 📝 Note
 
-- 이번 PR에서 백엔드 start/result 계약은 변경하지 않음.
+- 이번 PR에서 백엔드 start/result payload shape는 변경하지 않음.
+- 백엔드 Game WebSocket 접근 정책과 WebSocket sender 안정화는 실제 브라우저 검증 중 발견한 Custom GamePlay 연결 문제를 해결하기 위해 포함함.
 - Custom Room 재사용, Custom Game 다시하기, 친구 목록 기반 초대는 제외함.
 - 전적 목록에서 custom/match badge 표시는 후속 이슈로 남김.
 - 새 패키지 추가 없음.
@@ -391,6 +404,8 @@ flowchart TD
   - `npm run test` 통과함. 35 files / 323 tests passed 확인함.
   - `npm run build` 통과함.
   - CustomRoomPage, GamePlayPage, GameResultPage 관련 targeted test 통과함.
+  - 실제 브라우저 2세션으로 방 생성 -> 초대 참가 -> ROOM_STARTED -> GamePlay 진입 -> Game WebSocket connected -> 결과 화면 이동까지 확인함.
+  - 결과 화면에서 Custom 설명 문구, rank pending 문구, LP, 게임룸 표시가 노출되지 않음 확인함.
   - Playwright가 설치되어 있지 않아 desktop/mobile screenshot overflow 검증은 수행하지 못함. 새 패키지를 추가하지 않는 정책 때문에 DOM/test/build 검증으로 대체함.
 
 ## 📌 Related Issue
