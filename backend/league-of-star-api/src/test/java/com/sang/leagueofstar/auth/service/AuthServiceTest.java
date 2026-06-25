@@ -1,6 +1,7 @@
 package com.sang.leagueofstar.auth.service;
 
 import com.sang.leagueofstar.auth.infrastructure.jwt.JwtTokenProvider;
+import com.sang.leagueofstar.auth.domain.RefreshToken;
 import com.sang.leagueofstar.auth.service.dto.LoginDto;
 import com.sang.leagueofstar.auth.service.dto.TokenDto;
 import com.sang.leagueofstar.common.exception.ApiErrorCode;
@@ -8,7 +9,6 @@ import com.sang.leagueofstar.common.exception.ApiException;
 import com.sang.leagueofstar.domain.user.domain.User;
 import com.sang.leagueofstar.domain.user.service.UserCommandService;
 import com.sang.leagueofstar.domain.user.service.UserReadService;
-import com.sang.leagueofstar.auth.domain.RefreshToken;
 import com.sang.leagueofstar.auth.infrastructure.token.RefreshTokenRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +47,9 @@ class AuthServiceTest {
 
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
+    private AuthTokenIssueService authTokenIssueService;
 
     @Test
     @DisplayName("회원가입 - 성공")
@@ -120,9 +123,7 @@ class AuthServiceTest {
 
         given(userReadService.findByEmail(email)).willReturn(Optional.of(user));
         given(passwordEncoder.matches(password, user.getPassword())).willReturn(true);
-        given(jwtTokenProvider.createAccessToken(anyLong(), anyString())).willReturn("access-token");
-        given(jwtTokenProvider.createRefreshToken(anyLong(), anyString())).willReturn("refresh-token");
-        given(jwtTokenProvider.getRefreshTokenExpirationMs()).willReturn(604800000L);
+        given(authTokenIssueService.issueTokens(user)).willReturn(new TokenDto("access-token", "refresh-token"));
 
         // when
         LoginDto result = authService.login(email, password);
@@ -131,7 +132,7 @@ class AuthServiceTest {
         assertThat(result.tokens().accessToken()).isEqualTo("access-token");
         assertThat(result.tokens().refreshToken()).isEqualTo("refresh-token");
         assertThat(result.user().getEmail()).isEqualTo(email);
-        verify(refreshTokenRepository, times(1)).save(any(RefreshToken.class));
+        verify(authTokenIssueService, times(1)).issueTokens(user);
     }
 
     @Test
@@ -163,8 +164,7 @@ class AuthServiceTest {
         given(authentication.getName()).willReturn(user.getEmail());
         given(userReadService.findByEmail(user.getEmail())).willReturn(Optional.of(user));
         
-        given(jwtTokenProvider.createAccessToken(anyLong(), anyString())).willReturn("new-at");
-        given(jwtTokenProvider.createRefreshToken(anyLong(), anyString())).willReturn("new-rt");
+        given(authTokenIssueService.issueTokens(user)).willReturn(new TokenDto("new-at", "new-rt"));
 
         // when
         TokenDto result = authService.refresh(oldRefreshToken);
@@ -172,7 +172,7 @@ class AuthServiceTest {
         // then
         assertThat(result.accessToken()).isEqualTo("new-at");
         assertThat(result.refreshToken()).isEqualTo("new-rt");
-        verify(refreshTokenRepository, times(1)).save(any(RefreshToken.class));
+        verify(authTokenIssueService, times(1)).issueTokens(user);
     }
 
     @Test
