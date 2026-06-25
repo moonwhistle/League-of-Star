@@ -1,8 +1,14 @@
 <template>
-  <main class="oauth-redirect-page" :style="{ '--oauth-background-image': `url(${backgroundImageUrl})` }">
+  <!-- eslint-disable vue/max-attributes-per-line, vue/singleline-html-element-content-newline -->
+  <main
+    class="oauth-redirect-page"
+    :style="{ '--oauth-background-image': `url(${backgroundImageUrl})` }"
+  >
     <section class="oauth-redirect-card" aria-labelledby="oauth-redirect-title">
       <div class="oauth-redirect-heading">
-        <h1 id="oauth-redirect-title">{{ t('oauthRedirect.title') }}</h1>
+        <h1 id="oauth-redirect-title">
+          {{ t('oauthRedirect.title') }}
+        </h1>
         <p>{{ t('oauthRedirect.subtitle') }}</p>
       </div>
 
@@ -146,8 +152,7 @@ function getCodeQuery() {
   background-color: #0d1723;
   background:
     linear-gradient(90deg, rgb(4 8 22 / 0.58), rgb(4 8 22 / 0.14) 58%),
-    linear-gradient(0deg, rgb(4 8 22 / 0.5), rgb(4 8 22 / 0.1) 50%),
-    var(--oauth-background-image);
+    linear-gradient(0deg, rgb(4 8 22 / 0.5), rgb(4 8 22 / 0.1) 50%), var(--oauth-background-image);
   background-repeat: no-repeat;
   background-size:
     100% 100%,

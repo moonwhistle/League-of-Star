@@ -702,8 +702,7 @@ function getInitialErrorMessage() {
   overflow: hidden;
   background:
     radial-gradient(circle at 52% 42%, rgb(99 242 232 / 0.16), transparent 38%),
-    radial-gradient(circle at 46% 58%, rgb(188 107 255 / 0.2), transparent 48%),
-    rgb(8 15 34 / 0.86);
+    radial-gradient(circle at 46% 58%, rgb(188 107 255 / 0.2), transparent 48%), rgb(8 15 34 / 0.86);
 }
 
 .about-modal-media img {
