@@ -25,11 +25,11 @@
 
 ## 남은 작업 관리
 
-- [ ] Section 1. User / Auth
-- [ ] Section 2. Match Page 실데이터 전환
-- [ ] Section 3. Record / Profile Page
-- [ ] Section 4. Optional Game Modes
-- [ ] Section 5. Deferred Account Features
+- [x] Section 1. User / Auth
+- [x] Section 2. Match Page 실데이터 전환
+- [x] Section 3. Record / Profile Page
+- [x] Section 4. Optional Game Modes
+- [x] Section 5. Deferred Account Features
 
 ## Section 1. User / Auth
 
@@ -1015,4 +1015,4 @@ Policy:
 - [x] “MatchPage의 모든 주요 표시가 실데이터다”라고 말하려면 Section 2-1부터 2-5까지 필요하다.
 - [x] “내 기록을 다시 볼 수 있다”고 말하려면 Section 3-1과 3-2가 필요하다.
 - [x] “내 프로필 상세를 볼 수 있다”고 말하려면 Section 3-3과 3-4가 필요하다.
-- [ ] “현재 화면의 모든 버튼이 기능한다”고 말하려면 Section 4까지 필요하다.
+- [x] “현재 화면의 모든 버튼이 기능한다”고 말하려면 Section 4까지 필요하다.
