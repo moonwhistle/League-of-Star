@@ -8,6 +8,8 @@ import com.sang.leagueofstar.auth.service.AuthService;
 import com.sang.leagueofstar.auth.service.OAuthLoginService;
 import com.sang.leagueofstar.auth.service.dto.LoginDto;
 import com.sang.leagueofstar.auth.service.dto.TokenDto;
+import com.sang.leagueofstar.common.exception.ApiErrorCode;
+import com.sang.leagueofstar.common.exception.ApiException;
 import com.sang.leagueofstar.common.path.auth.AuthPath;
 import com.sang.leagueofstar.domain.user.domain.User;
 import com.sang.leagueofstar.global.restdocs.RestDocsSupport;
@@ -18,6 +20,7 @@ import org.springframework.restdocs.payload.JsonFieldType;
 
 import static com.epages.restdocs.apispec.ResourceDocumentation.resource;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -203,6 +206,47 @@ class AuthControllerRestDocsTest extends RestDocsSupport {
                                         fieldWithPath("refreshToken").type(JsonFieldType.STRING).description("리프레시 토큰"),
                                         fieldWithPath("userId").type(JsonFieldType.NUMBER).description("사용자 ID"),
                                         fieldWithPath("nickname").type(JsonFieldType.STRING).description("사용자 닉네임")
+                                )
+                                .build()
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("OAuth 토큰 교환 INVALID_OAUTH_CODE 응답 문서화")
+    void exchangeOAuthTokenInvalidCode() {
+        // given
+        OAuthTokenRequest request = new OAuthTokenRequest("expired-oauth-code");
+        doThrow(new ApiException(ApiErrorCode.AUTH_INVALID_OAUTH_CODE))
+                .when(oauthLoginService)
+                .exchangeCode("expired-oauth-code");
+
+        // when & then
+        spec.body(request)
+                .contentType(ContentType.JSON)
+                .when()
+                .post(AuthPath.OAUTH2_TOKEN)
+                .then()
+                .statusCode(401)
+                .apply(document("auth-oauth2-token-invalid-code",
+                        resource(com.epages.restdocs.apispec.ResourceSnippetParameters.builder()
+                                .tag("Auth")
+                                .summary("OAuth 토큰 교환 실패 - code 없음/만료")
+                                .description("""
+                                        OAuth 성공 redirect로 받은 one-time code가 Redis에 없거나 만료되었으면 전역 `ErrorResponse` 형식으로 실패합니다.
+
+                                        access/refresh token은 redirect URL이 아니라 이 token exchange API 성공 시에만 발급됩니다.
+                                        """)
+                                .requestFields(
+                                        fieldWithPath("code").type(JsonFieldType.STRING)
+                                                .description("OAuth 성공 redirect에서 받은 one-time code")
+                                )
+                                .responseFields(
+                                        fieldWithPath("timestamp").type(JsonFieldType.ARRAY).description("에러 발생 시각"),
+                                        fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
+                                        fieldWithPath("code").type(JsonFieldType.STRING).description("애플리케이션 에러 코드"),
+                                        fieldWithPath("message").type(JsonFieldType.STRING).description("에러 메시지"),
+                                        fieldWithPath("errors").type(JsonFieldType.ARRAY).optional().description("필드 검증 에러 목록. code 실패 응답에서는 null")
                                 )
                                 .build()
                         )

@@ -948,7 +948,7 @@ Policy:
 
 - [x] 기존 로그인/회원가입 흐름과 독립된 account recovery 흐름으로 둔다.
 
-### 5-3. [ ] OAuth 로그인 백엔드 계약
+### 5-3. [x] OAuth 로그인 백엔드 계약
 
 담당: Backend
 
@@ -956,13 +956,13 @@ Policy:
 
 Backend:
 
-- [ ] Google OAuth redirect/callback/session 발급 정책을 확정한다.
-- [ ] 기존 email/password 계정과 OAuth 계정 연결 정책을 정한다.
-- [ ] access/refresh token 발급 response가 기존 login response와 같은지 결정한다.
+- [x] Google OAuth redirect/callback/session 발급 정책을 확정한다.
+- [x] 기존 email/password 계정과 OAuth 계정 연결 정책을 정한다.
+- [x] access/refresh token 발급 response가 기존 login response와 같은지 결정한다.
 
 Policy:
 
-- [ ] 기존 email/password login을 대체하지 않고 병렬 로그인 수단으로 둔다.
+- [x] 기존 email/password login을 대체하지 않고 병렬 로그인 수단으로 둔다.
 
 ### 5-4. [ ] OAuth 로그인 프론트 구현
 
@@ -1004,7 +1004,8 @@ Policy:
 20. [x] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
 21. [x] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
 22. [x] Section 5-1/5-2. 비밀번호 찾기
-23. [ ] Section 5-3/5-4. OAuth 로그인
+23. [x] Section 5-3. OAuth 로그인 백엔드 계약
+24. [ ] Section 5-4. OAuth 로그인 프론트 구현
 
 ## 판단 기준
 

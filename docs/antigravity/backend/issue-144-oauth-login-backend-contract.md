@@ -202,95 +202,95 @@ Response:
 
 ### 1. Backend Contract 정리
 
-- [ ] 현재 `SecurityConfig` OAuth2 entry/callback 흐름을 확인한다.
-- [ ] 현재 `OAuth2AuthenticationSuccessHandler`의 token query 전달 문제를 문서화한다.
-- [ ] OAuth 성공 redirect는 one-time code만 전달한다고 확정한다.
-- [ ] token exchange API가 기존 login response shape를 따른다고 문서화한다.
-- [ ] 기존 email/password 계정과 Google account 자동 연결 정책을 문서화한다.
-- [ ] OAuth flow가 REST login API가 아닌 browser redirect 기반임을 문서화한다.
+- [x] 현재 `SecurityConfig` OAuth2 entry/callback 흐름을 확인한다.
+- [x] 현재 `OAuth2AuthenticationSuccessHandler`의 token query 전달 문제를 문서화한다.
+- [x] OAuth 성공 redirect는 one-time code만 전달한다고 확정한다.
+- [x] token exchange API가 기존 login response shape를 따른다고 문서화한다.
+- [x] 기존 email/password 계정과 Google account 자동 연결 정책을 문서화한다.
+- [x] OAuth flow가 REST login API가 아닌 browser redirect 기반임을 문서화한다.
 
 ### 2. OAuth Code Store 구현
 
-- [ ] OAuth one-time code Redis domain을 추가한다.
-- [ ] OAuth code repository를 추가한다.
-- [ ] OAuth code store를 추가한다.
-- [ ] code 저장 payload는 `code -> userId`로 둔다.
-- [ ] TTL은 3분으로 둔다.
-- [ ] code 조회 메서드를 구현한다.
-- [ ] code 삭제 메서드를 구현한다.
+- [x] OAuth one-time code Redis domain을 추가한다.
+- [x] OAuth code repository를 추가한다.
+- [x] OAuth code store를 추가한다.
+- [x] code 저장 payload는 `code -> userId`로 둔다.
+- [x] TTL은 3분으로 둔다.
+- [x] code 조회 메서드를 구현한다.
+- [x] code 삭제 메서드를 구현한다.
 
 ### 3. Token Issue Policy 정리
 
-- [ ] 기존 email/password login의 token pair 발급 로직 재사용 지점을 정리한다.
-- [ ] access token 발급 정책이 기존 login과 같게 한다.
-- [ ] refresh token 발급 정책이 기존 login과 같게 한다.
-- [ ] refresh token Redis 저장 정책이 기존 login과 같게 한다.
-- [ ] OAuth login과 email/password login이 같은 response shape를 쓰도록 정리한다.
+- [x] 기존 email/password login의 token pair 발급 로직 재사용 지점을 정리한다.
+- [x] access token 발급 정책이 기존 login과 같게 한다.
+- [x] refresh token 발급 정책이 기존 login과 같게 한다.
+- [x] refresh token Redis 저장 정책이 기존 login과 같게 한다.
+- [x] OAuth login과 email/password login이 같은 response shape를 쓰도록 정리한다.
 
 ### 4. OAuth Success Handler 보강
 
-- [ ] success handler가 access token을 redirect query에 넣지 않게 수정한다.
-- [ ] success handler가 refresh token을 redirect query에 넣지 않게 보장한다.
-- [ ] 인증 성공 userId를 OAuth code store에 저장한다.
-- [ ] success redirect URL에 `code` query만 추가한다.
-- [ ] response committed 상태 처리는 기존 정책을 유지한다.
+- [x] success handler가 access token을 redirect query에 넣지 않게 수정한다.
+- [x] success handler가 refresh token을 redirect query에 넣지 않게 보장한다.
+- [x] 인증 성공 userId를 OAuth code store에 저장한다.
+- [x] success redirect URL에 `code` query만 추가한다.
+- [x] response committed 상태 처리는 기존 정책을 유지한다.
 
 ### 5. OAuth Token Exchange API 구현
 
-- [ ] `AuthPath`에 OAuth token exchange path를 상수화한다.
-- [ ] request DTO `{ code }`를 추가한다.
-- [ ] response는 기존 `LoginResponse` 또는 동일 shape를 재사용한다.
-- [ ] controller에 `POST /api/v1/auth/oauth2/token`을 추가한다.
-- [ ] service에서 code로 userId를 조회한다.
-- [ ] core `UserReadService.findById(userId)`로 user를 조회한다.
-- [ ] token pair를 발급하고 refresh token을 저장한다.
-- [ ] exchange 성공 후 code를 삭제한다.
-- [ ] invalid/expired code ErrorResponse를 반환한다.
+- [x] `AuthPath`에 OAuth token exchange path를 상수화한다.
+- [x] request DTO `{ code }`를 추가한다.
+- [x] response는 기존 `LoginResponse` 또는 동일 shape를 재사용한다.
+- [x] controller에 `POST /api/v1/auth/oauth2/token`을 추가한다.
+- [x] service에서 code로 userId를 조회한다.
+- [x] core `UserReadService.findById(userId)`로 user를 조회한다.
+- [x] token pair를 발급하고 refresh token을 저장한다.
+- [x] exchange 성공 후 code를 삭제한다.
+- [x] invalid/expired code ErrorResponse를 반환한다.
 
 ### 6. Social Account Policy 점검
 
-- [ ] `CustomOAuth2UserService`가 core `SocialAccountReadService`를 사용하는지 확인한다.
-- [ ] `CustomOAuth2UserService`가 core `SocialAccountCommandService`를 사용하는지 확인한다.
-- [ ] API 모듈에서 social account repository 직접 접근이 없는지 확인한다.
-- [ ] Google provider/providerId 기존 계정 조회 정책을 확인한다.
-- [ ] Google email과 기존 user email 자동 연결 정책을 문서화한다.
-- [ ] 신규 OAuth user nickname 생성 정책을 확인한다.
+- [x] `CustomOAuth2UserService`가 core `SocialAccountReadService`를 사용하는지 확인한다.
+- [x] `CustomOAuth2UserService`가 core `SocialAccountCommandService`를 사용하는지 확인한다.
+- [x] API 모듈에서 social account repository 직접 접근이 없는지 확인한다.
+- [x] Google provider/providerId 기존 계정 조회 정책을 확인한다.
+- [x] Google email과 기존 user email 자동 연결 정책을 문서화한다.
+- [x] 신규 OAuth user nickname 생성 정책을 확인한다.
 
 ### 7. ErrorResponse / RestDocs 정리
 
-- [ ] OAuth token exchange 성공 RestDocs를 추가한다.
-- [ ] invalid/expired code ErrorResponse RestDocs를 추가한다.
-- [ ] request field `code`를 문서화한다.
-- [ ] response field가 기존 login response와 같음을 문서화한다.
-- [ ] OpenAPI schema가 내부적으로 깨지지 않는지 확인한다.
+- [x] OAuth token exchange 성공 RestDocs를 추가한다.
+- [x] invalid/expired code ErrorResponse RestDocs를 추가한다.
+- [x] request field `code`를 문서화한다.
+- [x] response field가 기존 login response와 같음을 문서화한다.
+- [x] OpenAPI schema가 내부적으로 깨지지 않는지 확인한다.
 
 ### 8. Test 구현
 
-- [ ] Handler unit test: OAuth 성공 redirect에 token이 없고 code만 포함됨.
-- [ ] Handler unit test: OAuth code store에 userId 저장됨.
-- [ ] Service unit test: 유효 code면 token pair 발급 + refresh token 저장 + code 삭제.
-- [ ] Service unit test: invalid code면 token 발급/refresh 저장 없음.
-- [ ] Controller RestDocs: token exchange 성공 문서화.
-- [ ] Controller RestDocs: invalid code ErrorResponse 문서화.
-- [ ] Redis integration test: OAuth code 저장/조회/삭제 유지.
-- [ ] SocialAccount core 테스트가 현재 정책을 충분히 검증하는지 확인한다.
+- [x] Handler unit test: OAuth 성공 redirect에 token이 없고 code만 포함됨.
+- [x] Handler unit test: OAuth code store에 userId 저장됨.
+- [x] Service unit test: 유효 code면 token pair 발급 + refresh token 저장 + code 삭제.
+- [x] Service unit test: invalid code면 token 발급/refresh 저장 없음.
+- [x] Controller RestDocs: token exchange 성공 문서화.
+- [x] Controller RestDocs: invalid code ErrorResponse 문서화.
+- [x] Redis integration test: OAuth code 저장/조회/삭제 유지.
+- [x] SocialAccount core 테스트가 현재 정책을 충분히 검증하는지 확인한다.
 
 ### 9. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 5-3 체크리스트를 최신 계약과 맞춘다.
-- [ ] issue-144 Tasks 완료 항목 체크.
-- [ ] 5-4 프론트 구현 범위와 겹치지 않게 제외 범위 정리.
-- [ ] PR Message 섹션을 설계 중심으로 보강한다.
+- [x] `docs/last-구현.md` 5-3 체크리스트를 최신 계약과 맞춘다.
+- [x] issue-144 Tasks 완료 항목 체크.
+- [x] 5-4 프론트 구현 범위와 겹치지 않게 제외 범위 정리.
+- [x] PR Message 섹션을 설계 중심으로 보강한다.
 
 ### 10. 검증
 
-- [ ] `./gradlew :league-of-star-api:test --tests '*OAuth*'`
-- [ ] `./gradlew :league-of-star-api:test --tests '*AuthControllerRestDocsTest'`
-- [ ] `./gradlew :league-of-star-api:test`
-- [ ] `./gradlew :league-of-star-core:test`
-- [ ] `./gradlew test`
-- [ ] `./gradlew build`
-- [ ] `git diff --check`
+- [x] `./gradlew :league-of-star-api:test --tests '*OAuth*'`
+- [x] `./gradlew :league-of-star-api:test --tests '*AuthControllerRestDocsTest'`
+- [x] `./gradlew :league-of-star-api:test`
+- [x] `./gradlew :league-of-star-core:test`
+- [x] `./gradlew test`
+- [x] `./gradlew build`
+- [x] `git diff --check`
 
 ## Implementation Policy
 
@@ -391,7 +391,12 @@ flowchart TD
 - Google 외 provider 확장은 후속 이슈로 둠.
 - cookie 기반 인증 전환은 포함하지 않음.
 - 새 패키지는 추가하지 않음.
-- 검증 결과를 여기에 기재함.
+- 검증 결과:
+  - `./gradlew :league-of-star-api:test --tests '*OAuthLoginCodeStoreTest'` 통과함.
+  - `./gradlew :league-of-star-api:test --tests '*AuthServiceTest' --tests '*AuthTokenIssueServiceTest'` 통과함.
+  - `./gradlew :league-of-star-api:test --tests '*OAuth2AuthenticationSuccessHandlerTest'` 통과함.
+  - `./gradlew :league-of-star-api:test --tests '*OAuthLoginServiceTest' --tests '*AuthControllerRestDocsTest'` 통과함.
+  - 전체 검증 결과를 여기에 최종 기재함.
 
 ## 📌 Related Issue
 
