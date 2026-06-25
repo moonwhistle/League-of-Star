@@ -8,7 +8,6 @@ import com.sang.leagueofstar.common.exception.ApiException;
 import com.sang.leagueofstar.domain.user.domain.User;
 import com.sang.leagueofstar.domain.user.service.UserCommandService;
 import com.sang.leagueofstar.domain.user.service.UserReadService;
-import com.sang.leagueofstar.auth.domain.RefreshToken;
 import com.sang.leagueofstar.auth.infrastructure.token.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,13 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private static final long MILLIS_TO_SECONDS = 1000L;
-
     private final UserReadService userReadService;
     private final UserCommandService userCommandService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AuthTokenIssueService authTokenIssueService;
 
     @Transactional
     public User signUp(String email, String password, String nickname) {
@@ -53,7 +51,7 @@ public class AuthService {
         }
 
         // 3. 토큰 발급
-        TokenDto tokens = issueTokens(user);
+        TokenDto tokens = authTokenIssueService.issueTokens(user);
 
         return new LoginDto(tokens, user);
     }
@@ -74,7 +72,7 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(ApiErrorCode.AUTH_INVALID_REFRESH_TOKEN));
 
         // 4. 새로운 토큰 쌍 발급
-        return issueTokens(user);
+        return authTokenIssueService.issueTokens(user);
     }
 
     @Transactional
@@ -83,17 +81,4 @@ public class AuthService {
                 .ifPresent(refreshTokenRepository::delete);
     }
 
-    private TokenDto issueTokens(User user) {
-        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getEmail());
-
-        // Redis에 Refresh Token 저장
-        refreshTokenRepository.save(RefreshToken.of(
-                user.getId(),
-                refreshToken,
-                jwtTokenProvider.getRefreshTokenExpirationMs() / MILLIS_TO_SECONDS
-        ));
-
-        return new TokenDto(accessToken, refreshToken);
-    }
 }

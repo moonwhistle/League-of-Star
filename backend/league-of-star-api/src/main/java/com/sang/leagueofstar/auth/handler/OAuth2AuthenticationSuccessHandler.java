@@ -1,6 +1,6 @@
 package com.sang.leagueofstar.auth.handler;
 
-import com.sang.leagueofstar.auth.infrastructure.jwt.JwtTokenProvider;
+import com.sang.leagueofstar.auth.repository.OAuthLoginCodeStore;
 import com.sang.leagueofstar.auth.security.dto.PrincipalDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,47 +12,49 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Slf4j
 @Component
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private static final String TOKEN_PARAMETER_NAME = "accessToken";
+    private static final String CODE_PARAMETER_NAME = "code";
+    private static final long OAUTH_LOGIN_CODE_TTL_SECONDS = 180L;
 
     private final String successRedirectUrl;
-    private final JwtTokenProvider tokenProvider;
+    private final OAuthLoginCodeStore oauthLoginCodeStore;
 
     public OAuth2AuthenticationSuccessHandler(
             @Value("${oauth2.success-redirect-url}") String successRedirectUrl,
-            JwtTokenProvider tokenProvider
+            OAuthLoginCodeStore oauthLoginCodeStore
     ) {
         this.successRedirectUrl = successRedirectUrl;
-        this.tokenProvider = tokenProvider;
+        this.oauthLoginCodeStore = oauthLoginCodeStore;
     }
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
-        PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
-        
-        String accessToken = tokenProvider.createAccessToken(
-                principalDetails.getUserId(),
-                principalDetails.getUsername()
-        );
-
-        String targetUrl = determineTargetUrl(accessToken);
-        
         if (response.isCommitted()) {
-            log.debug("Response has already been committed. Unable to redirect to " + targetUrl);
+            log.debug("Response has already been committed. Unable to redirect OAuth success response.");
             return;
         }
 
+        PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
+        String code = generateCode();
+        oauthLoginCodeStore.save(code, principalDetails.getUserId(), OAUTH_LOGIN_CODE_TTL_SECONDS);
+
+        String targetUrl = determineTargetUrl(code);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 
-    private String determineTargetUrl(String token) {
+    private String determineTargetUrl(String code) {
         // 프론트엔드 리다이렉트 경로
         return UriComponentsBuilder.fromUriString(successRedirectUrl)
-                .queryParam(TOKEN_PARAMETER_NAME, token)
+                .queryParam(CODE_PARAMETER_NAME, code)
                 .build().toUriString();
+    }
+
+    private String generateCode() {
+        return UUID.randomUUID().toString();
     }
 }
