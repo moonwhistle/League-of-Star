@@ -913,7 +913,7 @@ Acceptance Criteria:
 
 ## Section 5. Deferred Account Features
 
-### 5-1. [ ] 비밀번호 찾기 API / 메일 정책
+### 5-1. [x] 비밀번호 찾기 API / 메일 정책
 
 담당: Backend
 
@@ -921,15 +921,15 @@ Acceptance Criteria:
 
 Backend:
 
-- [ ] 이메일 발송 인프라를 결정한다.
-- [ ] reset token 발급/만료/사용 정책을 정한다.
-- [ ] password reset API 계약을 확정한다.
-- [ ] RestDocs와 ErrorResponse를 정리한다.
+- [x] 이메일 발송 인프라를 결정한다.
+- [x] reset token 발급/만료/사용 정책을 정한다.
+- [x] password reset API 계약을 확정한다.
+- [x] RestDocs와 ErrorResponse를 정리한다.
 
 Policy:
 
-- [ ] MVP 매칭/게임 흐름과 독립으로 둔다.
-- [ ] 메일 발송 인프라와 보안 정책을 먼저 확정한다.
+- [x] MVP 매칭/게임 흐름과 독립으로 둔다.
+- [x] 메일 발송 인프라와 보안 정책을 먼저 확정한다.
 
 ### 5-2. [ ] 비밀번호 찾기 프론트 구현
 

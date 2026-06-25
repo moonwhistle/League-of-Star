@@ -23,7 +23,8 @@ sequenceDiagram
     API->>Core: 유저 존재 여부 확인
     API->>API: UUID 기반 고유 토큰 생성
     API->>Redis: 토큰 저장 (Key: reset_token:{token}, Value: {email}, TTL: 10min)
-    API-->>User: 재설정 링크 제공 (AuthPath 상수 기반 로그 출력)
+    API->>User: 동일한 요청 접수 응답 반환
+    API-->>User: 메일 링크는 프론트 reset 화면(`/password/reset?token=...`) 기준
 
     Note over User, DB: [Phase 2: 비밀번호 변경]
     User->>API: 새 비밀번호 제출 (Token + New Password)
@@ -42,7 +43,8 @@ sequenceDiagram
 |------|------|
 | **토큰 만료 시간** | 10분 (Redis TTL 설정) |
 | **토큰 형식** | UUID (예측 불가능성 확보) |
-| **이메일 발송** | 실제 발송 엔진 연동 전까지 **서버 로그 출력**으로 대체 |
+| **이메일 발송** | Spring Mail 기반 발송을 시도하되, 실패는 사용자 응답 실패로 전파하지 않음 |
+| **메일 링크 목적지** | 백엔드 submit API가 아니라 프론트 reset 화면 `/password/reset?token=...` |
 | **비밀번호 저장** | **league-of-star-api**에서 Spring Security `PasswordEncoder`로 암호화 후 전달 |
 | **토큰 재사용** | 비밀번호 변경 성공 시 토큰 즉시 폐기 (1회용) |
 
@@ -89,7 +91,8 @@ sequenceDiagram
   - `application.yml`: `spring.config.import`를 통해 외부 설정 파일 명시적 로드.
 
 ## 📝 Note
-- **Security**: 이메일 존재 여부에 관계없이 동일한 성공 메시지를 반환하여 이메일 열거 공격(Email Enumeration)을 방지함.
+- **Security**: 이메일 존재 여부와 메일 발송 실패 여부에 관계없이 동일한 성공 메시지를 반환하여 이메일 열거 공격(Email Enumeration)을 방지함.
+- **Reset Link**: 메일 링크는 백엔드 `reset-submit` API가 아니라 프론트 `/password/reset?token=...` 화면으로 연결함.
 - **Architecture**: `league-of-star-core`는 어떠한 보안 라이브러리나 외부 기술에도 의존하지 않으며, `league-of-star-api` 계층에서 모든 기술적 구현(Encryption, Mail)을 담당함.
 - **Testing**:
   - `RestAssuredMockMvc`를 활용한 Controller 테스트 및 RestDocs 명세 생성 완료.
