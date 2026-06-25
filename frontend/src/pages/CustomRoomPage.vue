@@ -30,15 +30,6 @@
             {{ t('customRoom.refresh') }}
           </button>
           <button
-            v-if="canShowStartButton"
-            type="button"
-            data-testid="custom-room-start-button"
-            :disabled="!canStartCustomGame"
-            @click="startRoom"
-          >
-            {{ startButtonLabel }}
-          </button>
-          <button
             v-if="roomStatus === 'success'"
             type="button"
             data-testid="custom-room-leave-button"
@@ -119,6 +110,30 @@
               {{ leaveErrorMessage }}
             </p>
           </section>
+        </section>
+
+        <section
+          v-if="canShowStartButton"
+          class="custom-room-panel custom-room-start-card"
+          :aria-label="t('customRoom.startControl')"
+        >
+          <div class="custom-room-panel-heading">
+            <span>{{ t('customRoom.startControl') }}</span>
+          </div>
+          <div class="custom-room-start-body">
+            <div>
+              <strong>{{ t('customRoom.start') }}</strong>
+              <p>{{ startHelpMessage }}</p>
+            </div>
+            <button
+              type="button"
+              data-testid="custom-room-start-button"
+              :disabled="!canStartCustomGame"
+              @click="startRoom"
+            >
+              {{ startButtonLabel }}
+            </button>
+          </div>
         </section>
 
         <section
@@ -218,15 +233,18 @@ const startButtonLabel = computed(() => {
     return t('customRoom.startWaitingShort')
   }
 
+  return t('customRoom.start')
+})
+const startHelpMessage = computed(() => {
   if (room.value !== undefined && room.value.participants.length < room.value.maxParticipants) {
-    return t('customRoom.startNeedsPlayers')
+    return t('customRoom.startWaitingPlayers')
   }
 
   if (socketStatus.value !== 'open') {
-    return t('customRoom.startNeedsSocket')
+    return t('customRoom.startWaitingSocket')
   }
 
-  return t('customRoom.start')
+  return t('customRoom.startReady')
 })
 const inviteLink = computed(() => {
   const inviteCode = room.value?.inviteCode.trim() ?? ''
@@ -796,6 +814,57 @@ function errorMessage(error: unknown, fallback: string) {
   color: #fecaca;
 }
 
+.custom-room-start-card {
+  margin-top: 18px;
+}
+
+.custom-room-start-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.custom-room-start-body strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 22px;
+}
+
+.custom-room-start-body p {
+  margin: 0;
+  color: rgba(248, 251, 255, 0.72);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.custom-room-start-body button {
+  min-width: 148px;
+  min-height: 46px;
+  border: 1px solid rgba(147, 197, 253, 0.46);
+  border-radius: 8px;
+  padding: 0 18px;
+  color: #05101f;
+  background: linear-gradient(135deg, #8eeeff, #f7d26d);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    filter 140ms ease,
+    opacity 140ms ease;
+}
+
+.custom-room-start-body button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.custom-room-start-body button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
 .custom-room-participants {
   margin-top: 18px;
 }
@@ -846,6 +915,15 @@ function errorMessage(error: unknown, fallback: string) {
   .custom-room-actions button,
   .custom-room-invite-copy button,
   .custom-room-invite-link {
+    width: 100%;
+  }
+
+  .custom-room-start-body {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .custom-room-start-body button {
     width: 100%;
   }
 }

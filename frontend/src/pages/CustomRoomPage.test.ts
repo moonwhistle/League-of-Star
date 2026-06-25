@@ -118,7 +118,8 @@ describe('CustomRoomPage', () => {
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).toContain('Guest')
     expect(wrapper.text()).toContain('방장')
-    expect(wrapper.get('[data-testid="custom-room-start-button"]').text()).toContain('연결 대기')
+    expect(wrapper.get('[data-testid="custom-room-start-button"]').text()).toContain('게임 시작')
+    expect(wrapper.text()).toContain('대기실 실시간 연결이 열리면 게임을 시작할 수 있습니다.')
     expect(connectCustomRoomWebSocketMock).toHaveBeenCalledWith(100, expect.any(Object))
   })
 
@@ -278,7 +279,8 @@ describe('CustomRoomPage', () => {
 
     const startButton = wrapper.get('[data-testid="custom-room-start-button"]')
     expect(startButton.attributes('disabled')).toBeDefined()
-    expect(startButton.text()).toContain('참가자 대기')
+    expect(startButton.text()).toContain('게임 시작')
+    expect(wrapper.text()).toContain('참가자 2명이 모이면 게임을 시작할 수 있습니다.')
   })
 
   it('stores ROOM_STARTED payload and moves to GamePlay route', async () => {
