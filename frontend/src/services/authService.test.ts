@@ -4,6 +4,7 @@ import { requestJson } from './apiClient'
 import {
   login,
   logout,
+  exchangeOAuthToken,
   refresh,
   requestPasswordReset,
   signup,
@@ -134,6 +135,26 @@ describe('authService', () => {
       body: {
         token: 'reset-token',
         newPassword: 'password123',
+      },
+      signal: abortController.signal,
+      auth: false,
+    })
+  })
+
+  it('exchanges OAuth one-time code with the public backend contract', async () => {
+    const abortController = new AbortController()
+
+    await exchangeOAuthToken(
+      {
+        code: 'oauth-one-time-code',
+      },
+      abortController.signal,
+    )
+
+    expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/auth/oauth2/token', {
+      method: 'POST',
+      body: {
+        code: 'oauth-one-time-code',
       },
       signal: abortController.signal,
       auth: false,

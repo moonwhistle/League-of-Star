@@ -2,6 +2,7 @@ import type {
   LoginRequest,
   LoginResponse,
   LogoutRequest,
+  OAuthTokenRequest,
   PasswordResetRequest,
   PasswordResetSubmitRequest,
   SignupRequest,
@@ -58,6 +59,18 @@ export function submitPasswordReset(
   signal?: AbortSignal,
 ): Promise<string> {
   return requestJson<string, PasswordResetSubmitRequest>('/api/v1/auth/password/reset-submit', {
+    method: 'POST',
+    body: request,
+    signal,
+    auth: false,
+  })
+}
+
+export function exchangeOAuthToken(
+  request: OAuthTokenRequest,
+  signal?: AbortSignal,
+): Promise<LoginResponse> {
+  return requestJson<LoginResponse, OAuthTokenRequest>('/api/v1/auth/oauth2/token', {
     method: 'POST',
     body: request,
     signal,
