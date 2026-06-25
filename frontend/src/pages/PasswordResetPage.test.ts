@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { reactive } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useLocale } from '@/composables/useLocale'
@@ -9,12 +10,14 @@ import { submitPasswordReset } from '@/services/authService'
 import PasswordResetPage from './PasswordResetPage.vue'
 
 const routerPushMock = vi.hoisted(() => vi.fn())
-const routeQueryMock = vi.hoisted(() => ({ value: {} as Record<string, string | string[]> }))
+const routeMock = vi.hoisted(() => ({
+  value: {
+    query: {} as Record<string, string | string[]>,
+  },
+}))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({
-    query: routeQueryMock.value,
-  }),
+  useRoute: () => routeMock.value,
   useRouter: () => ({
     push: routerPushMock,
   }),
@@ -30,14 +33,14 @@ const { setLocale } = useLocale()
 describe('PasswordResetPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    routeQueryMock.value = {
+    routeMock.value.query = reactive({
       token: 'reset-token',
-    }
+    })
     setLocale('ko')
   })
 
   it('renders invalid link state without calling backend when token is missing', async () => {
-    routeQueryMock.value = {}
+    routeMock.value.query = reactive({})
 
     const wrapper = mount(PasswordResetPage)
 
@@ -100,6 +103,22 @@ describe('PasswordResetPage', () => {
       query: {
         passwordReset: 'success',
       },
+    })
+  })
+
+  it('uses the latest token when the route query changes on the same page instance', async () => {
+    submitPasswordResetMock.mockResolvedValue('ok')
+    const wrapper = mount(PasswordResetPage)
+
+    routeMock.value.query.token = 'next-reset-token'
+    await wrapper.get('#password-reset-new-password').setValue('password123')
+    await wrapper.get('#password-reset-confirm-password').setValue('password123')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(submitPasswordResetMock).toHaveBeenCalledWith({
+      token: 'next-reset-token',
+      newPassword: 'password123',
     })
   })
 

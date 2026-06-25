@@ -89,12 +89,12 @@ const route = useRoute()
 const router = useRouter()
 const { nextLocaleLabel, t, toggleLocale } = useLocale()
 
-const token = getTokenQuery()
+const token = computed(() => getTokenQuery())
 const newPassword = ref('')
 const confirmPassword = ref('')
 const errorMessage = ref('')
 const isSubmitting = ref(false)
-const isTokenMissing = computed(() => token === '')
+const isTokenMissing = computed(() => token.value === '')
 
 async function handleSubmit() {
   if (isSubmitting.value || isTokenMissing.value) {
@@ -122,7 +122,7 @@ async function handleSubmit() {
 
   try {
     await submitPasswordReset({
-      token,
+      token: token.value,
       newPassword: newPassword.value,
     })
 
