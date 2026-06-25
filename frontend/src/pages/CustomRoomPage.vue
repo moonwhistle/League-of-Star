@@ -113,30 +113,6 @@
         </section>
 
         <section
-          v-if="canShowStartButton"
-          class="custom-room-panel custom-room-start-card"
-          :aria-label="t('customRoom.startControl')"
-        >
-          <div class="custom-room-panel-heading">
-            <span>{{ t('customRoom.startControl') }}</span>
-          </div>
-          <div class="custom-room-start-body">
-            <div>
-              <strong>{{ t('customRoom.start') }}</strong>
-              <p>{{ startHelpMessage }}</p>
-            </div>
-            <button
-              type="button"
-              data-testid="custom-room-start-button"
-              :disabled="!canStartCustomGame"
-              @click="startRoom"
-            >
-              {{ startButtonLabel }}
-            </button>
-          </div>
-        </section>
-
-        <section
           class="custom-room-panel custom-room-participants"
           :aria-label="t('customRoom.participants')"
         >
@@ -153,6 +129,25 @@
             </li>
           </ol>
         </section>
+
+        <aside
+          v-if="canShowStartButton"
+          class="custom-room-start-panel"
+          :aria-label="t('customRoom.startControl')"
+        >
+          <p>{{ startHelpMessage }}</p>
+          <button
+            class="custom-room-primary-start"
+            :class="{ 'is-waiting': startStatus === 'waiting' }"
+            type="button"
+            data-testid="custom-room-start-button"
+            :disabled="!canStartCustomGame"
+            @click="startRoom"
+          >
+            <span v-if="startStatus !== 'waiting'" aria-hidden="true">▶</span>
+            {{ startButtonLabel }}
+          </button>
+        </aside>
       </template>
     </section>
   </main>
@@ -814,57 +809,6 @@ function errorMessage(error: unknown, fallback: string) {
   color: #fecaca;
 }
 
-.custom-room-start-card {
-  margin-top: 18px;
-}
-
-.custom-room-start-body {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.custom-room-start-body strong {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 22px;
-}
-
-.custom-room-start-body p {
-  margin: 0;
-  color: rgba(248, 251, 255, 0.72);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.custom-room-start-body button {
-  min-width: 148px;
-  min-height: 46px;
-  border: 1px solid rgba(147, 197, 253, 0.46);
-  border-radius: 8px;
-  padding: 0 18px;
-  color: #05101f;
-  background: linear-gradient(135deg, #8eeeff, #f7d26d);
-  font: inherit;
-  font-weight: 900;
-  cursor: pointer;
-  transition:
-    transform 140ms ease,
-    filter 140ms ease,
-    opacity 140ms ease;
-}
-
-.custom-room-start-body button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  filter: brightness(1.08);
-}
-
-.custom-room-start-body button:disabled {
-  cursor: not-allowed;
-  opacity: 0.56;
-}
-
 .custom-room-participants {
   margin-top: 18px;
 }
@@ -899,9 +843,85 @@ function errorMessage(error: unknown, fallback: string) {
   color: #bfdbfe;
 }
 
+.custom-room-start-panel {
+  position: fixed;
+  right: max(32px, env(safe-area-inset-right));
+  bottom: max(32px, env(safe-area-inset-bottom));
+  z-index: 3;
+  width: min(318px, calc(100vw - 64px));
+  min-width: 0;
+}
+
+.custom-room-start-panel p {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  color: rgba(248, 251, 255, 0.78);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.3;
+  background: rgba(18, 27, 48, 0.66);
+  border-right: 3px solid rgba(99, 242, 232, 0.42);
+}
+
+.custom-room-primary-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 18px;
+  color: #f8fbff;
+  font: inherit;
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1.15;
+  background: #162a42;
+  border: 1px solid rgba(99, 242, 232, 0.48);
+  border-radius: 4px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease,
+    filter 140ms ease;
+}
+
+.custom-room-primary-start:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #1b3854;
+  border-color: rgba(99, 242, 232, 0.72);
+  box-shadow:
+    0 0 0 3px rgba(99, 242, 232, 0.12),
+    0 14px 32px rgba(0, 0, 0, 0.34);
+}
+
+.custom-room-primary-start.is-waiting {
+  color: #63f2e8;
+  background: #0b1727;
+  border-color: rgba(165, 107, 255, 0.72);
+  box-shadow:
+    inset 0 4px 12px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(99, 242, 232, 0.12);
+  transform: translateY(1px);
+}
+
+.custom-room-primary-start span {
+  margin-right: 8px;
+  font-size: 0.86rem;
+}
+
+.custom-room-primary-start:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+
 @media (max-width: 720px) {
   .custom-room-page {
-    padding: 18px;
+    padding: 18px 18px 128px;
   }
 
   .custom-room-header,
@@ -918,13 +938,10 @@ function errorMessage(error: unknown, fallback: string) {
     width: 100%;
   }
 
-  .custom-room-start-body {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .custom-room-start-body button {
-    width: 100%;
+  .custom-room-start-panel {
+    right: 18px;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    width: calc(100vw - 36px);
   }
 }
 </style>

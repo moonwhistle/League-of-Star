@@ -119,6 +119,10 @@ describe('CustomRoomPage', () => {
     expect(wrapper.text()).toContain('Guest')
     expect(wrapper.text()).toContain('방장')
     expect(wrapper.get('[data-testid="custom-room-start-button"]').text()).toContain('게임 시작')
+    expect(wrapper.get('[data-testid="custom-room-start-button"]').classes()).toContain(
+      'custom-room-primary-start',
+    )
+    expect(wrapper.find('.custom-room-start-panel').exists()).toBe(true)
     expect(wrapper.text()).toContain('대기실 실시간 연결이 열리면 게임을 시작할 수 있습니다.')
     expect(connectCustomRoomWebSocketMock).toHaveBeenCalledWith(100, expect.any(Object))
   })
