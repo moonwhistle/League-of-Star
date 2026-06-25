@@ -26,6 +26,15 @@ export interface LogoutRequest {
   refreshToken: string
 }
 
+export interface PasswordResetRequest {
+  email: string
+}
+
+export interface PasswordResetSubmitRequest {
+  token: string
+  newPassword: string
+}
+
 export interface TokenRefreshRequest {
   refreshToken: string
 }

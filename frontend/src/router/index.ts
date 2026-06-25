@@ -31,6 +31,11 @@ export const router = createRouter({
       },
     },
     {
+      path: ROUTE_PATHS.passwordReset,
+      name: ROUTE_NAMES.passwordReset,
+      component: () => import('@/pages/PasswordResetPage.vue'),
+    },
+    {
       path: ROUTE_PATHS.match,
       name: ROUTE_NAMES.match,
       component: () => import('@/pages/MatchPage.vue'),
