@@ -185,68 +185,68 @@ http://localhost:5173/password/reset?token={token}
 
 ### 1. Backend Contract 정리
 
-- [ ] `reset-request`가 command ack API임을 문서화.
-- [ ] `reset-submit`이 실제 password mutation API임을 문서화.
-- [ ] 미가입 이메일 동일 응답 정책을 정리.
-- [ ] 메일 발송 실패 동일 응답 정책을 정리.
-- [ ] reset token TTL 10분 정책을 정리.
-- [ ] reset token 1회성 사용 정책을 정리.
-- [ ] issue-20 기존 문서와 최신 정책 차이를 확인.
+- [x] `reset-request`가 command ack API임을 문서화.
+- [x] `reset-submit`이 실제 password mutation API임을 문서화.
+- [x] 미가입 이메일 동일 응답 정책을 정리.
+- [x] 메일 발송 실패 동일 응답 정책을 정리.
+- [x] reset token TTL 10분 정책을 정리.
+- [x] reset token 1회성 사용 정책을 정리.
+- [x] issue-20 기존 문서와 최신 정책 차이를 확인.
 
 ### 2. Reset Link / Mail Policy 구현
 
-- [ ] reset link 목적지를 프론트 reset 화면으로 변경.
-- [ ] 프론트 reset base URL을 설정값으로 분리.
-- [ ] local 기본 URL을 `http://localhost:5173/password/reset`로 둔다.
-- [ ] 메일 본문에 `{frontendResetUrl}?token={token}` 형식 링크를 넣는다.
-- [ ] 메일 발송 실패가 API 실패로 전파되지 않는 정책을 유지한다.
-- [ ] 메일 발송 실패 로그가 남는지 확인한다.
+- [x] reset link 목적지를 프론트 reset 화면으로 변경.
+- [x] 프론트 reset base URL을 설정값으로 분리.
+- [x] local 기본 URL을 `http://localhost:5173/password/reset`로 둔다.
+- [x] 메일 본문에 `{frontendResetUrl}?token={token}` 형식 링크를 넣는다.
+- [x] 메일 발송 실패가 API 실패로 전파되지 않는 정책을 유지한다.
+- [x] 메일 발송 실패 로그가 남는지 확인한다.
 
 ### 3. Core User Access Policy 점검
 
-- [ ] 이메일 존재 확인이 `UserReadService.existsByEmail()`을 통해 수행되는지 확인.
-- [ ] 비밀번호 변경이 `UserCommandService.updatePasswordByEmail()`을 통해 수행되는지 확인.
-- [ ] API 모듈에서 `UserRepository`를 직접 참조하지 않는지 확인.
-- [ ] `UserCommandService.updatePasswordByEmail()` 트랜잭션 범위가 적절한지 확인.
-- [ ] 암호화 책임은 API 모듈의 `PasswordEncoder`에 남기는지 확인.
+- [x] 이메일 존재 확인이 `UserReadService.existsByEmail()`을 통해 수행되는지 확인.
+- [x] 비밀번호 변경이 `UserCommandService.updatePasswordByEmail()`을 통해 수행되는지 확인.
+- [x] API 모듈에서 `UserRepository`를 직접 참조하지 않는지 확인.
+- [x] `UserCommandService.updatePasswordByEmail()` 트랜잭션 범위가 적절한지 확인.
+- [x] 암호화 책임은 API 모듈의 `PasswordEncoder`에 남기는지 확인.
 
 ### 4. ErrorResponse / RestDocs 정리
 
-- [ ] `reset-request` request field 문서를 최신 정책으로 보강.
-- [ ] `reset-submit` request field 문서를 최신 정책으로 보강.
-- [ ] invalid token ErrorResponse 문서를 추가하거나 기존 문서와 연결한다.
-- [ ] validation 실패 문서화 필요 여부를 확인한다.
-- [ ] OpenAPI schema가 내부적으로 깨지지 않는지 확인한다.
+- [x] `reset-request` request field 문서를 최신 정책으로 보강.
+- [x] `reset-submit` request field 문서를 최신 정책으로 보강.
+- [x] invalid token ErrorResponse 문서를 추가하거나 기존 문서와 연결한다.
+- [x] validation 실패 문서화 필요 여부를 확인한다.
+- [x] OpenAPI schema가 내부적으로 깨지지 않는지 확인한다.
 
 ### 5. Test 구현
 
-- [ ] Controller RestDocs: `reset-request` 200 ack 문서화.
-- [ ] Controller RestDocs: `reset-submit` 200 문서화.
-- [ ] Controller RestDocs: invalid token ErrorResponse 문서화.
-- [ ] Service unit test: 가입 이메일이면 token 저장 + 메일 발송 시도.
-- [ ] Service unit test: 미가입 이메일이면 token 저장/메일 발송 없음.
-- [ ] Service unit test: 메일 실패가 request API 실패로 전파되지 않음.
-- [ ] Service unit test: reset link가 프론트 URL 기준으로 생성됨.
-- [ ] Service unit test: 유효 token이면 password encode + core command 호출 + token 삭제.
-- [ ] Service unit test: invalid token이면 password 변경 호출 없음.
-- [ ] Redis integration test: token 저장/조회/삭제 유지.
+- [x] Controller RestDocs: `reset-request` 200 ack 문서화.
+- [x] Controller RestDocs: `reset-submit` 200 문서화.
+- [x] Controller RestDocs: invalid token ErrorResponse 문서화.
+- [x] Service unit test: 가입 이메일이면 token 저장 + 메일 발송 시도.
+- [x] Service unit test: 미가입 이메일이면 token 저장/메일 발송 없음.
+- [x] Service unit test: 메일 실패가 request API 실패로 전파되지 않음.
+- [x] Service unit test: reset link가 프론트 URL 기준으로 생성됨.
+- [x] Service unit test: 유효 token이면 password encode + core command 호출 + token 삭제.
+- [x] Service unit test: invalid token이면 password 변경 호출 없음.
+- [x] Redis integration test: token 저장/조회/삭제 유지.
 
 ### 6. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 5-1 체크리스트를 최신 정책과 맞춤.
-- [ ] issue-140 Tasks 완료 항목 체크.
-- [ ] issue-20 기존 password reset 문서와 충돌하는 표현 정리.
-- [ ] 5-2 프론트 구현 범위와 겹치지 않게 제외 범위 정리.
-- [ ] PR Message 섹션을 설계 중심으로 보강.
+- [x] `docs/last-구현.md` 5-1 체크리스트를 최신 정책과 맞춤.
+- [x] issue-140 Tasks 완료 항목 체크.
+- [x] issue-20 기존 password reset 문서와 충돌하는 표현 정리.
+- [x] 5-2 프론트 구현 범위와 겹치지 않게 제외 범위 정리.
+- [x] PR Message 섹션을 설계 중심으로 보강.
 
 ### 7. 검증
 
-- [ ] `./gradlew :league-of-star-api:test --tests '*PasswordReset*'`
-- [ ] `./gradlew :league-of-star-api:test --tests '*AuthPasswordControllerRestDocsTest'`
-- [ ] `./gradlew :league-of-star-api:test`
-- [ ] `./gradlew test`
-- [ ] `./gradlew build`
-- [ ] `git diff --check`
+- [x] `./gradlew :league-of-star-api:test --tests '*PasswordReset*'`
+- [x] `./gradlew :league-of-star-api:test --tests '*AuthPasswordControllerRestDocsTest'`
+- [x] `./gradlew :league-of-star-api:test`
+- [x] `./gradlew test`
+- [x] `./gradlew build`
+- [x] `git diff --check`
 
 ## Implementation Policy
 
@@ -349,7 +349,13 @@ flowchart TD
 - LoginPage 버튼 연결은 5-2 프론트 이슈에서 진행함.
 - OAuth 계정 별도 정책, rate limit, captcha는 후속 보안 이슈로 분리함.
 - 새 패키지는 추가하지 않음.
-- 검증 결과를 여기에 기재함.
+- 검증 결과:
+  - `./gradlew :league-of-star-api:test --tests '*PasswordReset*'` 통과함.
+  - `./gradlew :league-of-star-api:test --tests '*AuthPasswordControllerRestDocsTest'` 통과함.
+  - `./gradlew :league-of-star-api:test` 통과함.
+  - `./gradlew test` 통과함.
+  - `./gradlew build` 통과함.
+  - `git diff --check` 통과함.
 
 ## 📌 Related Issue
 
