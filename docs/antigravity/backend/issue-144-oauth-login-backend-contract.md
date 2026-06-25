@@ -396,7 +396,13 @@ flowchart TD
   - `./gradlew :league-of-star-api:test --tests '*AuthServiceTest' --tests '*AuthTokenIssueServiceTest'` 통과함.
   - `./gradlew :league-of-star-api:test --tests '*OAuth2AuthenticationSuccessHandlerTest'` 통과함.
   - `./gradlew :league-of-star-api:test --tests '*OAuthLoginServiceTest' --tests '*AuthControllerRestDocsTest'` 통과함.
-  - 전체 검증 결과를 여기에 최종 기재함.
+  - `./gradlew :league-of-star-api:test --tests '*OAuth*'` 통과함.
+  - `./gradlew :league-of-star-api:test --tests '*AuthControllerRestDocsTest'` 통과함.
+  - `./gradlew :league-of-star-api:test` 통과함.
+  - `./gradlew :league-of-star-core:test` 통과함.
+  - `./gradlew test` 통과함.
+  - `./gradlew build` 통과함.
+  - `git diff --check` 통과함.
 
 ## 📌 Related Issue
 
