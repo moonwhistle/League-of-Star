@@ -445,8 +445,8 @@ describe('CustomRoomPage', () => {
     await flushPromises()
 
     const closeEvent = new CloseEvent('close', {
-      code: 1006,
-      reason: 'network closed',
+      code: 1000,
+      reason: 'duplicate connection closed',
     })
     Object.defineProperty(closeEvent, 'target', {
       value: customRoomSocketMock.socket,
@@ -456,7 +456,39 @@ describe('CustomRoomPage', () => {
 
     expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('closed')
     expect(wrapper.text()).toContain('대기실 실시간 연결이 끊겼습니다.')
+    expect(getCustomRoomMock).toHaveBeenCalledTimes(2)
+    expect(getCustomRoomMock).toHaveBeenLastCalledWith('100')
+    expect(connectCustomRoomWebSocketMock).toHaveBeenCalledTimes(1)
     expect(leaveCustomRoomMock).not.toHaveBeenCalled()
+  })
+
+  it('reconnects custom room websocket after abnormal close', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mount(CustomRoomPage)
+      await flushPromises()
+
+      const closeEvent = new CloseEvent('close', {
+        code: 1006,
+        reason: 'network closed',
+      })
+      Object.defineProperty(closeEvent, 'target', {
+        value: customRoomSocketMock.socket,
+      })
+      customRoomSocketMock.handlers?.onClose?.(closeEvent)
+      await flushPromises()
+
+      expect(wrapper.get('main').attributes('data-custom-room-socket-status')).toBe('closed')
+      expect(connectCustomRoomWebSocketMock).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(800)
+      await flushPromises()
+
+      expect(connectCustomRoomWebSocketMock).toHaveBeenCalledTimes(2)
+      expect(connectCustomRoomWebSocketMock).toHaveBeenLastCalledWith(100, expect.any(Object))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

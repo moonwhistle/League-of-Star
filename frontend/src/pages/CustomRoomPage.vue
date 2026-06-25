@@ -179,6 +179,13 @@ type LeaveStatus = 'idle' | 'loading' | 'success' | 'error'
 type StartStatus = 'idle' | 'loading' | 'waiting' | 'started' | 'error'
 type SocketStatus = 'idle' | 'connecting' | 'open' | 'error' | 'closed'
 
+const SOCKET_RECONNECT_DELAY_MS = 800
+const SOCKET_RECONNECT_MAX_ATTEMPTS = 2
+const CLOSE_EVENT_CODES = {
+  normalClosure: 1000,
+  policyViolation: 1008,
+} as const
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useLocale()
@@ -199,7 +206,9 @@ const leaveAbortController = shallowRef<AbortController>()
 const startAbortController = shallowRef<AbortController>()
 const profileAbortController = shallowRef<AbortController>()
 const roomSocketConnection = shallowRef<CustomRoomWebSocketConnection>()
+const socketReconnectTimer = shallowRef<ReturnType<typeof window.setTimeout>>()
 const expectedSocketClose = ref(false)
+const socketReconnectAttempts = ref(0)
 const startFallbackUserId = shallowRef<number>()
 const routeRoomId = computed(() => String(route.params.roomId ?? '').trim())
 const isConfirmedNonOwner = computed(
@@ -265,6 +274,7 @@ onUnmounted(() => {
   abortLeaveRequest()
   abortStartRequest()
   abortProfileRequest()
+  clearSocketReconnectTimer()
   closeRoomSocket()
 })
 
@@ -301,6 +311,8 @@ async function loadRoom() {
   socketErrorMessage.value = ''
   roomErrorMessage.value = ''
   startStatus.value = 'idle'
+  socketReconnectAttempts.value = 0
+  clearSocketReconnectTimer()
 
   if (routeRoomId.value === '') {
     room.value = undefined
@@ -444,6 +456,7 @@ function abortProfileRequest() {
 }
 
 function connectRoomSocket(roomId: number) {
+  clearSocketReconnectTimer()
   closeRoomSocket()
   socketStatus.value = 'connecting'
   socketErrorMessage.value = ''
@@ -458,6 +471,7 @@ function connectRoomSocket(roomId: number) {
         }
 
         socketStatus.value = 'open'
+        socketReconnectAttempts.value = 0
       },
       onMessage: (message) => {
         if (connection === undefined || roomSocketConnection.value?.socket !== connection.socket) {
@@ -479,9 +493,12 @@ function connectRoomSocket(roomId: number) {
           return
         }
 
+        roomSocketConnection.value = undefined
         socketStatus.value = 'closed'
         if (!expectedSocketClose.value && roomStatus.value === 'success') {
           socketErrorMessage.value = t('customRoom.socketError')
+          void refreshRoomSnapshot()
+          scheduleRoomSocketReconnect(event)
         }
       },
     })
@@ -491,6 +508,63 @@ function connectRoomSocket(roomId: number) {
     socketStatus.value = 'error'
     socketErrorMessage.value = socketErrorMessageFrom(error)
   }
+}
+
+async function refreshRoomSnapshot() {
+  if (routeRoomId.value === '' || roomStatus.value !== 'success') {
+    return
+  }
+
+  try {
+    const response = await getCustomRoom(routeRoomId.value)
+    room.value = response
+    roomStatus.value = 'success'
+    rememberCurrentCustomRoom(response.roomId)
+  } catch {
+    // 보조 조회 실패만으로 room 화면을 error로 밀지 않는다. close 안내가 source가 된다.
+  }
+}
+
+function scheduleRoomSocketReconnect(event: CloseEvent) {
+  if (!canReconnectRoomSocket(event)) {
+    return
+  }
+
+  socketReconnectAttempts.value += 1
+  socketReconnectTimer.value = window.setTimeout(() => {
+    socketReconnectTimer.value = undefined
+    const roomId = room.value?.roomId
+    if (roomId === undefined || roomStatus.value !== 'success') {
+      return
+    }
+
+    connectRoomSocket(roomId)
+  }, SOCKET_RECONNECT_DELAY_MS)
+}
+
+function canReconnectRoomSocket(event: CloseEvent) {
+  if (
+    event.code === CLOSE_EVENT_CODES.normalClosure ||
+    event.code === CLOSE_EVENT_CODES.policyViolation
+  ) {
+    return false
+  }
+
+  return (
+    socketReconnectAttempts.value < SOCKET_RECONNECT_MAX_ATTEMPTS &&
+    room.value?.status === 'WAITING' &&
+    startStatus.value !== 'started' &&
+    leaveStatus.value !== 'success'
+  )
+}
+
+function clearSocketReconnectTimer() {
+  if (socketReconnectTimer.value === undefined) {
+    return
+  }
+
+  window.clearTimeout(socketReconnectTimer.value)
+  socketReconnectTimer.value = undefined
 }
 
 function handleRoomSocketMessage(message: CustomRoomWebSocketServerMessage) {
@@ -581,6 +655,7 @@ function resolveCustomParticipantContext() {
 }
 
 function closeRoomSocket(resetStatus = true) {
+  clearSocketReconnectTimer()
   const connection = roomSocketConnection.value
   roomSocketConnection.value = undefined
   expectedSocketClose.value = true
