@@ -2,6 +2,8 @@ import type {
   LoginRequest,
   LoginResponse,
   LogoutRequest,
+  PasswordResetRequest,
+  PasswordResetSubmitRequest,
   SignupRequest,
   SignupResponse,
   TokenRefreshRequest,
@@ -36,6 +38,30 @@ export function logout(refreshToken: string, signal?: AbortSignal): Promise<void
     },
     signal,
     skipAuthRefresh: true,
+  })
+}
+
+export function requestPasswordReset(
+  request: PasswordResetRequest,
+  signal?: AbortSignal,
+): Promise<string> {
+  return requestJson<string, PasswordResetRequest>('/api/v1/auth/password/reset-request', {
+    method: 'POST',
+    body: request,
+    signal,
+    auth: false,
+  })
+}
+
+export function submitPasswordReset(
+  request: PasswordResetSubmitRequest,
+  signal?: AbortSignal,
+): Promise<string> {
+  return requestJson<string, PasswordResetSubmitRequest>('/api/v1/auth/password/reset-submit', {
+    method: 'POST',
+    body: request,
+    signal,
+    auth: false,
   })
 }
 

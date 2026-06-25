@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { requestJson } from './apiClient'
-import { login, logout, refresh, signup } from './authService'
+import {
+  login,
+  logout,
+  refresh,
+  requestPasswordReset,
+  signup,
+  submitPasswordReset,
+} from './authService'
 
 vi.mock('./apiClient', () => ({
   requestJson: vi.fn(),
@@ -85,6 +92,48 @@ describe('authService', () => {
       method: 'POST',
       body: {
         refreshToken: 'refresh-token',
+      },
+      signal: abortController.signal,
+      auth: false,
+    })
+  })
+
+  it('requests password reset with the public backend contract', async () => {
+    const abortController = new AbortController()
+
+    await requestPasswordReset(
+      {
+        email: 'reset@example.com',
+      },
+      abortController.signal,
+    )
+
+    expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/auth/password/reset-request', {
+      method: 'POST',
+      body: {
+        email: 'reset@example.com',
+      },
+      signal: abortController.signal,
+      auth: false,
+    })
+  })
+
+  it('submits password reset with the public backend contract', async () => {
+    const abortController = new AbortController()
+
+    await submitPasswordReset(
+      {
+        token: 'reset-token',
+        newPassword: 'password123',
+      },
+      abortController.signal,
+    )
+
+    expect(requestJsonMock).toHaveBeenCalledWith('/api/v1/auth/password/reset-submit', {
+      method: 'POST',
+      body: {
+        token: 'reset-token',
+        newPassword: 'password123',
       },
       signal: abortController.signal,
       auth: false,

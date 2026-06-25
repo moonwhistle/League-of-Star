@@ -931,7 +931,7 @@ Policy:
 - [x] MVP 매칭/게임 흐름과 독립으로 둔다.
 - [x] 메일 발송 인프라와 보안 정책을 먼저 확정한다.
 
-### 5-2. [ ] 비밀번호 찾기 프론트 구현
+### 5-2. [x] 비밀번호 찾기 프론트 구현
 
 담당: Frontend
 
@@ -939,14 +939,14 @@ Policy:
 
 Frontend:
 
-- [ ] 비밀번호 찾기 route/page를 구현한다.
-- [ ] LoginPage의 관련 버튼과 연결한다.
-- [ ] reset token 입력/검증/새 비밀번호 입력 UI를 구현한다.
-- [ ] 5-1 API ErrorResponse를 사용자 메시지로 표시한다.
+- [x] 비밀번호 찾기 route/page를 구현한다.
+- [x] LoginPage의 관련 버튼과 연결한다.
+- [x] reset token 입력/검증/새 비밀번호 입력 UI를 구현한다.
+- [x] 5-1 API ErrorResponse를 사용자 메시지로 표시한다.
 
 Policy:
 
-- [ ] 기존 로그인/회원가입 흐름과 독립된 account recovery 흐름으로 둔다.
+- [x] 기존 로그인/회원가입 흐름과 독립된 account recovery 흐름으로 둔다.
 
 ### 5-3. [ ] OAuth 로그인 백엔드 계약
 
@@ -1003,7 +1003,7 @@ Policy:
 19. [x] Section 4-8. Custom Room 공개 대기실 / 초대 링크 프론트 구현
 20. [x] Section 4-9. Custom Room 초대 참가 / WebSocket 프론트 구현
 21. [x] Section 4-10. Custom Game 시작 / GamePlay 프론트 연결
-22. [ ] Section 5-1/5-2. 비밀번호 찾기
+22. [x] Section 5-1/5-2. 비밀번호 찾기
 23. [ ] Section 5-3/5-4. OAuth 로그인
 
 ## 판단 기준

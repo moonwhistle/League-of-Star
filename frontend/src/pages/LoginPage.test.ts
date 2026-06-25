@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
-import { login } from '@/services/authService'
+import { login, requestPasswordReset } from '@/services/authService'
 import { setAuthTokens } from '@/services/authToken'
 
 import LoginPage from './LoginPage.vue'
@@ -23,6 +23,7 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/services/authService', () => ({
   login: vi.fn(),
+  requestPasswordReset: vi.fn(),
 }))
 
 vi.mock('@/services/authToken', () => ({
@@ -30,6 +31,7 @@ vi.mock('@/services/authToken', () => ({
 }))
 
 const loginMock = vi.mocked(login)
+const requestPasswordResetMock = vi.mocked(requestPasswordReset)
 const setAuthTokensMock = vi.mocked(setAuthTokens)
 const { setLocale } = useLocale()
 
@@ -79,6 +81,71 @@ describe('LoginPage', () => {
     expect(wrapper.get('[role="status"]').text()).toBe(
       '회원가입이 완료되었습니다. 로그인해 주세요.',
     )
+  })
+
+  it('shows a password reset success message when redirected after reset submit', () => {
+    routeQueryMock.value = {
+      passwordReset: 'success',
+    }
+
+    const wrapper = mount(LoginPage)
+
+    expect(wrapper.get('[role="status"]').text()).toBe(
+      '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.',
+    )
+  })
+
+  it('opens password reset modal with the login email as prefill', async () => {
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('#login-email').setValue('test@example.com')
+    await wrapper.get('.login-links button:first-child').trigger('click')
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('비밀번호 찾기')
+    expect(wrapper.get<HTMLInputElement>('#password-reset-email').element.value).toBe(
+      'test@example.com',
+    )
+  })
+
+  it('validates password reset email before request', async () => {
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('.login-links button:first-child').trigger('click')
+    await wrapper.get('.password-reset-form').trigger('submit')
+
+    expect(requestPasswordResetMock).not.toHaveBeenCalled()
+    expect(wrapper.get('[role="alert"]').text()).toBe('이메일을 입력해 주세요.')
+  })
+
+  it('requests password reset without revealing whether email exists', async () => {
+    requestPasswordResetMock.mockResolvedValue('ok')
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('.login-links button:first-child').trigger('click')
+    await wrapper.get('#password-reset-email').setValue('reset@example.com')
+    await wrapper.get('.password-reset-form').trigger('submit')
+    await flushPromises()
+
+    expect(requestPasswordResetMock).toHaveBeenCalledWith({
+      email: 'reset@example.com',
+    })
+    expect(wrapper.get('[role="status"]').text()).toBe(
+      '가입 여부와 관계없이 메일함에서 재설정 링크를 확인해 주세요.',
+    )
+  })
+
+  it('shows backend password reset request errors', async () => {
+    requestPasswordResetMock.mockRejectedValue(
+      new ApiClientError(500, { message: '메일 전송 요청에 실패했습니다.' }),
+    )
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('.login-links button:first-child').trigger('click')
+    await wrapper.get('#password-reset-email').setValue('reset@example.com')
+    await wrapper.get('.password-reset-form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('메일 전송 요청에 실패했습니다.')
   })
 
   it('submits email and password through the login service', async () => {

@@ -43,7 +43,9 @@
         </label>
 
         <div class="login-links">
-          <button type="button">{{ t('login.forgotPassword') }}</button>
+          <button type="button" @click="openPasswordResetModal">
+            {{ t('login.forgotPassword') }}
+          </button>
           <button type="button" @click="goToSignup">{{ t('login.signUp') }}</button>
         </div>
 
@@ -88,6 +90,72 @@
 
       <button class="about-button" type="button">{{ t('login.about') }}</button>
     </section>
+
+    <div
+      v-if="isPasswordResetModalOpen"
+      class="password-reset-modal-backdrop"
+      role="presentation"
+      @click.self="closePasswordResetModal"
+    >
+      <section
+        class="password-reset-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="password-reset-request-title"
+      >
+        <div class="password-reset-modal-heading">
+          <h2 id="password-reset-request-title">{{ t('login.passwordResetTitle') }}</h2>
+          <p>{{ t('login.passwordResetDescription') }}</p>
+        </div>
+
+        <form class="password-reset-form" @submit.prevent="handlePasswordResetRequest">
+          <label class="field-group" for="password-reset-email">
+            <span>{{ t('login.email') }}</span>
+            <span class="field-control">
+              <input
+                id="password-reset-email"
+                v-model.trim="passwordResetEmail"
+                type="email"
+                name="email"
+                autocomplete="email"
+                placeholder="email"
+              />
+              <span class="field-icon field-icon-email" aria-hidden="true"></span>
+            </span>
+          </label>
+
+          <p v-if="passwordResetSuccessMessage !== ''" class="login-success" role="status">
+            {{ passwordResetSuccessMessage }}
+          </p>
+
+          <p v-if="passwordResetErrorMessage !== ''" class="login-error" role="alert">
+            {{ passwordResetErrorMessage }}
+          </p>
+
+          <div class="password-reset-actions">
+            <button
+              class="password-reset-secondary-button"
+              type="button"
+              :disabled="isPasswordResetSubmitting"
+              @click="closePasswordResetModal"
+            >
+              {{ t('login.passwordResetCancel') }}
+            </button>
+            <button
+              class="password-reset-primary-button"
+              type="submit"
+              :disabled="isPasswordResetSubmitting"
+            >
+              {{
+                isPasswordResetSubmitting
+                  ? t('login.passwordResetSubmitting')
+                  : t('login.passwordResetSubmit')
+              }}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -98,7 +166,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
-import { login } from '@/services/authService'
+import { login, requestPasswordReset } from '@/services/authService'
 import { setAuthTokens } from '@/services/authToken'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
@@ -110,11 +178,60 @@ const { nextLocaleLabel, t, toggleLocale } = useLocale()
 const email = ref('')
 const password = ref('')
 const errorMessage = ref('')
-const successMessage = ref(route.query.signup === 'success' ? t('login.signupSuccess') : '')
+const successMessage = ref(getInitialSuccessMessage())
 const isSubmitting = ref(false)
+const isPasswordResetModalOpen = ref(false)
+const passwordResetEmail = ref('')
+const passwordResetErrorMessage = ref('')
+const passwordResetSuccessMessage = ref('')
+const isPasswordResetSubmitting = ref(false)
 
 async function goToSignup() {
   await router.push({ name: ROUTE_NAMES.signup })
+}
+
+function openPasswordResetModal() {
+  passwordResetEmail.value = email.value
+  passwordResetErrorMessage.value = ''
+  passwordResetSuccessMessage.value = ''
+  isPasswordResetModalOpen.value = true
+}
+
+function closePasswordResetModal() {
+  if (isPasswordResetSubmitting.value) {
+    return
+  }
+
+  isPasswordResetModalOpen.value = false
+}
+
+async function handlePasswordResetRequest() {
+  if (isPasswordResetSubmitting.value) {
+    return
+  }
+
+  passwordResetErrorMessage.value = ''
+  passwordResetSuccessMessage.value = ''
+
+  if (passwordResetEmail.value === '') {
+    passwordResetErrorMessage.value = t('login.passwordResetEmailRequired')
+    return
+  }
+
+  isPasswordResetSubmitting.value = true
+
+  try {
+    await requestPasswordReset({
+      email: passwordResetEmail.value,
+    })
+
+    passwordResetSuccessMessage.value = t('login.passwordResetRequestSuccess')
+  } catch (error) {
+    passwordResetErrorMessage.value =
+      error instanceof ApiClientError ? error.message : t('login.passwordResetRequestFailed')
+  } finally {
+    isPasswordResetSubmitting.value = false
+  }
 }
 
 async function handleSubmit() {
@@ -161,6 +278,18 @@ function loginSuccessTarget() {
 
 function isSafeInternalRedirect(redirectPath: string) {
   return redirectPath.startsWith('/') && !redirectPath.startsWith('//')
+}
+
+function getInitialSuccessMessage() {
+  if (route.query.signup === 'success') {
+    return t('login.signupSuccess')
+  }
+
+  if (route.query.passwordReset === 'success') {
+    return t('login.passwordResetSuccess')
+  }
+
+  return ''
 }
 </script>
 
@@ -447,6 +576,87 @@ function isSafeInternalRedirect(redirectPath: string) {
   align-self: center;
 }
 
+.password-reset-modal-backdrop {
+  position: fixed;
+  z-index: 5;
+  inset: 0;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.62);
+}
+
+.password-reset-modal {
+  width: min(100%, 420px);
+  max-height: calc(100dvh - 48px);
+  padding: 28px;
+  border: 1px solid rgb(99 242 232 / 0.2);
+  border-radius: 8px;
+  overflow-y: auto;
+  background: rgb(6 10 24 / 0.96);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.48);
+  color: #f8fbff;
+}
+
+.password-reset-modal-heading h2 {
+  margin: 0;
+  color: #f0d7ff;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.password-reset-modal-heading p {
+  margin: 10px 0 0;
+  color: rgb(219 232 244 / 0.72);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.password-reset-form {
+  margin-top: 22px;
+}
+
+.password-reset-actions {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.password-reset-secondary-button,
+.password-reset-primary-button {
+  min-height: 46px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.password-reset-secondary-button {
+  border: 1px solid rgb(206 224 255 / 0.16);
+  background: rgb(8 15 34 / 0.72);
+  color: rgb(219 232 244 / 0.82);
+}
+
+.password-reset-primary-button {
+  border: 1px solid rgb(99 242 232 / 0.42);
+  background: #162a42;
+  color: #e9feff;
+}
+
+.password-reset-secondary-button:hover:not(:disabled),
+.password-reset-primary-button:hover:not(:disabled) {
+  border-color: rgb(99 242 232 / 0.68);
+  filter: brightness(1.08);
+}
+
+.password-reset-secondary-button:disabled,
+.password-reset-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
 @media (max-width: 760px) {
   .login-page {
     padding: 16px;
@@ -509,6 +719,19 @@ function isSafeInternalRedirect(redirectPath: string) {
 
   .about-button {
     padding-top: 28px;
+  }
+
+  .password-reset-modal-backdrop {
+    padding: 16px;
+  }
+
+  .password-reset-modal {
+    max-height: calc(100dvh - 32px);
+    padding: 24px 20px;
+  }
+
+  .password-reset-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>
