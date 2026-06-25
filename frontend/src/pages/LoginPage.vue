@@ -66,7 +66,13 @@
         <span>{{ t('login.bridgeWith') }}</span>
       </div>
 
-      <button class="google-button" type="button" :aria-label="t('login.continueGoogle')">
+      <button
+        class="google-button"
+        type="button"
+        :disabled="isOAuthStarting"
+        :aria-label="t('login.continueGoogle')"
+        @click="startGoogleOAuth"
+      >
         <svg class="google-mark" viewBox="0 0 24 24" aria-hidden="true">
           <path
             fill="#4285f4"
@@ -85,10 +91,12 @@
             d="M12 4.7c1.7 0 3.3.6 4.5 1.8l3.4-3.4C17.9 1.2 15.2 0 12 0 7.5 0 3.5 2.7 1.5 6.6l3.9 3C6.3 6.8 8.9 4.7 12 4.7z"
           />
         </svg>
-        <span>Google</span>
+        <span>{{ isOAuthStarting ? t('login.oauthStarting') : 'Google' }}</span>
       </button>
 
-      <button class="about-button" type="button">{{ t('login.about') }}</button>
+      <button class="about-button" type="button" @click="openAboutModal">
+        {{ t('login.about') }}
+      </button>
     </section>
 
     <div
@@ -156,6 +164,30 @@
         </form>
       </section>
     </div>
+
+    <div
+      v-if="isAboutModalOpen"
+      class="about-modal-backdrop"
+      role="presentation"
+      @click.self="closeAboutModal"
+    >
+      <section class="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-title">
+        <div class="about-modal-media">
+          <img :src="characterImageUrl" :alt="t('login.aboutImageAlt')" />
+        </div>
+
+        <div class="about-modal-copy">
+          <h2 id="about-title">{{ t('login.aboutTitle') }}</h2>
+          <p>{{ t('login.aboutTarget') }}</p>
+          <p>{{ t('login.aboutDescription') }}</p>
+          <p>{{ t('login.aboutHomage') }}</p>
+        </div>
+
+        <button class="about-modal-button" type="button" @click="closeAboutModal">
+          {{ t('login.aboutClose') }}
+        </button>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -168,8 +200,10 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
 import { login, requestPasswordReset } from '@/services/authService'
 import { setAuthTokens } from '@/services/authToken'
+import { startGoogleOAuthRedirect } from '@/services/oauthRedirect'
 
 import backgroundImageUrl from '../../img/background-new-sharp.png'
+import characterImageUrl from '../../img/character-cutout.png'
 
 const router = useRouter()
 const route = useRoute()
@@ -177,9 +211,11 @@ const { nextLocaleLabel, t, toggleLocale } = useLocale()
 
 const email = ref('')
 const password = ref('')
-const errorMessage = ref('')
+const errorMessage = ref(getInitialErrorMessage())
 const successMessage = ref(getInitialSuccessMessage())
 const isSubmitting = ref(false)
+const isOAuthStarting = ref(false)
+const isAboutModalOpen = ref(false)
 const isPasswordResetModalOpen = ref(false)
 const passwordResetEmail = ref('')
 const passwordResetErrorMessage = ref('')
@@ -188,6 +224,25 @@ const isPasswordResetSubmitting = ref(false)
 
 async function goToSignup() {
   await router.push({ name: ROUTE_NAMES.signup })
+}
+
+function startGoogleOAuth() {
+  if (isOAuthStarting.value) {
+    return
+  }
+
+  errorMessage.value = ''
+  successMessage.value = ''
+  isOAuthStarting.value = true
+  startGoogleOAuthRedirect()
+}
+
+function openAboutModal() {
+  isAboutModalOpen.value = true
+}
+
+function closeAboutModal() {
+  isAboutModalOpen.value = false
 }
 
 function openPasswordResetModal() {
@@ -287,6 +342,14 @@ function getInitialSuccessMessage() {
 
   if (route.query.passwordReset === 'success') {
     return t('login.passwordResetSuccess')
+  }
+
+  return ''
+}
+
+function getInitialErrorMessage() {
+  if (route.query.oauth === 'failed') {
+    return t('login.oauthFailed')
   }
 
   return ''
@@ -563,6 +626,16 @@ function getInitialSuccessMessage() {
   font-weight: 800;
 }
 
+.google-button:hover:not(:disabled) {
+  border-color: rgb(99 242 232 / 0.52);
+  box-shadow: 0 0 22px rgb(99 242 232 / 0.14);
+}
+
+.google-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .google-mark {
   width: 22px;
   height: 22px;
@@ -586,6 +659,16 @@ function getInitialSuccessMessage() {
   background: rgb(0 0 0 / 0.62);
 }
 
+.about-modal-backdrop {
+  position: fixed;
+  z-index: 5;
+  inset: 0;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.68);
+}
+
 .password-reset-modal {
   width: min(100%, 420px);
   max-height: calc(100dvh - 48px);
@@ -596,6 +679,80 @@ function getInitialSuccessMessage() {
   background: rgb(6 10 24 / 0.96);
   box-shadow: 0 24px 70px rgb(0 0 0 / 0.48);
   color: #f8fbff;
+}
+
+.about-modal {
+  width: min(100%, 460px);
+  max-height: calc(100dvh - 48px);
+  padding: 28px;
+  border: 1px solid rgb(99 242 232 / 0.2);
+  border-radius: 8px;
+  overflow-y: auto;
+  background: rgb(6 10 24 / 0.96);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.48);
+  color: #f8fbff;
+}
+
+.about-modal-media {
+  min-height: 210px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(206 224 255 / 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 52% 42%, rgb(99 242 232 / 0.16), transparent 38%),
+    radial-gradient(circle at 46% 58%, rgb(188 107 255 / 0.2), transparent 48%),
+    rgb(8 15 34 / 0.86);
+}
+
+.about-modal-media img {
+  width: min(72%, 260px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 22px rgb(99 242 232 / 0.2));
+}
+
+.about-modal-copy {
+  margin-top: 22px;
+}
+
+.about-modal-copy h2 {
+  margin: 0;
+  color: #f0d7ff;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.about-modal-copy p {
+  margin: 10px 0 0;
+  color: rgb(219 232 244 / 0.76);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.about-modal-copy p:first-of-type {
+  color: #63f2e8;
+  font-weight: 900;
+}
+
+.about-modal-button {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 22px;
+  border: 1px solid rgb(99 242 232 / 0.42);
+  border-radius: 4px;
+  background: #162a42;
+  color: #e9feff;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.about-modal-button:hover {
+  border-color: rgb(99 242 232 / 0.68);
+  filter: brightness(1.08);
 }
 
 .password-reset-modal-heading h2 {
@@ -721,13 +878,19 @@ function getInitialSuccessMessage() {
     padding-top: 28px;
   }
 
-  .password-reset-modal-backdrop {
+  .password-reset-modal-backdrop,
+  .about-modal-backdrop {
     padding: 16px;
   }
 
-  .password-reset-modal {
+  .password-reset-modal,
+  .about-modal {
     max-height: calc(100dvh - 32px);
     padding: 24px 20px;
+  }
+
+  .about-modal-media {
+    min-height: 190px;
   }
 
   .password-reset-actions {

@@ -6,6 +6,7 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
 import { login, requestPasswordReset } from '@/services/authService'
 import { setAuthTokens } from '@/services/authToken'
+import { startGoogleOAuthRedirect } from '@/services/oauthRedirect'
 
 import LoginPage from './LoginPage.vue'
 
@@ -30,9 +31,14 @@ vi.mock('@/services/authToken', () => ({
   setAuthTokens: vi.fn(),
 }))
 
+vi.mock('@/services/oauthRedirect', () => ({
+  startGoogleOAuthRedirect: vi.fn(),
+}))
+
 const loginMock = vi.mocked(login)
 const requestPasswordResetMock = vi.mocked(requestPasswordReset)
 const setAuthTokensMock = vi.mocked(setAuthTokens)
+const startGoogleOAuthRedirectMock = vi.mocked(startGoogleOAuthRedirect)
 const { setLocale } = useLocale()
 
 describe('LoginPage', () => {
@@ -61,6 +67,7 @@ describe('LoginPage', () => {
 
     expect(wrapper.get('.login-button').text()).toBe('Login')
     expect(wrapper.get('.login-links').text()).toContain('Forgot Password?')
+    expect(wrapper.get('.bridge-divider').text()).toBe('Or continue with')
   })
 
   it('moves to signup route from the sign up button', async () => {
@@ -93,6 +100,44 @@ describe('LoginPage', () => {
     expect(wrapper.get('[role="status"]').text()).toBe(
       '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.',
     )
+  })
+
+  it('shows an OAuth failure message when redirected after OAuth exchange failure', () => {
+    routeQueryMock.value = {
+      oauth: 'failed',
+    }
+
+    const wrapper = mount(LoginPage)
+
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      'Google 로그인에 실패했습니다. 다시 시도해 주세요.',
+    )
+  })
+
+  it('starts Google OAuth through the backend redirect entrypoint command', async () => {
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('.google-button').trigger('click')
+
+    expect(startGoogleOAuthRedirectMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.get<HTMLButtonElement>('.google-button').element.disabled).toBe(true)
+    expect(wrapper.get('.google-button').text()).toContain('Google로 이동 중')
+  })
+
+  it('opens the game introduction modal without leaving the login page', async () => {
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('.about-button').trigger('click')
+
+    const dialog = wrapper.get('[role="dialog"]')
+
+    expect(dialog.text()).toContain('이 자식을 잡는 게 목표입니다.')
+    expect(dialog.text()).toContain('League of Legends의 Smite 싸움')
+    expect(dialog.find('img').attributes('alt')).toBe('잡아야 하는 장난꾸러기 별 캐릭터')
+
+    await dialog.get('.about-modal-button').trigger('click')
+
+    expect(wrapper.find('.about-modal').exists()).toBe(false)
   })
 
   it('opens password reset modal with the login email as prefill', async () => {
