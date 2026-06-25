@@ -375,6 +375,9 @@ flowchart TD
 - token query 전달을 one-time code 교환 방식으로 바꿈.
   OAuth 성공 직후 redirect URL에 access token을 싣는 방식은 구현은 단순하지만 브라우저 history, proxy log, referrer 등으로 token이 남을 수 있다. one-time code는 짧은 TTL을 갖고 한 번만 token으로 교환되므로 URL에 남아도 실제 credential 노출 위험을 줄일 수 있다.
 
+- one-time code 소비를 Redis Lua script로 원자화함.
+  단순히 code를 조회한 뒤 토큰을 발급하고 마지막에 삭제하면 같은 code에 대한 동시 요청이 모두 조회를 통과할 수 있다. 그래서 code exchange는 Redis에서 조회와 삭제를 한 번에 수행하고, 삭제에 성공한 첫 요청만 토큰 발급으로 넘어가게 함.
+
 - OAuth login도 기존 login과 같은 token pair 계약으로 맞춤.
   현재 일반 로그인은 access token과 refresh token을 함께 발급하고, refresh/logout은 Redis refresh token을 기준으로 동작한다. OAuth만 access token만 주면 프론트 세션 유지와 logout 정책이 달라진다. 따라서 OAuth token exchange도 기존 login response shape를 따르게 한다.
 

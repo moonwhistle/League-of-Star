@@ -48,7 +48,7 @@ class OAuthLoginServiceTest {
                 .email("oauth@example.com")
                 .nickname("StarUser")
                 .build();
-        given(oauthLoginCodeStore.getUserIdByCode(code)).willReturn(Optional.of(userId));
+        given(oauthLoginCodeStore.consumeUserIdByCode(code)).willReturn(Optional.of(userId));
         given(userReadService.findById(userId)).willReturn(user);
         given(authTokenIssueService.issueTokens(user)).willReturn(new TokenDto("access-token", "refresh-token"));
 
@@ -59,7 +59,8 @@ class OAuthLoginServiceTest {
         assertThat(result.tokens().accessToken()).isEqualTo("access-token");
         assertThat(result.tokens().refreshToken()).isEqualTo("refresh-token");
         assertThat(result.user()).isEqualTo(user);
-        verify(oauthLoginCodeStore, times(1)).remove(code);
+        verify(oauthLoginCodeStore, times(1)).consumeUserIdByCode(code);
+        verify(oauthLoginCodeStore, never()).remove(code);
     }
 
     @Test
@@ -67,7 +68,7 @@ class OAuthLoginServiceTest {
     void exchangeCodeInvalidCode() {
         // given
         String code = "invalid-code";
-        given(oauthLoginCodeStore.getUserIdByCode(code)).willReturn(Optional.empty());
+        given(oauthLoginCodeStore.consumeUserIdByCode(code)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> oauthLoginService.exchangeCode(code))

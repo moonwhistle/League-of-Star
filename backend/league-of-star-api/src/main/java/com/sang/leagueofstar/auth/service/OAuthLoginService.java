@@ -21,12 +21,11 @@ public class OAuthLoginService {
 
     @Transactional
     public LoginDto exchangeCode(String code) {
-        Long userId = oauthLoginCodeStore.getUserIdByCode(code)
+        Long userId = oauthLoginCodeStore.consumeUserIdByCode(code)
                 .orElseThrow(() -> new ApiException(ApiErrorCode.AUTH_INVALID_OAUTH_CODE));
 
         User user = userReadService.findById(userId);
         TokenDto tokens = authTokenIssueService.issueTokens(user);
-        oauthLoginCodeStore.remove(code);
 
         return new LoginDto(tokens, user);
     }

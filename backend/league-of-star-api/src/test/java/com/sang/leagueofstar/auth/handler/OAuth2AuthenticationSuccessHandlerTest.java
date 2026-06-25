@@ -2,6 +2,7 @@ package com.sang.leagueofstar.auth.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -63,5 +64,35 @@ class OAuth2AuthenticationSuccessHandlerTest {
         ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
         verify(oauthLoginCodeStore, times(1)).save(codeCaptor.capture(), eq(user.getId()), eq(180L));
         assertThat(codeCaptor.getValue()).isEqualTo(code);
+    }
+
+    @Test
+    @DisplayName("응답이 이미 커밋된 경우 OAuth code를 저장하지 않는다")
+    void committedResponseDoesNotSaveCode() throws Exception {
+        // given
+        OAuth2AuthenticationSuccessHandler handler = new OAuth2AuthenticationSuccessHandler(
+                SUCCESS_REDIRECT_URL,
+                oauthLoginCodeStore
+        );
+        User user = User.builder()
+                .id(1L)
+                .email("oauth@example.com")
+                .build();
+        PrincipalDetails principalDetails = new PrincipalDetails(user);
+        TestingAuthenticationToken authentication = new TestingAuthenticationToken(principalDetails, null);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        response.setCommitted(true);
+
+        // when
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        // then
+        assertThat(response.getRedirectedUrl()).isNull();
+        verify(oauthLoginCodeStore, never()).save(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong()
+        );
     }
 }

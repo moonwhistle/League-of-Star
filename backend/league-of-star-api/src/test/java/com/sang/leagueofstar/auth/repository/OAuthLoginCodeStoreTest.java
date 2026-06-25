@@ -57,4 +57,20 @@ class OAuthLoginCodeStoreTest extends AbstractRedisTest {
         // then
         assertThat(foundUserId).isEmpty();
     }
+
+    @Test
+    @DisplayName("OAuth 로그인 code는 조회와 삭제를 원자적으로 소비한다")
+    void consumeUserIdByCode() {
+        // given
+        String code = "oauth-code-to-consume";
+        oauthLoginCodeStore.save(code, 3L, 180L);
+
+        // when
+        Optional<Long> firstConsume = oauthLoginCodeStore.consumeUserIdByCode(code);
+        Optional<Long> secondConsume = oauthLoginCodeStore.consumeUserIdByCode(code);
+
+        // then
+        assertThat(firstConsume).contains(3L);
+        assertThat(secondConsume).isEmpty();
+    }
 }

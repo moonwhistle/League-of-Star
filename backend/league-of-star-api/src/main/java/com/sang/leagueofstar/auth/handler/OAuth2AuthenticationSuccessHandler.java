@@ -34,17 +34,16 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
+        if (response.isCommitted()) {
+            log.debug("Response has already been committed. Unable to redirect OAuth success response.");
+            return;
+        }
+
         PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
         String code = generateCode();
         oauthLoginCodeStore.save(code, principalDetails.getUserId(), OAUTH_LOGIN_CODE_TTL_SECONDS);
 
         String targetUrl = determineTargetUrl(code);
-        
-        if (response.isCommitted()) {
-            log.debug("Response has already been committed. Unable to redirect to " + targetUrl);
-            return;
-        }
-
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 
