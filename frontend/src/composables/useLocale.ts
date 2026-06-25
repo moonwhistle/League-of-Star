@@ -335,8 +335,7 @@ const messages = {
     'login.signupSuccess': 'Sign up complete. Please log in.',
     'login.passwordResetSuccess': 'Password changed. Please log in with your new password.',
     'login.passwordResetTitle': 'Reset Password',
-    'login.passwordResetDescription':
-      'Enter your account email to receive a password reset link.',
+    'login.passwordResetDescription': 'Enter your account email to receive a password reset link.',
     'login.passwordResetSubmit': 'Send reset link',
     'login.passwordResetSubmitting': 'Requesting',
     'login.passwordResetCancel': 'Cancel',
@@ -364,7 +363,8 @@ const messages = {
     'passwordReset.submitting': 'Changing',
     'passwordReset.backToLogin': 'Back to login',
     'passwordReset.required': 'New password and confirmation are required.',
-    'passwordReset.passwordRule': 'Password must be at least 8 characters with letters and numbers.',
+    'passwordReset.passwordRule':
+      'Password must be at least 8 characters with letters and numbers.',
     'passwordReset.passwordMismatch': 'Password confirmation does not match.',
     'passwordReset.submitFailed': 'Failed to change password. Please try again.',
     'passwordReset.invalidLinkTitle': 'Reset link is invalid.',

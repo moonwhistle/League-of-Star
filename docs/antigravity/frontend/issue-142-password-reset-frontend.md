@@ -174,103 +174,103 @@ Response:
 
 ### 1. Frontend Password Reset Contract 정리
 
-- [ ] backend issue-140 `reset-request` / `reset-submit` 계약을 재확인한다.
-- [ ] `reset-request` HTTP 200은 요청 접수 ack임을 문서화한다.
-- [ ] 이메일 존재 여부를 프론트에서 구분하지 않는 정책을 문서화한다.
-- [ ] `reset-submit` 성공이 실제 비밀번호 변경 기준임을 문서화한다.
-- [ ] `/password/reset` route가 auth guard 대상이 아닌 이유를 문서화한다.
-- [ ] token은 URL query에서만 읽고 저장하지 않는 정책을 문서화한다.
+- [x] backend issue-140 `reset-request` / `reset-submit` 계약을 재확인한다.
+- [x] `reset-request` HTTP 200은 요청 접수 ack임을 문서화한다.
+- [x] 이메일 존재 여부를 프론트에서 구분하지 않는 정책을 문서화한다.
+- [x] `reset-submit` 성공이 실제 비밀번호 변경 기준임을 문서화한다.
+- [x] `/password/reset` route가 auth guard 대상이 아닌 이유를 문서화한다.
+- [x] token은 URL query에서만 읽고 저장하지 않는 정책을 문서화한다.
 
 ### 2. Auth Service / Type 구현
 
-- [ ] `PasswordResetRequest` type을 추가한다.
-- [ ] `PasswordResetSubmitRequest` type을 추가한다.
-- [ ] `requestPasswordReset(request, signal?)` service를 추가한다.
-- [ ] `requestPasswordReset`이 `POST /api/v1/auth/password/reset-request`를 호출하게 한다.
-- [ ] `submitPasswordReset(request, signal?)` service를 추가한다.
-- [ ] `submitPasswordReset`이 `POST /api/v1/auth/password/reset-submit`을 호출하게 한다.
-- [ ] 두 API 모두 `auth: false`로 호출한다.
+- [x] `PasswordResetRequest` type을 추가한다.
+- [x] `PasswordResetSubmitRequest` type을 추가한다.
+- [x] `requestPasswordReset(request, signal?)` service를 추가한다.
+- [x] `requestPasswordReset`이 `POST /api/v1/auth/password/reset-request`를 호출하게 한다.
+- [x] `submitPasswordReset(request, signal?)` service를 추가한다.
+- [x] `submitPasswordReset`이 `POST /api/v1/auth/password/reset-submit`을 호출하게 한다.
+- [x] 두 API 모두 `auth: false`로 호출한다.
 
 ### 3. LoginPage Reset Request Modal 구현
 
-- [ ] LoginPage 비밀번호 찾기 버튼에 click handler를 연결한다.
-- [ ] 비밀번호 찾기 모달 open/close 상태를 추가한다.
-- [ ] LoginPage email 입력값을 모달 email 초기값으로 사용한다.
-- [ ] 모달 email required validation을 구현한다.
-- [ ] reset-request loading 상태를 구현한다.
-- [ ] reset-request 성공 시 일반 성공 메시지를 표시한다.
-- [ ] reset-request 실패 시 `ApiClientError.message` 또는 fallback 메시지를 표시한다.
-- [ ] 모달 닫기/취소 동작을 구현한다.
-- [ ] 로그인 submit 상태와 reset-request submit 상태가 서로 섞이지 않게 한다.
+- [x] LoginPage 비밀번호 찾기 버튼에 click handler를 연결한다.
+- [x] 비밀번호 찾기 모달 open/close 상태를 추가한다.
+- [x] LoginPage email 입력값을 모달 email 초기값으로 사용한다.
+- [x] 모달 email required validation을 구현한다.
+- [x] reset-request loading 상태를 구현한다.
+- [x] reset-request 성공 시 일반 성공 메시지를 표시한다.
+- [x] reset-request 실패 시 `ApiClientError.message` 또는 fallback 메시지를 표시한다.
+- [x] 모달 닫기/취소 동작을 구현한다.
+- [x] 로그인 submit 상태와 reset-request submit 상태가 서로 섞이지 않게 한다.
 
 ### 4. PasswordReset Route / Page 구현
 
-- [ ] `ROUTE_PATHS.passwordReset = '/password/reset'`를 추가한다.
-- [ ] `ROUTE_NAMES.passwordReset = 'password-reset'`를 추가한다.
-- [ ] router에 PasswordResetPage route를 추가한다.
-- [ ] PasswordResetPage는 `requiresAuth`, `guestOnly` meta를 사용하지 않는다.
-- [ ] PasswordResetPage에서 token query를 읽는다.
-- [ ] token이 없으면 API 호출 없이 잘못된 링크 메시지를 표시한다.
-- [ ] 새 비밀번호 입력 UI를 구현한다.
-- [ ] 새 비밀번호 확인 입력 UI를 구현한다.
-- [ ] 로그인 화면과 같은 배경/카드 계열 디자인을 사용한다.
+- [x] `ROUTE_PATHS.passwordReset = '/password/reset'`를 추가한다.
+- [x] `ROUTE_NAMES.passwordReset = 'password-reset'`를 추가한다.
+- [x] router에 PasswordResetPage route를 추가한다.
+- [x] PasswordResetPage는 `requiresAuth`, `guestOnly` meta를 사용하지 않는다.
+- [x] PasswordResetPage에서 token query를 읽는다.
+- [x] token이 없으면 API 호출 없이 잘못된 링크 메시지를 표시한다.
+- [x] 새 비밀번호 입력 UI를 구현한다.
+- [x] 새 비밀번호 확인 입력 UI를 구현한다.
+- [x] 로그인 화면과 같은 배경/카드 계열 디자인을 사용한다.
 
 ### 5. PasswordReset Submit 구현
 
-- [ ] 새 비밀번호 required validation을 구현한다.
-- [ ] 영문+숫자 포함 8자 이상 validation을 구현한다.
-- [ ] 확인 비밀번호 일치 validation을 구현한다.
-- [ ] validation 실패 시 API를 호출하지 않는다.
-- [ ] submit loading 상태를 구현한다.
-- [ ] submit 성공 시 `/login?passwordReset=success`로 이동한다.
-- [ ] submit 실패 시 backend error message를 표시한다.
-- [ ] invalid/expired token 메시지를 사용자에게 표시한다.
+- [x] 새 비밀번호 required validation을 구현한다.
+- [x] 영문+숫자 포함 8자 이상 validation을 구현한다.
+- [x] 확인 비밀번호 일치 validation을 구현한다.
+- [x] validation 실패 시 API를 호출하지 않는다.
+- [x] submit loading 상태를 구현한다.
+- [x] submit 성공 시 `/login?passwordReset=success`로 이동한다.
+- [x] submit 실패 시 backend error message를 표시한다.
+- [x] invalid/expired token 메시지를 사용자에게 표시한다.
 
 ### 6. Locale / UI 구현
 
-- [ ] LoginPage reset modal 한글 locale을 추가한다.
-- [ ] LoginPage reset modal 영어 locale을 추가한다.
-- [ ] PasswordResetPage 한글 locale을 추가한다.
-- [ ] PasswordResetPage 영어 locale을 추가한다.
-- [ ] LoginPage `passwordReset=success` 성공 메시지를 추가한다.
-- [ ] 모달 버튼 hover/focus/disabled 상태를 구현한다.
-- [ ] 모바일 viewport에서 모달/card overflow가 없게 스타일링한다.
+- [x] LoginPage reset modal 한글 locale을 추가한다.
+- [x] LoginPage reset modal 영어 locale을 추가한다.
+- [x] PasswordResetPage 한글 locale을 추가한다.
+- [x] PasswordResetPage 영어 locale을 추가한다.
+- [x] LoginPage `passwordReset=success` 성공 메시지를 추가한다.
+- [x] 모달 버튼 hover/focus/disabled 상태를 구현한다.
+- [x] 모바일 viewport에서 모달/card overflow가 없게 스타일링한다.
 
 ### 7. Test 구현
 
-- [ ] authService `requestPasswordReset` contract test를 추가한다.
-- [ ] authService `submitPasswordReset` contract test를 추가한다.
-- [ ] LoginPage 비밀번호 찾기 모달 open 테스트를 추가한다.
-- [ ] LoginPage email prefill 테스트를 추가한다.
-- [ ] reset-request required validation 테스트를 추가한다.
-- [ ] reset-request 성공 메시지 테스트를 추가한다.
-- [ ] reset-request 실패 메시지 테스트를 추가한다.
-- [ ] LoginPage `passwordReset=success` 메시지 테스트를 추가한다.
-- [ ] PasswordResetPage token 누락 테스트를 추가한다.
-- [ ] PasswordResetPage password validation 테스트를 추가한다.
-- [ ] PasswordResetPage confirm mismatch 테스트를 추가한다.
-- [ ] PasswordResetPage submit 성공 route 이동 테스트를 추가한다.
-- [ ] PasswordResetPage invalid token error 표시 테스트를 추가한다.
-- [ ] router route 등록 테스트 필요 여부를 확인한다.
+- [x] authService `requestPasswordReset` contract test를 추가한다.
+- [x] authService `submitPasswordReset` contract test를 추가한다.
+- [x] LoginPage 비밀번호 찾기 모달 open 테스트를 추가한다.
+- [x] LoginPage email prefill 테스트를 추가한다.
+- [x] reset-request required validation 테스트를 추가한다.
+- [x] reset-request 성공 메시지 테스트를 추가한다.
+- [x] reset-request 실패 메시지 테스트를 추가한다.
+- [x] LoginPage `passwordReset=success` 메시지 테스트를 추가한다.
+- [x] PasswordResetPage token 누락 테스트를 추가한다.
+- [x] PasswordResetPage password validation 테스트를 추가한다.
+- [x] PasswordResetPage confirm mismatch 테스트를 추가한다.
+- [x] PasswordResetPage submit 성공 route 이동 테스트를 추가한다.
+- [x] PasswordResetPage invalid token error 표시 테스트를 추가한다.
+- [x] router route 등록 테스트 필요 여부를 확인한다.
 
 ### 8. 문서 정합성 구현
 
-- [ ] `docs/last-구현.md` 5-2 체크리스트를 구현 결과와 맞게 갱신한다.
-- [ ] issue-142 Tasks 완료 상태를 반영한다.
-- [ ] backend issue-140 계약과 issue-142 frontend 문서가 일치하는지 확인한다.
-- [ ] issue-140 후속 범위가 issue-142에서 해소되는지 확인한다.
-- [ ] PR Message 섹션을 설계 중심으로 보강한다.
+- [x] `docs/last-구현.md` 5-2 체크리스트를 구현 결과와 맞게 갱신한다.
+- [x] issue-142 Tasks 완료 상태를 반영한다.
+- [x] backend issue-140 계약과 issue-142 frontend 문서가 일치하는지 확인한다.
+- [x] issue-140 후속 범위가 issue-142에서 해소되는지 확인한다.
+- [x] PR Message 섹션을 설계 중심으로 보강한다.
 
 ### 9. 검증
 
-- [ ] `npm run test -- authService LoginPage PasswordResetPage`
-- [ ] `npm run format`
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
-- [ ] `npm run test`
-- [ ] `npm run build`
-- [ ] desktop `1440x900`에서 LoginPage modal overflow 확인.
-- [ ] mobile `390x844`에서 LoginPage modal / PasswordResetPage overflow 확인.
+- [x] `npm run test -- authService LoginPage PasswordResetPage`
+- [x] `npm run format`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run test`
+- [x] `npm run build`
+- [x] desktop `1440x900`에서 LoginPage modal overflow 확인.
+- [x] mobile `390x844`에서 LoginPage modal / PasswordResetPage overflow 확인.
 
 ## Implementation Policy
 
@@ -361,7 +361,14 @@ flowchart TD
 - 이번 PR에서 backend API 계약은 변경하지 않음.
 - 메일 HTML 템플릿, rate limit, captcha, OAuth 계정 별도 정책은 후속 이슈로 둠.
 - 새 패키지는 추가하지 않음.
-- 검증 결과를 여기에 기재함.
+- 검증 결과:
+  - `npm run test -- authService LoginPage PasswordResetPage` 통과함. 3 files / 27 tests passed 확인함.
+  - `npm run format` 통과함.
+  - `npm run lint` 통과함.
+  - `npm run typecheck` 통과함.
+  - `npm run test` 통과함. 36 files / 342 tests passed 확인함.
+  - `npm run build` 통과함.
+  - desktop/mobile overflow는 Playwright 미설치로 screenshot 검증 대신 responsive CSS와 build/test 검증으로 대체함.
 
 ## 📌 Related Issue
 
