@@ -102,9 +102,6 @@
             </dl>
           </article>
         </div>
-        <p v-if="isCustomGameResult" class="summary-panel__custom-note">
-          {{ t('gameResult.customNoRankChange') }}
-        </p>
       </section>
 
       <button class="match-return-button" type="button" @click="returnToMatch">

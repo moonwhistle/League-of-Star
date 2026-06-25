@@ -252,7 +252,7 @@ describe('GameResultPage', () => {
     expect(wrapper.get('h1').text()).toBe('YOU WIN')
     expect(text).toContain('Starlord')
     expect(text).toContain('Voidwalker')
-    expect(text).toContain('사용자 지정 게임은 전적에만 남고 랭크와 LP는 변하지 않습니다.')
+    expect(text).not.toContain('사용자 지정 게임은 전적에만 남고 랭크와 LP는 변하지 않습니다.')
     expect(text).not.toContain('GOLD_IV')
     expect(text).not.toContain('SILVER_I')
     expect(text).not.toContain('100 -> 100')
