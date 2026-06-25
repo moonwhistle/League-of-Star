@@ -29,7 +29,10 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,6 +69,18 @@ class GameRecordRankSettlementServiceTest {
 
     @InjectMocks
     private GameRecordRankSettlementService gameRecordRankSettlementService;
+
+    @Test
+    @DisplayName("settleFinishedGameRoom - afterCommit 호출에서도 pessimistic lock이 가능하도록 새 transaction을 연다")
+    void settleFinishedGameRoom_RequiresNewTransaction() throws NoSuchMethodException {
+        // when
+        Method method = GameRecordRankSettlementService.class.getMethod("settleFinishedGameRoom", Long.class);
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        // then
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    }
 
     @Test
     @DisplayName("settleFinishedGameRoom - record가 없으면 참가자별 gameRecord 2행을 생성한다")

@@ -21,6 +21,7 @@ import com.sang.leagueofstar.domain.record.repository.GameRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -47,6 +48,7 @@ public class GameRecordRankSettlementService {
      *
      * <p>gameRoom 종료 transaction과 분리된 별도 transaction 경계입니다.</p>
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void settleFinishedGameRoom(Long gameRoomId) {
         GameRoom gameRoom = gameRoomRepository.findByIdForUpdate(gameRoomId)
                 .orElseThrow(() -> new CoreException(CoreErrorCode.GAME_ROOM_NOT_FOUND));
