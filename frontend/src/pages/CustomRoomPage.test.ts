@@ -248,7 +248,8 @@ describe('CustomRoomPage', () => {
     expect(wrapper.find('[data-testid="custom-room-start-button"]').exists()).toBe(false)
   })
 
-  it('keeps the start button visible when profile loading fails and relies on backend start validation', async () => {
+  it('keeps the start button visible when profile loading fails but token identifies the owner', async () => {
+    setAccessTokenUserId(1)
     getMyProfileMock.mockRejectedValueOnce(new Error('profile unavailable'))
 
     const wrapper = mount(CustomRoomPage)
@@ -264,6 +265,17 @@ describe('CustomRoomPage', () => {
     await flushPromises()
 
     expect(startCustomRoomMock).toHaveBeenCalledWith(100, expect.any(AbortSignal))
+  })
+
+  it('does not show the start button when profile loading fails and token identifies a non-owner', async () => {
+    setAccessTokenUserId(2)
+    getMyProfileMock.mockRejectedValueOnce(new Error('profile unavailable'))
+
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="custom-room-start-button"]').exists()).toBe(false)
+    expect(startCustomRoomMock).not.toHaveBeenCalled()
   })
 
   it('keeps start disabled until two participants and websocket open are ready', async () => {
@@ -321,6 +333,7 @@ describe('CustomRoomPage', () => {
   })
 
   it('stores ROOM_STARTED payload with owner fallback after starting without profile data', async () => {
+    setAccessTokenUserId(1)
     getMyProfileMock.mockRejectedValueOnce(new Error('profile unavailable'))
 
     const wrapper = mount(CustomRoomPage)
@@ -351,6 +364,36 @@ describe('CustomRoomPage', () => {
         gameRoomId: '200',
       },
     })
+  })
+
+  it('stores ROOM_STARTED payload for joined players when profile loading fails but token identifies the player', async () => {
+    setAccessTokenUserId(2)
+    getMyProfileMock.mockRejectedValue(new Error('profile unavailable'))
+
+    const wrapper = mount(CustomRoomPage)
+    await flushPromises()
+
+    customRoomSocketMock.handlers?.onOpen?.(new Event('open'))
+    customRoomSocketMock.handlers?.onMessage?.(
+      {
+        type: 'ROOM_STARTED',
+        payload: createStartResponse(),
+      },
+      new MessageEvent('message', { data: '{}' }),
+    )
+    await flushPromises()
+
+    expect(readCustomGameStartPayload(200)).toMatchObject({
+      myUserId: 2,
+      opponentUserId: 1,
+    })
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      name: ROUTE_NAMES.gamePlay,
+      params: {
+        gameRoomId: '200',
+      },
+    })
+    expect(wrapper.get('main').attributes('data-custom-room-start-status')).toBe('started')
   })
 
   it('waits for profile data before storing ROOM_STARTED payload for joined players', async () => {
@@ -585,4 +628,14 @@ function createStartResponse() {
       ],
     },
   }
+}
+
+function setAccessTokenUserId(userId: number) {
+  const payload = window
+    .btoa(JSON.stringify({ userId }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
+
+  localStorage.setItem('league-of-star.accessToken', `header.${payload}.signature`)
 }

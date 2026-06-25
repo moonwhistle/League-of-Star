@@ -162,6 +162,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLocale } from '@/composables/useLocale'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { ApiClientError } from '@/services/apiClient'
+import { getAccessToken } from '@/services/authToken'
 import { startCustomRoom, getCustomRoom, leaveCustomRoom } from '@/services/customRoomService'
 import { saveCustomGameStartPayloadFromResponse } from '@/services/customGameStartPayload'
 import { getMyProfile } from '@/services/profileService'
@@ -214,13 +215,14 @@ const socketReconnectAttempts = ref(0)
 const lastSocketCloseCode = ref<number>()
 const startFallbackUserId = shallowRef<number>()
 const routeRoomId = computed(() => String(route.params.roomId ?? '').trim())
-const isConfirmedNonOwner = computed(
+const currentUserId = computed(() => profile.value?.userId ?? readAccessTokenUserId())
+const isCurrentUserOwner = computed(
   () =>
     room.value !== undefined &&
-    profile.value !== undefined &&
-    profile.value.userId !== room.value.ownerUserId,
+    currentUserId.value !== undefined &&
+    currentUserId.value === room.value.ownerUserId,
 )
-const canShowStartButton = computed(() => room.value !== undefined && !isConfirmedNonOwner.value)
+const canShowStartButton = computed(() => room.value !== undefined && isCurrentUserOwner.value)
 const canStartCustomGame = computed(
   () =>
     canShowStartButton.value &&
@@ -421,7 +423,7 @@ async function startRoom() {
   startErrorMessage.value = ''
 
   try {
-    startFallbackUserId.value = profile.value?.userId ?? room.value.ownerUserId
+    startFallbackUserId.value = currentUserId.value
     await startCustomRoom(room.value.roomId, controller.signal)
 
     if (startAbortController.value !== controller) {
@@ -667,7 +669,7 @@ async function handleRoomStarted(payload = {}) {
 }
 
 function resolveCustomParticipantContext() {
-  const myUserId = profile.value?.userId ?? startFallbackUserId.value
+  const myUserId = currentUserId.value ?? startFallbackUserId.value
   const participants = room.value?.participants ?? []
 
   if (typeof myUserId !== 'number' || !Number.isFinite(myUserId)) {
@@ -683,6 +685,34 @@ function resolveCustomParticipantContext() {
   return {
     myUserId,
     opponentUserId: opponent.userId,
+  }
+}
+
+function readAccessTokenUserId() {
+  const accessToken = getAccessToken()
+
+  if (accessToken === null || accessToken.trim() === '') {
+    return undefined
+  }
+
+  const [, payload] = accessToken.split('.')
+
+  if (payload === undefined || payload.trim() === '') {
+    return undefined
+  }
+
+  try {
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      '=',
+    )
+    const parsedPayload = JSON.parse(window.atob(paddedPayload)) as unknown
+    const userId = Number(Reflect.get(Object(parsedPayload), 'userId'))
+
+    return Number.isFinite(userId) ? userId : undefined
+  } catch {
+    return undefined
   }
 }
 
