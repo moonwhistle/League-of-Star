@@ -36,6 +36,11 @@ export const router = createRouter({
       component: () => import('@/pages/PasswordResetPage.vue'),
     },
     {
+      path: ROUTE_PATHS.oauth2Redirect,
+      name: ROUTE_NAMES.oauth2Redirect,
+      component: () => import('@/pages/OAuthRedirectPage.vue'),
+    },
+    {
       path: ROUTE_PATHS.match,
       name: ROUTE_NAMES.match,
       component: () => import('@/pages/MatchPage.vue'),

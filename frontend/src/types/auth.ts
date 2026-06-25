@@ -35,6 +35,10 @@ export interface PasswordResetSubmitRequest {
   newPassword: string
 }
 
+export interface OAuthTokenRequest {
+  code: string
+}
+
 export interface TokenRefreshRequest {
   refreshToken: string
 }
