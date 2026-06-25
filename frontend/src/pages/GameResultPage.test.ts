@@ -91,7 +91,7 @@ describe('GameResultPage', () => {
     await flushPromises()
 
     expect(wrapper.get('main').attributes('data-game-summary-status')).toBe('pending')
-    expect(wrapper.text()).toContain('랭크 정산이 진행 중입니다')
+    expect(wrapper.text()).toContain('최종 결과를 정리하는 중입니다')
 
     await vi.advanceTimersByTimeAsync(249)
     expect(getGameSummaryMock).toHaveBeenCalledTimes(1)
