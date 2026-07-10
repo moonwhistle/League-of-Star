@@ -10,6 +10,7 @@ import com.sang.leagueofstar.global.restdocs.RestDocsSupport;
 import com.sang.leagueofstar.ranking.controller.response.RankingEntryResponse;
 import com.sang.leagueofstar.ranking.controller.response.RankingResponse;
 import com.sang.leagueofstar.ranking.controller.response.RankingSummaryResponse;
+import com.sang.leagueofstar.ranking.service.RankingBaselineService;
 import com.sang.leagueofstar.ranking.service.RankingService;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
@@ -36,10 +37,11 @@ class RankingControllerRestDocsTest extends RestDocsSupport {
     private static final Long USER_ID = 1L;
 
     private final RankingService rankingService = mock(RankingService.class);
+    private final RankingBaselineService rankingBaselineService = mock(RankingBaselineService.class);
 
     @Override
     protected Object initController() {
-        return new RankingController(rankingService);
+        return new RankingController(rankingService, rankingBaselineService);
     }
 
     @Override

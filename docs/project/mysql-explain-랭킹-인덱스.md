@@ -1,281 +1,202 @@
-# 랭킹 조회 API의 N+1 제거와 MySQL 인덱스 검증 계획
+# 랭킹 조회 API의 N+1 제거와 MySQL 인덱스 최적화
 
-## 요약
+## 1. 목적
 
-랭킹 조회 API는 랭킹 목록과 유저 닉네임을 함께 제공해야 한다. 이때 랭킹 row마다 유저를 단건 조회하면 애플리케이션 레벨 N+1이 발생할 수 있으므로, rank page 조회 후 userId 목록을 모아 `users where id in (...)` 방식으로 batch 조회하도록 구성했다.
-
-추가로 랭킹 정렬 정책이 복합 조건을 사용하므로, MySQL `EXPLAIN ANALYZE`를 통해 기존 인덱스와 개선 인덱스의 실행 계획을 비교한다.
-
-## 단계별 개선 전략
-
-인덱스 개선과 N+1 제거는 서로 다른 층위의 문제다.
+랭킹 API는 상위 랭커 목록과 각 유저의 닉네임을 함께 내려준다.
 
 ```text
-N+1 제거: SQL 실행 횟수와 DB round-trip 수를 줄이는 개선
-인덱스 적용: 랭킹 목록을 가져오는 단일 SQL의 실행 계획을 개선
+user_rank_info: 티어, LP, 승/패/무, 랭킹 정렬 정보
+users: 닉네임
 ```
 
-따라서 포트폴리오와 실험 설계에서는 두 효과를 섞지 않고 분리해서 측정하는 것이 좋다. 가장 깔끔한 순서는 다음과 같다.
+따라서 랭킹 row를 조회한 뒤 각 row의 `userId`로 닉네임을 조립해야 한다. 이 과정에서 row별 단건 조회가 반복되면 N+1이 발생할 수 있고, 랭킹 정렬 쿼리 자체도 데이터가 많아지면 정렬 비용이 커질 수 있다.
 
-| 단계 | N+1 상태 | 랭킹 정렬 인덱스 | 측정 목적 |
-| --- | --- | --- | --- |
-| 개선 전 | row별 유저 단건 조회 | 기존 인덱스만 사용 | 최악 기준선 확보 |
-| 1차 개선 | batch 조회로 N+1 제거 | 기존 인덱스만 사용 | SQL 실행 횟수 감소 효과 확인 |
-| 2차 개선 | batch 조회 유지 | 복합 정렬 인덱스 추가 | 단일 랭킹 쿼리 실행 계획 개선 확인 |
-
-사용자가 처음 제안한 `개선 전 -> 인덱스 적용 -> N+1 제거` 순서도 실험은 가능하다. 다만 N+1이 남아 있는 상태에서는 전체 응답 시간이 유저 단건 조회 N회에 영향을 크게 받으므로, 인덱스 개선 효과가 응답 시간 수치에 묻힐 수 있다.
-
-따라서 최종 문서에는 다음 흐름으로 정리한다.
+이번 트러블슈팅의 목표는 다음 두 가지를 분리해서 검증하는 것이다.
 
 ```text
-개선 전: 기존 인덱스 + row별 user 조회
-1차 개선: 기존 인덱스 + users IN batch 조회
-2차 개선: 복합 정렬 인덱스 + users IN batch 조회
+1. N+1 제거: SQL 실행 횟수와 DB round-trip 감소
+2. 인덱스 최적화: Top 랭킹 정렬 SQL의 실행 계획 개선
 ```
 
-이 순서의 장점은 다음과 같다.
+## 2. 진행 순서
 
-- 1차 개선에서 `1 + N` 쿼리가 `1 + 1`로 줄어드는 효과를 명확히 보여줄 수 있다.
-- 2차 개선에서 쿼리 수는 동일하게 유지한 채, `EXPLAIN ANALYZE`로 랭킹 SQL 자체의 실행 계획만 비교할 수 있다.
-- 면접에서 “N+1과 인덱스는 각각 어떤 병목을 해결했는가?”라는 질문에 분리해서 답할 수 있다.
-
-## 단계별 측정 항목
-
-### 개선 전
-
-조건:
+처음부터 특정 기술을 적용하지 않고, 증상과 원인을 분리해서 확인한다.
 
 ```text
-랭킹 정렬 인덱스: idx_rank_order 없음
-유저 닉네임 조회: row마다 UserReadService.findById() 호출
-데이터 규모: 15,000명 / 100,000명
-랭킹 limit: 50
+1. 랭킹 API 응답 시간 측정
+2. 실제 실행 SQL과 쿼리 수 확인
+3. N+1 유형 판별
+4. 애플리케이션 레벨 N+1 제거
+5. Top 랭킹 SQL의 EXPLAIN ANALYZE 확인
+6. 랭킹 정렬 복합 인덱스 적용
+7. 동일 조건으로 재측정
 ```
 
-측정 항목:
+이 순서로 진행하면 N+1 제거 효과와 인덱스 개선 효과를 분리해서 설명할 수 있다.
 
-| 항목 | 측정 방법 |
-| --- | --- |
-| SQL 실행 횟수 | Hibernate Statistics `prepareStatementCount` |
-| API 응답 시간 | 랭킹 API p50 / p95 |
-| Top 랭킹 쿼리 실행 계획 | `EXPLAIN ANALYZE` |
-| 정렬 비용 | `Using filesort`, actual time 확인 |
-| DB 부하 | 가능하면 MySQL slow query log 또는 performance schema 확인 |
+## 3. N+1 유형 판별
 
-기대되는 문제:
+N+1이라고 해서 바로 fetch join이나 EntityGraph를 적용하지 않는다. 먼저 이 문제가 JPA 연관관계 lazy loading 때문에 발생하는지, 애플리케이션 코드의 반복 조회 때문에 발생하는지 구분해야 한다.
+
+### 3.1 테이블 관계 확인
+
+랭킹 API 응답은 `user_rank_info`의 랭킹 정보와 `users`의 닉네임을 함께 사용한다.
 
 ```text
-랭킹 목록 조회 1회 + 유저 단건 조회 N회
-limit=50 기준 최소 51회 SQL 실행
-정렬 조건 전체를 커버하지 못해 filesort 가능성 존재
+user_rank_info.user_id -> users.id
 ```
 
-### 1차 개선
-
-조건:
-
-```text
-랭킹 정렬 인덱스: idx_rank_order 없음
-유저 닉네임 조회: userId 수집 후 UserReadService.findByIds() batch 조회
-데이터 규모: 개선 전과 동일
-랭킹 limit: 50
-```
-
-수정 방식:
-
-```text
-1. rank page 조회
-2. rank rows에서 userId 목록 추출
-3. users where id in (...) 조회
-4. userId -> User map 생성
-5. response 조립
-```
-
-측정 항목:
-
-| 항목 | 측정 방법 |
-| --- | --- |
-| SQL 실행 횟수 | Hibernate Statistics |
-| API 응답 시간 | 개선 전과 동일 조건으로 p50 / p95 비교 |
-| Top 랭킹 쿼리 실행 계획 | 기존 인덱스 상태에서 `EXPLAIN ANALYZE` 유지 측정 |
-
-기대 결과:
-
-```text
-limit=50 기준 SQL 실행 횟수 51회 -> 2회
-DB round-trip 감소
-Top 랭킹 쿼리의 filesort 가능성은 아직 남음
-```
-
-### 2차 개선
-
-조건:
-
-```text
-랭킹 정렬 인덱스: idx_rank_order 추가
-유저 닉네임 조회: users IN batch 조회 유지
-데이터 규모: 개선 전/1차 개선과 동일
-랭킹 limit: 50
-```
-
-수정 방식:
+`user_rank_info.user_id`에는 unique 제약이 있으므로, 두 테이블은 논리적으로 1:1 관계다.
 
 ```sql
-CREATE INDEX idx_rank_order
-ON user_rank_info (
-  tier_score DESC,
-  lp DESC,
-  total_wins DESC,
-  total_losses ASC,
-  total_draws DESC,
-  user_id ASC
-);
+UNIQUE KEY uk_user_id (user_id)
 ```
 
-측정 항목:
+즉 랭킹 row 하나는 특정 유저 한 명의 랭킹 정보이며, 화면에 필요한 닉네임은 `users` 테이블에서 가져와야 한다.
 
-| 항목 | 측정 방법 |
-| --- | --- |
-| SQL 실행 횟수 | 1차 개선과 동일하게 2회 유지 확인 |
-| Top 랭킹 쿼리 실행 계획 | `EXPLAIN ANALYZE` before / after 비교 |
-| 인덱스 사용 여부 | `key = idx_rank_order` 확인 |
-| 정렬 비용 | `Using filesort` 제거 또는 감소 여부 확인 |
-| 실제 실행 시간 | `actual time` 비교 |
+### 3.2 JPA 엔티티 연관관계 확인
 
-기대 결과:
+DB에 논리적 관계가 있다고 해서 JPA 엔티티 연관관계가 있는 것은 아니다. 현재 `UserRankInfo`는 `User`를 객체 참조로 들고 있지 않고, `userId` 스칼라 값만 보유한다.
+
+```java
+public class UserRankInfo {
+    private Long userId;
+}
+```
+
+즉 다음과 같은 JPA 연관관계가 없다.
+
+```java
+@OneToOne(fetch = FetchType.LAZY)
+private User user;
+```
+
+### 3.3 Lazy Loading N+1 가능성 배제
+
+JPA lazy loading N+1은 보통 다음과 같은 접근에서 발생한다.
+
+```java
+rankInfo.getUser().getNickname();
+```
+
+하지만 현재 모델에서는 `UserRankInfo`가 `User` 연관관계를 갖지 않으므로 위와 같은 접근 자체가 불가능하다. 따라서 이번 문제는 Hibernate가 연관관계를 lazy loading하면서 자동으로 추가 쿼리를 발생시키는 유형이 아니다.
+
+이 때문에 fetch join이나 EntityGraph는 직접적인 해결책이 아니다. fetch join은 JPQL에서 연관관계를 함께 로딩하는 방식인데, 현재는 join fetch할 `rankInfo.user` 연관관계가 존재하지 않는다.
+
+### 3.4 애플리케이션 레벨 N+1 판단
+
+실제 위험 지점은 랭킹 row를 순회하면서 유저를 명시적으로 단건 조회하는 코드다.
+
+```java
+for (UserRankInfo rank : ranks) {
+    User user = userReadService.findById(rank.getUserId());
+}
+```
+
+이 코드는 Hibernate가 lazy loading으로 자동 쿼리를 발생시키는 것이 아니라, 애플리케이션 코드가 반복문 안에서 `findById()`를 직접 호출하는 구조다.
+
+따라서 `limit=50`이면 유저 단건 조회가 50회 추가된다.
 
 ```text
-SQL 실행 횟수는 2회로 유지
-Top 랭킹 조회에서 정렬 정책과 인덱스 순서 일치
-filesort 감소 또는 제거
-데이터가 많을수록 actual time 차이가 커질 가능성
+랭킹 목록 조회 1회
++ user 단건 조회 N회
+= 1 + N
 ```
 
-## 측정 시 주의점
+이 기준으로 이번 문제는 **JPA 연관관계 N+1이 아니라 애플리케이션 레벨 N+1**로 분류한다.
 
-15,000명 데이터는 매칭 부하 테스트 기준과 맞기 때문에 기본 기준으로 사용한다. 다만 MySQL 인덱스 효과를 보여주기에는 데이터가 작을 수 있다. 따라서 포트폴리오 수치를 만들 때는 `15,000명`과 함께 `100,000명` 이상 데이터를 추가로 측정하는 것이 좋다.
+### 3.5 Hibernate Statistics 검증
 
-측정 시에는 다음 조건을 고정한다.
+유형 판별이 맞는지 확인하기 위해 Hibernate Statistics의 `prepareStatementCount`를 사용한다.
 
-```text
-동일한 데이터 건수
-동일한 LIMIT
-동일한 MySQL 서버 설정
-동일한 API 인스턴스 수
-동일한 JVM warm-up 이후 측정
-```
-
-API 응답 시간은 네트워크나 JVM 상태에 영향을 받을 수 있으므로, 인덱스 효과를 설명할 때는 `EXPLAIN ANALYZE` 결과를 핵심 근거로 사용한다. 반대로 N+1 제거 효과는 `Hibernate Statistics`의 SQL 실행 횟수와 API p95 응답 시간을 함께 사용한다.
-
-## 문제 원인
-
-애플리케이션 레벨 N+1 : `UserRankInfo`는 `User`를 JPA 연관관계로 참조하지 않고 `userId`만 보유한다. 따라서 랭킹 row마다 `UserReadService.findById()`를 호출하면 랭킹 목록 1회 조회 이후 유저 단건 조회가 N회 추가된다.
-
-정렬 조건 대비 부족한 인덱스 : 랭킹 목록은 `tier_score`, `lp`, `total_wins`, `total_losses`, `total_draws`, `user_id` 순서로 정렬된다. 하지만 기존 DDL에는 `(tier_score, lp)` 중심 인덱스만 존재하므로, 데이터가 증가하면 정렬 과정에서 `Using filesort`가 발생할 수 있다.
-
-실제 성장 데이터 기준 검증 필요 : 매칭 부하 테스트에서는 `50 TPS / 5분` 기준 총 `15,000명`의 매칭 진입 요청을 처리했다. 이 수치를 기본 데이터 규모로 삼되, 랭킹 테이블 성장 상황을 고려해 `100,000명` 이상의 데이터에서도 실행 계획을 비교할 필요가 있다.
-
-## 현재 구현
-
-랭킹 조회 흐름은 다음과 같다.
-
-```text
-1. RankReadService.findTopRankings(limit)로 랭킹 page 조회
-2. rank rows에서 userId 목록 추출
-3. UserReadService.findByIds(userIds)로 users batch 조회
-4. userId -> User map 생성
-5. ranking response 조립
-```
-
-쿼리 수 검증은 `UserRankInfoRepositoryTest`에서 Hibernate Statistics를 통해 확인한다.
+이미 repository 테스트에서 두 흐름을 비교한다.
 
 ```text
 row별 단건 조회: rank page 1 query + users N query = 1 + N
 batch 조회: rank page 1 query + users IN query 1회 = 1 + 1
 ```
 
-## EXPLAIN 검증 대상
-
-### 1. Top 랭킹 조회
-
-현재 repository 정렬 정책은 다음과 같다.
-
-```sql
-SELECT *
-FROM user_rank_info
-ORDER BY tier_score DESC,
-         lp DESC,
-         total_wins DESC,
-         total_losses ASC,
-         total_draws DESC,
-         user_id ASC
-LIMIT 50;
-```
-
-기존 인덱스는 다음과 같다.
-
-```sql
-INDEX idx_tier_score_lp (tier_score, lp)
-```
-
-개선 후보 인덱스는 실제 정렬 정책과 동일한 복합 인덱스다.
-
-```sql
-CREATE INDEX idx_rank_order
-ON user_rank_info (
-  tier_score DESC,
-  lp DESC,
-  total_wins DESC,
-  total_losses ASC,
-  total_draws DESC,
-  user_id ASC
-);
-```
-
-### 2. 유저 전적 최신순 조회
-
-현재 repository 조회는 다음과 같다.
+검증 방식:
 
 ```java
-findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable)
+Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+statistics.setStatisticsEnabled(true);
+statistics.clear();
+
+// ranking query + user lookup
+
+statistics.getPrepareStatementCount();
 ```
 
-기존 인덱스는 다음과 같다.
+이 검증을 통해 row별 단건 조회 baseline에서는 user 조회가 row 수만큼 증가하고, userId를 모아 `findByIds()`로 batch 조회하면 user 조회가 IN query 1회로 고정되는지 확인한다.
 
-```sql
-INDEX idx_user_id_created (user_id, created_at DESC)
+## 4. 개선 방식
+
+### 개선 전 Baseline
+
+측정용 baseline은 운영 로직을 망가뜨리지 않기 위해 별도 서비스로 분리했다.
+
+```text
+RankingBaselineService
+- 트러블슈팅 측정 전용
+- 랭킹 row마다 userReadService.findById() 호출
+- 의도적으로 애플리케이션 레벨 N+1 재현
 ```
 
-개선 후보는 정렬 조건의 마지막 tie-breaker인 `id DESC`까지 포함한 인덱스다.
+측정 endpoint:
 
-```sql
-CREATE INDEX idx_game_records_user_created_id
-ON game_records (user_id, created_at DESC, id DESC);
+```text
+GET /api/v1/rankings/baseline?limit=50
 ```
 
-### 3. 진행 중 게임 참여 여부 조회
+### 1차 개선: Batch 조회
 
-현재 조회는 `game_participants.user_id`로 참여 정보를 찾고, `game_rooms.status`를 확인하는 흐름이다. 기존 unique key는 `(game_room_id, user_id)` 순서라 `user_id` 선행 조회에 최적화되어 있지 않다.
+N+1 유형이 애플리케이션 레벨 반복 조회이므로 fetch join이 아니라 batch 조회를 선택한다.
 
-개선 후보는 다음과 같다.
-
-```sql
-CREATE INDEX idx_game_participants_user_room
-ON game_participants (user_id, game_room_id);
+```text
+1. rank page 조회
+2. rank rows에서 userId 목록 추출
+3. users where id in (...) 조회
+4. userId -> User map 생성
+5. ranking response 조립
 ```
 
-## 검증 절차
+측정 endpoint:
 
-### 1. 기존 인덱스 기준 측정
+```text
+GET /api/v1/rankings?limit=50
+```
 
-개선 인덱스가 없는 상태에서 먼저 실행 계획을 확인한다.
+쿼리 수 기대값:
+
+```text
+닉네임 조립 구간
+- 개선 전: users 단건 조회 N회
+- 1차 개선 후: users IN 조회 1회
+
+API 전체 기준
+- 개선 전 baseline: 약 55회
+- 1차 개선 후: 약 6회
+```
+
+### 2차 개선: 랭킹 정렬 인덱스
+
+N+1을 제거해도 Top 랭킹 목록을 가져오는 SQL 자체가 비효율적이면 응답 시간이 남을 수 있다. 따라서 랭킹 정렬 쿼리의 실행 계획을 `EXPLAIN ANALYZE`로 확인한다.
+
+랭킹 API의 조회 흐름은 다음과 같다.
+
+```text
+1. user_rank_info에서 상위 랭킹 row를 limit만큼 조회
+2. 조회된 rank row의 userId를 수집
+3. users 테이블에서 닉네임을 batch 조회
+4. rank row와 user nickname을 조립해 응답 생성
+```
+
+1차 개선으로 2~3번의 N+1은 제거했다. 하지만 1번의 Top 랭킹 조회는 여전히 `user_rank_info` 테이블의 정렬 성능에 의존한다.
+
+분석 대상 쿼리:
 
 ```sql
-SHOW INDEX FROM user_rank_info;
-
-DROP INDEX idx_rank_order ON user_rank_info;
-
-EXPLAIN ANALYZE
 SELECT *
 FROM user_rank_info
 ORDER BY tier_score DESC,
@@ -287,11 +208,29 @@ ORDER BY tier_score DESC,
 LIMIT 50;
 ```
 
-`idx_rank_order`가 아직 없다면 `DROP INDEX`는 생략한다.
+랭킹 정렬 정책은 다음 순서로 고정되어 있다.
 
-### 2. 개선 인덱스 추가 후 재측정
+| 정렬 컬럼 | 방향 | 이유 |
+| --- | --- | --- |
+| `tier_score` | DESC | 높은 티어 유저가 먼저 노출되어야 함 |
+| `lp` | DESC | 같은 티어에서는 LP가 높은 유저가 먼저 노출되어야 함 |
+| `total_wins` | DESC | 같은 티어/LP에서는 승리 수가 많은 유저 우선 |
+| `total_losses` | ASC | 패배 수가 적은 유저 우선 |
+| `total_draws` | DESC | 나머지 조건이 같을 때 무승부 수를 tie-breaker로 사용 |
+| `user_id` | ASC | 모든 조건이 같을 때 결과 순서를 안정적으로 고정 |
 
-같은 데이터, 같은 쿼리, 같은 `LIMIT` 조건으로 다시 측정한다.
+`user_rank_info` 테이블은 유저별 현재 랭크 상태를 1 row로 보관한다.
+
+```text
+users 1명당 user_rank_info 1 row
+랭킹 조회는 전체 랭커 중 상위 N명을 조회
+WHERE 조건 없이 ORDER BY + LIMIT 구조로 실행
+데이터가 늘수록 정렬 대상 row 수가 증가
+```
+
+따라서 `PRIMARY`나 `user_id` unique index만으로는 랭킹 정렬을 해결할 수 없다. `LIMIT 50`이 있어도 정렬 조건을 만족하는 인덱스가 없으면 DB는 랭킹 순서를 만들기 위해 Sort를 수행해야 한다.
+
+개선 후보 인덱스:
 
 ```sql
 CREATE INDEX idx_rank_order
@@ -303,7 +242,121 @@ ON user_rank_info (
   total_draws DESC,
   user_id ASC
 );
+```
 
+이 인덱스의 목적은 DB가 별도 정렬을 수행하지 않고, 인덱스 순서대로 상위 50개 row를 읽도록 유도하는 것이다.
+
+컬럼 순서를 정렬 정책과 동일하게 둔 이유는 다음과 같다.
+
+```text
+ORDER BY와 인덱스 컬럼 순서가 일치해야 MySQL이 인덱스 순서를 정렬 결과로 활용할 수 있다.
+Top-N 조회에서는 인덱스 순서대로 앞에서부터 읽고 LIMIT 50에서 멈출 수 있는 구조가 유리하다.
+마지막에 user_id를 포함해 동률 상황에서도 결과 순서를 안정적으로 고정한다.
+```
+
+즉 2차 개선은 N+1과는 다른 문제를 해결한다.
+
+```text
+1차 개선: SQL 실행 횟수 감소
+2차 개선: 남아 있는 Top 랭킹 SQL의 정렬 비용 감소
+```
+
+## 5. 측정 조건
+
+현재 측정 기준:
+
+```text
+데이터 규모: users 100,000건 / user_rank_info 100,000건
+limit: 50
+개선 전 인덱스: PRIMARY, uk_user_id
+랭킹 정렬 인덱스: 없음
+```
+
+인덱스 상태 기준:
+
+```text
+개선 전
+- PRIMARY
+- uk_user_id
+
+2차 개선 후
+- PRIMARY
+- uk_user_id
+- idx_rank_order
+```
+
+측정 항목:
+
+| 항목 | 측정 방법 | 목적 |
+| --- | --- | --- |
+| API 응답 시간 | `docs/load-test/ranking-api-repeat.js` 단일 VU 반복 호출 | E2E 응답 시간 비교 |
+| SQL 실행 횟수 | Hibernate Statistics `prepareStatementCount` | N+1 제거 효과 확인 |
+| 실제 실행 SQL | Hibernate SQL log 또는 MySQL general log | EXPLAIN 대상 쿼리와 실제 쿼리 일치 확인 |
+| 실행 계획 | `EXPLAIN ANALYZE` | Sort, scan, actual time 확인 |
+
+## 6. 단계별 비교표
+
+최종 결과는 아래 표를 채우는 방식으로 정리한다.
+
+| 단계 | 코드 상태 | 인덱스 상태 | 쿼리 수 | API p95 | 실행 계획 | Top 랭킹 SQL 시간 |
+| --- | --- | --- | ---: | ---: | --- | ---: |
+| 개선 전 | row별 `findById()` | `PRIMARY`, `uk_user_id` | 측정 예정 | 139.97ms | Sort + Limit | 약 31.6ms |
+| 1차 개선 | `findByIds()` batch 조회 | `PRIMARY`, `uk_user_id` | 측정 예정 | 82.67ms | Sort + Limit | 동일 조건 |
+| 2차 개선 | `findByIds()` batch 조회 | `idx_rank_order` 추가 | 측정 예정 | 49.61ms | Index Scan | 약 0.201ms |
+
+## 7. 개선 전 Baseline API 응답 시간
+
+개선 전 baseline endpoint를 단일 VU로 30회 반복 호출했다.
+
+```text
+GET /api/v1/rankings/baseline?limit=50
+```
+
+측정 조건:
+
+```text
+환경: 로컬 API 서버 + Docker MySQL
+데이터 규모: users 100,000건 / user_rank_info 100,000건
+인덱스 상태: PRIMARY, uk_user_id
+랭킹 정렬 인덱스: 없음
+코드 상태: RankingBaselineService 기준 row별 findById() 호출
+측정 도구: k6
+VUS: 1
+Iterations: 30
+Limit: 50
+실패율: 0.00%
+```
+
+반복 측정 결과:
+
+| 지표 | 값 |
+| --- | ---: |
+| avg | 125.17ms |
+| min | 117.94ms |
+| med | 122.89ms |
+| p90 | 130.78ms |
+| p95 | 139.97ms |
+| max | 152.36ms |
+| http_req_failed | 0.00% |
+
+아래 이미지는 같은 baseline endpoint를 단일 요청으로 호출했을 때의 참고 캡처다. 단일 요청에서는 총 응답 시간이 약 `351.97ms`로 관측됐지만, 대표 비교 지표는 30회 반복 측정 결과의 p95인 `139.97ms`를 사용한다.
+
+![개선 전 baseline 랭킹 API 응답 시간](./images/ranking-baseline-api-time.png)
+
+해석:
+
+```text
+1. 단일 VU 30회 반복 측정 기준 p95는 139.97ms다.
+2. 단일 요청 캡처에서는 351.97ms가 관측됐지만, 1회 측정값은 대표값으로 사용하지 않는다.
+3. k6 반복 측정에서 실패율은 0.00%로, baseline endpoint는 정상 응답했다.
+4. 현재 값은 로컬 환경 기준이므로 EC2 등 배포 환경에서는 동일 조건으로 별도 재측정이 필요하다.
+```
+
+## 8. 개선 전 EXPLAIN ANALYZE 결과
+
+개선 전 상태에서 Top 랭킹 쿼리를 분석했다.
+
+```sql
 EXPLAIN ANALYZE
 SELECT *
 FROM user_rank_info
@@ -316,46 +369,240 @@ ORDER BY tier_score DESC,
 LIMIT 50;
 ```
 
-### 3. 비교 지표
+측정 결과 일부:
 
-다음 항목을 before / after로 비교한다.
+```text
+-> Limit: 50 row(s)  (cost=10107 rows=50) (actual time=31.6..31.6 rows=50 loops=1)
+    -> Sort: user_rank_info.tier_score DESC,
+             user_rank_info.lp DESC,
+             user_rank_info.total_wins DESC,
+             user_rank_info.total_losses,
+             user_rank_info.total_draws DESC,
+             user_rank_info.user_id
+```
 
-| 항목 | 확인 이유 |
+해석:
+
+```text
+1. 최종 반환 row는 50개다.
+2. 하지만 랭킹 정렬 조건을 만족하는 인덱스가 없어 Sort 단계가 발생했다.
+3. LIMIT 50이 있어도 인덱스 순서대로 상위 50개만 바로 읽는 구조가 아니다.
+4. 100,000건 기준 최종 50개 반환까지 약 31.6ms가 소요됐다.
+```
+
+현재 확인된 핵심 문제:
+
+| 항목 | 개선 전 결과 |
 | --- | --- |
-| `key` | 어떤 인덱스를 사용하는지 확인 |
-| `rows` | 예상 스캔 row 수 확인 |
-| `Extra` | `Using filesort`, `Using temporary` 여부 확인 |
-| `actual time` | 실제 실행 시간 비교 |
-| `loops` | 반복 실행 여부 확인 |
-| `cost` | 옵티마이저 비용 비교 |
+| 조회 목적 | 상위 랭킹 50명 조회 |
+| 데이터 규모 | 100,000건 |
+| 랭킹 정렬 인덱스 | 없음 |
+| 실행 계획 핵심 | `Sort` 후 `Limit 50` |
+| 반환 row 수 | 50건 |
+| 실제 실행 시간 | 약 31.6ms |
+| 문제점 | 정렬 조건을 만족하는 복합 인덱스가 없어 Sort 비용 발생 |
 
-## 데이터 규모
+전체 `EXPLAIN ANALYZE` 결과에서 `Table scan on user_rank_info` 줄이 확인되면, 해당 내용을 추가해 스캔 row 수까지 기록한다.
 
-기본 기준은 매칭 부하 테스트와 맞춰 `15,000명`으로 둔다.
+## 9. 1차 개선 API 응답 시간
 
-다만 15,000건은 MySQL에서 full scan과 filesort도 빠르게 끝날 수 있어 인덱스 효과가 작게 보일 수 있다. 따라서 랭킹 테이블 성장 상황을 가정해 다음 규모도 함께 측정한다.
-
-```text
-15,000명: 실제 매칭 부하 테스트 기준
-100,000명: 랭킹 테이블 성장 상황 가정
-300,000명 이상: 인덱스 효과 확인용
-```
-
-포트폴리오에는 다음처럼 표현한다.
+1차 개선 endpoint를 단일 VU로 30회 반복 호출했다.
 
 ```text
-매칭 부하 테스트 기준인 15,000명 데이터를 기본으로 검증하고,
-랭킹 테이블 성장 상황을 가정해 100,000명 데이터에서도 EXPLAIN ANALYZE를 비교했다.
+GET /api/v1/rankings?limit=50
 ```
 
-## 기대 결과
+측정 조건:
 
-기존 `(tier_score, lp)` 인덱스만 사용할 경우, 전체 정렬 조건을 모두 만족하지 못해 추가 정렬 비용이 발생할 수 있다.
+```text
+환경: 로컬 API 서버 + Docker MySQL
+데이터 규모: users 100,000건 / user_rank_info 100,000건
+인덱스 상태: PRIMARY, uk_user_id
+랭킹 정렬 인덱스: 없음
+코드 상태: RankingService 기준 findByIds() batch 조회
+측정 도구: k6
+VUS: 1
+Iterations: 30
+Limit: 50
+실패율: 0.00%
+```
 
-개선 인덱스 `idx_rank_order`를 적용하면 Top-N 랭킹 조회에서 정렬 정책과 인덱스 순서가 일치하므로, `Using filesort`를 줄이고 상위 랭킹 row를 더 적은 비용으로 가져오는 것을 기대한다.
+반복 측정 결과:
 
-## 포트폴리오 요약
+| 지표 | 값 |
+| --- | ---: |
+| avg | 75.14ms |
+| min | 69.76ms |
+| med | 74.71ms |
+| p90 | 81.27ms |
+| p95 | 82.67ms |
+| max | 85.78ms |
+| http_req_failed | 0.00% |
 
-랭킹 조회 API에서 row별 유저 단건 조회로 발생할 수 있는 애플리케이션 레벨 N+1을 확인하고, rank page 조회 후 userId를 수집해 `users IN query`로 batch 조회하도록 개선했다. Hibernate Statistics 기반 테스트로 쿼리 수가 `1 + N`에서 `1 + 1`로 고정되는 것을 검증했다.
+개선 전 baseline과 비교하면 p95가 `139.97ms`에서 `82.67ms`로 감소했다.
 
-또한 랭킹 정렬 정책이 `tierScore`, `LP`, 승/패/무, `userId`까지 포함하는 복합 정렬이므로, 기존 `(tier_score, lp)` 인덱스와 정렬 정책 기반 복합 인덱스를 `EXPLAIN ANALYZE`로 비교해 `Using filesort`, 스캔 row 수, 실제 실행 시간을 검증하는 계획을 수립했다.
+```text
+139.97ms -> 82.67ms
+감소폭: 57.30ms
+개선율: 약 40.9%
+```
+
+해석:
+
+```text
+1. 인덱스 상태는 개선 전과 동일하게 PRIMARY, uk_user_id만 유지했다.
+2. 따라서 이번 개선의 주요 차이는 row별 findById() 반복 호출을 findByIds() batch 조회로 바꾼 점이다.
+3. Top 랭킹 SQL의 Sort 비용은 아직 남아 있지만, users 단건 조회 반복이 제거되면서 E2E 응답 시간이 감소했다.
+4. 다음 단계에서는 쿼리 수를 Hibernate Statistics로 확인하고, 이후 idx_rank_order를 추가해 Top 랭킹 SQL 자체의 실행 계획을 개선한다.
+```
+
+## 10. 다음 측정 항목
+
+## 10. 2차 개선: 인덱스 적용 후 실행 계획과 API 응답 시간
+
+2차 개선에서는 `user_rank_info`의 랭킹 정렬 정책과 동일한 복합 인덱스를 추가했다.
+
+```sql
+CREATE INDEX idx_rank_order
+ON user_rank_info (
+  tier_score DESC,
+  lp DESC,
+  total_wins DESC,
+  total_losses ASC,
+  total_draws DESC,
+  user_id ASC
+);
+```
+
+### EXPLAIN ANALYZE 결과
+
+인덱스 적용 후 동일한 Top 랭킹 쿼리를 다시 분석했다.
+
+```sql
+EXPLAIN ANALYZE
+SELECT *
+FROM user_rank_info
+ORDER BY tier_score DESC,
+         lp DESC,
+         total_wins DESC,
+         total_losses ASC,
+         total_draws DESC,
+         user_id ASC
+LIMIT 50;
+```
+
+결과:
+
+```text
+-> Limit: 50 row(s)  (cost=0.0708 rows=50) (actual time=0.196..0.201 rows=50 loops=1)
+    -> Index scan on user_rank_info using idx_rank_order
+       (cost=0.0708 rows=50) (actual time=0.195..0.198 rows=50 loops=1)
+```
+
+개선 전후 비교:
+
+| 항목 | 개선 전 | 2차 개선 후 |
+| --- | ---: | ---: |
+| 실행 계획 | Sort + Limit | Index Scan + Limit |
+| 사용 인덱스 | 없음 | `idx_rank_order` |
+| Top 랭킹 SQL actual time | 31.6ms | 0.201ms |
+| 개선 배율 | - | 약 157배 |
+| 실행 시간 감소율 | - | 약 99.36% |
+
+해석:
+
+```text
+1. 개선 전에는 정렬 조건을 만족하는 인덱스가 없어 Sort 후 상위 50개를 반환했다.
+2. 인덱스 적용 후에는 idx_rank_order를 사용한 Index Scan으로 실행 계획이 변경됐다.
+3. DB가 별도 정렬을 수행하지 않고 인덱스 순서대로 50개 row를 읽고 종료했다.
+4. Top 랭킹 SQL 단독 실행 시간은 약 31.6ms에서 0.201ms로 감소했다.
+```
+
+주의할 점은 이 수치가 API 전체 응답 시간이 아니라 Top 랭킹 SQL 단독 실행 시간이라는 점이다. API 전체에는 인증, 현재 유저 조회, 내 순위 계산, users batch 조회, JSON 직렬화 비용이 남아 있다.
+
+### API 반복 측정 결과
+
+인덱스 적용 후 optimized endpoint를 단일 VU로 30회 반복 호출했다.
+
+```text
+GET /api/v1/rankings?limit=50
+```
+
+측정 조건:
+
+```text
+환경: 로컬 API 서버 + Docker MySQL
+데이터 규모: users 100,000건 / user_rank_info 100,000건
+인덱스 상태: PRIMARY, uk_user_id, idx_rank_order
+코드 상태: RankingService 기준 findByIds() batch 조회
+측정 도구: k6
+VUS: 1
+Iterations: 30
+Limit: 50
+실패율: 0.00%
+```
+
+반복 측정 결과:
+
+| 지표 | 값 |
+| --- | ---: |
+| avg | 44.02ms |
+| min | 39.31ms |
+| med | 43.03ms |
+| p90 | 48.45ms |
+| p95 | 49.61ms |
+| max | 50.62ms |
+| http_req_failed | 0.00% |
+
+E2E API p95 비교:
+
+| 단계 | API p95 |
+| --- | ---: |
+| 개선 전 baseline | 139.97ms |
+| 1차 개선: N+1 제거 | 82.67ms |
+| 2차 개선: 인덱스 추가 | 49.61ms |
+
+개선 폭:
+
+```text
+개선 전 -> 1차 개선: 139.97ms -> 82.67ms, 약 40.9% 감소
+1차 개선 -> 2차 개선: 82.67ms -> 49.61ms, 약 40.0% 감소
+개선 전 -> 2차 개선: 139.97ms -> 49.61ms, 약 64.6% 감소
+```
+
+해석:
+
+```text
+1. 1차 개선으로 users 단건 조회 반복을 제거해 API p95가 139.97ms에서 82.67ms로 감소했다.
+2. 2차 개선으로 Top 랭킹 SQL의 Sort 비용을 제거해 API p95가 49.61ms까지 감소했다.
+3. SQL 단독 실행 시간은 약 157배 개선됐지만, API 전체 응답 시간은 다른 처리 비용도 포함하므로 p95 기준 약 64.6% 감소로 해석한다.
+```
+
+## 11. 다음 측정 항목
+
+아직 채워야 할 값:
+
+```text
+1. RankingBaselineService 기준 SQL 실행 횟수
+2. RankingService 기준 SQL 실행 횟수
+```
+
+API 응답 시간은 다음 스크립트로 측정한다.
+
+```bash
+MODE=baseline API_BASE_URL=http://localhost:8080 TOKEN=<access-token> ITERATIONS=30 k6 run docs/load-test/ranking-api-repeat.js
+MODE=optimized API_BASE_URL=http://localhost:8080 TOKEN=<access-token> ITERATIONS=30 k6 run docs/load-test/ranking-api-repeat.js
+```
+
+이 측정은 부하테스트가 아니라 단일 VU 반복 측정이다. 결과에서는 `http_req_duration`의 `avg`, `med`, `p(90)`, `p(95)`를 기록한다.
+
+측정 후 최종적으로 다음 문장 형태로 정리한다.
+
+```text
+랭킹 조회 API에서 닉네임 조립 방식에 따라 애플리케이션 레벨 N+1이 발생할 수 있음을 확인했다.
+측정용 baseline을 구성해 row별 user 단건 조회를 재현했고,
+Hibernate Statistics로 SQL 실행 횟수를 비교했다.
+
+1차 개선으로 userId를 수집해 users IN query로 batch 조회하도록 변경했고,
+2차 개선으로 랭킹 정렬 정책과 동일한 복합 인덱스를 추가해 Top 랭킹 SQL의 Sort 비용을 줄였다.
+```

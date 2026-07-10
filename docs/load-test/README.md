@@ -8,6 +8,7 @@
 | `join-queue-burst.js` | 정해진 인원을 짧은 시간에 순간 유입 | k6 |
 | `sse-notification-load.mjs` | SSE 연결 유지와 `match_found` 수신 검증 | Node |
 | `match-response-timeout-load.mjs` | 수락/거절/timeout 정책과 `match_response_*` 지표 검증 | Node |
+| `ranking-api-repeat.js` | 랭킹 API 단일 VU 반복 측정 | k6 |
 
 ## 실행 환경
 
@@ -58,6 +59,33 @@ TOTAL_USERS=5000 VUS=500 k6 run docs/load-test/join-queue-burst.js
 - 전체 대기 인원이 테스트 종료 후 1분 내 0에 수렴하는지
 - 초당 매칭 성사 수가 유입 TPS의 절반에 근접하는지
 - 스캔 소요 시간 p95/p99가 scheduler 주기를 침범하지 않는지
+
+## Ranking API Repeat
+
+랭킹 API의 N+1 제거 전후 E2E 응답 시간을 비교하기 위한 단일 VU 반복 측정입니다.
+부하테스트가 아니라 같은 요청을 여러 번 호출해 `avg`, `med`, `p(90)`, `p(95)`를 확인하는 용도입니다.
+
+```bash
+MODE=baseline API_BASE_URL=http://localhost:8080 TOKEN=<access-token> ITERATIONS=30 k6 run docs/load-test/ranking-api-repeat.js
+MODE=optimized API_BASE_URL=http://localhost:8080 TOKEN=<access-token> ITERATIONS=30 k6 run docs/load-test/ranking-api-repeat.js
+```
+
+기본값:
+
+| 옵션 | 기본값 | 설명 |
+| --- | ---: | --- |
+| `MODE` | `baseline` | `baseline`은 `/api/v1/rankings/baseline`, `optimized`는 `/api/v1/rankings` 호출 |
+| `API_BASE_URL` | `http://localhost:8080` | API 서버 주소 |
+| `TOKEN` | 선택 | Authorization Bearer token. 또는 스크립트의 `LOCAL_ACCESS_TOKEN`에 직접 입력 |
+| `LIMIT` | `50` | ranking limit |
+| `ITERATIONS` | `30` | 반복 호출 횟수 |
+| `VUS` | `1` | 기본은 단일 VU |
+
+확인 지표:
+
+- `http_req_duration`의 `avg`, `med`, `p(90)`, `p(95)`
+- `http_req_failed`가 0인지
+- baseline과 optimized의 p95 차이
 
 ## SSE Notification
 

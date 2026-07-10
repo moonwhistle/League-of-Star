@@ -8,6 +8,7 @@ import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.ranking.controller.response.RankingEntryResponse;
 import com.sang.leagueofstar.ranking.controller.response.RankingResponse;
 import com.sang.leagueofstar.ranking.controller.response.RankingSummaryResponse;
+import com.sang.leagueofstar.ranking.service.RankingBaselineService;
 import com.sang.leagueofstar.ranking.service.RankingService;
 import io.restassured.module.mockmvc.RestAssuredMockMvc;
 import org.junit.jupiter.api.AfterEach;
@@ -35,10 +36,12 @@ class RankingControllerTest {
     private static final Long USER_ID = 1L;
 
     private final RankingService rankingService = mock(RankingService.class);
+    private final RankingBaselineService rankingBaselineService = mock(RankingBaselineService.class);
 
     @BeforeEach
     void setUp() {
-        RestAssuredMockMvc.mockMvc(MockMvcBuilders.standaloneSetup(new RankingController(rankingService))
+        RestAssuredMockMvc.mockMvc(MockMvcBuilders.standaloneSetup(
+                        new RankingController(rankingService, rankingBaselineService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(authUserArgumentResolver())
                 .setValidator(validator())
@@ -76,6 +79,25 @@ class RankingControllerTest {
                 .body("currentUser.isCurrentUser", equalTo(true));
 
         verify(rankingService).getRankings(USER_ID, 5);
+    }
+
+    @Test
+    @DisplayName("baseline 랭킹 조회 요청을 baseline service에 위임한다")
+    void getBaselineRankings() {
+        // given
+        when(rankingBaselineService.getRankings(USER_ID, 50)).thenReturn(rankingResponse());
+
+        // when & then
+        RestAssuredMockMvc.given()
+                .header("Authorization", "Bearer access-token")
+                .queryParam("limit", 50)
+                .when()
+                .get(RankingPath.RANKING_BASE + "/baseline")
+                .then()
+                .statusCode(200)
+                .body("entries[0].nickname", equalTo("LegendaryStar"));
+
+        verify(rankingBaselineService).getRankings(USER_ID, 50);
     }
 
     @Test

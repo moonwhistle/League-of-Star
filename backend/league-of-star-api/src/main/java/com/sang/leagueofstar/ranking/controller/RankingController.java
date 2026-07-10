@@ -3,6 +3,7 @@ package com.sang.leagueofstar.ranking.controller;
 import com.sang.leagueofstar.common.path.ranking.RankingPath;
 import com.sang.leagueofstar.global.resolver.annotation.AuthUser;
 import com.sang.leagueofstar.ranking.controller.response.RankingResponse;
+import com.sang.leagueofstar.ranking.service.RankingBaselineService;
 import com.sang.leagueofstar.ranking.service.RankingService;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.constraints.Max;
@@ -28,6 +29,7 @@ public class RankingController {
     private static final int MAX_LIMIT = 50;
 
     private final RankingService rankingService;
+    private final RankingBaselineService rankingBaselineService;
 
     @GetMapping
     public ResponseEntity<RankingResponse> getRankings(
@@ -36,6 +38,15 @@ public class RankingController {
     ) {
         validateLimit(limit);
         return ResponseEntity.ok(rankingService.getRankings(userId, limit));
+    }
+
+    @GetMapping("/baseline")
+    public ResponseEntity<RankingResponse> getBaselineRankings(
+            @AuthUser Long userId,
+            @RequestParam(defaultValue = DEFAULT_LIMIT_VALUE) @Min(MIN_LIMIT) @Max(MAX_LIMIT) int limit
+    ) {
+        validateLimit(limit);
+        return ResponseEntity.ok(rankingBaselineService.getRankings(userId, limit));
     }
 
     private void validateLimit(int limit) {
