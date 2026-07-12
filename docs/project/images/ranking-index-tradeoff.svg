@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .panel { fill: #ffffff; stroke: #d9dee8; stroke-width: 1.4; }
+      .panel-strong { fill: #fffdf8; stroke: #e1b954; stroke-width: 2.2; }
+      .title { font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; font-size: 48px; font-weight: 800; fill: #18202f; }
+      .subtitle { font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; font-size: 24px; font-weight: 500; fill: #596274; }
+      .h2 { font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; font-size: 30px; font-weight: 800; fill: #18202f; }
+      .h3 { font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; font-size: 24px; font-weight: 800; fill: #18202f; }
+      .body { font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; font-size: 22px; font-weight: 500; fill: #333b49; }
+      .small { font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; font-size: 18px; font-weight: 500; fill: #667085; }
+      .tiny { font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; font-size: 16px; font-weight: 500; fill: #798293; }
+      .value { font-family: "Segoe UI", "Pretendard", sans-serif; font-size: 25px; font-weight: 800; fill: #111827; }
+      .good { fill: #14805e; }
+      .warn { fill: #a15c00; }
+      .muted-line { stroke: #e5e9f1; stroke-width: 1.2; }
+      .axis { stroke: #c7cedb; stroke-width: 1.4; }
+      .read-bar { fill: #3f7ee8; }
+      .write-bar { fill: #ef8b3a; }
+      .selected { fill: #f6b93b; }
+      .tag { font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; font-size: 18px; font-weight: 800; }
+      .tag-bg { fill: #18202f; }
+      .tag-text { fill: #ffffff; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1000"/>
+
+  <text class="title" x="80" y="92">랭킹 인덱스 선택 실험</text>
+  <text class="subtitle" x="80" y="132">100,000건 랭킹 데이터 기준, 조회 성능과 쓰기 비용을 함께 비교</text>
+
+  <rect class="panel-strong" x="1080" y="60" width="440" height="116" rx="14"/>
+  <text class="h3" x="1110" y="108">최종 선택: B</text>
+  <text class="body" x="1110" y="144">랭킹 정렬에 맞춘 단일 복합 인덱스</text>
+
+  <rect class="panel" x="80" y="210" width="690" height="650" rx="18"/>
+  <text class="h2" x="120" y="265">조회 성능</text>
+  <text class="small" x="120" y="297">EXPLAIN ANALYZE actual time, 낮을수록 좋음</text>
+
+  <line class="axis" x1="205" y1="760" x2="705" y2="760"/>
+  <line class="axis" x1="205" y1="340" x2="205" y2="760"/>
+  <text class="small" x="410" y="872">인덱스 구성</text>
+  <text class="small" transform="translate(110 585) rotate(-90)">조회 시간(ms)</text>
+  <line class="muted-line" x1="205" y1="638" x2="705" y2="638"/>
+  <line class="muted-line" x1="205" y1="516" x2="705" y2="516"/>
+  <line class="muted-line" x1="205" y1="394" x2="705" y2="394"/>
+  <text class="tiny" x="145" y="765">0ms</text>
+  <text class="tiny" x="130" y="643">10ms</text>
+  <text class="tiny" x="130" y="521">20ms</text>
+  <text class="tiny" x="130" y="399">30ms</text>
+
+  <rect class="read-bar" x="250" y="367" width="70" height="393" rx="8"/>
+  <text class="value" x="242" y="347">32.2</text>
+  <text class="small" x="262" y="800">A</text>
+  <text class="tiny" x="225" y="828">인덱스 없음</text>
+
+  <rect class="selected" x="370" y="758" width="70" height="2" rx="1"/>
+  <circle class="selected" cx="405" cy="758" r="7"/>
+  <text class="value good" x="367" y="732">0.119</text>
+  <text class="small" x="397" y="800">B</text>
+  <text class="tiny" x="340" y="828">정렬 인덱스</text>
+
+  <rect class="read-bar" x="490" y="379" width="70" height="381" rx="8"/>
+  <text class="value" x="482" y="359">31.2</text>
+  <text class="small" x="512" y="800">C</text>
+  <text class="tiny" x="445" y="828">후보 인덱스 2개</text>
+
+  <rect class="selected" x="610" y="759" width="70" height="1" rx="1"/>
+  <circle class="selected" cx="645" cy="759" r="7"/>
+  <text class="value good" x="607" y="732">0.116</text>
+  <text class="small" x="637" y="800">D</text>
+  <text class="tiny" x="590" y="828">후보 + 정렬</text>
+
+  <rect class="panel" x="830" y="210" width="690" height="650" rx="18"/>
+  <text class="h2" x="870" y="265">쓰기 비용</text>
+  <text class="small" x="870" y="297">10,000건 UPDATE elapsed time, 낮을수록 좋음</text>
+
+  <line class="axis" x1="955" y1="760" x2="1455" y2="760"/>
+  <line class="axis" x1="955" y1="340" x2="955" y2="760"/>
+  <text class="small" x="1160" y="872">인덱스 구성</text>
+  <text class="small" transform="translate(860 590) rotate(-90)">UPDATE 시간(ms)</text>
+  <line class="muted-line" x1="955" y1="653" x2="1455" y2="653"/>
+  <line class="muted-line" x1="955" y1="546" x2="1455" y2="546"/>
+  <line class="muted-line" x1="955" y1="439" x2="1455" y2="439"/>
+  <text class="tiny" x="895" y="765">0ms</text>
+  <text class="tiny" x="880" y="658">100</text>
+  <text class="tiny" x="880" y="551">200</text>
+  <text class="tiny" x="880" y="444">300</text>
+
+  <rect class="write-bar" x="1000" y="672" width="70" height="88" rx="8"/>
+  <text class="value" x="993" y="652">81.9</text>
+  <text class="small" x="1012" y="800">A</text>
+
+  <rect class="selected" x="1120" y="517" width="70" height="243" rx="8"/>
+  <text class="value warn" x="1104" y="497">226.9</text>
+  <text class="small" x="1132" y="800">B</text>
+
+  <rect class="write-bar" x="1240" y="549" width="70" height="211" rx="8"/>
+  <text class="value" x="1224" y="529">197.1</text>
+  <text class="small" x="1252" y="800">C</text>
+
+  <rect class="write-bar" x="1360" y="339" width="70" height="421" rx="8"/>
+  <text class="value" x="1344" y="319">393.7</text>
+  <text class="small" x="1372" y="800">D</text>
+
+  <rect class="panel" x="80" y="890" width="1440" height="70" rx="16"/>
+  <text class="body" x="120" y="934">B안은 조회 시간을 32.2ms → 0.119ms로 줄이면서, D안 대비 쓰기 비용을 약 42.4% 낮게 유지했다.</text>
+</svg>

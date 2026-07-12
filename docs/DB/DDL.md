@@ -252,7 +252,7 @@ CREATE TABLE social_accounts (
 | `tier` | VARCHAR(20) | NOT NULL | IRON ~ CHALLENGER |
 | `division` | VARCHAR(5) | NULLABLE | I ~ IV (Apex는 NULL) |
 | `lp` | INT | NOT NULL, DEFAULT 0 | 현재 LP |
-| `tier_score` | INT | NULLABLE | 매칭용 점수 1~28 (Apex는 NULL, 비정규화) |
+| `tier_score` | INT | NOT NULL, DEFAULT 1 | 랭킹 정렬/매칭용 점수 1~28 (비정규화) |
 | `total_wins` | INT | NOT NULL, DEFAULT 0 | 총 승리 수 |
 | `total_losses` | INT | NOT NULL, DEFAULT 0 | 총 패배 수 |
 | `total_draws` | INT | NOT NULL, DEFAULT 0 | 총 무승부 수 |
@@ -266,7 +266,7 @@ CREATE TABLE user_rank_info (
     tier              VARCHAR(20) NOT NULL DEFAULT 'IRON',
     division          VARCHAR(5)  NULL     DEFAULT 'IV',
     lp                INT         NOT NULL DEFAULT 0,
-    tier_score        INT         NULL     DEFAULT 1,
+    tier_score        INT         NOT NULL DEFAULT 1,
     total_wins        INT         NOT NULL DEFAULT 0,
     total_losses      INT         NOT NULL DEFAULT 0,
     total_draws       INT         NOT NULL DEFAULT 0,
@@ -274,15 +274,22 @@ CREATE TABLE user_rank_info (
     updated_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_user_id (user_id),
-    INDEX idx_tier_score_lp (tier_score, lp),
-    INDEX idx_tier_division_lp (tier, division, lp),
+    INDEX idx_rank_order (
+        tier_score DESC,
+        lp DESC,
+        total_wins DESC,
+        total_losses ASC,
+        total_draws DESC,
+        user_id ASC
+    ),
     CONSTRAINT fk_user_rank_info_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
 > **인덱스 설명**
-> - `idx_tier_score_lp`: 티어 점수 기반 매칭/랭크 조회용
-> - `idx_tier_division_lp`: 리더보드 정렬용
+> - `idx_rank_order`: 랭킹 API의 `ORDER BY tier_score DESC, lp DESC, total_wins DESC, total_losses ASC, total_draws DESC, user_id ASC LIMIT N` 조회 최적화용 복합 인덱스
+>
+> 랭킹 조회는 전체 `user_rank_info` 중 상위 N명을 가져오는 `ORDER BY + LIMIT` 구조입니다. 정렬 정책과 동일한 복합 인덱스를 사용하면 MySQL이 별도 Sort 없이 인덱스 순서대로 상위 row를 읽을 수 있습니다. A/B/C/D 인덱스 실험 결과, 기존 후보 인덱스들을 함께 유지하는 구성은 조회 성능 이득이 거의 없고 랭크 정산 시 UPDATE 비용만 증가해 `idx_rank_order` 단일 복합 인덱스를 최종 선택했습니다.
 >
 > 현재 애플리케이션의 매칭 진입 경로는 `UserRankInfo.getTierScore()`가 embedded `Rank`에서 계산한 값을 사용합니다. 일반 티어는 Iron IV(1) ~ Diamond I(28) 점수로 매칭되며, Apex LP 근접 매칭과 배치 유저의 Silver IV ~ Gold IV 구간 보정은 아직 별도 구현되지 않았습니다.
 
@@ -590,3 +597,4 @@ ZADD game:end:pending naturalDeathAtMillis gameRoomId
 | 2026-05-22 | `game:end:pending` score를 `naturalDeathAt = startAt + durationMs` 기준으로 수정하고 2000ms 입력 유예 제거 |
 | 2026-05-22 | Issue 50 기준 자연사 scheduler 정산 흐름, DB entity 변경 없음, `game_records` 실제 엔티티 컬럼명 정합성 반영 |
 | 2026-05-24 | Issue 52 기준 `game_records` 시리즈 표현을 `rank_series_id`, `series_type=RANK/PLACEMENT/PROMOTION`으로 정리하고 `promotion_series_id`, `is_promotion_game` 구조 제거 |
+| 2026-07-10 | 랭킹 조회 성능 검증 결과를 반영해 `user_rank_info` 인덱스를 `idx_rank_order` 단일 복합 인덱스로 정리 |

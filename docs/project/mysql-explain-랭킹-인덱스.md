@@ -300,9 +300,9 @@ limit: 50
 
 | 단계 | 코드 상태 | 인덱스 상태 | 쿼리 수 | API p95 | 실행 계획 | Top 랭킹 SQL 시간 |
 | --- | --- | --- | ---: | ---: | --- | ---: |
-| 개선 전 | row별 `findById()` | `PRIMARY`, `uk_user_id` | 측정 예정 | 139.97ms | Sort + Limit | 약 31.6ms |
-| 1차 개선 | `findByIds()` batch 조회 | `PRIMARY`, `uk_user_id` | 측정 예정 | 82.67ms | Sort + Limit | 동일 조건 |
-| 2차 개선 | `findByIds()` batch 조회 | `idx_rank_order` 추가 | 측정 예정 | 49.61ms | Index Scan | 약 0.201ms |
+| 개선 전 | row별 `findById()` | `PRIMARY`, `uk_user_id` | 약 55회 | 139.97ms | Sort + Limit | 약 31.6ms |
+| 1차 개선 | `findByIds()` batch 조회 | `PRIMARY`, `uk_user_id` | 약 6회 | 82.67ms | Sort + Limit | 동일 조건 |
+| 2차 개선 | `findByIds()` batch 조회 | `idx_rank_order` 추가 | 약 6회 | 49.61ms | Index Scan | 약 0.201ms |
 
 ## 7. 개선 전 Baseline API 응답 시간
 
@@ -453,10 +453,8 @@ Limit: 50
 1. 인덱스 상태는 개선 전과 동일하게 PRIMARY, uk_user_id만 유지했다.
 2. 따라서 이번 개선의 주요 차이는 row별 findById() 반복 호출을 findByIds() batch 조회로 바꾼 점이다.
 3. Top 랭킹 SQL의 Sort 비용은 아직 남아 있지만, users 단건 조회 반복이 제거되면서 E2E 응답 시간이 감소했다.
-4. 다음 단계에서는 쿼리 수를 Hibernate Statistics로 확인하고, 이후 idx_rank_order를 추가해 Top 랭킹 SQL 자체의 실행 계획을 개선한다.
+4. Hibernate Statistics로 쿼리 수 감소를 확인한 뒤, 이후 idx_rank_order를 추가해 Top 랭킹 SQL 자체의 실행 계획을 개선했다.
 ```
-
-## 10. 다음 측정 항목
 
 ## 10. 2차 개선: 인덱스 적용 후 실행 계획과 API 응답 시간
 
@@ -578,14 +576,61 @@ E2E API p95 비교:
 3. SQL 단독 실행 시간은 약 157배 개선됐지만, API 전체 응답 시간은 다른 처리 비용도 포함하므로 p95 기준 약 64.6% 감소로 해석한다.
 ```
 
-## 11. 다음 측정 항목
+## 11. 인덱스 선택 실험: 조회 성능과 쓰기 비용 비교
 
-아직 채워야 할 값:
+랭킹 조회 성능만 보면 정렬 조건을 모두 포함한 `idx_rank_order`를 추가하는 것이 가장 유리하다. 하지만 랭킹 정산 시 `lp`, `tier_score`, `total_wins` 같은 랭킹 컬럼이 갱신되므로, 인덱스를 많이 추가하면 쓰기 성능이 저하될 수 있다.
+
+따라서 다음 4가지 인덱스 구성을 비교했다.
 
 ```text
-1. RankingBaselineService 기준 SQL 실행 횟수
-2. RankingService 기준 SQL 실행 횟수
+A: PRIMARY, uk_user_id만 유지
+B: A + 랭킹 정렬 전용 인덱스(idx_rank_order)
+C: A + 기존 후보 인덱스 2개(idx_tier_score_lp, idx_tier_division_lp)
+D: C + 랭킹 정렬 전용 인덱스(idx_rank_order)
 ```
+
+### 측정 결과
+
+| 구성 | 인덱스 구성 | 조회 계획 | 조회 시간 | 10,000건 UPDATE |
+| --- | --- | --- | ---: | ---: |
+| A | 기본 인덱스만 유지 | Sort + Limit | 32.2ms | 81.855ms |
+| B | `idx_rank_order` | Index Scan + Limit | 0.119ms | 226.931ms |
+| C | 기존 후보 인덱스 2개 | Sort + Limit | 31.2ms | 197.142ms |
+| D | 기존 후보 인덱스 2개 + `idx_rank_order` | Index Scan + Limit | 0.116ms | 393.738ms |
+
+### 해석
+
+```text
+1. A는 인덱스 유지 비용이 가장 적어 쓰기는 가장 빠르지만, 랭킹 조회 시 Sort가 발생해 조회 성능이 낮다.
+2. B는 랭킹 정렬 조건과 동일한 복합 인덱스를 사용해 Sort를 제거했고, 조회 시간이 32.2ms에서 0.119ms로 감소했다.
+3. C의 기존 후보 인덱스는 랭킹 ORDER BY 전체 순서를 만족하지 못해 Sort가 그대로 발생했다.
+4. D는 조회 성능은 B와 거의 동일하지만, 유지해야 할 인덱스가 많아 10,000건 UPDATE 비용이 가장 컸다.
+```
+
+B와 D의 조회 시간은 각각 0.119ms, 0.116ms로 거의 차이가 없었다. 반면 쓰기 시간은 B가 226.931ms, D가 393.738ms로 D가 약 73.5% 더 느렸다.
+
+따라서 최종적으로는 기존 후보 인덱스를 모두 유지하지 않고, 실제 랭킹 조회 패턴에 직접 대응하는 `idx_rank_order`만 선택하는 것이 가장 합리적이라고 판단했다.
+
+포트폴리오 정리 문장:
+
+```text
+랭킹 조회는 ORDER BY + LIMIT 구조로 동작하므로 정렬 정책과 동일한 복합 인덱스를 설계했다.
+단순히 인덱스를 많이 추가하면 조회 성능은 유지되더라도 랭크 정산 시 쓰기 비용이 증가할 수 있어,
+A/B/C/D 실험으로 조회 성능과 UPDATE 비용을 함께 비교했다.
+그 결과 B안은 조회 시간을 32.2ms에서 0.119ms로 줄이면서도 D안 대비 쓰기 비용을 약 42.4% 낮게 유지해 최종 인덱스로 선택했다.
+```
+
+## 12. SQL 실행 횟수 검증
+
+Hibernate Statistics로 baseline과 개선 후 흐름의 SQL 실행 횟수를 비교했다.
+
+| 구분 | 닉네임 조립 방식 | SQL 실행 횟수 | 해석 |
+| --- | --- | ---: | --- |
+| 개선 전 baseline | 랭킹 row마다 `findById()` 단건 조회 | 약 55회 | limit=50 기준 users 단건 조회가 row 수만큼 반복됨 |
+| 1차 개선 후 | userId 수집 후 `findByIds()` batch 조회 | 약 6회 | users 조회가 IN query 1회로 고정됨 |
+| 2차 개선 후 | 1차 개선과 동일 | 약 6회 | 인덱스는 쿼리 수가 아니라 Top 랭킹 SQL의 Sort 비용을 줄임 |
+
+이 결과로 이번 N+1은 JPA 연관관계 lazy loading이 아니라, 반복문 안에서 user 단건 조회를 직접 호출한 애플리케이션 레벨 N+1임을 확인했다.
 
 API 응답 시간은 다음 스크립트로 측정한다.
 
@@ -596,12 +641,12 @@ MODE=optimized API_BASE_URL=http://localhost:8080 TOKEN=<access-token> ITERATION
 
 이 측정은 부하테스트가 아니라 단일 VU 반복 측정이다. 결과에서는 `http_req_duration`의 `avg`, `med`, `p(90)`, `p(95)`를 기록한다.
 
-측정 후 최종적으로 다음 문장 형태로 정리한다.
+최종적으로 다음 문장 형태로 정리한다.
 
 ```text
 랭킹 조회 API에서 닉네임 조립 방식에 따라 애플리케이션 레벨 N+1이 발생할 수 있음을 확인했다.
 측정용 baseline을 구성해 row별 user 단건 조회를 재현했고,
-Hibernate Statistics로 SQL 실행 횟수를 비교했다.
+Hibernate Statistics로 SQL 실행 횟수가 약 55회에서 약 6회로 감소함을 확인했다.
 
 1차 개선으로 userId를 수집해 users IN query로 batch 조회하도록 변경했고,
 2차 개선으로 랭킹 정렬 정책과 동일한 복합 인덱스를 추가해 Top 랭킹 SQL의 Sort 비용을 줄였다.

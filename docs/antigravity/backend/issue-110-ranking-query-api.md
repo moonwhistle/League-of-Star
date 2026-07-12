@@ -32,6 +32,7 @@ flowchart TD
 - 랭킹 row마다 `UserReadService.findById()`를 반복 호출하지 않는다.
 - 현재 구조의 N+1 위험은 JPA lazy loading이 아니라 row별 nickname 조회 반복에서 발생한다.
 - N+1 해결 방식은 학습/검증 과정을 문서화하고, 기본 구현은 rank page 조회 + users IN batch 조회로 진행한다.
+- 후속 성능 검증에서는 Hibernate Statistics로 SQL 실행 횟수를 비교하고, Top 랭킹 SQL은 `EXPLAIN ANALYZE`로 실행 계획을 확인한다.
 - 새 패키지를 추가하지 않는다.
 - 이번 작업은 사용자 요청 전까지 자동 커밋하지 않는다.
 
@@ -188,6 +189,8 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 - nickname batch 조회.
 - N+1 발생 지점과 해결 방식 문서화.
 - N+1 학습/실험 가이드 문서화.
+- Hibernate Statistics 기반 SQL 실행 횟수 비교 문서화.
+- Top 랭킹 SQL 정렬 인덱스 실험 문서화.
 - RestDocs 성공/실패 문서화.
 - controller/service/repository 테스트 구현.
 - `docs/last-구현.md` 2-4 정합성 반영.
@@ -262,6 +265,7 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 - [x] service unit test에서 row별 `UserReadService.findById()`를 호출하지 않는지 검증.
 - [x] service unit test에서 `UserReadService.findByIds()` batch 조회를 사용하는지 검증.
 - [x] service unit test에서 top entries와 currentUser를 올바르게 조립하는지 검증.
+- [x] Hibernate Statistics로 row별 user 단건 조회와 batch 조회의 SQL 실행 횟수 차이를 검증.
 - [x] repository query는 `@DataJpaTest`로 실제 데이터 기준 검증.
 - [x] rank 정렬 순서 검증.
 - [x] tie-breaker 검증.
@@ -287,6 +291,10 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 - [x] `./gradlew :league-of-star-api:test --tests '*Ranking*'` 검증.
 - [x] `./gradlew :league-of-star-api:test --tests '*UserController*'` 영향 검증.
 - [x] `./gradlew test` 검증.
+- [x] 랭킹 API 성능 검증 문서화.
+  - SQL 실행 횟수: 약 55회 -> 약 6회
+  - API p95: 139.97ms -> 82.67ms -> 49.61ms
+  - Top 랭킹 SQL: Sort + Limit -> `idx_rank_order` Index Scan + Limit
 
 ## Implementation Policy
 
@@ -302,6 +310,7 @@ topPercent = ceil(myRankPosition * 100 / totalRankers)
 - ToMany fetch join은 이번 API에 적용하지 않는다.
 - `default_batch_fetch_size`는 이미 100으로 설정되어 있으나, 이번 nickname 조회의 직접 해결책으로 취급하지 않는다.
 - rank row가 없을 때 자동 생성하지 않는다.
+- 랭킹 조회 성능 최적화 인덱스는 정렬 정책과 동일한 `idx_rank_order` 단일 복합 인덱스를 기준으로 한다.
 - 새 패키지를 추가하지 않는다.
 - 이번 작업은 사용자 요청 전까지 자동 커밋하지 않는다.
 
@@ -626,7 +635,8 @@ flowchart TD
     `UserRankInfo`는 `User`를 직접 참조하지 않고 `userId`만 갖고 있으므로 `join fetch r.user`와 EntityGraph를 사용할 수 없다. `default_batch_fetch_size`도 lazy association이 없으므로 직접 해결책이 아니다.
   - 이번 랭킹 API의 기본 해결책은 `findByIds / IN query` 방식임.
     rank page를 먼저 조회하고, 그 결과의 userId 목록으로 `UserReadService.findByIds()`를 호출해 nickname을 batch 조회한 뒤 Java에서 조립함.
-- 검증 결과는 구현 후 갱신함.
+- 성능 검증 결과, SQL 실행 횟수는 약 55회에서 약 6회로 감소했고 API p95는 139.97ms에서 49.61ms로 약 64.6% 감소함.
+- N+1 제거 이후 남은 Top 랭킹 SQL의 Sort 비용은 랭킹 정렬 정책과 동일한 `idx_rank_order` 복합 인덱스로 줄임.
 
 ## 📌 Related Issue
 

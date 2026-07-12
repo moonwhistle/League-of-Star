@@ -325,6 +325,13 @@ Backend:
   - `losses asc`
   - `draws desc`
   - `userId asc`
+- [x] Hibernate Statistics로 row별 단건 조회와 batch 조회의 SQL 실행 횟수를 비교한다.
+  - 개선 전 baseline: 약 55회
+  - batch 조회 적용 후: 약 6회
+- [x] Top 랭킹 SQL의 Sort 비용을 `EXPLAIN ANALYZE`로 확인한다.
+- [x] 랭킹 정렬 정책과 동일한 `idx_rank_order` 복합 인덱스를 최종 선택한다.
+- [x] A/B/C/D 인덱스 실험으로 조회 성능과 랭크 정산 UPDATE 비용을 함께 비교한다.
+  - B안(`idx_rank_order`)은 D안과 조회 성능이 유사하면서 쓰기 비용을 약 42.4% 낮게 유지한다.
 
 Policy:
 
