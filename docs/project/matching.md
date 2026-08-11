@@ -2,7 +2,7 @@
 
 이 문서는 League of Star의 매칭 시스템이 초기 구축(Stage 1)부터 대규모 확장(Stage 3)까지 어떻게 진화하는지 상세 기술 명세를 정의합니다.
 
-매칭 = 티어 큐 + FIFO 우선 + 대기 시간 기반 티어 확장 + Scheduler Batch 매칭 + 분산 락 + 원자적 제거
+매칭 = 단일 FIFO ZSET + Scheduler Batch Pairing + Redis Streams Consumer Group + PEL 복구
 ---
 
 ## 1. 개요 (Overview)
@@ -16,8 +16,11 @@
 ## 2. 공통 데이터 구조 (Common Data Structures)
 모든 확장 단계에서 동일한 Redis 구조를 사용하여 데이터 마이그레이션 없이 로직만 교체 가능하도록 설계합니다.
 
-- **매칭 대기열 (ZSET)**: `matching:queue:{tierScore}` (Member: userId, Score: entryTime)
-  - *특징*: 티어별 물리적 격리 및 진입 시간 기반의 **자연스러운 FIFO** 보장.
+- **매칭 대기열 (ZSET)**: `matching:queue` (Member: userId, Score: entryTime)
+  - *특징*: 전체 사용자를 진입 시간 기준으로 정렬해 **FIFO**를 보장합니다.
+- **매칭 작업 (STREAM)**: `matching:jobs`
+  - *특징*: Lua가 대기열 제거와 MatchJob 생성을 원자 처리합니다.
+  - `matching-workers` Consumer Group이 작업을 인스턴스별로 분배하고, ACK 전 작업은 PEL에서 관리합니다.
 - **유저 매칭 상태 (STRING)**: `match:status:{userId}`
   - *특징*: `MATCHING`, `FOUND`, `ACCEPTED`, `IN_GAME` 등 유저가 매칭/게임 플로우에 묶여 있는지 저장합니다.
   - gameRoom 생성 성공 이후에는 `IN_GAME`으로 전환하여 중복 큐 진입을 막습니다.
@@ -36,25 +39,14 @@
 
 ---
 
-## 3. 단계별 매칭 구현 방식 (Implementation Stages)
+## 3. 현재 매칭 구현 방식
 
-### [Stage 1] 글로벌 락 + 인메모리 일괄 처리 (현재)
-**규모**: 1,000~10,000 CCU 이벤트 피크 검증 | **특징**: 가장 단순하고 안정적
-1. **Fetch**: `matching:queue:*` 모든 키의 데이터를 메모리로 로드 (티어별 28개 큐).
-2. **Match**: 통합 리스트를 `entryTime` 순으로 정렬 후, 오래 기다린 유저부터 대기 시간에 따라 허용 티어 범위를 넓혀 짝을 찾음.
-3. **Write**: **Lua Script**를 사용하여 서로 다른 티어 큐에 있는 유저들을 원자적으로 제거.
-4. **Lock**: `lock:match:engine` 전역 락 사용. 고정 lease time 대신 Redisson watchdog으로 작업 중 락을 자동 연장.
-
-### [Stage 2] 티어 그룹별 분산 락 (과도기)
-**규모**: ~20,000 CCU | **특징**: 티어 구간별 독립적 병렬 처리
-1. **Partition**: 특정 티어 구간(예: 10~15점)만 담당하는 엔진 워커 배치.
-2. **Fetch**: 자기 담당 구역의 `matching:queue:{tierScore}` 키들만 감시.
-3. **Lock**: `matching:lock:GOLD` 등 티어 구간별 락 사용.
-
-### [Stage 3] 유저 단위 루아 스크립트 (최종)
-**규모**: 20,000+ CCU | **특징**: 글로벌 락 제거, 극강의 동시성
-1. **Trigger**: 매칭 엔진이 큐의 Head 유저를 타겟팅하여 루아 스크립트 즉시 실행.
-2. **Atomic**: 루아 내부에서 인접 큐를 조회하고 즉시 제거하여 락 없이 원자성 확보.
+1. **Join**: `matching:queue`에 userId를 member, entryTime을 score로 저장합니다.
+2. **Pairing**: 각 인스턴스의 50ms scheduler가 Lua로 FIFO 상위 100명을 최대 50개 MatchJob으로 전환합니다.
+3. **Atomic**: Lua 안에서 `XADD` 후 `ZREM`해 대기열 제거와 작업 생성을 원자 처리합니다.
+4. **Dispatch**: 각 인스턴스는 `XREADGROUP BLOCK COUNT 50`으로 서로 다른 작업을 가져옵니다.
+5. **Complete**: 세션과 timeout을 준비한 뒤 Lua로 사용자 상태 변경, `XACK`, `XDEL`을 처리합니다.
+6. **Recovery**: ACK되지 않은 PEL 작업은 idle 5초 후 `XAUTOCLAIM`으로 다른 consumer가 인계합니다.
 
 ---
 
@@ -65,33 +57,37 @@ sequenceDiagram
     participant User as 유저
     participant API as API Server
     participant Redis as Redis
-    participant Engine as MatchEngine
+    participant Producer as Pairing Producer
+    participant Consumer as MatchJob Consumer
 
     Note over User, Redis: [1. 진입] joinQueue API 호출 -> Redis 등록
     User->>API: 매칭 시작
     API->>Redis: 대기열/티켓 등록
 
-    Note over Redis, Engine: [2. 탐색] 단계별 방식(Stage 1~3)에 따라 짝짓기
-    loop Every 1 Second
-        Engine->>Redis: (Stage 1) 전체 로드 / (Stage 3) 루아 스크립트 실행
-        Engine->>Redis: 매칭 성공 시 데이터 삭제 및 세션 생성
+    Note over Redis, Producer: [2. 페어링] FIFO 사용자를 Stream 작업으로 전환
+    loop Every 50ms
+        Producer->>Redis: Lua(XADD MatchJobs + ZREM users)
     end
 
-    Note over User, Engine: [3. 알림] MatchFoundEvent 발행 -> SSE 전송
-    Engine->>API: 이벤트 발행
+    Note over Redis, Consumer: [3. 처리] Consumer Group 기반 분배
+    Consumer->>Redis: XREADGROUP BLOCK COUNT 50
+    Consumer->>Redis: 세션/timeout 준비 후 FOUND + XACK + XDEL
+
+    Note over User, Consumer: [4. 알림] MatchFoundEvent 발행 -> SSE 전송
+    Consumer->>API: 이벤트 발행
     API->>User: 수락 팝업 노출
 ```
 
 ---
 
-## 5. 단계별 비교 요약 (Summary Table)
+## 5. 구조 비교 요약
 
-| 항목 | Stage 1 (인메모리) | Stage 2 (티어별 분산) | Stage 3 (루아 스크립트) |
-| :--- | :--- | :--- | :--- |
-| **복잡도** | 매우 낮음 | 중간 | 높음 |
-| **Redis 통신** | 1~2회 (Batch) | 티어 그룹당 수회 | 유저당 1회 (Atomic) |
-| **동시성** | 낮음 (Global Lock) | 중간 (Group Lock) | 매우 높음 (No Lock) |
-| **추천 시점** | 초기 런칭 및 베타 | 유저 유입 급증 시 | 초대규모 글로벌 서비스 |
+| 항목 | 기존 직접 처리 | 현재 Redis Streams |
+| :--- | :--- | :--- |
+| **대기열 제거 이후 작업** | 애플리케이션 메모리에만 존재 | Stream에 저장 |
+| **멀티 인스턴스 분배** | Lua 선점 경쟁 | Consumer Group |
+| **장애 복구** | 제거 직후 종료 시 불가 | PEL + XAUTOCLAIM |
+| **전역 락** | 없음 | 없음 |
 
 ---
 
@@ -283,21 +279,21 @@ gameRoom 생성 성공
 
 ## 8. 확장 및 최적화 전략 (Scalability & Optimization)
 
-본 시스템은 초기 구축의 단순함과 미래의 확장성을 모두 고려한 **3단계 성장형 아키텍처**를 지향합니다.
+현재 단일 FIFO 정책은 Stream Consumer Group으로 수평 확장하며, 큐 크기나 정책이 복잡해질 때 파티션을 추가합니다.
 
 ### 8.1 매칭 아키텍처 확장 로드맵
 
-| 단계 | 방식 | 특징 | 적합 규모 |
+| 단계 | 방식 | 특징 | 적용 기준 |
 | :--- | :--- | :--- | :--- |
-| **Stage 1 (현재)** | **글로벌 락 + 인메모리 일괄 처리** | `matching:queue:*` 모든 키를 로드하여 자바 메모리에서 통합 매칭. | CCU 1,000 ~ 10,000 이벤트 피크 |
-| **Stage 2 (중간)** | **티어 그룹별 분산 락** | 특정 티어 범위(예: 골드 구간)만 담당하는 엔진 배치. 구간별 독립적 병렬 처리. | CCU 5,000 ~ 20,000 |
-| **Stage 3 (최종)** | **유저 단위 루아 스크립트** | 글로벌 락 제거. 루아 스크립트로 인접 큐를 즉시 조회하고 원자적으로 페어링. | CCU 20,000+ |
+| **현재** | **단일 FIFO + Stream Consumer Group** | 100명 pairing batch와 consumer별 작업 분배 | 전체 사용자 동일 정책 |
+| **확장 1** | **다중 Consumer** | 후처리 consumer 수를 늘려 Stream backlog 처리량 확장 | 후처리 lag 증가 시 |
+| **확장 2** | **큐/Stream 파티션** | 지역·게임 모드 등 독립 정책 단위로 producer와 consumer 분리 | 단일 Redis Lua 실행이 병목일 때 |
 
-### 8.2 Stage 1에서 Stage 3로의 진화 (Transition)
-- **전환 시점**: 동시 접속자가 늘어나 전체 큐 스캔 부하가 커지거나, 글로벌 락으로 인해 매칭 엔진의 처리 속도가 유저 유입 속도를 따라가지 못할 때 전환합니다.
-- **구현 변경**: 
-  - **Stage 1**: 모든 티어 큐 스캔 -> 자바 매칭 -> **다중 키 Lua Script** (원자적 제거)
-  - **Stage 3**: 타겟 유저 선정 -> **탐색형 Lua Script** (루아 내부에서 인접 큐 탐색 및 즉시 제거)
+### 8.2 확장 판단 기준
+
+- Consumer 처리량이 부족하면 Consumer Group의 consumer 수를 먼저 늘립니다.
+- pairing Lua 실행 시간이 50ms 주기를 지속해서 넘으면 게임 모드나 지역처럼 정책상 독립적인 단위로 큐를 분리합니다.
+- `XPENDING` 수와 idle 시간, waiting ZSET 크기, 전체 매칭 완료 시간을 함께 관찰합니다.
   - *핵심 포인트*: 데이터 구조(`matching:queue:{tier}`)가 동일하므로, 인프라 변경 없이 로직 코드만 교체하여 확장이 가능합니다.
 
 ### 8.3 Lua Script를 이용한 원자적 페어링 (Stage 1용)
