@@ -40,3 +40,6 @@ security.yml
 .env
 
 backend/league-of-star-infra-redis/src/main/resources/application-redis.yml
+
+# Generated matching load-test artifacts
+/docs/load-test/result/matching/

@@ -1,6 +1,10 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
+const preparedTokenData = __ENV.TOKENS_FILE
+  ? JSON.parse(open(__ENV.TOKENS_FILE))
+  : null;
+
 export const totalUsers = Number(__ENV.TOTAL_USERS || 5000);
 export const vus = Number(__ENV.VUS || 100);
 export const batchSize = Number(__ENV.SETUP_BATCH_SIZE || 250);
@@ -15,6 +19,16 @@ const password = __ENV.TEST_PASSWORD || 'loadtest123';
 const nicknamePrefix = buildNicknamePrefix(userNamespace);
 
 export function prepareUsers(count) {
+  if (preparedTokenData) {
+    const preparedTokens = Array.isArray(preparedTokenData)
+      ? preparedTokenData
+      : preparedTokenData.tokens;
+    if (!Array.isArray(preparedTokens) || preparedTokens.length < count) {
+      throw new Error(`TOKENS_FILE has ${preparedTokens?.length || 0} tokens; ${count} required`);
+    }
+    return { tokens: preparedTokens.slice(0, count) };
+  }
+
   const tokens = [];
 
   for (let start = 0; start < count; start += batchSize) {
@@ -140,6 +154,7 @@ export function durationToSeconds(value) {
 export function joinQueueThresholds() {
   return {
     'http_req_failed{endpoint:joinQueue}': ['rate<0.01'],
+    'http_req_duration{endpoint:joinQueue}': ['p(95)<300'],
   };
 }
 
