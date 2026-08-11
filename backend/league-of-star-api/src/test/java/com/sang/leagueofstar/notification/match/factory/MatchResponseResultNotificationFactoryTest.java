@@ -35,12 +35,10 @@ class MatchResponseResultNotificationFactoryTest {
     @DisplayName("거절한 유저와 수락한 상대에게 유저 관점별 match_response_result 메시지를 생성한다")
     void createRejectAndAcceptResult() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                13,
-                MatchStatus.DECLINED,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.DECLINED,
                 MatchResponseStatus.REJECTED,
                 MatchResponseStatus.ACCEPTED
         );
@@ -69,12 +67,10 @@ class MatchResponseResultNotificationFactoryTest {
     @DisplayName("양쪽 수락 최종 결과는 게임 대기 화면 이동 메시지로 생성한다")
     void createBothAcceptedResult() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                13,
-                MatchStatus.ACCEPTED,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED,
                 new MatchResponseResultEvent.Game(
@@ -102,15 +98,13 @@ class MatchResponseResultNotificationFactoryTest {
     }
 
     @Test
-    @DisplayName("상대가 배치 진행 중이면 실제 rank 대신 Unranked와 매칭용 tierScore를 표시한다")
+    @DisplayName("상대가 배치 진행 중이면 Unranked로 표시한다")
     void createResultWithPlacementOpponentProfile() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                12,
-                9,
-                MatchStatus.ACCEPTED,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED
         );
@@ -122,19 +116,17 @@ class MatchResponseResultNotificationFactoryTest {
 
         assertThat(userAMessage.notification().opponent().nickname()).isEqualTo("placement");
         assertThat(userAMessage.notification().opponent().tier()).isEqualTo("Unranked");
-        assertThat(userAMessage.notification().opponent().tierScore()).isEqualTo(9);
+        assertThat(userAMessage.notification().opponent().tierScore()).isZero();
     }
 
     @Test
     @DisplayName("수락 유저와 timeout 유저에게 유저 관점별 실패 메시지를 생성한다")
     void createAcceptAndTimeoutResult() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                13,
-                MatchStatus.TIMEOUT,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.TIMEOUT,
                 MatchResponseStatus.ACCEPTED,
                 MatchResponseStatus.TIMEOUT
         );
@@ -157,12 +149,10 @@ class MatchResponseResultNotificationFactoryTest {
     @DisplayName("거절 유저와 timeout 유저에게 유저 관점별 실패 메시지를 생성한다")
     void createRejectAndTimeoutResult() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                13,
-                MatchStatus.TIMEOUT,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.TIMEOUT,
                 MatchResponseStatus.REJECTED,
                 MatchResponseStatus.TIMEOUT
         );
@@ -185,12 +175,10 @@ class MatchResponseResultNotificationFactoryTest {
     @DisplayName("양쪽 timeout 최종 결과는 양쪽 모두 start 화면 복귀 메시지로 생성한다")
     void createBothTimeoutResult() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                13,
-                MatchStatus.TIMEOUT,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.TIMEOUT,
                 MatchResponseStatus.TIMEOUT,
                 MatchResponseStatus.TIMEOUT
         );
@@ -213,12 +201,10 @@ class MatchResponseResultNotificationFactoryTest {
     @DisplayName("게임 준비 실패 결과는 양쪽 모두 start 화면 복귀 메시지로 생성한다")
     void createGameSetupFailedResult() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                13,
-                MatchStatus.GAME_SETUP_FAILED,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.GAME_SETUP_FAILED,
                 MatchResponseStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED
         );

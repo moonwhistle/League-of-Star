@@ -28,13 +28,16 @@ public class MatchQueueCommandService {
      * 매칭 대기열에 진입합니다.
      *
      * @param userId    유저 ID
-     * @param tierScore 유저의 티어 점수
      */
-    public void joinQueue(Long userId, int tierScore) {
-        log.info("Attempting to join queue: userId={}, tierScore={}", userId, tierScore);
+    public void joinQueue(Long userId) {
+        log.info("Attempting to join queue: userId={}", userId);
 
         // 1. 상태를 MATCHING으로 설정 시도 (원자적)
-        boolean success = userStatusStore.setStatusIfAbsent(userId, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
+        boolean success = userStatusStore.setStatusIfAbsent(
+                userId,
+                MatchStatus.MATCHING,
+                MatchingConstants.STATUS_TTL_SECONDS
+        );
         if (!success) {
             log.warn("User already in queue or game: userId={}", userId);
             throw new MatchingException(MatchingErrorCode.ALREADY_IN_QUEUE);
@@ -42,10 +45,10 @@ public class MatchQueueCommandService {
 
         // 2. 대기열 추가
         try {
-            MatchTicket ticket = new MatchTicket(userId, tierScore, System.currentTimeMillis());
+            MatchTicket ticket = new MatchTicket(userId, System.currentTimeMillis());
             matchStore.add(ticket);
             log.info("Successfully joined queue: userId={}", userId);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             // 실패 시 상태 롤백
             userStatusStore.removeStatus(userId);
             throw new MatchingException(MatchingErrorCode.MATCH_QUEUE_ADD_ERROR, e);
@@ -56,10 +59,9 @@ public class MatchQueueCommandService {
      * 매칭 대기열에서 나갑니다 (취소).
      *
      * @param userId    유저 ID
-     * @param tierScore 유저의 티어 점수
      */
-    public void leaveQueue(Long userId, int tierScore) {
-        log.info("Attempting to leave queue: userId={}, tierScore={}", userId, tierScore);
+    public void leaveQueue(Long userId) {
+        log.info("Attempting to leave queue: userId={}", userId);
 
         // 1. 현재 상태 확인
         Optional<MatchStatus> currentStatus = userStatusStore.getStatus(userId);
@@ -69,7 +71,7 @@ public class MatchQueueCommandService {
         }
 
         // 2. 대기열 제거 및 결과 확인
-        boolean removedFromQueue = matchStore.remove(userId, tierScore);
+        boolean removedFromQueue = matchStore.remove(userId);
 
         // 3. 큐에서 성공적으로 제거된 경우에만 상태 초기화
         // 만약 false라면 매칭 엔진이 이미 이 유저를 큐에서 꺼내간 상태이므로 상태를 건드리면 안 됨

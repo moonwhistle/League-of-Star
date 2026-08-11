@@ -346,10 +346,10 @@ public class MatchResponseResultService {
     }
 
     /**
-     * 기존 진입 시각과 티어 점수를 유지해 수락 유저를 매칭 큐에 다시 넣습니다.
+     * 기존 진입 시각을 유지해 수락 유저를 FIFO 매칭 큐에 다시 넣습니다.
      */
     private void returnAcceptedUserToQueue(MatchSession session, Long userId) {
-        MatchTicket ticket = new MatchTicket(userId, session.tierScoreOf(userId), session.entryTimeOf(userId));
+        MatchTicket ticket = new MatchTicket(userId, session.entryTimeOf(userId));
         matchQueueStore.add(ticket);
         userStatusStore.updateStatus(userId, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
     }

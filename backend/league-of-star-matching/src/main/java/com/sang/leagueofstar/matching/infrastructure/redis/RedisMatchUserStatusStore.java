@@ -6,6 +6,7 @@ import com.sang.leagueofstar.matching.repository.MatchUserStatusStore;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
@@ -23,28 +24,28 @@ public class RedisMatchUserStatusStore implements MatchUserStatusStore {
     @Override
     public boolean setStatusIfAbsent(Long userId, MatchStatus status, long ttlSeconds) {
         String key = getStatusKey(userId);
-        RBucket<MatchStatus> bucket = redissonClient.getBucket(key);
-        return bucket.setIfAbsent(status, Duration.ofSeconds(ttlSeconds));
+        RBucket<String> bucket = redissonClient.getBucket(key, StringCodec.INSTANCE);
+        return bucket.setIfAbsent(status.name(), Duration.ofSeconds(ttlSeconds));
     }
 
     @Override
     public Optional<MatchStatus> getStatus(Long userId) {
         String key = getStatusKey(userId);
-        RBucket<MatchStatus> bucket = redissonClient.getBucket(key);
-        return Optional.ofNullable(bucket.get());
+        RBucket<String> bucket = redissonClient.getBucket(key, StringCodec.INSTANCE);
+        return Optional.ofNullable(bucket.get()).map(MatchStatus::valueOf);
     }
 
     @Override
     public void updateStatus(Long userId, MatchStatus status, long ttlSeconds) {
         String key = getStatusKey(userId);
-        RBucket<MatchStatus> bucket = redissonClient.getBucket(key);
-        bucket.set(status, Duration.ofSeconds(ttlSeconds));
+        RBucket<String> bucket = redissonClient.getBucket(key, StringCodec.INSTANCE);
+        bucket.set(status.name(), Duration.ofSeconds(ttlSeconds));
     }
 
     @Override
     public void removeStatus(Long userId) {
         String key = getStatusKey(userId);
-        RBucket<MatchStatus> bucket = redissonClient.getBucket(key);
+        RBucket<String> bucket = redissonClient.getBucket(key, StringCodec.INSTANCE);
         bucket.delete();
     }
 

@@ -7,8 +7,6 @@ public record MatchSession(
         String matchId,
         Long userA,
         Long userB,
-        int userATierScore,
-        int userBTierScore,
         long userAEntryTime,
         long userBEntryTime,
         MatchStatus status,
@@ -20,8 +18,6 @@ public record MatchSession(
             String matchId,
             Long userA,
             Long userB,
-            int userATierScore,
-            int userBTierScore,
             long userAEntryTime,
             long userBEntryTime
     ) {
@@ -29,8 +25,6 @@ public record MatchSession(
                 matchId,
                 userA,
                 userB,
-                userATierScore,
-                userBTierScore,
                 userAEntryTime,
                 userBEntryTime,
                 MatchStatus.FOUND,
@@ -71,16 +65,6 @@ public record MatchSession(
         return isRespondedBy(userA) && isRespondedBy(userB);
     }
 
-    public int tierScoreOf(Long userId) {
-        if (isUserA(userId)) {
-            return userATierScore;
-        }
-        if (isUserB(userId)) {
-            return userBTierScore;
-        }
-        throw new IllegalArgumentException("매칭 세션 참여자가 아닙니다.");
-    }
-
     public long entryTimeOf(Long userId) {
         if (isUserA(userId)) {
             return userAEntryTime;
@@ -115,11 +99,11 @@ public record MatchSession(
 
     public MatchSession accept(Long userId) {
         if (isUserA(userId)) {
-            return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+            return new MatchSession(matchId, userA, userB, userAEntryTime,
                     userBEntryTime, status, createdAt, MatchResponseStatus.ACCEPTED, userBStatus);
         }
         if (isUserB(userId)) {
-            return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+            return new MatchSession(matchId, userA, userB, userAEntryTime,
                     userBEntryTime, status, createdAt, userAStatus, MatchResponseStatus.ACCEPTED);
         }
         throw new IllegalArgumentException("매칭 세션 참여자가 아닙니다.");
@@ -127,11 +111,11 @@ public record MatchSession(
 
     public MatchSession reject(Long userId) {
         if (isUserA(userId)) {
-            return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+            return new MatchSession(matchId, userA, userB, userAEntryTime,
                     userBEntryTime, status, createdAt, MatchResponseStatus.REJECTED, userBStatus);
         }
         if (isUserB(userId)) {
-            return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+            return new MatchSession(matchId, userA, userB, userAEntryTime,
                     userBEntryTime, status, createdAt, userAStatus, MatchResponseStatus.REJECTED);
         }
         throw new IllegalArgumentException("매칭 세션 참여자가 아닙니다.");
@@ -144,12 +128,12 @@ public record MatchSession(
         MatchResponseStatus nextUserBStatus = userBStatus == MatchResponseStatus.PENDING
                 ? MatchResponseStatus.TIMEOUT
                 : userBStatus;
-        return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+        return new MatchSession(matchId, userA, userB, userAEntryTime,
                 userBEntryTime, status, createdAt, nextUserAStatus, nextUserBStatus);
     }
 
     public MatchSession withStatus(MatchStatus status) {
-        return new MatchSession(matchId, userA, userB, userATierScore, userBTierScore, userAEntryTime,
+        return new MatchSession(matchId, userA, userB, userAEntryTime,
                 userBEntryTime, status, createdAt, userAStatus, userBStatus);
     }
 }

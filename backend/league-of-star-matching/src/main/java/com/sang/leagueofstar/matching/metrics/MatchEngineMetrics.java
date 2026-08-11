@@ -48,16 +48,12 @@ public class MatchEngineMetrics {
         meterRegistry.counter(MatchQueueMetrics.ENGINE_PAIRS).increment();
     }
 
-    public void incrementAtomicPairAttempts() {
-        meterRegistry.counter(MatchQueueMetrics.ENGINE_ATOMIC_PAIR_ATTEMPTS).increment();
+    public void incrementAtomicBatchAttempts() {
+        meterRegistry.counter(MatchQueueMetrics.ENGINE_ATOMIC_BATCH_ATTEMPTS).increment();
     }
 
-    public void incrementAtomicPairFailures() {
-        meterRegistry.counter(MatchQueueMetrics.ENGINE_ATOMIC_PAIR_FAILURES).increment();
-    }
-
-    public void incrementLockSkipped() {
-        meterRegistry.counter(MatchQueueMetrics.ENGINE_LOCK_SKIPPED).increment();
+    public void incrementAtomicBatchFailures() {
+        meterRegistry.counter(MatchQueueMetrics.ENGINE_ATOMIC_BATCH_FAILURES).increment();
     }
 
     public void recordMatchedUserWait(long waitMillis) {
@@ -65,5 +61,9 @@ public class MatchEngineMetrics {
                 .publishPercentileHistogram()
                 .register(meterRegistry)
                 .record(Duration.ofMillis(waitMillis));
+    }
+
+    public void incrementRecoveredClaims(int count) {
+        meterRegistry.counter(MatchQueueMetrics.ENGINE_RECOVERED_CLAIMS).increment(count);
     }
 }

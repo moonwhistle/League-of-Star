@@ -23,23 +23,21 @@ public class MatchResponseResultNotificationFactory {
 
     public MatchResponseResultPubSubMessage createForUserA(MatchResponseResultEvent event) {
         return create(
-                event.userA(),
-                event.userB(),
-                event.userAStatus(),
-                event.userBStatus(),
-                event.userBTierScore(),
-                event
+                 event.userA(),
+                 event.userB(),
+                 event.userAStatus(),
+                 event.userBStatus(),
+                 event
         );
     }
 
     public MatchResponseResultPubSubMessage createForUserB(MatchResponseResultEvent event) {
         return create(
-                event.userB(),
-                event.userA(),
-                event.userBStatus(),
-                event.userAStatus(),
-                event.userATierScore(),
-                event
+                 event.userB(),
+                 event.userA(),
+                 event.userBStatus(),
+                 event.userAStatus(),
+                 event
         );
     }
 
@@ -48,7 +46,6 @@ public class MatchResponseResultNotificationFactory {
             Long opponentUserId,
             MatchResponseStatus myStatus,
             MatchResponseStatus opponentStatus,
-            int opponentTierScore,
             MatchResponseResultEvent event
     ) {
         MatchResponseResultNotification notification = new MatchResponseResultNotification(
@@ -56,7 +53,7 @@ public class MatchResponseResultNotificationFactory {
                 outcomeOf(event.sessionStatus()),
                 reasonOf(myStatus, opponentStatus, event.sessionStatus()),
                 actionOf(myStatus, opponentStatus, event.sessionStatus()),
-                opponentProfileProvider.getOpponent(opponentUserId, opponentTierScore),
+                opponentProfileProvider.getOpponent(opponentUserId),
                 gameOf(event)
         );
         return new MatchResponseResultPubSubMessage(targetUserId, notification);

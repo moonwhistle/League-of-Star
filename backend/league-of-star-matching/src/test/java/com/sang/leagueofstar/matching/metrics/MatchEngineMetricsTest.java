@@ -64,21 +64,21 @@ class MatchEngineMetricsTest {
     }
 
     @Test
-    @DisplayName("atomic_pair.attempts Counter가 의도한 이름으로 증가한다")
-    void incrementAtomicPairAttempts() {
-        metrics.incrementAtomicPairAttempts();
+    @DisplayName("atomic_batch.attempts Counter가 의도한 이름으로 증가한다")
+    void incrementAtomicBatchAttempts() {
+        metrics.incrementAtomicBatchAttempts();
 
-        assertThat(meterRegistry.find(MatchQueueMetrics.ENGINE_ATOMIC_PAIR_ATTEMPTS).counter()).isNotNull();
-        assertThat(Objects.requireNonNull(meterRegistry.find(MatchQueueMetrics.ENGINE_ATOMIC_PAIR_ATTEMPTS).counter()).count()).isEqualTo(1.0);
+        assertThat(meterRegistry.find(MatchQueueMetrics.ENGINE_ATOMIC_BATCH_ATTEMPTS).counter()).isNotNull();
+        assertThat(Objects.requireNonNull(meterRegistry.find(MatchQueueMetrics.ENGINE_ATOMIC_BATCH_ATTEMPTS).counter()).count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("atomic_pair.failures Counter가 의도한 이름으로 증가한다")
-    void incrementAtomicPairFailures() {
-        metrics.incrementAtomicPairFailures();
+    @DisplayName("atomic_batch.failures Counter가 의도한 이름으로 증가한다")
+    void incrementAtomicBatchFailures() {
+        metrics.incrementAtomicBatchFailures();
 
-        assertThat(meterRegistry.find(MatchQueueMetrics.ENGINE_ATOMIC_PAIR_FAILURES).counter()).isNotNull();
-        assertThat(Objects.requireNonNull(meterRegistry.find(MatchQueueMetrics.ENGINE_ATOMIC_PAIR_FAILURES).counter()).count()).isEqualTo(1.0);
+        assertThat(meterRegistry.find(MatchQueueMetrics.ENGINE_ATOMIC_BATCH_FAILURES).counter()).isNotNull();
+        assertThat(Objects.requireNonNull(meterRegistry.find(MatchQueueMetrics.ENGINE_ATOMIC_BATCH_FAILURES).counter()).count()).isEqualTo(1.0);
     }
 
     @Test
@@ -93,11 +93,14 @@ class MatchEngineMetricsTest {
     }
 
     @Test
-    @DisplayName("lock.skipped Counter가 의도한 이름으로 증가한다")
-    void incrementLockSkipped() {
-        metrics.incrementLockSkipped();
+    @DisplayName("recovered_claims Counter에 복구한 claim 수를 기록한다")
+    void incrementRecoveredClaims() {
+        metrics.incrementRecoveredClaims(3);
 
-        assertThat(meterRegistry.find(MatchQueueMetrics.ENGINE_LOCK_SKIPPED).counter()).isNotNull();
-        assertThat(Objects.requireNonNull(meterRegistry.find(MatchQueueMetrics.ENGINE_LOCK_SKIPPED).counter()).count()).isEqualTo(1.0);
+        assertThat(meterRegistry.find(MatchQueueMetrics.ENGINE_RECOVERED_CLAIMS).counter()).isNotNull();
+        assertThat(Objects.requireNonNull(
+                meterRegistry.find(MatchQueueMetrics.ENGINE_RECOVERED_CLAIMS).counter()
+        ).count()).isEqualTo(3.0);
     }
+
 }

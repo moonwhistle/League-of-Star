@@ -14,6 +14,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: league_of_star1234
       SPRING_DATA_REDIS_HOST: league-of-star-redis
       SPRING_DATA_REDIS_PORT: 6379
+      MATCHING_STREAM_CONSUMER_NAME: api-1
     networks:
       - league-of-star-local
 
@@ -32,6 +33,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: league_of_star1234
       SPRING_DATA_REDIS_HOST: league-of-star-redis
       SPRING_DATA_REDIS_PORT: 6379
+      MATCHING_STREAM_CONSUMER_NAME: api-2
     networks:
       - league-of-star-local
 

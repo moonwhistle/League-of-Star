@@ -28,8 +28,6 @@ public class RedisMatchSessionStore implements MatchSessionStore {
     private static final String FIELD_MATCH_ID = "matchId";
     private static final String FIELD_USER_A = "userA";
     private static final String FIELD_USER_B = "userB";
-    private static final String FIELD_USER_A_TIER_SCORE = "userATierScore";
-    private static final String FIELD_USER_B_TIER_SCORE = "userBTierScore";
     private static final String FIELD_USER_A_ENTRY_TIME = "userAEntryTime";
     private static final String FIELD_USER_B_ENTRY_TIME = "userBEntryTime";
     private static final String FIELD_STATUS = "status";
@@ -60,8 +58,6 @@ public class RedisMatchSessionStore implements MatchSessionStore {
                 fields.get(FIELD_MATCH_ID),
                 Long.valueOf(fields.get(FIELD_USER_A)),
                 Long.valueOf(fields.get(FIELD_USER_B)),
-                Integer.parseInt(fields.get(FIELD_USER_A_TIER_SCORE)),
-                Integer.parseInt(fields.get(FIELD_USER_B_TIER_SCORE)),
                 Long.parseLong(fields.get(FIELD_USER_A_ENTRY_TIME)),
                 Long.parseLong(fields.get(FIELD_USER_B_ENTRY_TIME)),
                 MatchStatus.valueOf(fields.get(FIELD_STATUS)),
@@ -87,8 +83,6 @@ public class RedisMatchSessionStore implements MatchSessionStore {
         fields.put(FIELD_MATCH_ID, session.matchId());
         fields.put(FIELD_USER_A, String.valueOf(session.userA()));
         fields.put(FIELD_USER_B, String.valueOf(session.userB()));
-        fields.put(FIELD_USER_A_TIER_SCORE, String.valueOf(session.userATierScore()));
-        fields.put(FIELD_USER_B_TIER_SCORE, String.valueOf(session.userBTierScore()));
         fields.put(FIELD_USER_A_ENTRY_TIME, String.valueOf(session.userAEntryTime()));
         fields.put(FIELD_USER_B_ENTRY_TIME, String.valueOf(session.userBEntryTime()));
         fields.put(FIELD_STATUS, session.status().name());
