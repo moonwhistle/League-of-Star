@@ -5,7 +5,6 @@ import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
 import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
-import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
 import com.sang.leagueofstar.domain.game.service.GameRoomResultResolver;
 import com.sang.leagueofstar.domain.rank.domain.UserRankInfo;
@@ -28,7 +27,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -343,25 +341,6 @@ class GameRecordRankSettlementServiceTest {
                 .isInstanceOfSatisfying(CoreException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CoreErrorCode.RANK_NOT_FOUND));
         verify(gameRecordRepository, never()).saveAll(anyList());
-    }
-
-    @Test
-    @DisplayName("findUnsettledFinishedGameRoomIds - FINISHED 미정산 후보를 조회한다")
-    void findUnsettledFinishedGameRoomIds() {
-        // given
-        int limit = 100;
-        given(gameRoomRepository.findGameRoomIdsByStatusAndGameModeInAndRecordCountNot(
-                GameStatus.FINISHED,
-                List.of(GameMode.MATCH, GameMode.CUSTOM),
-                GameRoom.MAX_PARTICIPANTS,
-                PageRequest.of(0, limit)
-        )).willReturn(List.of(GAME_ROOM_ID));
-
-        // when
-        List<Long> result = gameRecordRankSettlementService.findUnsettledFinishedGameRoomIds(limit);
-
-        // then
-        assertThat(result).containsExactly(GAME_ROOM_ID);
     }
 
     private GameRoom createFinishedGameRoom(GameResult result, Long winnerId) {

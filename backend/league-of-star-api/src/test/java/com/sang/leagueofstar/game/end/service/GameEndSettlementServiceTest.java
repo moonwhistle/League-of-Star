@@ -7,7 +7,6 @@ import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.service.GameNaturalDeathSettlementService;
 import com.sang.leagueofstar.domain.game.service.dto.GameNaturalDeathSettlementResult;
 import com.sang.leagueofstar.game.end.common.constant.GameEndConstants;
-import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
 import com.sang.leagueofstar.game.result.domain.PracticeResult;
 import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
@@ -39,15 +38,12 @@ class GameEndSettlementServiceTest {
             mock(GameNaturalDeathSettlementService.class);
     private final GameResultPayloadFactory gameResultPayloadFactory = new GameResultPayloadFactory();
     private final GameResultWebSocketSender gameResultWebSocketSender = mock(GameResultWebSocketSender.class);
-    private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger =
-            mock(GameRecordRankSettlementTrigger.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final GameEndSettlementService service = new GameEndSettlementService(
             gameEndScheduleService,
             gameNaturalDeathSettlementService,
             gameResultPayloadFactory,
             gameResultWebSocketSender,
-            gameRecordRankSettlementTrigger,
             clock
     );
 
@@ -78,12 +74,6 @@ class GameEndSettlementServiceTest {
         org.assertj.core.api.Assertions.assertThat(payload.winnerUserId()).isNull();
         org.assertj.core.api.Assertions.assertThat(payload.reason()).isEqualTo("NATURAL_DEATH_DRAW");
         org.assertj.core.api.Assertions.assertThat(payload.finishedAt()).isEqualTo(NOW.toEpochMilli());
-        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(
-                org.mockito.ArgumentMatchers.argThat(gameRoom -> gameRoom.getId().equals(FIRST_GAME_ROOM_ID))
-        );
-        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(
-                org.mockito.ArgumentMatchers.argThat(gameRoom -> gameRoom.getId().equals(SECOND_GAME_ROOM_ID))
-        );
         verify(gameEndScheduleService).cleanupEndDeadline(FIRST_GAME_ROOM_ID);
         verify(gameEndScheduleService).cleanupEndDeadline(SECOND_GAME_ROOM_ID);
     }
@@ -113,9 +103,6 @@ class GameEndSettlementServiceTest {
                 org.mockito.ArgumentMatchers.eq(FIRST_GAME_ROOM_ID),
                 org.mockito.ArgumentMatchers.any(GameResultPayload.class)
         );
-        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(
-                org.mockito.ArgumentMatchers.any(GameRoom.class)
-        );
         verify(gameEndScheduleService, never()).cleanupEndDeadline(FIRST_GAME_ROOM_ID);
     }
 
@@ -144,9 +131,6 @@ class GameEndSettlementServiceTest {
         org.assertj.core.api.Assertions.assertThat(payload.result()).isEqualTo(GameResult.DRAW);
         org.assertj.core.api.Assertions.assertThat(payload.reason()).isEqualTo("PRACTICE_TIMEOUT");
         org.assertj.core.api.Assertions.assertThat(payload.practiceResult()).isEqualTo(PracticeResult.FAILED);
-        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(
-                org.mockito.ArgumentMatchers.any(GameRoom.class)
-        );
     }
 
     @Test
@@ -175,9 +159,6 @@ class GameEndSettlementServiceTest {
         org.assertj.core.api.Assertions.assertThat(payload.winnerUserId()).isNull();
         org.assertj.core.api.Assertions.assertThat(payload.reason()).isEqualTo("NATURAL_DEATH_DRAW");
         org.assertj.core.api.Assertions.assertThat(payload.practiceResult()).isNull();
-        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(
-                org.mockito.ArgumentMatchers.argThat(gameRoom -> gameRoom.getId().equals(FIRST_GAME_ROOM_ID))
-        );
     }
 
     @Test
@@ -203,9 +184,6 @@ class GameEndSettlementServiceTest {
                 org.mockito.ArgumentMatchers.eq(SECOND_GAME_ROOM_ID),
                 org.mockito.ArgumentMatchers.any(GameResultPayload.class)
         );
-        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(
-                org.mockito.ArgumentMatchers.argThat(gameRoom -> gameRoom.getId().equals(SECOND_GAME_ROOM_ID))
-        );
         verify(gameEndScheduleService).cleanupEndDeadline(SECOND_GAME_ROOM_ID);
     }
 
@@ -230,9 +208,6 @@ class GameEndSettlementServiceTest {
         service.processDueEndDeadlines();
 
         // then
-        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(
-                org.mockito.ArgumentMatchers.argThat(gameRoom -> gameRoom.getId().equals(FIRST_GAME_ROOM_ID))
-        );
         verify(gameEndScheduleService).cleanupEndDeadline(FIRST_GAME_ROOM_ID);
     }
 

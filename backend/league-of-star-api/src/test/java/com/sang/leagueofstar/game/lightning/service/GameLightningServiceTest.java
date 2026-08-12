@@ -13,7 +13,6 @@ import com.sang.leagueofstar.domain.game.service.GameRoomCommandService;
 import com.sang.leagueofstar.domain.game.service.dto.GameActionSaveResult;
 import com.sang.leagueofstar.game.end.service.GameEndDeadlineAdvanceService;
 import com.sang.leagueofstar.game.lightning.domain.GameLightningCommand;
-import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.leagueofstar.game.result.domain.PracticeResult;
 import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
 import org.junit.jupiter.api.DisplayName;
@@ -46,8 +45,6 @@ class GameLightningServiceTest {
             mock(GameLightningJudgementService.class);
     private final GameEndDeadlineAdvanceService gameEndDeadlineAdvanceService =
             mock(GameEndDeadlineAdvanceService.class);
-    private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger =
-            mock(GameRecordRankSettlementTrigger.class);
     private final GameResultPayloadFactory gameResultPayloadFactory = new GameResultPayloadFactory();
     private final Clock clock = Clock.fixed(FINISHED_AT, ZoneOffset.UTC);
     private final GameLightningService service = new GameLightningService(
@@ -56,7 +53,6 @@ class GameLightningServiceTest {
             gameActionCommandService,
             gameLightningJudgementService,
             gameEndDeadlineAdvanceService,
-            gameRecordRankSettlementTrigger,
             gameResultPayloadFactory,
             clock
     );
@@ -85,7 +81,6 @@ class GameLightningServiceTest {
                 .isEqualTo(SERVER_RECEIVE_TIME_MS + GameRules.LIGHTNING_COOLDOWN_MS);
         assertThat(result.get().gameResult()).isNull();
         verify(gameEndDeadlineAdvanceService).advanceAfterFailedLightning(gameRoom, List.of(action));
-        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(gameRoom);
     }
 
     @Test
@@ -129,7 +124,6 @@ class GameLightningServiceTest {
         assertThat(result.get().gameResultBroadcast()).isTrue();
         assertThat(result.get().gameResult().reason()).isEqualTo("LIGHTNING_KILL");
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
-        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(finishedRoom);
         verify(gameEndDeadlineAdvanceService, never()).advanceAfterFailedLightning(lockedRoom, List.of(action));
     }
 
@@ -159,7 +153,6 @@ class GameLightningServiceTest {
         assertThat(result.get().gameResult().gameMode()).isEqualTo(GameMode.PRACTICE);
         assertThat(result.get().gameResult().reason()).isEqualTo("PRACTICE_LIGHTNING_KILL");
         assertThat(result.get().gameResult().practiceResult()).isEqualTo(PracticeResult.SUCCESS);
-        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
     }
 
     @Test
@@ -191,7 +184,6 @@ class GameLightningServiceTest {
         assertThat(result.get().gameResult().reason()).isEqualTo("LIGHTNING_KILL");
         assertThat(result.get().gameResult().practiceResult()).isNull();
         assertThat(result.get().gameResult().winnerUserId()).isEqualTo(USER_ID);
-        verify(gameRecordRankSettlementTrigger).settleFinishedGameRoomAfterCommit(finishedRoom);
     }
 
     @Test
@@ -214,7 +206,6 @@ class GameLightningServiceTest {
         assertThat(result.get().gameResult()).isNotNull();
         assertThat(result.get().gameResultBroadcast()).isFalse();
         assertThat(result.get().gameResult().reason()).isEqualTo("LIGHTNING_KILL");
-        verify(gameRecordRankSettlementTrigger, never()).settleFinishedGameRoomAfterCommit(finishedRoom);
     }
 
     @Test
