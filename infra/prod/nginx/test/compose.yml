@@ -1,0 +1,28 @@
+services:
+  league-of-star-api-1:
+    image: traefik/whoami:v1.10.3
+    command: ["--port=8080"]
+    hostname: api-1
+    networks:
+      - nginx-routing-test
+
+  league-of-star-api-2:
+    image: traefik/whoami:v1.10.3
+    command: ["--port=8080"]
+    hostname: api-2
+    networks:
+      - nginx-routing-test
+
+  nginx:
+    build:
+      context: ..
+    ports:
+      - "127.0.0.1:18080:80"
+    depends_on:
+      - league-of-star-api-1
+      - league-of-star-api-2
+    networks:
+      - nginx-routing-test
+
+networks:
+  nginx-routing-test:
