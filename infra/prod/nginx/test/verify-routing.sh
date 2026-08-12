@@ -22,6 +22,10 @@ docker compose -f "$COMPOSE_FILE" up -d --build --wait
 health=$(curl --fail --silent --show-error "$BASE_URL/nginx-health")
 test "$health" = "ok"
 
+actuator_status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+    "$BASE_URL/actuator/prometheus")
+test "$actuator_status" = "404"
+
 rest_targets=""
 request=1
 while [ "$request" -le 20 ]; do
@@ -49,16 +53,19 @@ done
 custom_target=$(printf '%s\n' "$custom_targets" | tr ' ' '\n' | sed '/^$/d' | sort -u)
 test "$(printf '%s\n' "$custom_target" | wc -l | tr -d ' ')" = "1"
 
-websocket_echo=$(curl --fail --silent --show-error \
+websocket_headers=$(curl --fail --silent --dump-header - --output /dev/null \
     --header "Connection: Upgrade" \
     --header "Upgrade: websocket" \
-    "$BASE_URL/ws/game/300")
-printf '%s\n' "$websocket_echo" | grep -Eiq '^Upgrade:[[:space:]]*websocket[[:space:]]*$'
-printf '%s\n' "$websocket_echo" | grep -Eiq '^Connection:[[:space:]]*upgrade[[:space:]]*$'
+    --header "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+    --header "Sec-WebSocket-Version: 13" \
+    --max-time 1 \
+    "$BASE_URL/ws/game/300" || true)
+printf '%s\n' "$websocket_headers" | grep -Eiq '^HTTP/1\.1[[:space:]]+101[[:space:]]'
+printf '%s\n' "$websocket_headers" | grep -Eiq '^Upgrade:[[:space:]]*websocket[[:space:]]*$'
+printf '%s\n' "$websocket_headers" | grep -Eiq '^Connection:[[:space:]]*upgrade[[:space:]]*$'
 
-sse_headers=$(curl --fail --silent --show-error --dump-header - --output /dev/null \
-    "$BASE_URL/api/v1/notifications/match/stream")
-printf '%s\n' "$sse_headers" | grep -Eiq '^X-Proxy-Buffering:[[:space:]]*off[[:space:]]*$'
+sse_body=$(curl --silent --max-time 1 "$BASE_URL/api/v1/notifications/match/stream" || true)
+printf '%s\n' "$sse_body" | grep -Eq '^data: first$'
 
 if [ "$game_target" = "api-1" ]; then
     selected_game_service="league-of-star-api-1"

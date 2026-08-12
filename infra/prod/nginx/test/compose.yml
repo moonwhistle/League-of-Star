@@ -1,14 +1,18 @@
 services:
   league-of-star-api-1:
-    image: traefik/whoami:v1.10.3
-    command: ["--port=8080"]
+    image: league-of-star-nginx-routing-mock:local
+    build:
+      context: .
+      dockerfile: Dockerfile.mock-api
     hostname: api-1
     networks:
       - nginx-routing-test
 
   league-of-star-api-2:
-    image: traefik/whoami:v1.10.3
-    command: ["--port=8080"]
+    image: league-of-star-nginx-routing-mock:local
+    build:
+      context: .
+      dockerfile: Dockerfile.mock-api
     hostname: api-2
     networks:
       - nginx-routing-test

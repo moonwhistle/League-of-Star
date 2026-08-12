@@ -25,6 +25,16 @@ try {
         throw "Nginx health endpoint returned an unexpected response"
     }
 
+    try {
+        Invoke-WebRequest -Uri "$baseUrl/actuator/prometheus" | Out-Null
+        throw "Actuator endpoint was publicly accessible"
+    }
+    catch {
+        if ($_.Exception.Response.StatusCode.value__ -ne 404) {
+            throw
+        }
+    }
+
     $restTargets = 1..20 | ForEach-Object { Get-UpstreamHostname "/api/test?request=$_" }
     if (($restTargets | Sort-Object -Unique).Count -ne 2) {
         throw "REST requests were not distributed across both API instances"
@@ -42,27 +52,31 @@ try {
         throw "Requests for the same custom roomId reached multiple API instances"
     }
 
-    $webSocketEcho = curl.exe --silent --show-error `
+    $webSocketHeaders = curl.exe --silent --dump-header - --output NUL `
         --header "Connection: Upgrade" `
         --header "Upgrade: websocket" `
+        --header "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" `
+        --header "Sec-WebSocket-Version: 13" `
+        --max-time 1 `
         "$baseUrl/ws/game/300"
-    if ($LASTEXITCODE -ne 0) {
+    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 28) {
         throw "Failed to request the WebSocket route"
     }
-    $webSocketEchoText = $webSocketEcho -join "`n"
-    if ($webSocketEchoText -notmatch "(?im)^Upgrade:\s*websocket\s*$" `
-            -or $webSocketEchoText -notmatch "(?im)^Connection:\s*upgrade\s*$") {
-        throw "WebSocket upgrade headers were not forwarded to the API instance"
+    $webSocketHeadersText = $webSocketHeaders -join "`n"
+    if ($webSocketHeadersText -notmatch "(?im)^HTTP/1\.1 101\s" `
+            -or $webSocketHeadersText -notmatch "(?im)^Upgrade:\s*websocket\s*$" `
+            -or $webSocketHeadersText -notmatch "(?im)^Connection:\s*upgrade\s*$") {
+        throw "WebSocket handshake was not proxied successfully"
     }
 
-    $sseHeaders = curl.exe --silent --show-error --dump-header - --output NUL `
+    $sseBody = curl.exe --silent --max-time 1 `
         "$baseUrl/api/v1/notifications/match/stream"
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to request the SSE endpoint"
+    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 28) {
+        throw "SSE request failed unexpectedly"
     }
-    $sseHeadersText = $sseHeaders -join "`n"
-    if ($sseHeadersText -notmatch "(?im)^X-Proxy-Buffering:\s*off\s*$") {
-        throw "SSE buffering header was not disabled"
+    $sseBodyText = $sseBody -join "`n"
+    if ($sseBodyText -notmatch "(?m)^data: first$") {
+        throw "The first SSE event was buffered instead of being delivered immediately"
     }
 
     $selectedGameTarget = $gameTargets[0]
