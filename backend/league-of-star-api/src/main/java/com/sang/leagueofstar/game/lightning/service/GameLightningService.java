@@ -9,7 +9,6 @@ import com.sang.leagueofstar.domain.game.service.GameRoomCommandService;
 import com.sang.leagueofstar.domain.game.service.GameLightningJudgementService;
 import com.sang.leagueofstar.domain.game.service.dto.GameActionSaveResult;
 import com.sang.leagueofstar.game.end.service.GameEndDeadlineAdvanceService;
-import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
 import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
 import com.sang.leagueofstar.game.lightning.domain.GameLightningCommand;
@@ -33,7 +32,6 @@ public class GameLightningService {
     private final GameActionCommandService gameActionCommandService;
     private final GameLightningJudgementService gameLightningJudgementService;
     private final GameEndDeadlineAdvanceService gameEndDeadlineAdvanceService;
-    private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger;
     private final GameResultPayloadFactory gameResultPayloadFactory;
     private final Clock clock;
 
@@ -74,9 +72,6 @@ public class GameLightningService {
                 saveResult.action().getUserId()
         );
         return finishedGameRoom.map(finishedRoom -> {
-            if (!finishedRoom.isPracticeMode()) {
-                gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(finishedRoom);
-            }
             return GameLightningHandleResponse.appliedAndBroadcastResult(
                     lightningApplied,
                     lightningKillGameResult(gameRoomId, finishedRoom)

@@ -3,9 +3,7 @@ package com.sang.leagueofstar.domain.record.service;
 import com.sang.leagueofstar.common.exception.CoreErrorCode;
 import com.sang.leagueofstar.common.exception.CoreException;
 import com.sang.leagueofstar.domain.game.domain.GameRoom;
-import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameParticipantResult;
-import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
 import com.sang.leagueofstar.domain.game.service.GameRoomResultResolver;
 import com.sang.leagueofstar.domain.game.service.dto.GameRoomParticipantResult;
@@ -19,7 +17,6 @@ import com.sang.leagueofstar.domain.record.domain.vo.GameRecordResult;
 import com.sang.leagueofstar.domain.record.domain.vo.GameRecordSeriesType;
 import com.sang.leagueofstar.domain.record.repository.GameRecordRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +32,6 @@ import java.util.stream.Collectors;
 public class GameRecordRankSettlementService {
 
     private static final long SETTLED_RECORD_COUNT = GameRoom.MAX_PARTICIPANTS;
-    private static final List<GameMode> RECORD_SETTLEMENT_RECOVERY_MODES = List.of(GameMode.MATCH, GameMode.CUSTOM);
 
     private final GameRoomRepository gameRoomRepository;
     private final GameRecordRepository gameRecordRepository;
@@ -116,19 +112,6 @@ public class GameRecordRankSettlementService {
     @Transactional(readOnly = true)
     public long countRecordsByGameRoomId(Long gameRoomId) {
         return gameRecordRepository.countByGameRoomId(gameRoomId);
-    }
-
-    /**
-     * FINISHED 상태지만 참가자 수만큼 record가 생성되지 않은 gameRoom 후보를 조회합니다.
-     */
-    @Transactional(readOnly = true)
-    public List<Long> findUnsettledFinishedGameRoomIds(int limit) {
-        return gameRoomRepository.findGameRoomIdsByStatusAndGameModeInAndRecordCountNot(
-                GameStatus.FINISHED,
-                RECORD_SETTLEMENT_RECOVERY_MODES,
-                SETTLED_RECORD_COUNT,
-                PageRequest.of(0, limit)
-        );
     }
 
     private RankRecordSettlementCommand toRankCommand(GameRoomParticipantResult participantResult) {

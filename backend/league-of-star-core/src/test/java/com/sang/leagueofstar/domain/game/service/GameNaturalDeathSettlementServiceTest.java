@@ -14,6 +14,7 @@ import com.sang.leagueofstar.domain.game.service.dto.GameNaturalDeathSettlementR
 import com.sang.leagueofstar.domain.game.service.dto.GameNaturalDeathSettlementStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -40,7 +41,8 @@ class GameNaturalDeathSettlementServiceTest {
             new GameEffectiveNaturalDeathService();
     private final GameRoomCommandService gameRoomCommandService = new GameRoomCommandService(
             gameRoomRepository,
-            mock(GameScenarioGenerator.class)
+            mock(GameScenarioGenerator.class),
+            mock(ApplicationEventPublisher.class)
     );
     private final GameNaturalDeathSettlementService service = new GameNaturalDeathSettlementService(
             gameRoomRepository,

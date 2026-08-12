@@ -3,7 +3,6 @@ package com.sang.leagueofstar.game.end.service;
 import com.sang.leagueofstar.domain.game.service.GameNaturalDeathSettlementService;
 import com.sang.leagueofstar.domain.game.service.dto.GameNaturalDeathSettlementResult;
 import com.sang.leagueofstar.game.end.common.constant.GameEndConstants;
-import com.sang.leagueofstar.game.record.service.GameRecordRankSettlementTrigger;
 import com.sang.leagueofstar.game.result.dto.GameResultPayload;
 import com.sang.leagueofstar.game.result.service.GameResultPayloadFactory;
 import com.sang.leagueofstar.game.result.service.GameResultWebSocketSender;
@@ -24,7 +23,6 @@ public class GameEndSettlementService {
     private final GameNaturalDeathSettlementService gameNaturalDeathSettlementService;
     private final GameResultPayloadFactory gameResultPayloadFactory;
     private final GameResultWebSocketSender gameResultWebSocketSender;
-    private final GameRecordRankSettlementTrigger gameRecordRankSettlementTrigger;
     private final Clock clock;
 
     public void processDueEndDeadlines() {
@@ -55,9 +53,6 @@ public class GameEndSettlementService {
         }
         if (result.status().isFinished()) {
             broadcastNaturalDeathResult(gameRoomId, nowMillis, result);
-            if (!result.finishedGameRoom().isPracticeMode()) {
-                gameRecordRankSettlementTrigger.settleFinishedGameRoomAfterCommit(result.finishedGameRoom());
-            }
         }
         if (result.shouldCleanupEndDeadline()) {
             cleanupEndDeadline(gameRoomId);
