@@ -9,6 +9,8 @@ subprojects {
 	apply plugin: 'io.spring.dependency-management'
 	apply plugin: 'org.springframework.boot'
 
+	ext['testcontainers.version'] = '1.21.4'
+
 	group = 'com.sang'
 	version = '0.0.1-SNAPSHOT'
 
