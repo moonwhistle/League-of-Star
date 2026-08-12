@@ -24,17 +24,17 @@ public class MatchOpponentProfileProvider {
     private final UserReadService userReadService;
     private final RankReadService rankReadService;
 
-    public MatchResponseResultNotification.Opponent getOpponent(Long opponentUserId, int fallbackTierScore) {
+    public MatchResponseResultNotification.Opponent getOpponent(Long opponentUserId) {
         String nickname = findNickname(opponentUserId);
 
         try {
             UserRankInfo rankInfo = rankReadService.getUserRankInfo(opponentUserId);
             if (rankReadService.isPlacementInProgress(opponentUserId)) {
                 return new MatchResponseResultNotification.Opponent(
-                        opponentUserId,
-                        nickname,
-                        UNRANKED_TIER,
-                        fallbackTierScore
+                          opponentUserId,
+                          nickname,
+                          UNRANKED_TIER,
+                          0
                 );
             }
             return new MatchResponseResultNotification.Opponent(
@@ -46,10 +46,10 @@ public class MatchOpponentProfileProvider {
         } catch (Exception e) {
             log.warn("Failed to lookup opponent rank info for match response result: userId={}", opponentUserId, e);
             return new MatchResponseResultNotification.Opponent(
-                    opponentUserId,
-                    nickname,
-                    UNKNOWN_TIER,
-                    fallbackTierScore
+                      opponentUserId,
+                      nickname,
+                      UNKNOWN_TIER,
+                      0
             );
         }
     }

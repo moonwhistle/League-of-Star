@@ -27,12 +27,10 @@ class MatchResponseResultEventPublisherAdapterTest {
     @DisplayName("publish 가능한 매칭 응답 결과는 유저별 Pub/Sub 메시지로 발행한다")
     void publish() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                11,
-                MatchStatus.ACCEPTED,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED
         );
@@ -51,12 +49,10 @@ class MatchResponseResultEventPublisherAdapterTest {
     @DisplayName("FOUND 상태 이벤트는 최종 결과가 아니므로 발행하지 않는다")
     void skipFoundEvent() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                11,
-                MatchStatus.FOUND,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.FOUND,
                 MatchResponseStatus.ACCEPTED,
                 MatchResponseStatus.PENDING
         );
@@ -72,12 +68,10 @@ class MatchResponseResultEventPublisherAdapterTest {
     @DisplayName("GAME_SETUP_FAILED 상태 이벤트는 유저별 Pub/Sub 메시지로 발행한다")
     void publishGameSetupFailedEvent() {
         MatchResponseResultEvent event = new MatchResponseResultEvent(
-                "match-1",
-                1L,
-                2L,
-                10,
-                11,
-                MatchStatus.GAME_SETUP_FAILED,
+                  "match-1",
+                  1L,
+                  2L,
+                  MatchStatus.GAME_SETUP_FAILED,
                 MatchResponseStatus.ACCEPTED,
                 MatchResponseStatus.ACCEPTED
         );

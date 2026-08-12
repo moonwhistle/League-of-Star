@@ -10,29 +10,30 @@ import java.util.List;
 public interface MatchQueueStore {
 
     /**
-     * 유저를 해당 티어 대기열에 추가합니다.
+     * 유저를 FIFO 대기열에 추가합니다.
      */
     void add(MatchTicket ticket);
 
     /**
-     * 유저를 해당 티어 대기열에서 수동으로 제거합니다. (매칭 취소 등)
+     * 유저를 FIFO 대기열에서 수동으로 제거합니다. (매칭 취소 등)
      * @return 큐에 유저가 존재하여 성공적으로 제거했으면 true, 아니면 false
      */
-    boolean remove(Long userId, int tierScore);
+    boolean remove(Long userId);
 
     /**
-     * 현재 모든 티어 대기열에 있는 모든 유저 목록을 로드합니다.
+     * 현재 FIFO 대기열의 모든 유저를 조회합니다.
      */
     List<MatchTicket> findAll();
 
     /**
-     * 특정 티어 대기열의 현재 유저 수를 조회합니다.
+     * 현재 FIFO 대기열의 유저 수를 조회합니다.
      */
-    int countByTierScore(int tierScore);
+    int count();
 
     /**
-     * 두 유저를 각자의 티어 대기열에서 원자적으로 확인하고 제거합니다.
-     * @return 두 유저가 모두 존재하여 제거에 성공하면 true, 아니면 false
+     * 가장 오래 대기한 티켓을 페어링해 Redis Stream MatchJob으로 원자 전환합니다.
+     *
+     * @return 생성된 MatchJob 수
      */
-    boolean atomicPairRemove(Long userAId, int tierAScore, Long userBId, int tierBScore);
+    int enqueueOldestMatches(int maxUsers);
 }

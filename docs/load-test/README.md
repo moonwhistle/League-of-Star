@@ -8,6 +8,8 @@
 | `join-queue-burst.js` | 정해진 인원을 짧은 시간에 순간 유입 | k6 |
 | `sse-notification-load.mjs` | SSE 연결 유지와 `match_found` 수신 검증 | Node |
 | `match-response-timeout-load.mjs` | 수락/거절/timeout 정책과 `match_response_*` 지표 검증 | Node |
+| `redis/matching-e2e-benchmark.sh` | HTTP 진입부터 세션 확정까지 전체 매칭 시간 측정 | k6 + Redis CLI |
+| `redis/matching-lease-recovery-benchmark.sh` | worker 종료 후 Stream PEL 복구 검증 | Redis CLI + Docker |
 
 ## 실행 환경
 
@@ -30,6 +32,8 @@ Redis 초기화 명령어
 ```bash
 docker exec league-of-star-redis sh -c 'for key in $(redis-cli --scan --pattern "match:status:*"); do redis-cli del "$key"; done'
 docker exec league-of-star-redis sh -c 'for key in $(redis-cli --scan --pattern "matching:queue:*"); do redis-cli del "$key"; done'
+docker exec league-of-star-redis redis-cli del matching:queue
+docker exec league-of-star-redis redis-cli del matching:jobs
 docker exec league-of-star-redis sh -c 'for key in $(redis-cli --scan --pattern "match:session:*"); do redis-cli del "$key"; done'
 docker exec league-of-star-redis redis-cli del match:response:timeout:pending
 docker exec league-of-star-redis redis-cli del match:response:timeout:processing
@@ -41,6 +45,19 @@ docker exec league-of-star-redis redis-cli del match:response:timeout:processing
 
 기본 기준은 컨테이너 OOM을 피하면서 정책을 검증할 수 있는 5,000명입니다.
 
+### Matching Engine Stream Job
+
+API, 세션 저장, 알림 발행을 제외하고 Redis pairing producer만 비교합니다. 독립된 Redis connection을 사용하는 worker 2개가 동시에 FIFO 대기열을 Stream MatchJob으로 전환하며, 배치 크기별 소진 시간·Lua 호출 수·중복 여부를 측정합니다.
+
+```bash
+USERS=5000 WORKERS=2 WARMUPS=2 REPETITIONS=7 \
+  BATCH_SIZES=20,50,100,200,500,1000 \
+  OUTPUT_FILE=docs/load-test/result/matching/redis/matching-engine-benchmark.json \
+  node docs/load-test/redis/matching-engine-benchmark.mjs
+```
+
+실행 전 Redis가 `127.0.0.1:6379`에서 실행 중이어야 합니다. 스크립트는 각 시나리오 시작 전 `FLUSHALL`을 실행하므로 로컬 테스트용 Redis에서만 사용합니다.
+
 ```bash
 TARGET_TPS=50 DURATION=5m VUS=400 k6 run docs/load-test/join-queue-steady.js
 ```
@@ -51,6 +68,44 @@ TARGET_TPS=50 DURATION=5m VUS=400 k6 run docs/load-test/join-queue-steady.js
 TOTAL_USERS=5000 VUS=500 k6 run docs/load-test/join-queue-burst.js
 ```
 
+HTTP 진입부터 2,500개 매칭 세션 확정까지 전체 시간을 측정합니다. 종료 조건은 `waiting=0`, `Stream PEL=0`, `pending timeout=2,500`입니다.
+
+```bash
+TOTAL_USERS=5000 VUS=500 TIMEOUT_SECONDS=90 \
+  bash docs/load-test/redis/matching-e2e-benchmark.sh improved-batch-ack
+```
+
+Stream PEL 복구는 실제 DB 사용자 ID를 FIFO에 준비한 뒤, 첫 번째 인스턴스가 MatchJob을 읽어 PEL에 등록한 순간 종료하고 두 번째 인스턴스의 `XAUTOCLAIM` 재처리 결과를 확인합니다. 로컬 전용 스크립트이며 실행 중 애플리케이션 컨테이너를 pause/kill/start합니다.
+
+```bash
+TOTAL_USERS=5000 TIMEOUT_SECONDS=90 \
+  bash docs/load-test/redis/matching-lease-recovery-benchmark.sh lease-recovery
+```
+
+Redis 명령 수와 네트워크 전송량은 시나리오 실행 직전에 통계를 초기화하고, 큐가 모두 소진된 직후 스냅샷을 저장합니다.
+
+```bash
+TOTAL_USERS=5000 TEST_USER_NAMESPACE=redis-metrics \
+  TOKENS_FILE=/tmp/league-of-star-load-test-tokens.json \
+  node docs/load-test/prepare-join-users.mjs
+
+bash docs/load-test/redis/measure-commandstats.sh fifo-5000 reset
+TOTAL_USERS=5000 VUS=500 \
+  TOKENS_FILE=/tmp/league-of-star-load-test-tokens.json \
+  k6 run docs/load-test/join-queue-burst.js
+bash docs/load-test/redis/measure-commandstats.sh fifo-5000 snapshot
+```
+
+토큰 준비를 분리해야 로그인·회원가입 과정의 Redis 명령이 매칭 측정값에 섞이지 않습니다. 토큰 파일은 기본적으로 `/tmp`에 생성하며 저장소에 커밋하지 않습니다. 결과는 `docs/load-test/result/matching/redis/<label>.txt`에 저장됩니다. `INFO commandstats`의 명령별 호출 수와 CPU 시간뿐 아니라 `total_commands_processed`, `total_net_input_bytes`, `total_net_output_bytes`를 함께 기록합니다. 테스트마다 Redis 통계를 초기화하므로 다른 시나리오와 동시에 실행하지 않습니다.
+
+peak ops/s와 Redis CPU·메모리 추이는 별도 실행에서 샘플링합니다. 샘플러의 `INFO` 명령이 전체 명령 수와 네트워크 바이트에 포함되므로, 명령 수는 위의 비샘플링 실행 결과를 사용합니다.
+
+```bash
+INTERVAL_SECONDS=0.2 bash docs/load-test/redis/sample-runtime.sh fifo-5000
+# 다른 터미널에서 burst 실행 후 종료
+touch /tmp/league-of-star-redis-sampler.stop
+```
+
 확인 지표:
 
 - `joinQueue` 5xx 비율 1% 미만
@@ -58,6 +113,9 @@ TOTAL_USERS=5000 VUS=500 k6 run docs/load-test/join-queue-burst.js
 - 전체 대기 인원이 테스트 종료 후 1분 내 0에 수렴하는지
 - 초당 매칭 성사 수가 유입 TPS의 절반에 근접하는지
 - 스캔 소요 시간 p95/p99가 scheduler 주기를 침범하지 않는지
+- 사용자 수 대비 전체 Redis 명령 수와 네트워크 입출력 바이트
+- `EVAL`, `ZADD`, `SET`, `HSET`, `PEXPIRE`, `PUBLISH` 호출 수
+- Lua 내부 명령을 제외한 애플리케이션-Redis 왕복 횟수
 
 ## SSE Notification
 

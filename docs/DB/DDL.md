@@ -499,7 +499,8 @@ MySQL이 아닌 **Redis에서 관리**하는 데이터입니다.
 
 | 키 패턴 | 타입 | 용도 | TTL |
 |--------|------|------|-----|
-| `matching:queue:{tierScore}` | Sorted Set | 티어별 매칭 큐. score = `entryTime`, member = `userId` | - |
+| `matching:queue` | Sorted Set | 전체 사용자 FIFO 매칭 큐. score = `entryTime`, member = `userId` | - |
+| `matching:jobs` | Stream | 페어링 완료 후 처리할 MatchJob. `matching-workers` Consumer Group과 PEL로 분배·복구 | 처리 완료 시 XDEL |
 | `match:status:{userId}` | String | 유저 매칭 상태 (`MATCHING`, `FOUND`, `ACCEPTED`, `DECLINED`, `TIMEOUT`, `GAME_SETUP_FAILED`, `IN_GAME`) | 30분 |
 | `match:session:{matchId}` | Hash | 매칭 성사 후 수락/거절 세션. 세션 TTL은 cleanup 실패 대비 안전장치 | 60분 |
 | `match:response:timeout:pending` | Sorted Set | 아직 scheduler가 claim하지 않은 응답 timeout 후보. score = `deadlineMillis` | - |

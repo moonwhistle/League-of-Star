@@ -24,7 +24,6 @@ class FinishedGameRequeuePolicyTest {
 
     private static final Long USER_A_ID = 1L;
     private static final Long USER_B_ID = 2L;
-    private static final int TIER_SCORE = 10;
 
     private final InMemoryMatchUserStatusStore userStatusStore = new InMemoryMatchUserStatusStore();
     private final MatchQueueStore matchQueueStore = mock(MatchQueueStore.class);
@@ -40,7 +39,7 @@ class FinishedGameRequeuePolicyTest {
         userStatusStore.updateStatus(USER_A_ID, MatchStatus.IN_GAME, 1_800L);
 
         // when & then
-        assertThatThrownBy(() -> matchQueueCommandService.joinQueue(USER_A_ID, TIER_SCORE))
+        assertThatThrownBy(() -> matchQueueCommandService.joinQueue(USER_A_ID))
                 .isInstanceOf(MatchingException.class)
                 .hasFieldOrPropertyWithValue("errorCode", MatchingErrorCode.ALREADY_IN_QUEUE);
         verify(matchQueueStore, never()).add(any(MatchTicket.class));
@@ -55,7 +54,7 @@ class FinishedGameRequeuePolicyTest {
 
         // when
         matchUserStatusCommandService.removeFinishedGameStatuses(USER_A_ID, USER_B_ID);
-        matchQueueCommandService.joinQueue(USER_A_ID, TIER_SCORE);
+        matchQueueCommandService.joinQueue(USER_A_ID);
 
         // then
         assertThat(userStatusStore.getStatus(USER_A_ID)).contains(MatchStatus.MATCHING);

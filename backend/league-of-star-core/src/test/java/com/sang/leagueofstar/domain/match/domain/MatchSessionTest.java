@@ -10,13 +10,11 @@ class MatchSessionTest {
     @Test
     @DisplayName("매칭 세션 생성 시 수락 대기 상태와 미수락 상태로 초기화한다.")
     void create() {
-        MatchSession session = MatchSession.create("match-1", 1L, 2L, 10, 11, 1000L, 2000L);
+        MatchSession session = MatchSession.create("match-1", 1L, 2L, 1000L, 2000L);
 
         assertThat(session.matchId()).isEqualTo("match-1");
         assertThat(session.userA()).isEqualTo(1L);
         assertThat(session.userB()).isEqualTo(2L);
-        assertThat(session.userATierScore()).isEqualTo(10);
-        assertThat(session.userBTierScore()).isEqualTo(11);
         assertThat(session.userAEntryTime()).isEqualTo(1000L);
         assertThat(session.userBEntryTime()).isEqualTo(2000L);
         assertThat(session.status()).isEqualTo(MatchStatus.FOUND);
@@ -27,7 +25,7 @@ class MatchSessionTest {
     @Test
     @DisplayName("세션 참여자 여부를 확인한다.")
     void isParticipant() {
-        MatchSession session = new MatchSession("match-1", 1L, 2L, 10, 11, 1000L, 2000L,
+        MatchSession session = new MatchSession("match-1", 1L, 2L, 1000L, 2000L,
                 MatchStatus.FOUND, 3000L, MatchResponseStatus.PENDING, MatchResponseStatus.PENDING);
 
         assertThat(session.isParticipant(1L)).isTrue();
@@ -40,9 +38,9 @@ class MatchSessionTest {
     @Test
     @DisplayName("두 유저가 모두 수락했는지 확인한다.")
     void isAcceptedByBoth() {
-        MatchSession notAccepted = new MatchSession("match-1", 1L, 2L, 10, 11, 1000L, 2000L,
+        MatchSession notAccepted = new MatchSession("match-1", 1L, 2L, 1000L, 2000L,
                 MatchStatus.FOUND, 3000L, MatchResponseStatus.ACCEPTED, MatchResponseStatus.PENDING);
-        MatchSession acceptedByBoth = new MatchSession("match-1", 1L, 2L, 10, 11, 1000L, 2000L,
+        MatchSession acceptedByBoth = new MatchSession("match-1", 1L, 2L, 1000L, 2000L,
                 MatchStatus.ACCEPTED, 3000L, MatchResponseStatus.ACCEPTED, MatchResponseStatus.ACCEPTED);
 
         assertThat(notAccepted.isAcceptedByBoth()).isFalse();
@@ -50,12 +48,10 @@ class MatchSessionTest {
     }
 
     @Test
-    @DisplayName("참여자별 tierScore와 entryTime을 조회한다.")
+    @DisplayName("참여자별 entryTime을 조회한다.")
     void queueSnapshotOfParticipant() {
-        MatchSession session = MatchSession.create("match-1", 1L, 2L, 10, 11, 1000L, 2000L);
+        MatchSession session = MatchSession.create("match-1", 1L, 2L, 1000L, 2000L);
 
-        assertThat(session.tierScoreOf(1L)).isEqualTo(10);
-        assertThat(session.tierScoreOf(2L)).isEqualTo(11);
         assertThat(session.entryTimeOf(1L)).isEqualTo(1000L);
         assertThat(session.entryTimeOf(2L)).isEqualTo(2000L);
     }
@@ -63,7 +59,7 @@ class MatchSessionTest {
     @Test
     @DisplayName("특정 참여자의 수락 상태를 변경한다.")
     void accept() {
-        MatchSession session = MatchSession.create("match-1", 1L, 2L, 10, 11, 1000L, 2000L);
+        MatchSession session = MatchSession.create("match-1", 1L, 2L, 1000L, 2000L);
 
         MatchSession acceptedByA = session.accept(1L);
         MatchSession acceptedByBoth = acceptedByA.accept(2L);
@@ -77,7 +73,7 @@ class MatchSessionTest {
     @Test
     @DisplayName("특정 참여자의 거절 상태를 변경한다.")
     void reject() {
-        MatchSession session = MatchSession.create("match-1", 1L, 2L, 10, 11, 1000L, 2000L);
+        MatchSession session = MatchSession.create("match-1", 1L, 2L, 1000L, 2000L);
 
         MatchSession rejectedByB = session.reject(2L);
         MatchSession respondedByBoth = rejectedByB.accept(1L);
@@ -93,7 +89,7 @@ class MatchSessionTest {
     @Test
     @DisplayName("세션 상태만 변경한 새 세션을 생성한다.")
     void withStatus() {
-        MatchSession session = MatchSession.create("match-1", 1L, 2L, 10, 11, 1000L, 2000L)
+        MatchSession session = MatchSession.create("match-1", 1L, 2L, 1000L, 2000L)
                 .accept(1L)
                 .accept(2L);
 
@@ -102,14 +98,13 @@ class MatchSessionTest {
         assertThat(accepted.status()).isEqualTo(MatchStatus.ACCEPTED);
         assertThat(accepted.userAStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
         assertThat(accepted.userBStatus()).isEqualTo(MatchResponseStatus.ACCEPTED);
-        assertThat(accepted.userATierScore()).isEqualTo(10);
         assertThat(accepted.userBEntryTime()).isEqualTo(2000L);
     }
 
     @Test
     @DisplayName("미응답 참여자만 TIMEOUT 상태로 변경한다.")
     void timeoutPendingUsers() {
-        MatchSession session = MatchSession.create("match-1", 1L, 2L, 10, 11, 1000L, 2000L)
+        MatchSession session = MatchSession.create("match-1", 1L, 2L, 1000L, 2000L)
                 .accept(1L);
 
         MatchSession timedOut = session.timeoutPendingUsers();

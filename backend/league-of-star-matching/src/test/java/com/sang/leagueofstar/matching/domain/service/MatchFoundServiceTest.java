@@ -1,42 +1,39 @@
 package com.sang.leagueofstar.matching.domain.service;
 
+import com.sang.leagueofstar.domain.match.domain.MatchClaim;
 import com.sang.leagueofstar.domain.match.domain.MatchSession;
-import com.sang.leagueofstar.domain.match.domain.MatchStatus;
-import com.sang.leagueofstar.domain.match.domain.MatchResponseStatus;
 import com.sang.leagueofstar.domain.match.domain.MatchTicket;
 import com.sang.leagueofstar.domain.match.event.MatchFoundEvent;
 import com.sang.leagueofstar.matching.common.constant.MatchingConstants;
-import com.sang.leagueofstar.matching.repository.MatchQueueStore;
+import com.sang.leagueofstar.matching.repository.MatchJobStore;
 import com.sang.leagueofstar.matching.repository.MatchSessionStore;
 import com.sang.leagueofstar.matching.repository.MatchTimeoutStore;
-import com.sang.leagueofstar.matching.repository.MatchUserStatusStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.InOrder;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MatchFoundServiceTest {
@@ -45,322 +42,145 @@ class MatchFoundServiceTest {
     private MatchFoundService matchFoundService;
 
     @Mock
-    private MatchQueueStore matchQueueStore;
-
-    @Mock
-    private MatchUserStatusStore userStatusStore;
-
+    private MatchJobStore matchJobStore;
     @Mock
     private MatchSessionStore sessionStore;
-
     @Mock
     private MatchTimeoutStore timeoutStore;
-
     @Mock
     private ApplicationEventPublisher eventPublisher;
-
     @Mock
     private Clock clock;
 
     @Test
-    @DisplayName("매칭 성사 시 세션과 timeout을 먼저 준비한 뒤 상태 변경과 이벤트 발행을 수행한다")
-    void process() {
+    @DisplayName("batch 세션과 timeout을 준비한 뒤 한 번의 ACK로 매칭을 확정한다")
+    void processBatch() {
         // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        when(clock.millis()).thenReturn(1_000L);
+        List<MatchClaim> claims = List.of(claim("batch:1", 1L), claim("batch:2", 3L));
+        given(clock.millis()).willReturn(1_000L);
+        given(matchJobStore.complete(claims, MatchingConstants.STATUS_TTL_SECONDS)).willReturn(2);
 
         // when
-        matchFoundService.process(userA, userB);
+        List<MatchClaim> completed = matchFoundService.processBatch(claims);
 
         // then
-        InOrder inOrder = inOrder(sessionStore, timeoutStore, userStatusStore, eventPublisher);
-        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
-        inOrder.verify(sessionStore).save(
-                sessionCaptor.capture(),
-                eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS)
-        );
-        MatchSession savedSession = sessionCaptor.getValue();
+        assertThat(completed).containsExactlyElementsOf(claims);
+        InOrder inOrder = inOrder(sessionStore, timeoutStore, matchJobStore, eventPublisher);
+        inOrder.verify(sessionStore).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        inOrder.verify(timeoutStore).addPending(claims.get(0).claimId(), 11_000L);
+        inOrder.verify(sessionStore).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
+        inOrder.verify(timeoutStore).addPending(claims.get(1).claimId(), 11_000L);
+        inOrder.verify(matchJobStore).complete(claims, MatchingConstants.STATUS_TTL_SECONDS);
+        inOrder.verify(eventPublisher, times(2)).publishEvent(any(MatchFoundEvent.class));
+    }
 
-        assertThat(savedSession.userA()).isEqualTo(1L);
-        assertThat(savedSession.userB()).isEqualTo(2L);
-        assertThat(savedSession.userATierScore()).isEqualTo(userA.tierScore());
-        assertThat(savedSession.userBTierScore()).isEqualTo(userB.tierScore());
-        assertThat(savedSession.userAEntryTime()).isEqualTo(userA.entryTime());
-        assertThat(savedSession.userBEntryTime()).isEqualTo(userB.entryTime());
-        assertThat(savedSession.status()).isEqualTo(MatchStatus.FOUND);
-        assertThat(savedSession.matchId()).isNotBlank();
-        assertThat(savedSession.userAStatus()).isEqualTo(MatchResponseStatus.PENDING);
-        assertThat(savedSession.userBStatus()).isEqualTo(MatchResponseStatus.PENDING);
+    @Test
+    @DisplayName("세션 저장에 실패한 작업은 PEL에 유지하고 나머지는 완료한다")
+    void continuesBatchWhenSessionSaveFails() {
+        // given
+        MatchClaim failed = claim("batch:1", 1L);
+        MatchClaim succeeded = claim("batch:2", 3L);
+        willThrow(new RuntimeException("session failure"))
+                .willDoNothing()
+                .given(sessionStore).save(any(), anyLong());
+        given(clock.millis()).willReturn(1_000L);
+        given(matchJobStore.complete(List.of(succeeded), MatchingConstants.STATUS_TTL_SECONDS))
+                .willReturn(1);
 
-        inOrder.verify(timeoutStore).addPending(
-                savedSession.matchId(),
-                1_000L + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
-        );
-        inOrder.verify(userStatusStore).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        inOrder.verify(userStatusStore).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
+        // when
+        List<MatchClaim> completed = matchFoundService.processBatch(List.of(failed, succeeded));
 
+        // then
+        assertThat(completed).containsExactly(succeeded);
+        then(matchJobStore).should().complete(List.of(succeeded), MatchingConstants.STATUS_TTL_SECONDS);
+    }
+
+    @Test
+    @DisplayName("timeout 등록 실패 시 세션을 삭제하고 해당 작업을 PEL에 유지한다")
+    void keepsJobPendingWhenTimeoutRegistrationFails() {
+        // given
+        MatchClaim claim = claim("batch:1", 1L);
+        willThrow(new RuntimeException("timeout failure")).given(timeoutStore).addPending(any(), anyLong());
+
+        // when
+        List<MatchClaim> completed = matchFoundService.processBatch(List.of(claim));
+
+        // then
+        assertThat(completed).isEmpty();
+        then(sessionStore).should().delete(claim.claimId());
+        then(matchJobStore).should(never()).complete(anyList(), anyLong());
+    }
+
+    @Test
+    @DisplayName("batch ACK가 불일치하면 동시 완료 가능성을 고려해 준비 상태를 유지한다")
+    void keepsPreparedStateWhenBatchCannotComplete() {
+        // given
+        List<MatchClaim> claims = List.of(claim("batch:1", 1L), claim("batch:2", 3L));
+        given(clock.millis()).willReturn(1_000L);
+        given(matchJobStore.complete(claims, MatchingConstants.STATUS_TTL_SECONDS)).willReturn(0);
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.processBatch(claims)).isInstanceOf(RuntimeException.class);
+        then(timeoutStore).should(never()).cleanup(any());
+        then(sessionStore).should(never()).delete(any());
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("batch ACK 결과가 불확실하면 PEL recovery를 위해 준비 상태를 유지한다")
+    void keepsPreparedStateWhenCompleteClaimsThrows() {
+        // given
+        List<MatchClaim> claims = List.of(claim("batch:1", 1L));
+        RuntimeException cause = new RuntimeException("redis response lost");
+        given(clock.millis()).willReturn(1_000L);
+        willThrow(cause).given(matchJobStore)
+                .complete(claims, MatchingConstants.STATUS_TTL_SECONDS);
+
+        // when & then
+        assertThatThrownBy(() -> matchFoundService.processBatch(claims)).isSameAs(cause);
+        then(timeoutStore).should(never()).cleanup(any());
+        then(sessionStore).should(never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("이벤트 발행 실패는 확정된 batch를 롤백하지 않는다")
+    void isolatesEventPublicationFailure() {
+        // given
+        List<MatchClaim> claims = List.of(claim("batch:1", 1L));
+        given(clock.millis()).willReturn(1_000L);
+        given(matchJobStore.complete(claims, MatchingConstants.STATUS_TTL_SECONDS)).willReturn(1);
+        willThrow(new RuntimeException("event failure")).given(eventPublisher).publishEvent(any());
+
+        // when & then
+        assertThatCode(() -> matchFoundService.processBatch(claims)).doesNotThrowAnyException();
+        then(matchJobStore).should().complete(claims, MatchingConstants.STATUS_TTL_SECONDS);
+    }
+
+    @Test
+    @DisplayName("이벤트에는 claim ID와 두 사용자 정보가 포함된다")
+    void publishesClaimInformation() {
+        // given
+        MatchClaim claim = claim("batch:1", 1L);
+        given(clock.millis()).willReturn(1_000L);
+        given(matchJobStore.complete(List.of(claim), MatchingConstants.STATUS_TTL_SECONDS))
+                .willReturn(1);
         ArgumentCaptor<MatchFoundEvent> eventCaptor = ArgumentCaptor.forClass(MatchFoundEvent.class);
-        inOrder.verify(eventPublisher).publishEvent(eventCaptor.capture());
-        MatchFoundEvent publishedEvent = eventCaptor.getValue();
 
-        assertThat(publishedEvent.userA()).isEqualTo(1L);
-        assertThat(publishedEvent.userB()).isEqualTo(2L);
-        assertThat(publishedEvent.matchId()).isEqualTo(savedSession.matchId());
-        assertThat(publishedEvent.acceptTimeoutSeconds()).isEqualTo(MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS);
-        verifyNoInteractions(matchQueueStore);
+        // when
+        matchFoundService.processBatch(List.of(claim));
+
+        // then
+        then(eventPublisher).should().publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().matchId()).isEqualTo(claim.claimId());
+        assertThat(eventCaptor.getValue().userA()).isEqualTo(claim.first().userId());
+        assertThat(eventCaptor.getValue().userB()).isEqualTo(claim.second().userId());
     }
 
-    @Test
-    @DisplayName("세션 저장에 실패하면 두 유저를 기존 티켓으로 queue에 복귀시키고 MATCHING 상태로 복구한다")
-    void processWhenSessionSaveFails() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        RuntimeException cause = new RuntimeException("session save failed");
-        doThrow(cause).when(sessionStore).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
-
-        // when & then
-        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
-                .isSameAs(cause);
-
-        ArgumentCaptor<MatchTicket> ticketCaptor = ArgumentCaptor.forClass(MatchTicket.class);
-        verify(matchQueueStore, times(2)).add(ticketCaptor.capture());
-        assertThat(ticketCaptor.getAllValues())
-                .extracting(MatchTicket::userId, MatchTicket::tierScore, MatchTicket::entryTime)
-                .containsExactly(
-                        tuple(userA.userId(), userA.tierScore(), userA.entryTime()),
-                        tuple(userB.userId(), userB.tierScore(), userB.entryTime())
-                );
-        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(sessionStore, never()).delete(any());
-        verify(timeoutStore, never()).addPending(any(), anyLong());
-        verify(timeoutStore, never()).cleanup(any());
-        verify(eventPublisher, never()).publishEvent(any());
-        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-    }
-
-    @Test
-    @DisplayName("세션 저장 실패 보상 중 한 유저 queue 복귀가 실패해도 나머지 보상을 계속 시도한다")
-    void processWhenSessionSaveFailsAndQueueRestorePartiallyFails() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        RuntimeException cause = new RuntimeException("session save failed");
-        doThrow(cause).when(sessionStore).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
-        doThrow(new RuntimeException("queue restore failed")).when(matchQueueStore).add(userA);
-
-        // when & then
-        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
-                .isSameAs(cause);
-
-        verify(matchQueueStore).add(userA);
-        verify(matchQueueStore).add(userB);
-        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-    }
-
-    @Test
-    @DisplayName("세션 저장 실패 보상 중 한 유저 status 복구가 실패해도 나머지 보상을 계속 시도한다")
-    void processWhenSessionSaveFailsAndStatusRestorePartiallyFails() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        RuntimeException cause = new RuntimeException("session save failed");
-        doThrow(cause).when(sessionStore).save(any(MatchSession.class), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
-        doThrow(new RuntimeException("status restore failed"))
-                .when(userStatusStore)
-                .updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-
-        // when & then
-        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
-                .isSameAs(cause);
-
-        verify(matchQueueStore).add(userA);
-        verify(matchQueueStore).add(userB);
-        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-    }
-
-    @Test
-    @DisplayName("timeout pending 등록에 실패하면 저장된 세션을 삭제하고 두 유저를 queue와 MATCHING 상태로 복구한다")
-    void processWhenTimeoutPendingFails() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        RuntimeException cause = new RuntimeException("timeout pending failed");
-        when(clock.millis()).thenReturn(1_000L);
-        doThrow(cause).when(timeoutStore).addPending(any(), anyLong());
-
-        // when & then
-        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
-                .isSameAs(cause);
-
-        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
-        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
-        MatchSession savedSession = sessionCaptor.getValue();
-
-        verify(timeoutStore).addPending(
-                savedSession.matchId(),
-                1_000L + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
+    private MatchClaim claim(String claimId, long firstUserId) {
+        return new MatchClaim(
+                claimId,
+                new MatchTicket(firstUserId, firstUserId * 1_000L),
+                new MatchTicket(firstUserId + 1, (firstUserId + 1) * 1_000L)
         );
-        verify(sessionStore).delete(savedSession.matchId());
-        verify(matchQueueStore).add(userA);
-        verify(matchQueueStore).add(userB);
-        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(timeoutStore, never()).cleanup(any());
-        verify(eventPublisher, never()).publishEvent(any());
-        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-    }
-
-    @Test
-    @DisplayName("timeout pending 등록 실패 보상 중 세션 삭제가 실패해도 queue 복귀와 status 복구를 계속 시도한다")
-    void processWhenTimeoutPendingFailsAndSessionDeleteFails() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        RuntimeException cause = new RuntimeException("timeout pending failed");
-        when(clock.millis()).thenReturn(1_000L);
-        doThrow(cause).when(timeoutStore).addPending(any(), anyLong());
-        doThrow(new RuntimeException("session delete failed")).when(sessionStore).delete(any());
-
-        // when & then
-        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
-                .isSameAs(cause);
-
-        verify(sessionStore).delete(any());
-        verify(matchQueueStore).add(userA);
-        verify(matchQueueStore).add(userB);
-        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(eventPublisher, never()).publishEvent(any());
-    }
-
-    @Test
-    @DisplayName("userA FOUND 갱신에 실패하면 timeout과 세션을 정리하고 두 유저를 queue와 MATCHING 상태로 복구한다")
-    void processWhenUserAFoundStatusFails() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        RuntimeException cause = new RuntimeException("userA found failed");
-        when(clock.millis()).thenReturn(1_000L);
-        doThrow(cause)
-                .when(userStatusStore)
-                .updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-
-        // when & then
-        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
-                .isSameAs(cause);
-
-        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
-        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
-        MatchSession savedSession = sessionCaptor.getValue();
-
-        verify(timeoutStore).cleanup(savedSession.matchId());
-        verify(sessionStore).delete(savedSession.matchId());
-        verify(matchQueueStore).add(userA);
-        verify(matchQueueStore).add(userB);
-        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(eventPublisher, never()).publishEvent(any());
-    }
-
-    @Test
-    @DisplayName("userB FOUND 갱신에 실패하면 userA까지 포함해 두 유저를 queue와 MATCHING 상태로 복구한다")
-    void processWhenUserBFoundStatusFails() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        RuntimeException cause = new RuntimeException("userB found failed");
-        when(clock.millis()).thenReturn(1_000L);
-        doAnswer(invocation -> {
-            Long userId = invocation.getArgument(0, Long.class);
-            MatchStatus status = invocation.getArgument(1, MatchStatus.class);
-            if (userId.equals(2L) && status == MatchStatus.FOUND) {
-                throw cause;
-            }
-            return null;
-        })
-                .when(userStatusStore)
-                .updateStatus(any(Long.class), any(MatchStatus.class), anyLong());
-
-        // when & then
-        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
-                .isSameAs(cause);
-
-        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
-        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
-        MatchSession savedSession = sessionCaptor.getValue();
-
-        verify(userStatusStore).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(timeoutStore).cleanup(savedSession.matchId());
-        verify(sessionStore).delete(savedSession.matchId());
-        verify(matchQueueStore).add(userA);
-        verify(matchQueueStore).add(userB);
-        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(eventPublisher, never()).publishEvent(any());
-    }
-
-    @Test
-    @DisplayName("FOUND 갱신 실패 보상 중 timeout cleanup과 세션 삭제가 실패해도 queue 복귀와 status 복구를 계속 시도한다")
-    void processWhenFoundStatusFailsAndCleanupDeleteFail() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        RuntimeException cause = new RuntimeException("userA found failed");
-        when(clock.millis()).thenReturn(1_000L);
-        doThrow(cause)
-                .when(userStatusStore)
-                .updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        doThrow(new RuntimeException("timeout cleanup failed")).when(timeoutStore).cleanup(any());
-        doThrow(new RuntimeException("session delete failed")).when(sessionStore).delete(any());
-
-        // when & then
-        assertThatThrownBy(() -> matchFoundService.process(userA, userB))
-                .isSameAs(cause);
-
-        verify(timeoutStore).cleanup(any());
-        verify(sessionStore).delete(any());
-        verify(matchQueueStore).add(userA);
-        verify(matchQueueStore).add(userB);
-        verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(eventPublisher, never()).publishEvent(any());
-    }
-
-    @Test
-    @DisplayName("event 발행에 실패해도 session timeout FOUND 상태를 유지하고 queue 복귀를 수행하지 않는다")
-    void processWhenEventPublishFails() {
-        // given
-        MatchTicket userA = new MatchTicket(1L, 10, System.currentTimeMillis());
-        MatchTicket userB = new MatchTicket(2L, 11, System.currentTimeMillis());
-        when(clock.millis()).thenReturn(1_000L);
-        doThrow(new RuntimeException("event publish failed")).when(eventPublisher).publishEvent(any());
-
-        // when & then
-        assertThatCode(() -> matchFoundService.process(userA, userB))
-                .doesNotThrowAnyException();
-
-        ArgumentCaptor<MatchSession> sessionCaptor = ArgumentCaptor.forClass(MatchSession.class);
-        verify(sessionStore).save(sessionCaptor.capture(), eq(MatchingConstants.MATCH_SESSION_TTL_SECONDS));
-        MatchSession savedSession = sessionCaptor.getValue();
-
-        verify(timeoutStore).addPending(
-                savedSession.matchId(),
-                1_000L + MatchingConstants.MATCH_RESPONSE_TIMEOUT_SECONDS * 1000L
-        );
-        verify(userStatusStore).updateStatus(1L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore).updateStatus(2L, MatchStatus.FOUND, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(sessionStore, never()).delete(any());
-        verify(timeoutStore, never()).cleanup(any());
-        verify(matchQueueStore, never()).add(any());
-        verify(userStatusStore, never()).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
-        verify(userStatusStore, never()).updateStatus(2L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
     }
 }

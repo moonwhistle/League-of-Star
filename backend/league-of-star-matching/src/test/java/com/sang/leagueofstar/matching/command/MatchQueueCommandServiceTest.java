@@ -19,12 +19,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class MatchServiceTest {
+class MatchQueueCommandServiceTest {
 
     @Mock
     private MatchQueueStore matchStore;
@@ -40,15 +40,14 @@ class MatchServiceTest {
     void joinQueue_success() {
         // given
         Long userId = 1L;
-        int tierScore = 10;
         given(userStatusStore.setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class))).willReturn(true);
 
         // when
-        matchService.joinQueue(userId, tierScore);
+        matchService.joinQueue(userId);
 
         // then
-        verify(userStatusStore).setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class));
-        verify(matchStore).add(any(MatchTicket.class));
+        then(userStatusStore).should().setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class));
+        then(matchStore).should().add(any(MatchTicket.class));
     }
 
     @Test
@@ -56,14 +55,13 @@ class MatchServiceTest {
     void joinQueue_already_matching() {
         // given
         Long userId = 1L;
-        int tierScore = 10;
         given(userStatusStore.setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class))).willReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> matchService.joinQueue(userId, tierScore))
+        assertThatThrownBy(() -> matchService.joinQueue(userId))
                 .isInstanceOf(MatchingException.class)
                 .hasFieldOrPropertyWithValue("errorCode", MatchingErrorCode.ALREADY_IN_QUEUE);
-        verify(matchStore, never()).add(any(MatchTicket.class));
+        then(matchStore).should(never()).add(any(MatchTicket.class));
     }
 
     @Test
@@ -71,15 +69,14 @@ class MatchServiceTest {
     void joinQueue_queueAddFailed_removeStatus() {
         // given
         Long userId = 1L;
-        int tierScore = 10;
         given(userStatusStore.setStatusIfAbsent(eq(userId), eq(MatchStatus.MATCHING), any(Long.class))).willReturn(true);
-        doThrow(new IllegalStateException("queue add failed")).when(matchStore).add(any(MatchTicket.class));
+        willThrow(new IllegalStateException("queue add failed")).given(matchStore).add(any(MatchTicket.class));
 
         // when & then
-        assertThatThrownBy(() -> matchService.joinQueue(userId, tierScore))
+        assertThatThrownBy(() -> matchService.joinQueue(userId))
                 .isInstanceOf(MatchingException.class)
                 .hasFieldOrPropertyWithValue("errorCode", MatchingErrorCode.MATCH_QUEUE_ADD_ERROR);
-        verify(userStatusStore).removeStatus(userId);
+        then(userStatusStore).should().removeStatus(userId);
     }
 
     @Test
@@ -87,16 +84,15 @@ class MatchServiceTest {
     void leaveQueue_success() {
         // given
         Long userId = 1L;
-        int tierScore = 10;
         given(userStatusStore.getStatus(userId)).willReturn(Optional.of(MatchStatus.MATCHING));
-        given(matchStore.remove(userId, tierScore)).willReturn(true);
+        given(matchStore.remove(userId)).willReturn(true);
 
         // when
-        matchService.leaveQueue(userId, tierScore);
+        matchService.leaveQueue(userId);
 
         // then
-        verify(matchStore).remove(userId, tierScore);
-        verify(userStatusStore).removeStatus(userId);
+        then(matchStore).should().remove(userId);
+        then(userStatusStore).should().removeStatus(userId);
     }
 
     @Test
@@ -104,11 +100,10 @@ class MatchServiceTest {
     void leaveQueue_not_in_queue() {
         // given
         Long userId = 1L;
-        int tierScore = 10;
         given(userStatusStore.getStatus(userId)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> matchService.leaveQueue(userId, tierScore))
+        assertThatThrownBy(() -> matchService.leaveQueue(userId))
                 .isInstanceOf(MatchingException.class)
                 .hasFieldOrPropertyWithValue("errorCode", MatchingErrorCode.NOT_IN_QUEUE);
     }
@@ -118,12 +113,11 @@ class MatchServiceTest {
     void leaveQueue_already_picked_by_engine() {
         // given
         Long userId = 1L;
-        int tierScore = 10;
         given(userStatusStore.getStatus(userId)).willReturn(Optional.of(MatchStatus.MATCHING));
-        given(matchStore.remove(userId, tierScore)).willReturn(false);
+        given(matchStore.remove(userId)).willReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> matchService.leaveQueue(userId, tierScore))
+        assertThatThrownBy(() -> matchService.leaveQueue(userId))
                 .isInstanceOf(MatchingException.class)
                 .hasFieldOrPropertyWithValue("errorCode", MatchingErrorCode.NOT_IN_QUEUE);
     }

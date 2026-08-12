@@ -410,7 +410,6 @@ class MatchResponseResultServiceTest {
         verify(matchStore).add(ticketCaptor.capture());
         MatchTicket ticket = ticketCaptor.getValue();
         assertThat(ticket.userId()).isEqualTo(1L);
-        assertThat(ticket.tierScore()).isEqualTo(10);
         assertThat(ticket.entryTime()).isEqualTo(1000L);
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).removeStatus(2L);
@@ -462,7 +461,6 @@ class MatchResponseResultServiceTest {
         verify(matchStore).add(ticketCaptor.capture());
         MatchTicket ticket = ticketCaptor.getValue();
         assertThat(ticket.userId()).isEqualTo(1L);
-        assertThat(ticket.tierScore()).isEqualTo(10);
         assertThat(ticket.entryTime()).isEqualTo(1000L);
         verify(userStatusStore).updateStatus(1L, MatchStatus.MATCHING, MatchingConstants.STATUS_TTL_SECONDS);
         verify(userStatusStore).removeStatus(2L);
@@ -595,12 +593,10 @@ class MatchResponseResultServiceTest {
 
     private MatchSession foundSession() {
         return new MatchSession(
-                "match-1",
-                1L,
-                2L,
-                10,
-                11,
-                1000L,
+                  "match-1",
+                  1L,
+                  2L,
+                  1000L,
                 2000L,
                 MatchStatus.FOUND,
                 3000L,

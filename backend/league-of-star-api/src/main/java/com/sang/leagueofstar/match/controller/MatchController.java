@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 매칭 대기열 진입/취소 API를 제공하는 컨트롤러입니다.
  *
  * <p>인증된 유저의 ID만 추출하여 {@link MatchQueueService}에 위임합니다.
- * 티어 조회 등의 부가 로직은 서비스 레이어에서 처리합니다.
+ * 진행 중 게임 검증 등의 부가 로직은 서비스 레이어에서 처리합니다.
  */
 @RestController
 @RequestMapping(MatchPath.MATCH_BASE)

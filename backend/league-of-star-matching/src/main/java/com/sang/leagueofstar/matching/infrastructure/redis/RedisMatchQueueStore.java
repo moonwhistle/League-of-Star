@@ -1,19 +1,16 @@
 package com.sang.leagueofstar.matching.infrastructure.redis;
 
-import com.sang.leagueofstar.matching.common.exception.MatchingErrorCode;
 import com.sang.leagueofstar.domain.match.domain.MatchTicket;
 import com.sang.leagueofstar.matching.common.constant.MatchingConstants;
+import com.sang.leagueofstar.matching.common.exception.MatchingErrorCode;
 import com.sang.leagueofstar.matching.common.exception.MatchingException;
 import com.sang.leagueofstar.matching.repository.MatchQueueStore;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RBatch;
-import org.redisson.api.RFuture;
 import org.redisson.api.RScoredSortedSet;
-import org.redisson.api.RScoredSortedSetAsync;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 import org.redisson.client.protocol.ScoredEntry;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Repository;
@@ -24,112 +21,73 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 /**
- * Redis 기반의 매칭 대기열 저장소 구현체입니다.
- * 티어별 분할 ZSET 구조를 사용하여 성능과 확장성을 보장합니다.
+ * 대기 시작 시각을 score로 사용하는 Redis ZSET FIFO 대기열입니다.
  */
-@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class RedisMatchQueueStore implements MatchQueueStore {
 
     private final RedissonClient redissonClient;
-    private String atomicRemoveScript;
+    private String enqueueMatchJobsScript;
 
     @PostConstruct
     public void init() {
-        this.atomicRemoveScript = loadLuaScript();
+        enqueueMatchJobsScript = loadLuaScript(MatchingConstants.ENQUEUE_MATCH_JOBS_LUA_SCRIPT_PATH);
     }
 
     @Override
     public void add(MatchTicket ticket) {
-        String key = getQueueKey(ticket.tierScore());
-        RScoredSortedSet<Long> queue = redissonClient.getScoredSortedSet(key);
-        queue.add(ticket.entryTime(), ticket.userId());
+        queue().add(ticket.entryTime(), String.valueOf(ticket.userId()));
     }
 
     @Override
-    public boolean remove(Long userId, int tierScore) {
-        String key = getQueueKey(tierScore);
-        RScoredSortedSet<Long> queue = redissonClient.getScoredSortedSet(key);
-        return queue.remove(userId);
+    public boolean remove(Long userId) {
+        return queue().remove(String.valueOf(userId));
     }
 
     @Override
     public List<MatchTicket> findAll() {
-        RBatch batch = redissonClient.createBatch();
-        List<RFuture<Collection<ScoredEntry<Long>>>> futures = new ArrayList<>();
-
-        // 파이프라이닝으로 모든 티어 큐를 한 번에 조회
-        for (int i = MatchingConstants.TIER_SCORE_MIN; i <= MatchingConstants.TIER_SCORE_MAX; i++) {
-            String key = getQueueKey(i);
-            RScoredSortedSetAsync<Long> queue = batch.getScoredSortedSet(key);
-            futures.add(queue.entryRangeAsync(0, -1));
+        Collection<ScoredEntry<String>> entries = queue().entryRange(0, -1);
+        List<MatchTicket> tickets = new ArrayList<>(entries.size());
+        for (ScoredEntry<String> entry : entries) {
+            tickets.add(new MatchTicket(Long.valueOf(entry.getValue()), entry.getScore().longValue()));
         }
-
-        batch.execute();
-
-        List<MatchTicket> allTickets = new ArrayList<>();
-        for (int i = 0; i < futures.size(); i++) {
-            int tierScore = MatchingConstants.TIER_SCORE_MIN + i;
-            try {
-                Collection<ScoredEntry<Long>> entries = futures.get(i).get();
-                for (ScoredEntry<Long> entry : entries) {
-                    allTickets.add(new MatchTicket(
-                            entry.getValue(), 
-                            tierScore, 
-                            entry.getScore().longValue()
-                    ));
-                }
-            } catch (InterruptedException e) {
-                // 스레드 인터럽트 상태를 복원한 뒤 예외를 전파
-                Thread.currentThread().interrupt();
-                throw new MatchingException(MatchingErrorCode.MATCH_REDIS_FETCH_ERROR);
-            } catch (ExecutionException e) {
-                // Redis 작업 자체의 실패 원인(네트워크 오류, 타임아웃 등) 로그
-                // interrupt() 호출은 무관하므로 제거
-                log.error("Redis batch fetch failed for tierScore={}, cause={}", tierScore, e.getCause().toString());
-                throw new MatchingException(MatchingErrorCode.MATCH_REDIS_FETCH_ERROR);
-            }
-        }
-        return allTickets;
+        return tickets;
     }
 
     @Override
-    public int countByTierScore(int tierScore) {
-        String key = getQueueKey(tierScore);
-        RScoredSortedSet<Long> queue = redissonClient.getScoredSortedSet(key);
-        return queue.size();
+    public int count() {
+        return queue().size();
     }
 
     @Override
-    public boolean atomicPairRemove(Long userAId, int tierAScore, Long userBId, int tierBScore) {
-        List<Object> keys = List.of(getQueueKey(tierAScore), getQueueKey(tierBScore));
-        
-        Long result = redissonClient.getScript().eval(
+    public int enqueueOldestMatches(int maxUsers) {
+        validateBatchSize(maxUsers);
+        Long result = redissonClient.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
-                atomicRemoveScript,
+                enqueueMatchJobsScript,
                 RScript.ReturnType.INTEGER,
-                keys,
-                userAId, userBId
+                List.of(MatchingConstants.QUEUE_KEY, MatchingConstants.MATCH_JOB_STREAM_KEY),
+                maxUsers
         );
-        
-        return result != null && result == 1L;
+        return result == null ? 0 : result.intValue();
     }
 
-    private String getQueueKey(int tierScore) {
-        return MatchingConstants.QUEUE_KEY_PREFIX + tierScore;
+    private void validateBatchSize(int maxUsers) {
+        if (maxUsers < 2 || maxUsers % 2 != 0) {
+            throw new IllegalArgumentException("maxUsers must be an even number greater than or equal to 2");
+        }
     }
 
-    private String loadLuaScript() {
-        // [Fail-Fast 설계 의도]
-        // Lua 스크립트 없이는 원자적 페어 제거가 불가능하여 데이터 정합성을 보장할 수 없습니다.
-        // 따라서 스크립트 파일이 없으면 애플리케이션 시작 자체를 막는 것이 올바른 동작입니다.
-        // 폴백(Fallback) 로직은 의도적으로 제공하지 않습니다.
+    private RScoredSortedSet<String> queue() {
+        return redissonClient.getScoredSortedSet(MatchingConstants.QUEUE_KEY, StringCodec.INSTANCE);
+    }
+
+    private String loadLuaScript(String path) {
         try {
-            ClassPathResource resource = new ClassPathResource(MatchingConstants.LUA_SCRIPT_PATH);
+            ClassPathResource resource = new ClassPathResource(path);
             return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new MatchingException(MatchingErrorCode.MATCH_LUA_SCRIPT_ERROR);
