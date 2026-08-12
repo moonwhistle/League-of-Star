@@ -10,6 +10,7 @@ This directory owns the reverse proxy configuration for two API containers.
 | Match notification SSE | `least_conn`, buffering disabled | Keep the long-lived event stream responsive |
 | `/ws/game/{gameRoomId}` | Consistent hash by `gameRoomId` | Keep both game participants in one in-memory session registry |
 | `/ws/custom-games/rooms/{roomId}` | Consistent hash by `roomId` | Keep custom-room participants in one in-memory session registry |
+| `/actuator`, `/actuator/**` | `404`, not proxied | Keep internal metrics and management endpoints off the public entry point |
 
 Query parameters are not part of the affinity key. For example, every request to
 `/ws/game/100` is routed to the same API instance even when authentication query
@@ -25,6 +26,10 @@ The Docker network must resolve these names:
 Both API containers and Nginx must join the same Docker network. The production
 Compose issue will mount or build this configuration and expose only Nginx to the
 host.
+
+`worker_connections` is set to 16,384 because each proxied long-lived connection
+uses one client connection and one upstream connection. The container open-file
+limit must remain at least 16,384 in the production Compose configuration.
 
 ## Failure behavior
 
