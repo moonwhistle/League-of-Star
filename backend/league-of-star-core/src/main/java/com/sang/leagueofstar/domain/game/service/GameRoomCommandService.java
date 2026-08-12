@@ -7,8 +7,10 @@ import com.sang.leagueofstar.domain.game.domain.GameRoom;
 import com.sang.leagueofstar.domain.game.domain.vo.GameMode;
 import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameScenario;
+import com.sang.leagueofstar.domain.game.event.GameFinishedEvent;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ public class GameRoomCommandService {
 
     private final GameRoomRepository gameRoomRepository;
     private final GameScenarioGenerator gameScenarioGenerator;
+    private final ApplicationEventPublisher eventPublisher;
 
     public GameRoom createReadyRoom(Long firstUserId, Long secondUserId) {
         validateParticipants(firstUserId, secondUserId);
@@ -137,6 +140,7 @@ public class GameRoomCommandService {
                 .filter(gameRoom -> gameRoom.getStatus().isInProgress())
                 .map(gameRoom -> {
                     gameRoom.finish(resolveWinResult(gameRoom, winnerUserId), winnerUserId);
+                    publishGameFinished(gameRoom);
                     return gameRoom;
                 });
     }
@@ -147,6 +151,7 @@ public class GameRoomCommandService {
                 .map(gameRoom -> {
                     validateCompleteMatchParticipants(gameRoom);
                     gameRoom.finish(GameResult.DRAW, null);
+                    publishGameFinished(gameRoom);
                     return gameRoom;
                 });
     }
@@ -157,8 +162,15 @@ public class GameRoomCommandService {
                 .map(gameRoom -> {
                     validateExpectedParticipants(gameRoom);
                     gameRoom.finish(GameResult.DRAW, null);
+                    publishGameFinished(gameRoom);
                     return gameRoom;
                 });
+    }
+
+    private void publishGameFinished(GameRoom gameRoom) {
+        if (!gameRoom.isPracticeMode()) {
+            eventPublisher.publishEvent(GameFinishedEvent.create(gameRoom.getId()));
+        }
     }
 
     private void validateLightningJudgementRoom(GameRoom gameRoom, Long userId) {

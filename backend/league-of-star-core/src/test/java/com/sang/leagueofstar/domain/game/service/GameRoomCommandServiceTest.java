@@ -10,6 +10,7 @@ import com.sang.leagueofstar.domain.game.domain.vo.GameResult;
 import com.sang.leagueofstar.domain.game.domain.vo.GameStatus;
 import com.sang.leagueofstar.domain.game.domain.vo.HpStep;
 import com.sang.leagueofstar.domain.game.domain.vo.ParticipantStatus;
+import com.sang.leagueofstar.domain.game.event.GameFinishedEvent;
 import com.sang.leagueofstar.domain.game.repository.GameRoomRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,6 +32,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class GameRoomCommandServiceTest {
@@ -52,6 +55,9 @@ class GameRoomCommandServiceTest {
 
     @Mock
     private GameScenarioGenerator gameScenarioGenerator;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Test
     @DisplayName("createReadyRoom - READY 상태의 게임룸과 참가자 2명을 저장한다")
@@ -506,6 +512,7 @@ class GameRoomCommandServiceTest {
     void finishInProgressRoomByLightningKill_FirstParticipant() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .id(100L)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -523,6 +530,10 @@ class GameRoomCommandServiceTest {
         assertThat(gameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.FINISHED);
+        ArgumentCaptor<GameFinishedEvent> eventCaptor = ArgumentCaptor.forClass(GameFinishedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().gameRoomId()).isEqualTo(100L);
+        assertThat(eventCaptor.getValue().eventId()).isNotBlank();
     }
 
     @Test
@@ -530,6 +541,7 @@ class GameRoomCommandServiceTest {
     void finishInProgressRoomByLightningKill_SecondParticipant() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .id(100L)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -544,6 +556,7 @@ class GameRoomCommandServiceTest {
         assertThat(gameRoom.getStatus()).isEqualTo(GameStatus.FINISHED);
         assertThat(gameRoom.getResult()).isEqualTo(GameResult.PLAYER2_WIN);
         assertThat(gameRoom.getWinnerId()).isEqualTo(SECOND_USER_ID);
+        verifyGameFinishedEvent(100L);
     }
 
     @Test
@@ -568,6 +581,7 @@ class GameRoomCommandServiceTest {
         assertThat(gameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.FINISHED);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -593,6 +607,7 @@ class GameRoomCommandServiceTest {
     void finishInProgressRoomByBothLightningsUsedDraw_InProgress() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .id(100L)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -610,6 +625,7 @@ class GameRoomCommandServiceTest {
         assertThat(gameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.FINISHED);
+        verifyGameFinishedEvent(100L);
     }
 
     @Test
@@ -635,6 +651,7 @@ class GameRoomCommandServiceTest {
     void finishInProgressRoomByNaturalDeathDraw_InProgress() {
         // given
         GameRoom gameRoom = GameRoom.builder()
+                .id(100L)
                 .build();
         gameRoom.addParticipant(FIRST_USER_ID);
         gameRoom.addParticipant(SECOND_USER_ID);
@@ -652,6 +669,7 @@ class GameRoomCommandServiceTest {
         assertThat(gameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.FINISHED);
+        verifyGameFinishedEvent(100L);
     }
 
     @Test
@@ -676,6 +694,7 @@ class GameRoomCommandServiceTest {
         assertThat(gameRoom.getParticipants())
                 .extracting(GameParticipant::getStatus)
                 .containsOnly(ParticipantStatus.FINISHED);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -733,5 +752,12 @@ class GameRoomCommandServiceTest {
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    private void verifyGameFinishedEvent(Long gameRoomId) {
+        ArgumentCaptor<GameFinishedEvent> eventCaptor = ArgumentCaptor.forClass(GameFinishedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().gameRoomId()).isEqualTo(gameRoomId);
+        assertThat(eventCaptor.getValue().eventId()).isNotBlank();
     }
 }
