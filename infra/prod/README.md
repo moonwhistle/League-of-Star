@@ -46,3 +46,30 @@ docker compose --env-file .env -f compose.yml down
 The initial deployment uses Hibernate `ddl-auto=update` because this repository
 does not yet contain a schema migration tool. Introduce Flyway before changing
 `SPRING_JPA_HIBERNATE_DDL_AUTO` to `validate`.
+
+## GitHub Actions deployment
+
+`.github/workflows/backend-cd.yml` deploys the production stack when `main`
+changes under `backend/**` or `infra/prod/**`. It can also be run manually from
+the GitHub Actions tab.
+
+Required GitHub Secrets:
+
+| Secret | Description |
+| --- | --- |
+| `EC2_HOST` | EC2 public IP or DNS name |
+| `EC2_USER` | SSH user, for example `ubuntu` |
+| `EC2_SSH_KEY` | Private key allowed to SSH into the EC2 instance |
+| `EC2_DEPLOY_PATH` | Absolute repository path on EC2 |
+| `EC2_PORT` | SSH port. Optional when the port is `22` |
+
+Optional GitHub Variables:
+
+| Variable | Description |
+| --- | --- |
+| `PROD_HEALTH_CHECK_URL` | Health check URL. Defaults to `http://EC2_HOST/nginx-health` |
+
+Before enabling deployment, prepare the EC2 instance with Docker, Docker
+Compose, Git, a checked out copy of this repository, and `infra/prod/.env`. The
+workflow resets the EC2 checkout to `origin/main` and then runs
+`infra/prod/start.sh`.
