@@ -1,0 +1,119 @@
+name: Backend CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'infra/prod/**'
+      - '.github/workflows/backend-cd.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant Gradle permission
+        run: chmod +x gradlew
+
+      - name: Run backend build
+        run: ./gradlew build --build-cache --parallel
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/**/build/test-results/test/**
+            backend/**/build/reports/tests/test/**
+          if-no-files-found: ignore
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    environment: production
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_PORT: ${{ secrets.EC2_PORT || '22' }}
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      EC2_DEPLOY_PATH: ${{ secrets.EC2_DEPLOY_PATH }}
+      DEPLOY_BRANCH: main
+      HEALTH_CHECK_URL: ${{ vars.PROD_HEALTH_CHECK_URL }}
+
+    steps:
+      - name: Validate deployment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${EC2_HOST:?Missing EC2_HOST secret}"
+          : "${EC2_USER:?Missing EC2_USER secret}"
+          : "${EC2_PORT:?Missing EC2_PORT secret or default}"
+          : "${EC2_SSH_KEY:?Missing EC2_SSH_KEY secret}"
+          : "${EC2_DEPLOY_PATH:?Missing EC2_DEPLOY_PATH secret}"
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$EC2_PORT" -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy on EC2
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf -v deploy_path_q '%q' "$EC2_DEPLOY_PATH"
+          printf -v deploy_branch_q '%q' "$DEPLOY_BRANCH"
+
+          ssh -i ~/.ssh/deploy_key -p "$EC2_PORT" "$EC2_USER@$EC2_HOST" \
+            "DEPLOY_PATH=$deploy_path_q DEPLOY_BRANCH=$deploy_branch_q bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          cd "$DEPLOY_PATH"
+          git fetch origin "$DEPLOY_BRANCH"
+          git checkout "$DEPLOY_BRANCH"
+          git reset --hard "origin/$DEPLOY_BRANCH"
+
+          chmod +x infra/prod/start.sh
+          ./infra/prod/start.sh
+          REMOTE
+
+      - name: Check production health
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$HEALTH_CHECK_URL" ]; then
+            HEALTH_CHECK_URL="http://$EC2_HOST/nginx-health"
+          fi
+
+          curl --fail --silent --show-error \
+            --retry 10 \
+            --retry-delay 3 \
+            --retry-connrefused \
+            "$HEALTH_CHECK_URL"
