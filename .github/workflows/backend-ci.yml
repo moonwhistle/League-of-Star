@@ -7,44 +7,87 @@ on:
       - main
     paths:
       - 'backend/**'
+      - 'infra/local/**'
+      - 'infra/prod/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  workflow-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        run: docker run --rm -v "${{ github.workspace }}:/repo" -w /repo rhysd/actionlint:1.7.7
+
+  compose-config:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Validate local infrastructure compose
+        run: docker compose -f infra/local/docker-compose-infra.yml config --quiet
+
+      - name: Validate local app compose
+        run: docker compose -f infra/local/docker-compose-app.yml config --quiet
+
+      - name: Validate local monitoring compose
+        run: docker compose -f infra/local/docker-compose-monitoring.yml config --quiet
+
+      - name: Validate production compose
+        env:
+          HTTP_PORT: 8088
+          PUBLIC_API_URL: http://localhost:8088
+          FRONTEND_URL: http://localhost:3000
+          MYSQL_DATABASE: league_of_star
+          MYSQL_USER: league_of_star
+          MYSQL_PASSWORD: dummy-mysql-password
+          MYSQL_ROOT_PASSWORD: dummy-root-password
+          SPRING_JPA_HIBERNATE_DDL_AUTO: update
+          REDIS_PASSWORD: dummy-redis-password
+          JWT_SECRET: dummy-jwt-secret-dummy-jwt-secret-dummy-jwt-secret
+          JWT_ACCESS_TOKEN_EXPIRATION_MS: 3600000
+          JWT_REFRESH_TOKEN_EXPIRATION_MS: 604800000
+          GOOGLE_CLIENT_ID: dummy-google-client-id
+          GOOGLE_CLIENT_SECRET: dummy-google-client-secret
+          MAIL_HOST: smtp.gmail.com
+          MAIL_PORT: 587
+          MAIL_USERNAME: dummy@example.com
+          MAIL_PASSWORD: dummy-mail-password
+        run: docker compose -f infra/prod/compose.yml config --quiet
+
+  test:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
 
     steps:
-      - name: 소스 체크아웃
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: JDK 17 설정
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: gradle
 
-      - name: Gradle 캐시
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('backend/**/*.gradle*', 'backend/**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Gradle 실행 권한 부여
+      - name: Grant Gradle permission
         run: chmod +x gradlew
 
-      - name: 빌드 및 테스트
+      - name: Run backend build
         run: ./gradlew build --build-cache --parallel
 
-      - name: 테스트 리포트 업로드
+      - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
